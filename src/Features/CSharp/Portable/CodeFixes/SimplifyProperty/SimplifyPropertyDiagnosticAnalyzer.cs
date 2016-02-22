@@ -103,9 +103,22 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.SimplifyProperty
 
         private bool HasAnyNonWhitespaceTrivia(AccessorDeclarationSyntax accessor)
         {
-            return accessor.DescendantTrivia().Any(t => 
-                !t.IsKind(SyntaxKind.WhitespaceTrivia) &&
-                !t.IsKind(SyntaxKind.EndOfLineTrivia));
+            return accessor.DescendantTrivia().Any(t =>
+            {
+                if (!t.IsKind(SyntaxKind.WhitespaceTrivia) &&
+                    !t.IsKind(SyntaxKind.EndOfLineTrivia))
+                {
+                    // Allow trivia on the semicolon in the return statement.
+                    // We're going to move that to our final property, so 
+                    // we'll still preserve that trivia.
+                    if (t.Token.Kind() != SyntaxKind.SemicolonToken)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
         }
     }
 }

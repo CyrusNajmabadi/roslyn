@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Roslyn.Utilities;
@@ -35,11 +36,13 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.SimplifyProperty
             var propertyDeclaration = (PropertyDeclarationSyntax)root.FindNode(context.Span);
 
             var returnStatement = (ReturnStatementSyntax)propertyDeclaration.AccessorList.Accessors[0].Body.Statements[0];
+            var semicolonToken = returnStatement.SemicolonToken.WithTrailingTrivia(
+                returnStatement.SemicolonToken.TrailingTrivia.Where(t => t.Kind() != SyntaxKind.EndOfLineTrivia));
             var newPropertyDeclaration = propertyDeclaration
                 .WithAccessorList(null)
                 .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(returnStatement.Expression))
-                .WithSemicolonToken(returnStatement.SemicolonToken)
-                .WithTrailingTrivia(propertyDeclaration.AccessorList.GetTrailingTrivia());
+                .WithSemicolonToken(semicolonToken)
+                .WithAppendedTrailingTrivia(propertyDeclaration.AccessorList.GetTrailingTrivia());
 
             var newDocument = context.Document.WithSyntaxRoot(root.ReplaceNode(
                 propertyDeclaration, newPropertyDeclaration));
