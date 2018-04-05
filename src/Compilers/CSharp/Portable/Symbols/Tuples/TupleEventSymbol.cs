@@ -34,7 +34,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        public override Symbol ContainingSymbol
+        internal override NamedTypeSymbol ContainingSymbolCore
         {
             get
             {

@@ -444,6 +444,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
+        public sealed override Symbol ContainingSymbol => ContainingSymbolCore;
+
+        internal abstract NamedTypeSymbol ContainingSymbolCore { get; }
+
         #region IFieldSymbol Members
 
         ISymbol IFieldSymbol.AssociatedSymbol
@@ -476,6 +480,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get { return this.CorrespondingTupleField; }
         }
+
+        INamedTypeSymbol IFieldSymbol.ContainingSymbol => ContainingSymbolCore;
 
         #endregion
 

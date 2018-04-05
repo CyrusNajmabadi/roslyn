@@ -90,7 +90,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        public sealed override Symbol ContainingSymbol
+        internal sealed override NamedTypeSymbol ContainingSymbolCore
         {
             get
             {

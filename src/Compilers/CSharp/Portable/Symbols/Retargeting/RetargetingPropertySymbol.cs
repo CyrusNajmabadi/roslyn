@@ -204,11 +204,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
             return builder.ToImmutableAndFree();
         }
 
-        public override Symbol ContainingSymbol
+        internal override NamedTypeSymbol ContainingSymbolCore
         {
             get
             {
-                return this.RetargetingTranslator.Retarget(_underlyingProperty.ContainingSymbol);
+                return (NamedTypeSymbol)this.RetargetingTranslator.Retarget(_underlyingProperty.ContainingSymbolCore);
             }
         }
 

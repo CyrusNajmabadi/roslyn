@@ -73,11 +73,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
             }
         }
 
-        public override Symbol ContainingSymbol
+        internal override NamedTypeSymbol ContainingSymbolCore
         {
             get
             {
-                return this.RetargetingTranslator.Retarget(_underlyingField.ContainingSymbol);
+                return (NamedTypeSymbol)this.RetargetingTranslator.Retarget(_underlyingField.ContainingSymbolCore);
             }
         }
 

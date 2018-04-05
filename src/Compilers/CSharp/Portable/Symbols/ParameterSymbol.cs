@@ -420,6 +420,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get { return this.OriginalDefinition; }
         }
+
         #endregion
 
         #region ISymbol Members

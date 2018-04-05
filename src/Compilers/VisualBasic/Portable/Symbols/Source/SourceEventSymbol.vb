@@ -413,7 +413,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Function
 
-        Public Overrides ReadOnly Property ContainingSymbol As Symbol
+        Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
             Get
                 Return _containingType
             End Get

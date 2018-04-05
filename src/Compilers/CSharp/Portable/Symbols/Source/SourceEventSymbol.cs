@@ -80,7 +80,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         public override abstract TypeSymbol Type { get; }
 
-        public sealed override Symbol ContainingSymbol
+        internal override NamedTypeSymbol ContainingSymbolCore
         {
             get
             {

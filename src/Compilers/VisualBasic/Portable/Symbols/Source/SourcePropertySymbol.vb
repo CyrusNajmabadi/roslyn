@@ -418,7 +418,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Debug.Assert(old Is Nothing OrElse old = metadataName)
         End Sub
 
-        Public Overrides ReadOnly Property ContainingSymbol As Symbol
+        Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
             Get
                 Return _containingType
             End Get

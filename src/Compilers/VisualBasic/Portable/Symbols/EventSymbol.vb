@@ -245,6 +245,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 #End Region
 
+        Public NotOverridable Overrides ReadOnly Property ContainingSymbol As Symbol
+            Get
+                Return ContainingSymbolCore
+            End Get
+        End Property
+
+        Friend MustOverride ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
+
         Friend Overrides ReadOnly Property EmbeddedSymbolKind As EmbeddedSymbolKind
             Get
                 Return Me.ContainingSymbol.EmbeddedSymbolKind
@@ -309,6 +317,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property IEventSymbol_ExplicitInterfaceImplementations As ImmutableArray(Of IEventSymbol) Implements IEventSymbol.ExplicitInterfaceImplementations
             Get
                 Return StaticCast(Of IEventSymbol).From(Me.ExplicitInterfaceImplementations)
+            End Get
+        End Property
+
+        Private ReadOnly Property IEventSymbol_ContainingSymbol As INamedTypeSymbol Implements IEventSymbol.ContainingSymbol
+            Get
+                Return ContainingSymbolCore
             End Get
         End Property
 

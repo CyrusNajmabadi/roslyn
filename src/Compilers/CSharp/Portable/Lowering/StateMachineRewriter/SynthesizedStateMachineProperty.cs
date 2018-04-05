@@ -101,9 +101,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return ImmutableArray.Create(ImplementedProperty); }
         }
 
-        public override Symbol ContainingSymbol
+        internal override NamedTypeSymbol ContainingSymbolCore
         {
-            get { return _getter.ContainingSymbol; }
+            get { return _getter.StateMachineType; }
         }
 
         public override ImmutableArray<Location> Locations

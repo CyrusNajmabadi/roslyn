@@ -17,7 +17,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
     internal sealed class SignatureOnlyPropertySymbol : PropertySymbol
     {
         private readonly string _name;
-        private readonly TypeSymbol _containingType;
+        private readonly NamedTypeSymbol _containingType;
         private readonly ImmutableArray<ParameterSymbol> _parameters;
         private readonly RefKind _refKind;
         private readonly TypeSymbol _type;
@@ -28,7 +28,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         public SignatureOnlyPropertySymbol(
             string name,
-            TypeSymbol containingType,
+            NamedTypeSymbol containingType,
             ImmutableArray<ParameterSymbol> parameters,
             RefKind refKind,
             TypeSymbol type,
@@ -62,7 +62,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         public override ImmutableArray<PropertySymbol> ExplicitInterfaceImplementations { get { return _explicitInterfaceImplementations; } }
 
-        public override Symbol ContainingSymbol { get { return _containingType; } }
+        internal override NamedTypeSymbol ContainingSymbolCore { get { return _containingType; } }
 
         public override string Name { get { return _name; } }
 

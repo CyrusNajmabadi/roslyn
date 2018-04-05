@@ -72,9 +72,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return LexicalSortKey.NotInSource
         End Function
 
-        Public Overrides ReadOnly Property ContainingSymbol As Symbol
+        Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
             Get
-                Return _field.ContainingSymbol
+                Return _field.ContainingSymbolCore
             End Get
         End Property
 

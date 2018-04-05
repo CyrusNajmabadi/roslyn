@@ -1689,7 +1689,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
-                Public Overrides ReadOnly Property ContainingSymbol As Symbol
+                Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
                     Get
                         Return _interface
                     End Get

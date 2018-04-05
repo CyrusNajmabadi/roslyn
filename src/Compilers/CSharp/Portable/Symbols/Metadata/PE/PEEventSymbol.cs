@@ -203,7 +203,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             }
         }
 
-        public override Symbol ContainingSymbol
+        internal override NamedTypeSymbol ContainingSymbolCore
         {
             get
             {

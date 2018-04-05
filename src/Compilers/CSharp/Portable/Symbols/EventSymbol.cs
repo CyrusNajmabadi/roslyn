@@ -331,6 +331,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
+        public sealed override Symbol ContainingSymbol => ContainingSymbolCore;
+
+        internal abstract NamedTypeSymbol ContainingSymbolCore { get; }
+
         #region IEventSymbol Members
 
         ITypeSymbol IEventSymbol.Type
@@ -389,6 +393,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 return this.ExplicitInterfaceImplementations.Cast<EventSymbol, IEventSymbol>();
             }
         }
+
+        INamedTypeSymbol IEventSymbol.ContainingSymbol => ContainingSymbolCore;
 
         #endregion
 

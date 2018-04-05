@@ -463,6 +463,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend MustOverride Overrides ReadOnly Property IsMyGroupCollectionProperty As Boolean
 
+        Public NotOverridable Overrides ReadOnly Property ContainingSymbol As Symbol
+            Get
+                Return ContainingSymbolCore
+            End Get
+        End Property
+
+        Friend MustOverride ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
+
 #Region "IPropertySymbol"
 
         Private ReadOnly Property IPropertySymbol_ExplicitInterfaceImplementations As ImmutableArray(Of IPropertySymbol) Implements IPropertySymbol.ExplicitInterfaceImplementations
@@ -552,6 +560,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overrides Function Accept(Of TResult)(visitor As VisualBasicSymbolVisitor(Of TResult)) As TResult
             Return visitor.VisitProperty(Me)
         End Function
+
+        Private ReadOnly Property IPropertySymbol_ContainingSymbol As INamedTypeSymbol Implements IPropertySymbol.ContainingSymbol
+            Get
+                Return ContainingSymbolCore
+            End Get
+        End Property
 
 #End Region
 

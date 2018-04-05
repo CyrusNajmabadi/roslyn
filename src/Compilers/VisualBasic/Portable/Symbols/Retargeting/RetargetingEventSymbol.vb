@@ -63,9 +63,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
             End Get
         End Property
 
-        Public Overrides ReadOnly Property ContainingSymbol As Symbol
+        Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
             Get
-                Return RetargetingTranslator.Retarget(_underlyingEvent.ContainingSymbol)
+                Return DirectCast(RetargetingTranslator.Retarget(_underlyingEvent.ContainingSymbolCore), NamedTypeSymbol)
             End Get
         End Property
 

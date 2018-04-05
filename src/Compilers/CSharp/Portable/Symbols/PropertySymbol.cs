@@ -418,6 +418,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
+        public sealed override Symbol ContainingSymbol => ContainingSymbolCore;
+
+        internal abstract NamedTypeSymbol ContainingSymbolCore { get; }
+
         #region IPropertySymbol Members
 
         bool IPropertySymbol.IsIndexer
@@ -484,6 +488,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get { return this.RefCustomModifiers; }
         }
+
+        INamedTypeSymbol IPropertySymbol.ContainingSymbol => ContainingSymbolCore;
 
         #endregion
 

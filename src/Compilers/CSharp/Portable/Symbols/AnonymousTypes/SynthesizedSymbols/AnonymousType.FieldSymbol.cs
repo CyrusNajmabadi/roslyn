@@ -96,7 +96,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 return null;
             }
 
-            public override Symbol ContainingSymbol
+            internal override NamedTypeSymbol ContainingSymbolCore
             {
                 get { return _property.ContainingType; }
             }

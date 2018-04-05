@@ -1566,9 +1566,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Public Overrides ReadOnly Property ContainingSymbol As Symbol
+        Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
             Get
-                Return _originalDefinition.ContainingSymbol
+                Return _originalDefinition.ContainingSymbolCore
             End Get
         End Property
 

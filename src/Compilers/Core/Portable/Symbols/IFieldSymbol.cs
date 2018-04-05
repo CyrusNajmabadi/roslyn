@@ -77,5 +77,10 @@ namespace Microsoft.CodeAnalysis
         /// to the corresponding default element field such as "Item1"
         /// </remarks>
         IFieldSymbol CorrespondingTupleField { get; }
+
+        /// <summary>
+        /// Gets the <see cref="INamedTypeSymbol"/> for the immediately containing symbol.
+        /// </summary>
+        new INamedTypeSymbol ContainingSymbol { get; }
     }
 }

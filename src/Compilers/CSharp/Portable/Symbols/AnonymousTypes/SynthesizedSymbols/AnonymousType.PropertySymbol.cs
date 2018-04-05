@@ -143,7 +143,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 get { return ImmutableArray<PropertySymbol>.Empty; }
             }
 
-            public override Symbol ContainingSymbol
+            internal override NamedTypeSymbol ContainingSymbolCore
             {
                 get { return _containingType; }
             }

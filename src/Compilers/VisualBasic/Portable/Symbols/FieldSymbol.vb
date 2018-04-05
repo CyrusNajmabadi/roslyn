@@ -392,6 +392,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return If(newOwner = Me.ContainingSymbol, Me, DirectCast(DirectCast(newOwner, SubstitutedNamedType).GetMemberForDefinition(Me), FieldSymbol))
         End Function
 
+        Public NotOverridable Overrides ReadOnly Property ContainingSymbol As Symbol
+            Get
+                Return ContainingSymbolCore
+            End Get
+        End Property
+
+        Friend MustOverride ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
+
 #Region "IFieldSymbol"
 
         Private ReadOnly Property IFieldSymbol_AssociatedSymbol As ISymbol Implements IFieldSymbol.AssociatedSymbol
@@ -463,6 +471,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overrides Function Accept(Of TResult)(visitor As VisualBasicSymbolVisitor(Of TResult)) As TResult
             Return visitor.VisitField(Me)
         End Function
+
+        Private ReadOnly Property IFieldSymbol_ContainingSymbol As INamedTypeSymbol Implements IFieldSymbol.ContainingSymbol
+            Get
+                Return ContainingSymbolCore
+            End Get
+        End Property
 
 #End Region
 

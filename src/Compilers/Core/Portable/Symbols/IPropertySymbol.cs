@@ -101,5 +101,10 @@ namespace Microsoft.CodeAnalysis
         /// The list of custom modifiers, if any, associated with the type of the property. 
         /// </summary>
         ImmutableArray<CustomModifier> TypeCustomModifiers { get; }
+
+        /// <summary>
+        /// Gets the <see cref="INamedTypeSymbol"/> for the immediately containing symbol.
+        /// </summary>
+        new INamedTypeSymbol ContainingSymbol { get; }
     }
 }

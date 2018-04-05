@@ -104,8 +104,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         internal override ConstantValue GetConstantValue(ConstantFieldsInProgress inProgress, bool earlyDecodingWellKnownAttributes)
             => null;
 
-        public override Symbol ContainingSymbol
-            => _property.ContainingSymbol;
+        internal override NamedTypeSymbol ContainingSymbolCore
+            => _property.ContainingSymbolCore;
 
         public override NamedTypeSymbol ContainingType
             => _property.ContainingType;

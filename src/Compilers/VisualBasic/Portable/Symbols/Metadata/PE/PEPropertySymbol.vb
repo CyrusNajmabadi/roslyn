@@ -131,7 +131,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             _propertyType = TupleTypeDecoder.DecodeTupleTypesIfApplicable(_propertyType, handle, moduleSymbol)
         End Sub
 
-        Public Overrides ReadOnly Property ContainingSymbol As Symbol
+        Friend Overrides ReadOnly Property ContainingSymbolCore As NamedTypeSymbol
             Get
                 Return _containingType
             End Get

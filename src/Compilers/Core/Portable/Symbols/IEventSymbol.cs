@@ -58,5 +58,10 @@ namespace Microsoft.CodeAnalysis
         /// Properties imported from metadata can explicitly implement more than one event.
         /// </remarks>
         ImmutableArray<IEventSymbol> ExplicitInterfaceImplementations { get; }
+
+        /// <summary>
+        /// Gets the <see cref="INamedTypeSymbol"/> for the immediately containing symbol.
+        /// </summary>
+        new INamedTypeSymbol ContainingSymbol { get; }
     }
 }
