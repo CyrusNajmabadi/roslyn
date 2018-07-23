@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.CodeStyle;
 using Microsoft.CodeAnalysis.CSharp.UseExpressionBodyForLambda;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -1168,6 +1169,54 @@ class C
         Func<int, string> f = x => x.ToString();
     }
 }", options: UseExpressionBody);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task OfferToConvertThrowExpressionToBlockPriorToCSharp6()
+        {
+            await TestAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, Task<string>> f = x [|=>|] throw null;
+    }
+}",
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, Task<string>> f = x =>
+        {
+            throw null;
+        };
+    }
+}", options: UseBlockBody, parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp5));
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task DoNotOfferToConvertBlockWithThrowToExpressionIfCSharp6()
+        {
+            await TestMissingAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, Task<string>> f = x [|=>|]
+        {
+            throw null;
+        };
+    }
+}", new TestParameters(options: UseExpressionBody, parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp6)));
         }
     }
 }
