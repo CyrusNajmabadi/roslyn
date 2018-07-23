@@ -1017,5 +1017,157 @@ class C
     }
 }", options: UseBlockBody);
         }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseExpressionBodyWithPreprocessor()
+        {
+            await TestMissingAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|]
+        {
+#if DEBUG
+#endif
+            return x.ToString();
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseExpressionBodyWithPrecedingEmptyStatement()
+        {
+            await TestMissingAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|]
+        {
+            ;
+            return x.ToString();
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseExpressionBodyWithFololowingEmptyStatement()
+        {
+            await TestMissingAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|]
+        {
+            return x.ToString();
+            ;
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseExpressionBodyWithNonExpressionStatement()
+        {
+            await TestMissingAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|]
+        {
+            if (true) return x.ToString();
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseExpressionBodyWithNoStatements()
+        {
+            await TestMissingAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|]
+        {
+            // Comment
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseBlockBodyWithFollowingStatementOnSameLine()
+        {
+            await TestInRegularAndScriptAsync(
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|] x.ToString(); 1.ToString();
+    }
+}",
+@"using System;
+using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x =>
+        {
+            return x.ToString();
+        }; 1.ToString();
+    }
+}", options: UseBlockBody);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
+        public async Task UseExpressionBodyWithBlockBodyOnOneLine()
+        {
+            await TestInRegularAndScriptAsync(
+@"using System;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x [|=>|] { return x.ToString(); };
+    }
+}",
+@"using System;
+
+class C
+{
+    void Goo()
+    {
+        Func<int, string> f = x => x.ToString();
+    }
+}", options: UseExpressionBody);
+        }
     }
 }
