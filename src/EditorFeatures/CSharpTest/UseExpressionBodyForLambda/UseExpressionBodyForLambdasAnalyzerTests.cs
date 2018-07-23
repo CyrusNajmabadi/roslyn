@@ -25,58 +25,53 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.UseExpressionBody
         private IDictionary<OptionKey, object> UseBlockBody =>
             this.Option(CSharpCodeStyleOptions.PreferExpressionBodiedLambdaExpressions, CSharpCodeStyleOptions.NeverWithSuggestionEnforcement);
 
+        private async Task TestBoundAndUnboundAsync(string initialMarkup, string expectedMarkup, IDictionary<OptionKey, object> options)
+        {
+            await TestInRegularAndScriptAsync(
+                WrapStatementContext(initialMarkup, true),
+                WrapStatementContext(expectedMarkup, true),
+                options: options);
+
+            await TestInRegularAndScriptAsync(
+                WrapStatementContext(initialMarkup, false),
+                WrapStatementContext(expectedMarkup, false),
+                options: options);
+
+            string WrapStatementContext(string statementContextMarkup, bool withUsingSystem)
+            {
+                return (withUsingSystem ? "using System;\r\n" : null) +
+@"using System.Threading.Tasks;
+
+class C
+{
+    void Goo()
+    {
+" + statementContextMarkup + @"
+    }
+}";
+            }
+        }
+
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyInFieldInitializer()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, string> f = x [|=>|]
 {
-    void Goo()
-    {
-        Func<int, string> f = x [|=>|]
-        {
-            return x.ToString();
-        };
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, string> f = x => x.ToString();
-    }
-}", options: UseExpressionBody);
+    return x.ToString();
+};",
+@"Func<int, string> f = x => x.ToString();", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyInFieldInitializer()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, string> f = x [|=>|] x.ToString();",
+@"Func<int, string> f = x =>
 {
-    void Goo()
-    {
-        Func<int, string> f = x [|=>|] x.ToString();
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, string> f = x =>
-        {
-            return x.ToString();
-        };
-    }
-}", options: UseBlockBody);
+    return x.ToString();
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
@@ -198,735 +193,287 @@ class C
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, string> f = x [|=>|]
 {
-    void Goo()
-    {
-        Func<int, string> f = x [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, string> f = x => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Func<int, string> f = x => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, string> f = x [|=>|] throw null;",
+@"Func<int, string> f = x =>
 {
-    void Goo()
-    {
-        Func<int, string> f = x [|=>|] throw null;
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, string> f = x =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithVoidReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = x [|=>|]
 {
-    void Goo()
-    {
-        Action<int> f = x [|=>|]
-        {
-            x.ToString();
-        };
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = x => x.ToString();
-    }
-}", options: UseExpressionBody);
+    x.ToString();
+};",
+@"Action<int> f = x => x.ToString();", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithVoidReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = x [|=>|]
 {
-    void Goo()
-    {
-        Action<int> f = x [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = x => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Action<int> f = x => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithVoidReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = x [|=>|] x.ToString();",
+@"Action<int> f = x =>
 {
-    void Goo()
-    {
-        Action<int> f = x [|=>|] x.ToString();
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = x =>
-        {
-            x.ToString();
-        };
-    }
-}", options: UseBlockBody);
+    x.ToString();
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithVoidReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = x [|=>|] throw null;",
+@"Action<int> f = x =>
 {
-    void Goo()
-    {
-        Action<int> f = x [|=>|] throw null;
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = x =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithAsyncVoidReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = async x [|=>|]
 {
-    void Goo()
-    {
-        Action<int> f = async x [|=>|]
-        {
-            x.ToString();
-        };
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = async x => x.ToString();
-    }
-}", options: UseExpressionBody);
+    x.ToString();
+};",
+@"Action<int> f = async x => x.ToString();", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithAsyncVoidReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = async x [|=>|]
 {
-    void Goo()
-    {
-        Action<int> f = async x [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = async x => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Action<int> f = async x => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithAsyncVoidReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = async x [|=>|] x.ToString();",
+@"Action<int> f = async x =>
 {
-    void Goo()
-    {
-        Action<int> f = async x [|=>|] x.ToString();
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = async x =>
-        {
-            x.ToString();
-        };
-    }
-}", options: UseBlockBody);
+    x.ToString();
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithAsyncVoidReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Action<int> f = async x [|=>|] throw null;",
+@"Action<int> f = async x =>
 {
-    void Goo()
-    {
-        Action<int> f = async x [|=>|] throw null;
-    }
-}",
-@"using System;
-
-class C
-{
-    void Goo()
-    {
-        Action<int> f = async x =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithTaskReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = () [|=>|]
 {
-    void Goo()
-    {
-        Func<Task> f = () [|=>|]
-        {
-            return Task.CompletedTask;
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = () => Task.CompletedTask;
-    }
-}", options: UseExpressionBody);
+    return Task.CompletedTask;
+};",
+@"Func<Task> f = () => Task.CompletedTask;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithTaskReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = () [|=>|]
 {
-    void Goo()
-    {
-        Func<Task> f = () [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = () => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Func<Task> f = () => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithTaskReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = () [|=>|] Task.CompletedTask;",
+@"Func<Task> f = () =>
 {
-    void Goo()
-    {
-        Func<Task> f = () [|=>|] Task.CompletedTask;
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = () =>
-        {
-            return Task.CompletedTask;
-        };
-    }
-}", options: UseBlockBody);
+    return Task.CompletedTask;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithTaskReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = () [|=>|] throw null;",
+@"Func<Task> f = () =>
 {
-    void Goo()
-    {
-        Func<Task> f = () [|=>|] throw null;
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = () =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithAsyncTaskReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = async () [|=>|]
 {
-    void Goo()
-    {
-        Func<Task> f = async () [|=>|]
-        {
-            await Task.CompletedTask;
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = async () => await Task.CompletedTask;
-    }
-}", options: UseExpressionBody);
+    await Task.CompletedTask;
+};",
+@"Func<Task> f = async () => await Task.CompletedTask;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithAsyncTaskReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = async () [|=>|]
 {
-    void Goo()
-    {
-        Func<Task> f = async () [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = async () => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Func<Task> f = async () => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithAsyncTaskReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = async () [|=>|] await Task.CompletedTask;",
+@"Func<Task> f = async () =>
 {
-    void Goo()
-    {
-        Func<Task> f = async () [|=>|] await Task.CompletedTask;
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = async () =>
-        {
-            await Task.CompletedTask;
-        };
-    }
-}", options: UseBlockBody);
+    await Task.CompletedTask;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithAsyncTaskReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<Task> f = async () [|=>|] throw null;",
+@"Func<Task> f = async () =>
 {
-    void Goo()
-    {
-        Func<Task> f = async () [|=>|] throw null;
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<Task> f = async () =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithTaskTReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = x [|=>|]
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = x [|=>|]
-        {
-            return Task.FromResult(x.ToString());
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = x => Task.FromResult(x.ToString());
-    }
-}", options: UseExpressionBody);
+    return Task.FromResult(x.ToString());
+};",
+@"Func<int, Task<string>> f = x => Task.FromResult(x.ToString());", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithTaskTReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = x [|=>|]
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = x [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = x => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Func<int, Task<string>> f = x => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithTaskTReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = x [|=>|] Task.FromResult(x.ToString());",
+@"Func<int, Task<string>> f = x =>
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = x [|=>|] Task.FromResult(x.ToString());
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = x =>
-        {
-            return Task.FromResult(x.ToString());
-        };
-    }
-}", options: UseBlockBody);
+    return Task.FromResult(x.ToString());
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithTaskTReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = x [|=>|] throw null;",
+@"Func<int, Task<string>> f = x =>
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = x [|=>|] throw null;
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = x =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithAsyncTaskTReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = async x [|=>|]
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x [|=>|]
-        {
-            return await Task.FromResult(x.ToString());
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x => await Task.FromResult(x.ToString());
-    }
-}", options: UseExpressionBody);
+    return await Task.FromResult(x.ToString());
+};",
+@"Func<int, Task<string>> f = async x => await Task.FromResult(x.ToString());", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseExpressionBodyWithAsyncTaskTReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = async x [|=>|]
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x [|=>|]
-        {
-            throw null;
-        };
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x => throw null;
-    }
-}", options: UseExpressionBody);
+    throw null;
+};",
+@"Func<int, Task<string>> f = async x => throw null;", options: UseExpressionBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithAsyncTaskTReturn()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = async x [|=>|] await Task.FromResult(x.ToString());",
+@"Func<int, Task<string>> f = async x =>
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x [|=>|] await Task.FromResult(x.ToString());
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x =>
-        {
-            return await Task.FromResult(x.ToString());
-        };
-    }
-}", options: UseBlockBody);
+    return await Task.FromResult(x.ToString());
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
         public async Task UseBlockBodyWithAsyncTaskTReturnThrowing()
         {
-            await TestInRegularAndScriptAsync(
-@"using System;
-using System.Threading.Tasks;
-
-class C
+            await TestBoundAndUnboundAsync(
+@"Func<int, Task<string>> f = async x [|=>|] throw null;",
+@"Func<int, Task<string>> f = async x =>
 {
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x [|=>|] throw null;
-    }
-}",
-@"using System;
-using System.Threading.Tasks;
-
-class C
-{
-    void Goo()
-    {
-        Func<int, Task<string>> f = async x =>
-        {
-            throw null;
-        };
-    }
-}", options: UseBlockBody);
+    throw null;
+};", options: UseBlockBody);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
