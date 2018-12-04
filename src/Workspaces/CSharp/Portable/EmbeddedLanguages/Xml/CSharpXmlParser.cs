@@ -118,15 +118,15 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
                 ConvertToken(text, trivia.EndOfComment));
         }
 
-        private static XmlSequenceNode ConvertSequence(ImmutableArray<VirtualChar> text, SyntaxList<XmlNodeSyntax> content)
+        private static XmlGenericNode ConvertSequence(ImmutableArray<VirtualChar> text, SyntaxList<XmlNodeSyntax> content)
         {
-            var result = ArrayBuilder<XmlNode>.GetInstance();
+            var result = ArrayBuilder<XmlNodeOrToken>.GetInstance();
             foreach (var node in content)
             {
                 result.Add(ConvertNode(text, node));
             }
 
-            return new XmlSequenceNode(result.ToImmutableAndFree());
+            return new XmlGenericNode(XmlKind.Sequence, result.ToImmutableAndFree());
         }
 
         private static XmlToken ConvertToken(ImmutableArray<VirtualChar> text, SyntaxToken token)
@@ -179,6 +179,17 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
             }
         }
 
+        private static XmlKind ConvertNodeKind(SyntaxKind kind)
+        {
+            switch (kind)
+            {
+                case SyntaxKind.XmlElement: return XmlKind.Element;
+                default:
+                    Debug.Fail("Unknown node type.");
+                    return XmlKind.UnknownNode;
+            }
+        }
+
         private static ImmutableArray<XmlTrivia> ConvertTriviaList(ImmutableArray<VirtualChar> text, SyntaxTriviaList triviaList)
         {
             var result = ArrayBuilder<XmlTrivia>.GetInstance();
@@ -199,28 +210,14 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
                 ImmutableArray<EmbeddedDiagnostic>.Empty);
         }
 
-        private static XmlNode ConvertNode(
-            ImmutableArray<VirtualChar> text, SyntaxNode node)
+        private static XmlNode ConvertNode(ImmutableArray<VirtualChar> text, SyntaxNode node)
         {
-            switch (node.Kind())
-            {
-                case SyntaxKind.XmlElement: return ConvertXmlElement(text, (XmlElementSyntax)node);
-                default:
-                    Debug.Fail("Unknown node kind");
-                    return ConvertUnknownNode(text, node);
-            }
+            return new XmlGenericNode(
+                ConvertNodeKind(node.Kind()),
+                ConvertChildNodeAndTokens(text, node));
         }
 
-        private static XmlElementNode ConvertXmlElement(ImmutableArray<VirtualChar> text, XmlElementSyntax node)
-        {
-            return new XmlElementNode(
-                ConvertNode(text, node.StartTag),
-                ConvertSequence(text, node.Content),
-                ConvertNode(text, node.EndTag));
-        }
-
-        private static XmlUnknownNode ConvertUnknownNode(
-            ImmutableArray<VirtualChar> text, SyntaxNode node)
+        private static ImmutableArray<XmlNodeOrToken> ConvertChildNodeAndTokens(ImmutableArray<VirtualChar> text, SyntaxNode node)
         {
             var children = ArrayBuilder<XmlNodeOrToken>.GetInstance();
             foreach (var child in node.ChildNodesAndTokens())
@@ -235,7 +232,34 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
                 }
             }
 
-            return new XmlUnknownNode(children.ToImmutableAndFree());
+            return children.ToImmutableAndFree();
         }
+
+        //private static XmlElementNode ConvertXmlElement(ImmutableArray<VirtualChar> text, XmlElementSyntax node)
+        //{
+        //    return new XmlElementNode(
+        //        ConvertNode(text, node.StartTag),
+        //        ConvertSequence(text, node.Content),
+        //        ConvertNode(text, node.EndTag));
+        //}
+
+        //private static XmlUnknownNode ConvertUnknownNode(
+        //    ImmutableArray<VirtualChar> text, SyntaxNode node)
+        //{
+        //    var children = ArrayBuilder<XmlNodeOrToken>.GetInstance();
+        //    foreach (var child in node.ChildNodesAndTokens())
+        //    {
+        //        if (child.IsToken)
+        //        {
+        //            children.Add(ConvertToken(text, child.AsToken()));
+        //        }
+        //        else
+        //        {
+        //            children.Add(ConvertNode(text, child.AsNode()));
+        //        }
+        //    }
+
+        //    return new XmlUnknownNode(children.ToImmutableAndFree());
+        //}
     }
 }

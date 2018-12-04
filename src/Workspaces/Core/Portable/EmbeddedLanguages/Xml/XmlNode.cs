@@ -10,6 +10,6 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
         {
         }
 
-        public abstract void Accept(IXmlNodeVisitor visitor);
+        // public abstract void Accept(IXmlNodeVisitor visitor);
     }
 }

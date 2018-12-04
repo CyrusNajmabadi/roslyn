@@ -12,16 +12,16 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
 
     internal sealed class XmlCompilationUnit : XmlNode
     {
-        public XmlCompilationUnit(XmlSequenceNode sequence, XmlToken endOfFileToken)
+        public XmlCompilationUnit(XmlGenericNode content, XmlToken endOfFileToken)
             : base(XmlKind.CompilationUnit)
         {
-            Debug.Assert(sequence != null);
+            Debug.Assert(content != null);
             Debug.Assert(endOfFileToken.Kind == XmlKind.EndOfFile);
-            Sequence = sequence;
+            Content = content;
             EndOfFileToken = endOfFileToken;
         }
 
-        public XmlSequenceNode Sequence { get; }
+        public XmlGenericNode Content { get; }
         public XmlToken EndOfFileToken { get; }
 
         internal override int ChildCount => 2;
@@ -30,50 +30,50 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
         {
             switch (index)
             {
-                case 0: return Sequence;
+                case 0: return Content;
                 case 1: return EndOfFileToken;
             }
 
             throw new InvalidOperationException();
         }
 
-        public override void Accept(IXmlNodeVisitor visitor)
-            => visitor.Visit(this);
+        //public override void Accept(IXmlNodeVisitor visitor)
+        //    => visitor.Visit(this);
     }
 
-    /// <summary>
-    /// Represents a possibly-empty sequence of xml nodes.
-    /// 
-    /// This does not deviate from Roslyn principles.  While nodes for empty text are rare, they
-    /// are allowed (for example, OmittedTypeArgument in C#).
-    /// </summary>
-    internal sealed class XmlSequenceNode : XmlNode
-    {
-        public ImmutableArray<XmlNode> Children { get; }
+    ///// <summary>
+    ///// Represents a possibly-empty sequence of xml nodes.
+    ///// 
+    ///// This does not deviate from Roslyn principles.  While nodes for empty text are rare, they
+    ///// are allowed (for example, OmittedTypeArgument in C#).
+    ///// </summary>
+    //internal sealed class XmlSequenceNode : XmlNode
+    //{
+    //    public ImmutableArray<XmlNode> Children { get; }
 
-        internal override int ChildCount => Children.Length;
+    //    internal override int ChildCount => Children.Length;
 
-        public XmlSequenceNode(ImmutableArray<XmlNode> children)
-            : base(XmlKind.Sequence)
-        {
-            this.Children = children;
-        }
+    //    public XmlSequenceNode(ImmutableArray<XmlNode> children)
+    //        : base(XmlKind.Sequence)
+    //    {
+    //        this.Children = children;
+    //    }
 
-        internal override XmlNodeOrToken ChildAt(int index)
-            => Children[index];
+    //    internal override XmlNodeOrToken ChildAt(int index)
+    //        => Children[index];
 
-        public override void Accept(IXmlNodeVisitor visitor)
-            => visitor.Visit(this);
-    }
+    //    public override void Accept(IXmlNodeVisitor visitor)
+    //        => visitor.Visit(this);
+    //}
 
-    internal sealed class XmlUnknownNode : XmlNode
+    internal sealed class XmlGenericNode : XmlNode
     {
         public ImmutableArray<XmlNodeOrToken> Children { get; }
 
         internal override int ChildCount => Children.Length;
 
-        public XmlUnknownNode(ImmutableArray<XmlNodeOrToken> children)
-            : base(XmlKind.Sequence)
+        public XmlGenericNode(XmlKind kind, ImmutableArray<XmlNodeOrToken> children)
+            : base(kind)
         {
             this.Children = children;
         }
@@ -81,71 +81,71 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
         internal override XmlNodeOrToken ChildAt(int index)
             => Children[index];
 
-        public override void Accept(IXmlNodeVisitor visitor)
-            => visitor.Visit(this);
+        //public override void Accept(IXmlNodeVisitor visitor)
+        //    => visitor.Visit(this);
     }
 
-    internal sealed class XmlElementNode : XmlNode
-    {
-        public XmlElementNode(XmlElementStartTagNode startTag, XmlSequenceNode content, XmlElementEndTagNode endTag)
-            : base(XmlKind.CompilationUnit)
-        {
-            StartTag = startTag;
-            Content = content;
-            EndTag = endTag;
-        }
+    //internal sealed class XmlElementNode : XmlNode
+    //{
+    //    public XmlElementNode(XmlElementStartTagNode startTag, XmlSequenceNode content, XmlElementEndTagNode endTag)
+    //        : base(XmlKind.CompilationUnit)
+    //    {
+    //        StartTag = startTag;
+    //        Content = content;
+    //        EndTag = endTag;
+    //    }
 
-        internal override int ChildCount => 2;
+    //    internal override int ChildCount => 2;
 
-        public XmlElementStartTagNode StartTag { get; }
-        public XmlSequenceNode Content { get; }
-        public XmlElementEndTagNode EndTag { get; }
+    //    public XmlElementStartTagNode StartTag { get; }
+    //    public XmlSequenceNode Content { get; }
+    //    public XmlElementEndTagNode EndTag { get; }
 
-        internal override XmlNodeOrToken ChildAt(int index)
-        {
-            switch (index)
-            {
-                case 0: return StartTag;
-                case 1: return Content;
-                case 2: return EndTag;
-            }
+    //    internal override XmlNodeOrToken ChildAt(int index)
+    //    {
+    //        switch (index)
+    //        {
+    //            case 0: return StartTag;
+    //            case 1: return Content;
+    //            case 2: return EndTag;
+    //        }
 
-            throw new InvalidOperationException();
-        }
+    //        throw new InvalidOperationException();
+    //    }
 
-        public override void Accept(IXmlNodeVisitor visitor)
-            => visitor.Visit(this);
-    }
+    //    public override void Accept(IXmlNodeVisitor visitor)
+    //        => visitor.Visit(this);
+    //}
 
-    internal sealed class XmlElementStartTagNode : XmlNode
-    {
-        public XmlElementNode(XmlStartStartNode startTag, XmlSequenceNode content, XmlEndTagNode endTag)
-            : base(XmlKind.CompilationUnit)
-        {
-            StartTag = startTag;
-            Content = content;
-            EndTag = endTag;
-        }
+    //internal sealed class XmlElementStartTagNode : XmlNode
+    //{
+    //    public XmlElementNode(XmlStartStartNode startTag, XmlSequenceNode content, XmlEndTagNode endTag)
+    //        : base(XmlKind.CompilationUnit)
+    //    {
+    //        StartTag = startTag;
+    //        Content = content;
+    //        EndTag = endTag;
+    //    }
 
-        internal override int ChildCount => 2;
+    //    internal override int ChildCount => 2;
 
-        public XmlStartStartNode StartTag { get; }
-        public XmlSequenceNode Content { get; }
-        public XmlEndTagNode EndTag { get; }
+    //    public XmlStartStartNode StartTag { get; }
+    //    public XmlSequenceNode Content { get; }
+    //    public XmlEndTagNode EndTag { get; }
 
-        internal override XmlNodeOrToken ChildAt(int index)
-        {
-            switch (index)
-            {
-                case 0: return StartTag;
-                case 1: return Content;
-                case 2: return EndTag;
-            }
+    //    internal override XmlNodeOrToken ChildAt(int index)
+    //    {
+    //        switch (index)
+    //        {
+    //            case 0: return StartTag;
+    //            case 1: return Content;
+    //            case 2: return EndTag;
+    //        }
 
-            throw new InvalidOperationException();
-        }
+    //        throw new InvalidOperationException();
+    //    }
 
-        public override void Accept(IXmlNodeVisitor visitor)
-            => visitor.Visit(this);
-    }
+    //    public override void Accept(IXmlNodeVisitor visitor)
+    //        => visitor.Visit(this);
+    //}
 }

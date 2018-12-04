@@ -75,7 +75,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices
 
         private static void AddClassifications(XmlNode node, Visitor visitor, ArrayBuilder<ClassifiedSpan> result)
         {
-            node.Accept(visitor);
+            // node.Accept(visitor);
 
             foreach (var child in node)
             {
@@ -140,15 +140,15 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices
                 // Nothing to highlight.
             }
 
-            public void Visit(XmlSequenceNode node)
+            public void Visit(XmlGenericNode node)
             {
                 // Nothing to highlight.   
             }
 
-            public void Visit(XmlUnknownNode node)
-            {
-                throw new System.NotImplementedException();
-            }
+            //public void Visit(XmlUnknownNode node)
+            //{
+            //    throw new System.NotImplementedException();
+            //}
 
             // #region Character classes
 

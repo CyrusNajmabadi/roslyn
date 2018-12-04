@@ -5,9 +5,9 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
     internal interface IXmlNodeVisitor
     {
         void Visit(XmlCompilationUnit node);
-        void Visit(XmlSequenceNode node);
-        void Visit(XmlUnknownNode node);
-        void Visit(XmlElementNode node);
+        //void Visit(XmlSequenceNode node);
+//        void Visit(XmlElementNode node);
+        void Visit(XmlGenericNode node);
 
         //void Visit(XmlElementStartTagNode node);
         //void Visit(XmlElementEndTagNode node);
