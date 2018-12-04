@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices
 {
+    using System;
     using static EmbeddedSyntaxHelpers;
 
     using XmlToken = EmbeddedSyntaxToken<XmlKind>;
@@ -85,8 +86,37 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices
                 }
                 else
                 {
-                    AddTriviaClassifications(child.Token, result);
+                    AddTokenClassifications(child.Token, result);
                 }
+            }
+        }
+
+        private static void AddTokenClassifications(XmlToken token, ArrayBuilder<ClassifiedSpan> result)
+        {
+            AddTriviaClassifications(token, result);
+
+            switch (token.Kind)
+            {
+                case XmlKind.LessThanToken:
+                case XmlKind.GreaterThanToken:
+                case XmlKind.LessThanSlashToken:
+                case XmlKind.SlashGreaterThanToken:
+                case XmlKind.EqualsToken:
+                case XmlKind.CommentStartToken:
+                case XmlKind.CommentEndToken:
+                case XmlKind.CDataStartToken:
+                case XmlKind.CDataEndToken:
+                    AddClassification(token, ClassificationTypeNames.XmlDocCommentDelimiter, result);
+                    break;
+            }
+        }
+
+        private static void AddClassification(
+            XmlToken token, string typeName, ArrayBuilder<ClassifiedSpan> result)
+        {
+            if (!token.IsMissing)
+            {
+                result.Add(new ClassifiedSpan(typeName, token.GetSpan()));
             }
         }
 
@@ -96,16 +126,15 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices
             {
                 AddTriviaClassifications(trivia, result);
             }
+
+            foreach (var trivia in token.TrailingTrivia)
+            {
+                AddTriviaClassifications(trivia, result);
+            }
         }
 
         private static void AddTriviaClassifications(XmlTrivia trivia, ArrayBuilder<ClassifiedSpan> result)
         {
-            //if (trivia.Kind == XmlKind.CommentTrivia &&
-            //    trivia.VirtualChars.Length > 0)
-            //{
-            //    result.Add(new ClassifiedSpan(
-            //        ClassificationTypeNames.XmlComment, GetSpan(trivia.VirtualChars)));
-            //}
         }
 
         private class Visitor : IXmlNodeVisitor

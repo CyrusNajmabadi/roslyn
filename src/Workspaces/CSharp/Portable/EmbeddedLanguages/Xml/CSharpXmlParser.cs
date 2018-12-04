@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.EmbeddedLanguages.Xml;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
 {
@@ -23,6 +24,9 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
     [ExportLanguageService(typeof(IXmlParser), LanguageNames.CSharp), Shared]
     internal class CSharpXmlParser : IXmlParser
     {
+        private static readonly CSharpParseOptions s_parseOptions =
+            CSharpParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose);
+
         private static ImmutableArray<VirtualChar> GetChars(ImmutableArray<VirtualChar> text, TextSpan fullSpan)
             => ImmutableArray.Create(text, fullSpan.Start, fullSpan.Length);
 
@@ -36,7 +40,7 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
             var textWithSlashes = AddSlashes(text);
 
             var str = textWithSlashes.CreateString();
-            var trivia = SyntaxFactory.ParseDocumentationCommentTrivia(str, CSharpParseOptions.Default);
+            var trivia = SyntaxFactory.ParseDocumentationCommentTrivia(str, s_parseOptions);
             return new XmlTree(
                 text, Convert(textWithSlashes, trivia),
                 ConvertDiagnostics(trivia.GetDiagnostics(), textWithSlashes));
@@ -100,15 +104,21 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
             return result.ToImmutableAndFree();
         }
 
-        private EmbeddedDiagnostic ConvertDiagnostic(
-            Diagnostic diagnostic, ImmutableArray<VirtualChar> text)
+        private EmbeddedDiagnostic ConvertDiagnostic(Diagnostic diagnostic, ImmutableArray<VirtualChar> text)
+            => new EmbeddedDiagnostic(
+                diagnostic.GetMessage(),
+                GetDiagnosticSpan(text, diagnostic.Location.SourceSpan));
+
+        private TextSpan GetDiagnosticSpan(ImmutableArray<VirtualChar> text, TextSpan span)
         {
-            var span = diagnostic.Location.SourceSpan;
+            if (span.Start >= text.Length)
+            {
+                return new TextSpan(text.Last().Span.End, 0);
+            }
+
             var firstChar = text[span.Start];
             var lastChar = text[Math.Max(span.Start, span.End - 1)];
-            return new EmbeddedDiagnostic(
-                diagnostic.GetMessage(),
-                EmbeddedSyntaxHelpers.GetSpan(firstChar, lastChar));
+            return EmbeddedSyntaxHelpers.GetSpan(firstChar, lastChar);
         }
 
         private static XmlCompilationUnit Convert(ImmutableArray<VirtualChar> text, DocumentationCommentTriviaSyntax trivia)
@@ -144,22 +154,24 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
         {
             switch (kind)
             {
-                case SyntaxKind.XmlCDataEndToken: return XmlKind.CDataEndToken;
-                case SyntaxKind.XmlCDataStartToken: return XmlKind.CDataStartToken;
+                case SyntaxKind.EndOfDocumentationCommentToken: return XmlKind.EndOfFile;
                 case SyntaxKind.ColonToken: return XmlKind.ColonToken;
-                case SyntaxKind.XmlCommentStartToken: return XmlKind.CommentStartToken;
                 case SyntaxKind.DoubleQuoteToken: return XmlKind.DoubleQuoteToken;
-                case SyntaxKind.XmlEntityLiteralToken: return XmlKind.EntityLiteralToken;
                 case SyntaxKind.EqualsToken: return XmlKind.EqualsToken;
                 case SyntaxKind.GreaterThanToken: return XmlKind.GreaterThanToken;
                 case SyntaxKind.IdentifierToken: return XmlKind.IdentifierToken;
                 case SyntaxKind.LessThanSlashToken: return XmlKind.LessThanSlashToken;
                 case SyntaxKind.LessThanToken: return XmlKind.LessThanToken;
                 case SyntaxKind.MinusMinusToken: return XmlKind.MinusMinusToken;
-                case SyntaxKind.XmlProcessingInstructionEndToken: return XmlKind.ProcessingInstructionEndToken;
-                case SyntaxKind.XmlProcessingInstructionStartToken: return XmlKind.ProcessingInstructionStartToken;
                 case SyntaxKind.SingleQuoteToken: return XmlKind.SingleQuoteToken;
                 case SyntaxKind.SlashGreaterThanToken: return XmlKind.SlashGreaterThanToken;
+                case SyntaxKind.XmlCDataEndToken: return XmlKind.CDataEndToken;
+                case SyntaxKind.XmlCDataStartToken: return XmlKind.CDataStartToken;
+                case SyntaxKind.XmlCommentStartToken: return XmlKind.CommentStartToken;
+                case SyntaxKind.XmlCommentEndToken: return XmlKind.CommentEndToken;
+                case SyntaxKind.XmlEntityLiteralToken: return XmlKind.EntityLiteralToken;
+                case SyntaxKind.XmlProcessingInstructionEndToken: return XmlKind.ProcessingInstructionEndToken;
+                case SyntaxKind.XmlProcessingInstructionStartToken: return XmlKind.ProcessingInstructionStartToken;
                 case SyntaxKind.XmlTextLiteralNewLineToken: return XmlKind.TextLiteralNewLineToken;
                 case SyntaxKind.XmlTextLiteralToken: return XmlKind.TextLiteralToken;
                 default:
@@ -172,7 +184,10 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
         {
             switch (kind)
             {
-
+                case SyntaxKind.EndOfLineTrivia: return XmlKind.EndOfLineTrivia;
+                case SyntaxKind.WhitespaceTrivia: return XmlKind.WhitespaceTrivia;
+                case SyntaxKind.DocumentationCommentExteriorTrivia: return XmlKind.ExteriorTrivia;
+                case SyntaxKind.SkippedTokensTrivia: return XmlKind.SkippedTokensTrivia;
                 default:
                     Debug.Fail("Unknown trivia kind");
                     return XmlKind.UnknownTrivia;
@@ -183,7 +198,17 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
         {
             switch (kind)
             {
+                case SyntaxKind.XmlComment: return XmlKind.Comment;
+                case SyntaxKind.XmlCDataSection: return XmlKind.CDataSection;
                 case SyntaxKind.XmlElement: return XmlKind.Element;
+                case SyntaxKind.XmlElementEndTag: return XmlKind.ElementEndTag;
+                case SyntaxKind.XmlElementStartTag: return XmlKind.ElementStartTag;
+                case SyntaxKind.XmlEmptyElement: return XmlKind.EmptyElement;
+                case SyntaxKind.XmlName: return XmlKind.Name;
+                case SyntaxKind.XmlPrefix: return XmlKind.Prefix;
+                case SyntaxKind.XmlProcessingInstruction: return XmlKind.ProcessingInstruction;
+                case SyntaxKind.XmlText: return XmlKind.Text; 
+                case SyntaxKind.XmlTextAttribute: return XmlKind.TextAttribute;
                 default:
                     Debug.Fail("Unknown node type.");
                     return XmlKind.UnknownNode;

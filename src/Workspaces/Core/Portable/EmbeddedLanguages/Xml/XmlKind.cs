@@ -31,6 +31,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
         CDataStartToken,
         ColonToken,
         CommentStartToken,
+        CommentEndToken,
         DoubleQuoteToken,
         EntityLiteralToken,
         EqualsToken,
@@ -45,5 +46,10 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml
         SlashGreaterThanToken,
         TextLiteralNewLineToken,
         TextLiteralToken,
+
+        EndOfLineTrivia,
+        ExteriorTrivia,
+        WhitespaceTrivia,
+        SkippedTokensTrivia,
     }
 }

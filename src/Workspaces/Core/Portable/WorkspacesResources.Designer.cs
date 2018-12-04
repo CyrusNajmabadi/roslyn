@@ -10,7 +10,6 @@
 
 namespace Microsoft.CodeAnalysis {
     using System;
-    using System.Reflection;
     
     
     /// <summary>
@@ -40,7 +39,7 @@ namespace Microsoft.CodeAnalysis {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Microsoft.CodeAnalysis.WorkspacesResources", typeof(WorkspacesResources).GetTypeInfo().Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Microsoft.CodeAnalysis.WorkspacesResources", typeof(WorkspacesResources).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
@@ -1960,6 +1959,15 @@ namespace Microsoft.CodeAnalysis {
         internal static string x_y_range_in_reverse_order {
             get {
                 return ResourceManager.GetString("x_y_range_in_reverse_order", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Xml issue: {0}.
+        /// </summary>
+        internal static string Xml_issue_0 {
+            get {
+                return ResourceManager.GetString("Xml_issue_0", resourceCulture);
             }
         }
     }

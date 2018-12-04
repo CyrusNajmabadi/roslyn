@@ -24,6 +24,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             _optionSet = optionSet;
         }
 
+        public Solution Solution => _solution;
         public HostWorkspaceServices Services => _solution.Workspace.Services;
 
         [PerformanceSensitive("https://github.com/dotnet/roslyn/issues/23582", OftenCompletesSynchronously = true)]

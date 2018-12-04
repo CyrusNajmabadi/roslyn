@@ -172,6 +172,11 @@
         <target state="translated">工作區不是空的。</target>
         <note />
       </trans-unit>
+      <trans-unit id="Xml_issue_0">
+        <source>Xml issue: {0}</source>
+        <target state="new">Xml issue: {0}</target>
+        <note />
+      </trans-unit>
       <trans-unit id="_0_is_not_part_of_the_workspace">
         <source>'{0}' is not part of the workspace.</source>
         <target state="translated">'{0}' 不是工作區的一部分。</target>

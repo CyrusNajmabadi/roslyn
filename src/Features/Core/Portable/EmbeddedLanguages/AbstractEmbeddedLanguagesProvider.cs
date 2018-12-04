@@ -3,6 +3,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.EmbeddedLanguages.LanguageServices;
 using Microsoft.CodeAnalysis.Features.EmbeddedLanguages.RegularExpressions;
+using Microsoft.CodeAnalysis.Features.EmbeddedLanguages.Xml;
 
 namespace Microsoft.CodeAnalysis.Features.EmbeddedLanguages
 {
@@ -19,7 +20,8 @@ namespace Microsoft.CodeAnalysis.Features.EmbeddedLanguages
             // support any of the IEmbeddedLanguageFeatures or IEmbeddedLanguageEditorFeatures
             // capabilities.
             Languages = ImmutableArray.Create<IEmbeddedLanguageFeatures>(
-                new RegexEmbeddedLanguageFeatures(info));
+                new RegexEmbeddedLanguageFeatures(info),
+                new XmlEmbeddedLanguageFeatures(info));
         }
     }
 }

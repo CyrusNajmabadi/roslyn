@@ -801,4 +801,7 @@
   <data name="ValueUsageInfo_Write" xml:space="preserve">
     <value>Write</value>
   </data>
+  <data name="Xml_issue_0" xml:space="preserve">
+    <value>Xml issue: {0}</value>
+  </data>
 </root>
