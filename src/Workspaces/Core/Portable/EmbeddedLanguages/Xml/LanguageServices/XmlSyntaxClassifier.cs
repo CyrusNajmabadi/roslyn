@@ -106,7 +106,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices
                 case XmlKind.CommentEndToken:
                 case XmlKind.CDataStartToken:
                 case XmlKind.CDataEndToken:
-                    AddClassification(token, ClassificationTypeNames.XmlDocCommentDelimiter, result);
+                    AddClassification(token, ClassificationTypeNames.XmlLiteralDelimiter, result);
                     break;
             }
         }
