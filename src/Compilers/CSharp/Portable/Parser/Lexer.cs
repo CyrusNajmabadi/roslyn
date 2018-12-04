@@ -3047,7 +3047,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             return trivia;
         }
 
-        private CSharpSyntaxNode LexXmlDocComment(XmlDocCommentStyle style)
+        public DocumentationCommentTriviaSyntax LexXmlDocComment(XmlDocCommentStyle style)
         {
             var saveMode = _mode;
             bool isTerminated;

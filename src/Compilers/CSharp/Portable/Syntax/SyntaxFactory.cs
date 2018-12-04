@@ -1590,6 +1590,20 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         /// <summary>
+        /// Parses a piece of text as if it was an Xml doc comment.  Pass <see langword="true"/>
+        /// for <paramref name="isDelimited"/> for a `/** */` style doc comment.
+        /// </summary>
+        public static DocumentationCommentTriviaSyntax ParseDocumentationCommentTrivia(
+            string text, CSharpParseOptions options, bool isDelimited = false, int offset = 0)
+        {
+            using (var lexer = new InternalSyntax.Lexer(MakeSourceText(text, offset), options))
+            {
+                var style = isDelimited ? InternalSyntax.XmlDocCommentStyle.Delimited : InternalSyntax.XmlDocCommentStyle.SingleLine;
+                return (DocumentationCommentTriviaSyntax)lexer.LexXmlDocComment(style).CreateRed();
+            }
+        }
+
+        /// <summary>
         /// Parse a list of trivia using the parsing rules for trailing trivia.
         /// </summary>
         public static SyntaxTriviaList ParseTrailingTrivia(string text, int offset = 0)

@@ -2,6 +2,7 @@
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions.LanguageServices;
+using Microsoft.CodeAnalysis.EmbeddedLanguages.Xml.LanguageServices;
 
 namespace Microsoft.CodeAnalysis.EmbeddedLanguages.LanguageServices
 {
@@ -16,6 +17,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.LanguageServices
         {
             Languages = ImmutableArray.Create<IEmbeddedLanguage>(
                 new RegexEmbeddedLanguage(info),
+                new XmlEmbeddedLanguage(info),
                 new FallbackEmbeddedLanguage(info));
         }
     }
