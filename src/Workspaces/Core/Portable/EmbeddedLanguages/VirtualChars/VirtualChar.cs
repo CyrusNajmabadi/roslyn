@@ -24,9 +24,9 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.VirtualChars
         public readonly char Char;
         public readonly TextSpan Span;
 
-        public VirtualChar(char @char, TextSpan span)
+        public VirtualChar(char @char, TextSpan span, bool allowEmpty = false)
         {
-            if (span.IsEmpty)
+            if (span.IsEmpty && !allowEmpty)
             {
                 throw new ArgumentException("Span should not be empty.", nameof(span));
             }

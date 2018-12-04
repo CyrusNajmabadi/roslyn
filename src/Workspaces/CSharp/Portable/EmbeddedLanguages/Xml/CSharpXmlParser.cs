@@ -33,12 +33,59 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
                 return null;
             }
 
-            var str = text.CreateString();
+            var textWithSlashes = AddSlashes(text);
+
+            var str = textWithSlashes.CreateString();
             var trivia = SyntaxFactory.ParseDocumentationCommentTrivia(str, CSharpParseOptions.Default);
             return new XmlTree(
-                text, Convert(text, trivia),
-                ConvertDiagnostics(trivia.GetDiagnostics(), text));
+                text, Convert(textWithSlashes, trivia),
+                ConvertDiagnostics(trivia.GetDiagnostics(), textWithSlashes));
         }
+
+        private ImmutableArray<VirtualChar> AddSlashes(ImmutableArray<VirtualChar> text)
+        {
+            var result = ArrayBuilder<VirtualChar>.GetInstance();
+            var index = 0;
+
+            while (index < text.Length)
+            { 
+                AddTripleSlash(result, text[index]);
+                AddThroughNewLine(result, text, ref index);
+            }
+
+            return result.ToImmutableAndFree();
+        }
+
+        private void AddThroughNewLine(
+            ArrayBuilder<VirtualChar> result, ImmutableArray<VirtualChar> text, ref int index)
+        {
+            while (index < text.Length)
+            {
+                var ch = text[index];
+                result.Add(ch);
+                index++;
+
+                if (ch == '\r' && index < text.Length && text[index] == '\n')
+                {
+                    continue;
+                }
+
+                if (SyntaxFacts.IsNewLine(ch))
+                {
+                    return;
+                }
+            }
+        }
+
+        private static void AddTripleSlash(ArrayBuilder<VirtualChar> result, VirtualChar ch)
+        {
+            AddSlash(result, ch);
+            AddSlash(result, ch);
+            AddSlash(result, ch);
+        }
+
+        private static void AddSlash(ArrayBuilder<VirtualChar> result, VirtualChar ch)
+            => result.Add(new VirtualChar('/', new TextSpan(ch.Span.Start, 0), allowEmpty: true));
 
         private ImmutableArray<EmbeddedDiagnostic> ConvertDiagnostics(
             IEnumerable<Diagnostic> diagnostics, ImmutableArray<VirtualChar> text)
@@ -157,10 +204,19 @@ namespace Microsoft.CodeAnalysis.CSharp.EmbeddedLanguages.Xml
         {
             switch (node.Kind())
             {
+                case SyntaxKind.XmlElement: return ConvertXmlElement(text, (XmlElementSyntax)node);
                 default:
                     Debug.Fail("Unknown node kind");
                     return ConvertUnknownNode(text, node);
             }
+        }
+
+        private static XmlElementNode ConvertXmlElement(ImmutableArray<VirtualChar> text, XmlElementSyntax node)
+        {
+            return new XmlElementNode(
+                ConvertNode(text, node.StartTag),
+                ConvertSequence(text, node.Content),
+                ConvertNode(text, node.EndTag));
         }
 
         private static XmlUnknownNode ConvertUnknownNode(
