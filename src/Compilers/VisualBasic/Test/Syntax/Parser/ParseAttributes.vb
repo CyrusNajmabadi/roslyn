@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic
@@ -318,22 +320,36 @@ End Module
     End Sub
 
     <WorkItem(638911, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/638911")>
-    <Fact(Skip:="638911")>
+    <WorkItem(108689, "https://devdiv.visualstudio.com/defaultcollection/DevDiv/_workitems#_a=edit&id=108689")>
+    <Fact>
     Public Sub ParseFileLevelAttributesWithExtraColon_2()
-        ParseAndVerify(<![CDATA[
+        Const bug108689IsFixed = False
+
+        Dim source1 = <![CDATA[
 <Assembly::A>
-]]>,
-            <errors>
-                <error id="30203" message="Identifier expected."/>
-                <error id="30636" message="'>' expected."/>
-            </errors>)
-        ParseAndVerify(<![CDATA[
+]]>
+
+        Dim source2 = <![CDATA[
 <Module : : A>
-]]>.Value.Replace(":"c, FULLWIDTH_COLON),
+]]>.Value.Replace(":"c, FULLWIDTH_COLON)
+
+        If bug108689IsFixed Then
+            ParseAndVerify(source1,
             <errors>
                 <error id="30203" message="Identifier expected."/>
                 <error id="30636" message="'>' expected."/>
             </errors>)
+
+            ParseAndVerify(source2,
+            <errors>
+                <error id="30203" message="Identifier expected."/>
+                <error id="30636" message="'>' expected."/>
+            </errors>)
+        Else
+            ParseAndVerify(source1)
+            ParseAndVerify(source2)
+        End If
+
     End Sub
 
     <WorkItem(570808, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/570808")>

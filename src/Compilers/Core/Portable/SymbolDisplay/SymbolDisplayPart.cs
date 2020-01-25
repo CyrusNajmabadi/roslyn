@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 
@@ -13,9 +15,6 @@ namespace Microsoft.CodeAnalysis
     /// <seealso cref="SymbolDisplayPartKind"/>
     public struct SymbolDisplayPart
     {
-        private const string KindKey = "Kind";
-        private const string TextKey = "Text";
-
         private readonly SymbolDisplayPartKind _kind;
         private readonly string _text;
         private readonly ISymbol _symbol;

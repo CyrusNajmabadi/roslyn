@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Composition;
 using System.Threading;
@@ -10,17 +12,25 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing.Organizers
     [ExportSyntaxNodeOrganizer(LanguageNames.CSharp), Shared]
     internal class IndexerDeclarationOrganizer : AbstractSyntaxNodeOrganizer<IndexerDeclarationSyntax>
     {
+        [ImportingConstructor]
+        public IndexerDeclarationOrganizer()
+        {
+        }
+
         protected override IndexerDeclarationSyntax Organize(
             IndexerDeclarationSyntax syntax,
             CancellationToken cancellationToken)
         {
-            return syntax.Update(syntax.AttributeLists,
-                ModifiersOrganizer.Organize(syntax.Modifiers),
-                syntax.Type,
-                syntax.ExplicitInterfaceSpecifier,
-                syntax.ThisKeyword,
-                syntax.ParameterList,
-                syntax.AccessorList);
+            return syntax.Update(
+                attributeLists: syntax.AttributeLists,
+                modifiers: ModifiersOrganizer.Organize(syntax.Modifiers),
+                type: syntax.Type,
+                explicitInterfaceSpecifier: syntax.ExplicitInterfaceSpecifier,
+                thisKeyword: syntax.ThisKeyword,
+                parameterList: syntax.ParameterList,
+                accessorList: syntax.AccessorList,
+                expressionBody: syntax.ExpressionBody,
+                semicolonToken: syntax.SemicolonToken);
         }
     }
 }

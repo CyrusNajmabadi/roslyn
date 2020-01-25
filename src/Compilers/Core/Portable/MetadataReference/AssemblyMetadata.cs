@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,6 +11,7 @@ using System.Reflection.PortableExecutable;
 using System.Threading;
 using System.Diagnostics;
 using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.Symbols;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -67,13 +70,17 @@ namespace Microsoft.CodeAnalysis
         /// <remarks>
         /// Guarded by <see cref="CommonReferenceManager.SymbolCacheAndReferenceManagerStateGuard"/>.
         /// </remarks>
-        internal readonly WeakList<IAssemblySymbol> CachedSymbols = new WeakList<IAssemblySymbol>();
+        internal readonly WeakList<IAssemblySymbolInternal> CachedSymbols = new WeakList<IAssemblySymbolInternal>();
 
         // creates a copy
-        private AssemblyMetadata(AssemblyMetadata other)
+        private AssemblyMetadata(AssemblyMetadata other, bool shareCachedSymbols)
             : base(isImageOwner: false, id: other.Id)
         {
-            this.CachedSymbols = other.CachedSymbols;
+            if (shareCachedSymbols)
+            {
+                this.CachedSymbols = other.CachedSymbols;
+            }
+
             _lazyData = other._lazyData;
             _moduleFactoryOpt = other._moduleFactoryOpt;
             _initialModules = other._initialModules;
@@ -81,14 +88,14 @@ namespace Microsoft.CodeAnalysis
         }
 
         internal AssemblyMetadata(ImmutableArray<ModuleMetadata> modules)
-            : base(isImageOwner: true, id: new MetadataId())
+            : base(isImageOwner: true, id: MetadataId.CreateNewId())
         {
             Debug.Assert(!modules.IsDefaultOrEmpty);
             _initialModules = modules;
         }
 
         internal AssemblyMetadata(ModuleMetadata manifestModule, Func<string, ModuleMetadata> moduleFactory)
-            : base(isImageOwner: true, id: new MetadataId())
+            : base(isImageOwner: true, id: MetadataId.CreateNewId())
         {
             Debug.Assert(manifestModule != null);
             Debug.Assert(moduleFactory != null);
@@ -190,12 +197,7 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="ArgumentException"><paramref name="modules"/> is empty or contains a module that doesn't own its image (was created via <see cref="Metadata.Copy"/>).</exception>
         public static AssemblyMetadata Create(ImmutableArray<ModuleMetadata> modules)
         {
-            if (modules.IsDefault)
-            {
-                throw new ArgumentException(nameof(modules));
-            }
-
-            if (modules.Length == 0)
+            if (modules.IsDefaultOrEmpty)
             {
                 throw new ArgumentException(CodeAnalysisResources.AssemblyMustHaveAtLeastOneModule, nameof(modules));
             }
@@ -255,7 +257,12 @@ namespace Microsoft.CodeAnalysis
         /// </remarks>
         internal new AssemblyMetadata Copy()
         {
-            return new AssemblyMetadata(this);
+            return new AssemblyMetadata(this, shareCachedSymbols: true);
+        }
+
+        internal AssemblyMetadata CopyWithoutSharingCachedSymbols()
+        {
+            return new AssemblyMetadata(this, shareCachedSymbols: false);
         }
 
         protected override Metadata CommonCopy()

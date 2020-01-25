@@ -1,6 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System.Collections.Immutable;
+using System.Reflection.Metadata;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Symbols;
 
 namespace Microsoft.CodeAnalysis.CodeGen
@@ -9,18 +15,18 @@ namespace Microsoft.CodeAnalysis.CodeGen
     {
         public abstract void AddPreviousLocals(ArrayBuilder<Cci.ILocalDefinition> builder);
 
-        public abstract LocalDefinition GetPreviousLocal(
+        public abstract LocalDefinition? GetPreviousLocal(
             Cci.ITypeReference type,
             ILocalSymbolInternal symbol,
-            string nameOpt,
+            string? name,
             SynthesizedLocalKind kind,
             LocalDebugId id,
-            uint pdbAttributes,
+            LocalVariableAttributes pdbAttributes,
             LocalSlotConstraints constraints,
-            bool isDynamic,
-            ImmutableArray<TypedConstant> dynamicTransformFlags);
+            ImmutableArray<bool> dynamicTransformFlags,
+            ImmutableArray<string> tupleElementNames);
 
-        public abstract string PreviousStateMachineTypeName { get; }
+        public abstract string? PreviousStateMachineTypeName { get; }
 
         /// <summary>
         /// Returns an index of a slot that stores specified hoisted local variable in the previous generation.
@@ -30,6 +36,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             Cci.ITypeReference currentType,
             SynthesizedLocalKind synthesizedKind,
             LocalDebugId currentId,
+            DiagnosticBag diagnostics,
             out int slotIndex);
 
         /// <summary>
@@ -44,7 +51,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// <summary>
         /// Returns true and an index of a slot that stores an awaiter of a specified type in the previous generation, if any. 
         /// </summary>
-        public abstract bool TryGetPreviousAwaiterSlotIndex(Cci.ITypeReference currentType, out int slotIndex);
+        public abstract bool TryGetPreviousAwaiterSlotIndex(Cci.ITypeReference currentType, DiagnosticBag diagnostics, out int slotIndex);
 
         /// <summary>
         /// Number of slots reserved for awaiters.

@@ -1,9 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -19,13 +22,15 @@ namespace Microsoft.CodeAnalysis.CSharp
     {
         private readonly SyntheticBoundNodeFactory _factory;
         private readonly TypeSymbol _resultType;
+        private readonly ImmutableArray<LocalSymbol> _temps;
         public readonly BoundExpression SiteInitialization;
         public readonly BoundExpression SiteInvocation;
 
-        public LoweredDynamicOperation(SyntheticBoundNodeFactory factory, BoundExpression siteInitialization, BoundExpression siteInvocation, TypeSymbol resultType)
+        public LoweredDynamicOperation(SyntheticBoundNodeFactory factory, BoundExpression siteInitialization, BoundExpression siteInvocation, TypeSymbol resultType, ImmutableArray<LocalSymbol> temps)
         {
             _factory = factory;
             _resultType = resultType;
+            _temps = temps;
             this.SiteInitialization = siteInitialization;
             this.SiteInvocation = siteInvocation;
         }
@@ -36,7 +41,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             BoundExpression loweredRight,
             TypeSymbol resultType)
         {
-            var children = ArrayBuilder<BoundNode>.GetInstance();
+            var children = ArrayBuilder<BoundExpression>.GetInstance();
             children.AddOptional(loweredReceiver);
             children.AddRange(loweredArguments);
             children.AddOptional(loweredRight);
@@ -44,23 +49,30 @@ namespace Microsoft.CodeAnalysis.CSharp
             return LoweredDynamicOperation.Bad(resultType, children.ToImmutableAndFree());
         }
 
-        public static LoweredDynamicOperation Bad(TypeSymbol resultType, ImmutableArray<BoundNode> children)
+        public static LoweredDynamicOperation Bad(TypeSymbol resultType, ImmutableArray<BoundExpression> children)
         {
             Debug.Assert(children.Length > 0);
             var bad = new BoundBadExpression(children[0].Syntax, LookupResultKind.Empty, ImmutableArray<Symbol>.Empty, children, resultType);
-            return new LoweredDynamicOperation(null, null, bad, resultType);
+            return new LoweredDynamicOperation(null, null, bad, resultType, default(ImmutableArray<LocalSymbol>));
         }
 
         public BoundExpression ToExpression()
         {
             if (_factory == null)
             {
-                Debug.Assert(SiteInitialization == null && SiteInvocation is BoundBadExpression);
+                Debug.Assert(SiteInitialization == null && SiteInvocation is BoundBadExpression && _temps.IsDefaultOrEmpty);
                 return SiteInvocation;
             }
 
-            // TODO (tomat): we might be able to using SiteInvocation.Type instead of resultType once we stop using GetLoweredType
-            return _factory.Sequence(new[] { SiteInitialization }, SiteInvocation, _resultType);
+            // TODO (tomat): we might be able to use SiteInvocation.Type instead of resultType once we stop using GetLoweredType
+            if (_temps.IsDefaultOrEmpty)
+            {
+                return _factory.Sequence(new[] { SiteInitialization }, SiteInvocation, _resultType);
+            }
+            else
+            {
+                return new BoundSequence(_factory.Syntax, _temps, ImmutableArray.Create(SiteInitialization), SiteInvocation, _resultType) { WasCompilerGenerated = true };
+            }
         }
     }
 }

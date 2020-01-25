@@ -1,40 +1,43 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.ComponentModel.Composition;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.VisualStudio.Commanding;
+using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Operations;
 using Microsoft.VisualStudio.Utilities;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.DocumentationComments
 {
-    [ExportCommandHandler("XmlTagCompletionCommandHandler", ContentTypeNames.CSharpContentType)]
-    [Order(Before = PredefinedCommandHandlerNames.Completion)]
+    [Export(typeof(ICommandHandler))]
+    [ContentType(ContentTypeNames.CSharpContentType)]
+    [Name(nameof(XmlTagCompletionCommandHandler))]
+    [Order(Before = PredefinedCompletionNames.CompletionCommandHandler)]
     internal class XmlTagCompletionCommandHandler : AbstractXmlTagCompletionCommandHandler
     {
         [ImportingConstructor]
-        public XmlTagCompletionCommandHandler(ITextUndoHistoryRegistry undoHistory, IWaitIndicator waitIndicator)
-            : base(undoHistory, waitIndicator)
+        public XmlTagCompletionCommandHandler(ITextUndoHistoryRegistry undoHistory)
+            : base(undoHistory)
         {
         }
 
         protected override void TryCompleteTag(ITextView textView, ITextBuffer subjectBuffer, Document document, SnapshotPoint position, CancellationToken cancellationToken)
         {
-            var tree = document.GetSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var tree = document.GetSyntaxTreeSynchronously(cancellationToken);
             var token = tree.FindTokenOnLeftOfPosition(position, cancellationToken, includeDocumentationComments: true);
 
             if (token.IsKind(SyntaxKind.GreaterThanToken))
             {
-                var parentStartTag = token.Parent as XmlElementStartTagSyntax;
-                if (parentStartTag == null)
+                if (!(token.Parent is XmlElementStartTagSyntax parentStartTag))
                 {
                     return;
                 }
@@ -96,8 +99,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.DocumentationComments
 
         private bool HasUnmatchedIdenticalParent(XmlElementStartTagSyntax parentStartTag)
         {
-            var grandParentElement = parentStartTag.Parent.Parent as XmlElementSyntax;
-            if (grandParentElement != null)
+            if (parentStartTag.Parent.Parent is XmlElementSyntax grandParentElement)
             {
                 if (grandParentElement.StartTag.Name.LocalName.ValueText == parentStartTag.Name.LocalName.ValueText)
                 {
@@ -120,8 +122,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.DocumentationComments
                 return false;
             }
 
-            var parentElement = parentStartTag.Parent as XmlElementSyntax;
-            if (parentElement == null)
+            if (!(parentStartTag.Parent is XmlElementSyntax parentElement))
             {
                 return false;
             }

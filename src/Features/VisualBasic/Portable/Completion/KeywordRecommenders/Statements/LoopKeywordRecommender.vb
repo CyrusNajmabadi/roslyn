@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -23,11 +25,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Stat
                 End If
 
                 If doBlock.Kind <> SyntaxKind.SimpleDoLoopBlock Then
-                    Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Loop", VBFeaturesResources.LoopKeywordToolTip))
+                    Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Loop", VBFeaturesResources.Terminates_a_loop_that_is_introduced_with_a_Do_statement))
                 Else
-                    Return {New RecommendedKeyword("Loop", VBFeaturesResources.LoopKeywordToolTip),
-                            New RecommendedKeyword("Loop Until", VBFeaturesResources.LoopUntilKeywordToolTip),
-                            New RecommendedKeyword("Loop While", VBFeaturesResources.LoopWhileKeywordToolTip)}
+                    Return {New RecommendedKeyword("Loop", VBFeaturesResources.Terminates_a_loop_that_is_introduced_with_a_Do_statement),
+                            New RecommendedKeyword("Loop Until", VBFeaturesResources.Repeats_a_block_of_statements_until_a_Boolean_condition_becomes_true_Do_Loop_Until_condition),
+                            New RecommendedKeyword("Loop While", VBFeaturesResources.Repeats_a_block_of_statements_while_a_Boolean_condition_is_true_Do_Loop_While_condition)}
                 End If
             End If
 

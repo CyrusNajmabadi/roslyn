@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.ComponentModel;
 using Microsoft.VisualStudio.LanguageServices.SolutionExplorer;
@@ -9,14 +11,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
     {
         internal class BrowseObject : LocalizableProperties
         {
-            private AnalyzerItem _analyzerItem;
+            private readonly AnalyzerItem _analyzerItem;
 
             public BrowseObject(AnalyzerItem analyzerItem)
             {
                 _analyzerItem = analyzerItem;
             }
 
-            [BrowseObjectDisplayName(nameof(SolutionExplorerShim.AnalyzerItemNameDisplayName))]
+            [BrowseObjectDisplayName(nameof(SolutionExplorerShim.Name))]
             public string Name
             {
                 get
@@ -25,7 +27,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
                 }
             }
 
-            [BrowseObjectDisplayName(nameof(SolutionExplorerShim.AnalyzerItemPathDisplayName))]
+            [BrowseObjectDisplayName(nameof(SolutionExplorerShim.Path))]
             public string Path
             {
                 get
@@ -36,7 +38,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
 
             public override string GetClassName()
             {
-                return SolutionExplorerShim.AnalyzerItem_PropertyWindowClassName;
+                return SolutionExplorerShim.Analyzer_Properties;
             }
 
             public override string GetComponentName()

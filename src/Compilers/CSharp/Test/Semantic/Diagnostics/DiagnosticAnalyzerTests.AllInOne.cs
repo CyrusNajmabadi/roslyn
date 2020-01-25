@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -20,16 +22,18 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         {
             var source = TestResource.AllInOneCSharpCode;
 
-            // AllInOneCSharpCode has no properties with initializers or named types with primary constructors.
+            // AllInOneCSharpCode has no properties with initializers/attributes.
             var symbolKindsWithNoCodeBlocks = new HashSet<SymbolKind>();
             symbolKindsWithNoCodeBlocks.Add(SymbolKind.Property);
-            symbolKindsWithNoCodeBlocks.Add(SymbolKind.NamedType);
+
+            // Add nodes that are not yet in AllInOneCSharpCode to this list.
+            var missingSyntaxKinds = new HashSet<SyntaxKind>();
 
             var analyzer = new CSharpTrackingDiagnosticAnalyzer();
-            CreateCompilationWithMscorlib45(source, parseOptions: TestOptions.Regular).VerifyAnalyzerDiagnostics(new[] { analyzer });
+            CreateCompilationWithMscorlib45(source).VerifyAnalyzerDiagnostics(new[] { analyzer });
             analyzer.VerifyAllAnalyzerMembersWereCalled();
             analyzer.VerifyAnalyzeSymbolCalledForAllSymbolKinds();
-            analyzer.VerifyAnalyzeNodeCalledForAllSyntaxKinds();
+            analyzer.VerifyAnalyzeNodeCalledForAllSyntaxKinds(missingSyntaxKinds);
             analyzer.VerifyOnCodeBlockCalledForAllSymbolAndMethodKinds(symbolKindsWithNoCodeBlocks);
         }
 
@@ -66,13 +70,13 @@ public class C
     }
 }
 ";
-            CreateExperimentalCompilationWithMscorlib45(source).VerifyAnalyzerDiagnostics(new[] { new CSharpTrackingDiagnosticAnalyzer() });
+            CreateCompilationWithMscorlib45(source).VerifyAnalyzerDiagnostics(new[] { new CSharpTrackingDiagnosticAnalyzer() });
         }
 
         [Fact]
         public void DiagnosticAnalyzerExpressionBodiedProperty()
         {
-            var comp = CreateExperimentalCompilationWithMscorlib45(@"
+            var comp = CreateCompilationWithMscorlib45(@"
 public class C
 {
     public int P => 10;
@@ -85,7 +89,7 @@ public class C
         [WorkItem(759, "https://github.com/dotnet/roslyn/issues/759")]
         public void AnalyzerDriverIsSafeAgainstAnalyzerExceptions()
         {
-            var compilation = CreateCompilationWithMscorlib45(TestResource.AllInOneCSharpCode, parseOptions: TestOptions.Regular);
+            var compilation = CreateCompilationWithMscorlib45(TestResource.AllInOneCSharpCode);
             ThrowingDiagnosticAnalyzer<SyntaxKind>.VerifyAnalyzerEngineIsSafeAgainstExceptions(analyzer =>
                 compilation.GetAnalyzerDiagnostics(new[] { analyzer }, null, logAnalyzerExceptionAsDiagnostics: true));
         }
@@ -99,7 +103,7 @@ public class C
                 new[] { new TestAdditionalText("myfilepath", text) }.ToImmutableArray<AdditionalText>()
             );
 
-            var compilation = CreateCompilationWithMscorlib45(TestResource.AllInOneCSharpCode, parseOptions: TestOptions.Regular);
+            var compilation = CreateCompilationWithMscorlib45(TestResource.AllInOneCSharpCode);
             var analyzer = new OptionsDiagnosticAnalyzer<SyntaxKind>(options);
             compilation.GetAnalyzerDiagnostics(new[] { analyzer }, options);
             analyzer.VerifyAnalyzerOptions();

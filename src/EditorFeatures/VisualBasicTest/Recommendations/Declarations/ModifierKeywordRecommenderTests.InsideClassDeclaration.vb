@@ -1,6 +1,7 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations.ModifierKeywordRecommenderTests
     Public Class InsideClassDeclaration
@@ -115,6 +116,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.De
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function AfterIteratorTest() As Task
             Await VerifyRecommendationsContainAsync(<ClassDeclaration>Iterator |</ClassDeclaration>, "Public", "Protected", "Protected Friend", "Friend", "Private")
+        End Function
+
+        <WorkItem(20837, "https://github.com/dotnet/roslyn/issues/20837")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function AfterExtensionAttribute() As Task
+            Await VerifyRecommendationsContainAsync(<ClassDeclaration>&lt;Extension&gt; |</ClassDeclaration>, "Public", "Protected", "Protected Friend", "Friend", "Private")
         End Function
 
 #End Region

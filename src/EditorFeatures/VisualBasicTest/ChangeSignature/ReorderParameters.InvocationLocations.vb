@@ -1,6 +1,7 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ChangeSignature
@@ -11,13 +12,13 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ChangeSignature
         Public Async Function TestReorderMethodParameters_InvokeBeforeMethodName() As Task
             Dim markup = <Text><![CDATA[
 Class C
-    Public Sub $$Foo(x As Integer, y As String)
+    Public Sub $$Goo(x As Integer, y As String)
     End Sub
 End Class]]></Text>.NormalizedValue()
             Dim permutation = {1, 0}
             Dim updatedCode = <Text><![CDATA[
 Class C
-    Public Sub Foo(y As String, x As Integer)
+    Public Sub Goo(y As String, x As Integer)
     End Sub
 End Class]]></Text>.NormalizedValue()
 
@@ -30,13 +31,13 @@ End Class]]></Text>.NormalizedValue()
         Public Async Function TestReorderMethodParameters_InvokeInParameterList() As Task
             Dim markup = <Text><![CDATA[
 Class C
-    Public Sub Foo(x As Integer, $$y As String)
+    Public Sub Goo(x As Integer, $$y As String)
     End Sub
 End Class]]></Text>.NormalizedValue()
             Dim permutation = {1, 0}
             Dim updatedCode = <Text><![CDATA[
 Class C
-    Public Sub Foo(y As String, x As Integer)
+    Public Sub Goo(y As String, x As Integer)
     End Sub
 End Class]]></Text>.NormalizedValue()
 
@@ -47,13 +48,13 @@ End Class]]></Text>.NormalizedValue()
         Public Async Function TestReorderMethodParameters_InvokeAfterParameterList() As Task
             Dim markup = <Text><![CDATA[
 Class C
-    Public Sub Foo(x As Integer, y As String)$$
+    Public Sub Goo(x As Integer, y As String)$$
     End Sub
 End Class]]></Text>.NormalizedValue()
             Dim permutation = {1, 0}
             Dim updatedCode = <Text><![CDATA[
 Class C
-    Public Sub Foo(y As String, x As Integer)
+    Public Sub Goo(y As String, x As Integer)
     End Sub
 End Class]]></Text>.NormalizedValue()
 
@@ -64,13 +65,13 @@ End Class]]></Text>.NormalizedValue()
         Public Async Function TestReorderMethodParameters_InvokeBeforeMethodDeclaration() As Task
             Dim markup = <Text><![CDATA[
 Class C
-    $$Public Sub Foo(x As Integer, y As String)
+    $$Public Sub Goo(x As Integer, y As String)
     End Sub
 End Class]]></Text>.NormalizedValue()
             Dim permutation = {1, 0}
             Dim updatedCode = <Text><![CDATA[
 Class C
-    Public Sub Foo(y As String, x As Integer)
+    Public Sub Goo(y As String, x As Integer)
     End Sub
 End Class]]></Text>.NormalizedValue()
 
@@ -86,7 +87,7 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.TheMemberIsDefinedInMetadata)
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.The_member_is_defined_in_metadata)
         End Function
 
         <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
@@ -98,7 +99,7 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.TheMemberIsDefinedInMetadata)
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.The_member_is_defined_in_metadata)
         End Function
 
         <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
@@ -110,7 +111,7 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.TheMemberIsDefinedInMetadata)
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.The_member_is_defined_in_metadata)
         End Function
 
         <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
@@ -122,7 +123,7 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.TheMemberIsDefinedInMetadata)
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.The_member_is_defined_in_metadata)
         End Function
 
         <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
@@ -463,7 +464,7 @@ Class C
         End Set
     End Property
 
-    Sub Foo()
+    Sub Goo()
         Dim c = New C()
         Dim x = $$c(1, 2)
     End Sub
@@ -479,7 +480,7 @@ Class C
         End Set
     End Property
 
-    Sub Foo()
+    Sub Goo()
         Dim c = New C()
         Dim x = c(2, 1)
     End Sub
@@ -500,7 +501,7 @@ Class C
         End Set
     End Property
 
-    Sub Foo()
+    Sub Goo()
         Dim c = New C()
         Dim x = c(1, 2$$)
     End Sub
@@ -516,7 +517,7 @@ Class C
         End Set
     End Property
 
-    Sub Foo()
+    Sub Goo()
         Dim c = New C()
         Dim x = c(2, 1)
     End Sub
@@ -587,13 +588,13 @@ End Class]]></Text>.NormalizedValue()
         Public Async Function ReorderIndexerParameters_CodeRefactoring_InMethodDeclaration() As Threading.Tasks.Task
             Dim markup = <Text><![CDATA[
 Class C
-    Sub Foo(x As Integer[||], y As Integer)
+    Sub Goo(x As Integer[||], y As Integer)
     End Sub
 End Class]]></Text>.NormalizedValue()
             Dim permutation = {1, 0}
             Dim updatedCode = <Text><![CDATA[
 Class C
-    Sub Foo(y As Integer, x As Integer)
+    Sub Goo(y As Integer, x As Integer)
     End Sub
 End Class]]></Text>.NormalizedValue()
 
@@ -604,7 +605,7 @@ End Class]]></Text>.NormalizedValue()
         Public Async Function ReorderIndexerParameters_CodeRefactoring_NotInMethodBody() As Threading.Tasks.Task
             Dim markup = <Text><![CDATA[
 Class C
-    Sub Foo(x As Integer, y As Integer)
+    Sub Goo(x As Integer, y As Integer)
         [||]
     End Sub
 End Class]]></Text>.NormalizedValue()
@@ -613,22 +614,36 @@ End Class]]></Text>.NormalizedValue()
         End Function
 
         <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Async Function ReorderIndexerParameters_CodeRefactoring_InCallSite() As Threading.Tasks.Task
+        Public Async Function ReorderIndexerParameters_CodeRefactoring_InCallSite_ViaCommand() As Task
             Dim markup = <Text><![CDATA[
 Class C
-    Sub Foo(x As Integer, y As Integer)
-        Foo([|1|], 2)
+    Sub Goo(x As Integer, y As Integer)
+        Goo($$1, 2)
     End Sub
 End Class]]></Text>.NormalizedValue()
             Dim permutation = {1, 0}
             Dim updatedCode = <Text><![CDATA[
 Class C
-    Sub Foo(y As Integer, x As Integer)
-        Foo(2, 1)
+    Sub Goo(y As Integer, x As Integer)
+        Goo(2, 1)
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            Await TestChangeSignatureViaCodeActionAsync(markup, expectedCodeAction:=True, updatedSignature:=permutation, expectedCode:=updatedCode)
+            Await TestChangeSignatureViaCommandAsync(
+                LanguageNames.VisualBasic, markup, updatedSignature:=permutation,
+                expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function ReorderIndexerParameters_CodeRefactoring_InCallSite_ViaCodeAction() As Threading.Tasks.Task
+            Dim markup = <Text><![CDATA[
+Class C
+    Sub Goo(x As Integer, y As Integer)
+        Goo([||]1, 2)
+    End Sub
+End Class]]></Text>.NormalizedValue()
+
+            Await TestMissingAsync(markup)
         End Function
 #End Region
 

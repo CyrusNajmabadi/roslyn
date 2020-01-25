@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
@@ -17,7 +19,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
     [Export]
     internal class AnalyzerItemsTracker : IVsSelectionEvents
     {
-        private IServiceProvider _serviceProvider;
+        private readonly IServiceProvider _serviceProvider;
         private IVsMonitorSelection _vsMonitorSelection = null;
         private uint _selectionEventsCookie = 0;
 
@@ -32,7 +34,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
 
         public void Register()
         {
-            IVsMonitorSelection vsMonitorSelection = GetMonitorSelection();
+            var vsMonitorSelection = GetMonitorSelection();
 
             if (vsMonitorSelection != null)
             {
@@ -42,7 +44,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
 
         public void Unregister()
         {
-            IVsMonitorSelection vsMonitorSelection = GetMonitorSelection();
+            var vsMonitorSelection = GetMonitorSelection();
 
             if (vsMonitorSelection != null)
             {
@@ -54,7 +56,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
         public uint SelectedItemId { get; private set; } = VSConstants.VSITEMID_NIL;
         public AnalyzersFolderItem SelectedFolder { get; private set; }
         public ImmutableArray<AnalyzerItem> SelectedAnalyzerItems { get; private set; } = ImmutableArray<AnalyzerItem>.Empty;
-        public ImmutableArray<DiagnosticItem> SelectedDiagnosticItems { get; private set; } = ImmutableArray<DiagnosticItem>.Empty;
+        public ImmutableArray<BaseDiagnosticItem> SelectedDiagnosticItems { get; private set; } = ImmutableArray<BaseDiagnosticItem>.Empty;
 
         int IVsSelectionEvents.OnCmdUIContextChanged(uint dwCmdUICookie, int fActive)
         {
@@ -76,8 +78,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
             IVsMultiItemSelect pMISNew,
             ISelectionContainer pSCNew)
         {
-            IVsHierarchy oldSelectedHierarchy = this.SelectedHierarchy;
-            uint oldSelectedItemId = this.SelectedItemId;
+            var oldSelectedHierarchy = this.SelectedHierarchy;
+            var oldSelectedItemId = this.SelectedItemId;
 
             this.SelectedHierarchy = pHierNew;
             this.SelectedItemId = itemidNew;
@@ -95,7 +97,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
                                   .FirstOrDefault();
 
             this.SelectedDiagnosticItems = selectedObjects
-                                           .OfType<DiagnosticItem.BrowseObject>()
+                                           .OfType<BaseDiagnosticItem.BrowseObject>()
                                            .Select(b => b.DiagnosticItem)
                                            .ToImmutableArray();
 
@@ -112,19 +114,18 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
         {
             if (selectionContainer == null)
             {
-                return SpecializedCollections.EmptyArray<object>();
+                return Array.Empty<object>();
             }
 
-            uint selectedObjectCount = 0;
-            if (selectionContainer.CountObjects((uint)Constants.GETOBJS_SELECTED, out selectedObjectCount) < 0 || selectedObjectCount == 0)
+            if (selectionContainer.CountObjects((uint)Constants.GETOBJS_SELECTED, out var selectedObjectCount) < 0 || selectedObjectCount == 0)
             {
-                return SpecializedCollections.EmptyArray<object>();
+                return Array.Empty<object>();
             }
 
-            object[] selectedObjects = new object[selectedObjectCount];
+            var selectedObjects = new object[selectedObjectCount];
             if (selectionContainer.GetObjects((uint)Constants.GETOBJS_SELECTED, selectedObjectCount, selectedObjects) < 0)
             {
-                return SpecializedCollections.EmptyArray<object>();
+                return Array.Empty<object>();
             }
 
             return selectedObjects;

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Linq;
@@ -78,7 +80,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense
 
                 default:
                     Contract.Fail();
-                    return default(ViewTextSpan);
+                    return default;
             }
         }
 
@@ -100,9 +102,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense
                         yield return result;
                     }
                 }
-                else if (source is IProjectionSnapshot)
+                else if (source is IProjectionSnapshot sourceProjection)
                 {
-                    var sourceProjection = source as IProjectionSnapshot;
                     foreach (var span in MapUpToSnapshotRecursive(start, sourceProjection))
                     {
                         foreach (var result in target.MapFromSourceSnapshot(new SnapshotSpan(source, span)))

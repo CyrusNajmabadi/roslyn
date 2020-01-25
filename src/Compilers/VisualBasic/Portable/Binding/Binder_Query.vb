@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -341,7 +344,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim underlyingExpression As BoundExpression
 
             If source.Type.IsErrorType() Then
-                underlyingExpression = BadExpression(aggregate, ImmutableArray.Create(Of BoundNode)(source, letSelectorLambda),
+                underlyingExpression = BadExpression(aggregate, ImmutableArray.Create(Of BoundExpression)(source, letSelectorLambda),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 Dim callDiagnostics As DiagnosticBag = diagnostics
@@ -544,7 +547,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim suppressDiagnostics As DiagnosticBag = Nothing
 
                 If letOperator.Type.IsErrorType() Then
-                    underlyingExpression = BadExpression(aggregate, ImmutableArray.Create(Of BoundNode)(letOperator, selectSelectorLambda),
+                    underlyingExpression = BadExpression(aggregate, ImmutableArray.Create(Of BoundExpression)(letOperator, selectSelectorLambda),
                                                              ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
                 Else
                     Dim callDiagnostics As DiagnosticBag = diagnostics
@@ -700,7 +703,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundCallOrBadExpression As BoundExpression
 
             If source.Type.IsErrorType() Then
-                boundCallOrBadExpression = BadExpression(clauseSyntax, ImmutableArray.Create(Of BoundNode)(source, selectorLambda),
+                boundCallOrBadExpression = BadExpression(clauseSyntax, ImmutableArray.Create(Of BoundExpression)(source, selectorLambda),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 Dim suppressDiagnostics As DiagnosticBag = Nothing
@@ -846,7 +849,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim boundCallOrBadExpression As BoundExpression
 
                 If source.Type.IsErrorType() Then
-                    boundCallOrBadExpression = BadExpression(variable, ImmutableArray.Create(Of BoundNode)(source, selectorLambda),
+                    boundCallOrBadExpression = BadExpression(variable, ImmutableArray.Create(Of BoundExpression)(source, selectorLambda),
                                                              ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
                 Else
                     If suppressDiagnostics Is Nothing AndAlso ShouldSuppressDiagnostics(selectorLambda) Then
@@ -1168,7 +1171,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim boundCallOrBadExpression As BoundExpression
 
                 If source.Type.IsErrorType() Then
-                    boundCallOrBadExpression = BadExpression(variable, ImmutableArray.Create(Of BoundNode)(source, manySelectorLambda, joinSelectorLambda),
+                    boundCallOrBadExpression = BadExpression(variable, ImmutableArray.Create(Of BoundExpression)(source, manySelectorLambda, joinSelectorLambda),
                                                              ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
                 Else
                     If suppressDiagnostics Is Nothing AndAlso
@@ -1556,7 +1559,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundCallOrBadExpression As BoundExpression
 
             If outer.Type.IsErrorType() Then
-                boundCallOrBadExpression = BadExpression(join, ImmutableArray.Create(Of BoundNode)(outer, inner, outerKeyLambda, innerKeyLambda, joinSelectorLambda),
+                boundCallOrBadExpression = BadExpression(join, ImmutableArray.Create(Of BoundExpression)(outer, inner, outerKeyLambda, innerKeyLambda, joinSelectorLambda),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 Dim callDiagnostics As DiagnosticBag = diagnostics
@@ -1745,7 +1748,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundCallOrBadExpression As BoundExpression
 
             If outer.Type.IsErrorType() OrElse methodGroup Is Nothing Then
-                boundCallOrBadExpression = BadExpression(groupJoin, ImmutableArray.Create(Of BoundNode)(outer, inner, outerKeyLambda, innerKeyLambda, intoLambda),
+                boundCallOrBadExpression = BadExpression(groupJoin, ImmutableArray.Create(Of BoundExpression)(outer, inner, outerKeyLambda, innerKeyLambda, intoLambda),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 Dim callDiagnostics As DiagnosticBag = diagnostics
@@ -1856,7 +1859,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If source.Type.IsErrorType() OrElse methodGroup Is Nothing Then
                 boundCallOrBadExpression = BadExpression(groupBy,
-                                                         ImmutableArray.Create(Of BoundNode)(source).AddRange(groupByArguments),
+                                                         ImmutableArray.Create(Of BoundExpression)(source).AddRange(groupByArguments),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 Dim callDiagnostics As DiagnosticBag = diagnostics
@@ -2222,7 +2225,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Sub
 
-        Private Function GetQueryLambdaParameterSyntax(syntaxNode As VisualBasicSyntaxNode, rangeVariables As ImmutableArray(Of RangeVariableSymbol)) As VisualBasicSyntaxNode
+        Private Shared Function GetQueryLambdaParameterSyntax(syntaxNode As VisualBasicSyntaxNode, rangeVariables As ImmutableArray(Of RangeVariableSymbol)) As VisualBasicSyntaxNode
             If rangeVariables.Length = 1 Then
                 Return rangeVariables(0).Syntax
             End If
@@ -2237,12 +2240,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             syntaxNode As VisualBasicSyntaxNode,
             rangeVariables As ImmutableArray(Of RangeVariableSymbol)
         ) As BoundLambdaParameterSymbol
-            syntaxNode = Me.GetQueryLambdaParameterSyntax(syntaxNode, rangeVariables)
+            syntaxNode = GetQueryLambdaParameterSyntax(syntaxNode, rangeVariables)
             Dim param = New BoundLambdaParameterSymbol(name, ordinal, type, isByRef:=False, syntaxNode:=syntaxNode, location:=syntaxNode.GetLocation())
             Return param
         End Function
 
-        Private Function CreateQueryLambdaParameterSymbol(
+        Private Shared Function CreateQueryLambdaParameterSymbol(
             name As String,
             ordinal As Integer,
             type As TypeSymbol,
@@ -2431,7 +2434,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundCallOrBadExpression As BoundExpression
 
             If source.Type.IsErrorType() Then
-                boundCallOrBadExpression = BadExpression(operatorSyntax, ImmutableArray.Create(Of BoundNode)(source, filterLambda),
+                boundCallOrBadExpression = BadExpression(operatorSyntax, ImmutableArray.Create(Of BoundExpression)(source, filterLambda),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 If suppressDiagnostics Is Nothing AndAlso ShouldSuppressDiagnostics(filterLambda) Then
@@ -2478,7 +2481,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If source.Type.IsErrorType() Then
                 ' Operator BindQueryClauseCall will fail, let's not bother.
-                boundCallOrBadExpression = BadExpression(distinct, ImmutableArray.Create(Of BoundNode)(source),
+                boundCallOrBadExpression = BadExpression(distinct, source,
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 boundCallOrBadExpression = BindQueryOperatorCall(distinct, source,
@@ -2545,7 +2548,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundCallOrBadExpression As BoundExpression
 
             If source.Type.IsErrorType() Then
-                boundCallOrBadExpression = BadExpression(partition, ImmutableArray.Create(Of BoundNode)(source, boundCount),
+                boundCallOrBadExpression = BadExpression(partition, ImmutableArray.Create(source, boundCount),
                                                          ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
             Else
                 Dim suppressDiagnostics As DiagnosticBag = Nothing
@@ -2558,7 +2561,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 boundCallOrBadExpression = BindQueryOperatorCall(partition, source,
                                                                operatorName,
-                                                               ImmutableArray.Create(Of BoundExpression)(boundCount),
+                                                               ImmutableArray.Create(boundCount),
                                                                partition.SkipOrTakeKeyword.Span,
                                                                diagnostics)
 
@@ -2642,7 +2645,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim boundCallOrBadExpression As BoundExpression
 
                 If sourceOrPreviousOrdering.Type.IsErrorType() Then
-                    boundCallOrBadExpression = BadExpression(ordering, ImmutableArray.Create(Of BoundNode)(sourceOrPreviousOrdering, keyLambda),
+                    boundCallOrBadExpression = BadExpression(ordering, ImmutableArray.Create(Of BoundExpression)(sourceOrPreviousOrdering, keyLambda),
                                                              ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
                 Else
                     If suppressDiagnostics Is Nothing AndAlso ShouldSuppressDiagnostics(keyLambda) Then
@@ -2732,6 +2735,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Public Overrides ReadOnly Property ContainingMember As Symbol
                 Get
                     Return _lambdaSymbol
+                End Get
+            End Property
+
+            Public Overrides ReadOnly Property AdditionalContainingMembers As ImmutableArray(Of Symbol)
+                Get
+                    Return ImmutableArray(Of Symbol).Empty
                 End Get
             End Property
 
@@ -3429,13 +3438,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                       True)
 
                         outerKey = outerKeyBinder.BindAnonymousObjectCreationExpression(join, descriptor, outerKeys.AsImmutableOrNull(),
-                                                                                        diagnostics).MakeCompilerGenerated()
+                                                                                        diagnostics)
                         innerKey = innerKeyBinder.BindAnonymousObjectCreationExpression(join, descriptor, innerKeys.AsImmutableOrNull(),
-                                                                                        diagnostics).MakeCompilerGenerated()
+                                                                                        diagnostics)
                     Else
-                        outerKey = BadExpression(join, DirectCast(outerKeys, BoundNode()).AsImmutableOrNull(), ErrorTypeSymbol.UnknownResultType)
-                        innerKey = BadExpression(join, DirectCast(innerKeys, BoundNode()).AsImmutableOrNull(), ErrorTypeSymbol.UnknownResultType)
+                        outerKey = BadExpression(join, outerKeys.AsImmutableOrNull(), ErrorTypeSymbol.UnknownResultType)
+                        innerKey = BadExpression(join, innerKeys.AsImmutableOrNull(), ErrorTypeSymbol.UnknownResultType)
                     End If
+
+                    outerKey.MakeCompilerGenerated()
+                    innerKey.MakeCompilerGenerated()
                 End If
 
                 If suppressDiagnostics IsNot Nothing Then
@@ -3547,7 +3559,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     keysAreGood = Not (outerKey.Type.IsErrorType() OrElse innerKey.Type.IsErrorType())
                 End If
 
-                If keysAreGood AndAlso Not outerKey.Type.IsSameTypeIgnoringCustomModifiers(innerKey.Type) Then
+                If keysAreGood AndAlso Not outerKey.Type.IsSameTypeIgnoringAll(innerKey.Type) Then
                     ' Apply conversion if available.
                     Dim targetType As TypeSymbol = Nothing
                     Dim intrinsicOperatorType As SpecialType = SpecialType.None
@@ -4037,7 +4049,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 If m_GroupReference.Type.IsErrorType() OrElse String.IsNullOrEmpty(functionAggregationSyntax.FunctionName.ValueText) Then
                     boundCallOrBadExpression = BadExpression(functionAggregationSyntax,
-                                                             ImmutableArray.Create(Of BoundNode)(m_GroupReference).AddRange(arguments),
+                                                             ImmutableArray.Create(m_GroupReference).AddRange(arguments),
                                                              ErrorTypeSymbol.UnknownResultType).MakeCompilerGenerated()
                 Else
                     Dim callDiagnostics As DiagnosticBag = diagnostics
@@ -4258,7 +4270,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
 
             ElseIf targetVariableType IsNot Nothing AndAlso
-                   Not targetVariableType.IsSameTypeIgnoringCustomModifiers(variableType) Then
+                   Not targetVariableType.IsSameTypeIgnoringAll(variableType) Then
                 Debug.Assert(Not sourceIsNotQueryable AndAlso syntax.AsClause IsNot Nothing)
                 ' Need to apply implicit Select that converts variableType to targetVariableType.
                 source = ApplyImplicitCollectionConversion(syntax, source, variableType, targetVariableType, diagnostics)
@@ -4578,7 +4590,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                     If result Is Nothing Then
                         result = inferredType
-                    ElseIf Not result.IsSameTypeIgnoringCustomModifiers(inferredType) Then
+                    ElseIf Not result.IsSameTypeIgnoringAll(inferredType) Then
                         failedDueToAnAmbiguity = True
                         Return Nothing
                     End If
@@ -4646,7 +4658,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Note, returned group might have ResultKind = "Inaccessible".
         ''' </summary>
         Private Function LookupQueryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             source As BoundExpression,
             operatorName As String,
             typeArgumentsOpt As BoundTypeArguments,
@@ -4684,7 +4696,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 
         Private Function BindQueryOperatorCall(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             source As BoundExpression,
             operatorName As String,
             arguments As ImmutableArray(Of BoundExpression),
@@ -4701,7 +4713,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function BindQueryOperatorCall(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             source As BoundExpression,
             operatorName As String,
             typeArgumentsOpt As BoundTypeArguments,
@@ -4722,7 +4734,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' [methodGroup] can be Nothing if lookup didn't find anything.
         ''' </summary>
         Private Function BindQueryOperatorCall(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             source As BoundExpression,
             operatorName As String,
             methodGroup As BoundMethodGroup,
@@ -4785,12 +4797,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             If boundCall Is Nothing Then
-                Dim childBoundNodes As ImmutableArray(Of BoundNode)
+                Dim childBoundNodes As ImmutableArray(Of BoundExpression)
 
                 If arguments.IsEmpty Then
-                    childBoundNodes = ImmutableArray.Create(Of BoundNode)(If(methodGroup, source))
+                    childBoundNodes = ImmutableArray.Create(If(methodGroup, source))
                 Else
-                    Dim builder = ArrayBuilder(Of BoundNode).GetInstance()
+                    Dim builder = ArrayBuilder(Of BoundExpression).GetInstance()
                     builder.Add(If(methodGroup, source))
                     builder.AddRange(arguments)
                     childBoundNodes = builder.ToImmutableAndFree()

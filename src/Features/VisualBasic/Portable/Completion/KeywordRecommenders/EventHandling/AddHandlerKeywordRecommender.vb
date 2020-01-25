@@ -1,9 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
 Imports Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.CodeAnalysis.VisualBasic.Utilities.IntrinsicOperators
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.EventHandling
@@ -17,7 +18,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Even
             If context.IsSingleLineStatementContext OrElse context.CanDeclareCustomEventAccessor(SyntaxKind.AddHandlerAccessorBlock) Then
                 Return SpecializedCollections.SingletonEnumerable(
                                 CreateRecommendedKeywordForIntrinsicOperator(SyntaxKind.AddHandlerKeyword,
-                                                                             VBFeaturesResources.AddhandlerStatement,
+                                                                             VBFeaturesResources.AddHandler_statement,
                                                                              Glyph.Keyword,
                                                                              New AddHandlerStatementDocumentation()))
             Else

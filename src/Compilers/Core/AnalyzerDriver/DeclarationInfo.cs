@@ -1,15 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Linq;
 
 namespace Microsoft.CodeAnalysis
 {
     /// <summary>
     /// Struct containing information about a source declaration.
     /// </summary>
-    internal struct DeclarationInfo
+    internal readonly struct DeclarationInfo
     {
         private readonly SyntaxNode _declaredNode;
         private readonly ImmutableArray<SyntaxNode> _executableCodeBlocks;
@@ -32,16 +33,16 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Topmost syntax node for this declaration.
         /// </summary>
-        public SyntaxNode DeclaredNode { get { return _declaredNode; } }
+        public SyntaxNode DeclaredNode => _declaredNode;
 
         /// <summary>
         /// Syntax nodes for executable code blocks (method body, initializers, etc.) associated with this declaration.
         /// </summary>
-        public ImmutableArray<SyntaxNode> ExecutableCodeBlocks { get { return _executableCodeBlocks; } }
+        public ImmutableArray<SyntaxNode> ExecutableCodeBlocks => _executableCodeBlocks;
 
         /// <summary>
         /// Symbol declared by this declaration.
         /// </summary>
-        public ISymbol DeclaredSymbol { get { return _declaredSymbol; } }
+        public ISymbol DeclaredSymbol => _declaredSymbol;
     }
 }

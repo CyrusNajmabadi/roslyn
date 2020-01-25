@@ -1,5 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,12 +17,13 @@ namespace Microsoft.CodeAnalysis.Editor
         private readonly IList<SolutionPreviewItem> _previews;
         public readonly SolutionChangeSummary ChangeSummary;
 
-        public SolutionPreviewResult(SolutionPreviewItem preview, SolutionChangeSummary changeSummary = null)
-            : this(new List<SolutionPreviewItem> { preview }, changeSummary)
+        public SolutionPreviewResult(IThreadingContext threadingContext, SolutionPreviewItem preview, SolutionChangeSummary changeSummary = null)
+            : this(threadingContext, new List<SolutionPreviewItem> { preview }, changeSummary)
         {
         }
 
-        public SolutionPreviewResult(IList<SolutionPreviewItem> previews, SolutionChangeSummary changeSummary = null)
+        public SolutionPreviewResult(IThreadingContext threadingContext, IList<SolutionPreviewItem> previews, SolutionChangeSummary changeSummary = null)
+            : base(threadingContext)
         {
             _previews = previews ?? SpecializedCollections.EmptyList<SolutionPreviewItem>();
             this.ChangeSummary = changeSummary;
@@ -27,7 +31,7 @@ namespace Microsoft.CodeAnalysis.Editor
 
         public bool IsEmpty => _previews.Count == 0;
 
-        public async Task<IReadOnlyList<object>> GetPreviewsAsync(DocumentId preferredDocumentId = null, ProjectId preferredProjectId = null, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<IReadOnlyList<object>> GetPreviewsAsync(DocumentId preferredDocumentId = null, ProjectId preferredProjectId = null, CancellationToken cancellationToken = default)
         {
             AssertIsForeground();
             cancellationToken.ThrowIfCancellationRequested();
@@ -52,25 +56,35 @@ namespace Microsoft.CodeAnalysis.Editor
             var result = new List<object>();
             var gotRichPreview = false;
 
-            foreach (var previewItem in _previews)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (previewItem.Text != null)
+                foreach (var previewItem in _previews)
                 {
-                    result.Add(previewItem.Text);
-                }
-                else if (!gotRichPreview)
-                {
-                    var preview = await previewItem.LazyPreview(cancellationToken).ConfigureAwait(true);
-                    if (preview != null)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (previewItem.Text != null)
                     {
-                        result.Add(preview);
-                        gotRichPreview = true;
+                        result.Add(previewItem.Text);
+                    }
+                    else if (!gotRichPreview)
+                    {
+                        var preview = await previewItem.LazyPreview(cancellationToken).ConfigureAwait(true);
+                        if (preview != null)
+                        {
+                            result.Add(preview);
+                            gotRichPreview = true;
+                        }
                     }
                 }
-            }
 
-            return result.Count == 0 ? null : result;
+                return result.Count == 0 ? null : result;
+            }
+            catch (OperationCanceledException)
+            {
+                // make sure we dispose all disposable preview objects before
+                // we let control to exit this method
+                result.OfType<IDisposable>().Do(d => d.Dispose());
+                throw;
+            }
         }
 
         /// <summary>Merge two different previews into one final preview result.  The final preview will
@@ -88,6 +102,7 @@ namespace Microsoft.CodeAnalysis.Editor
             }
 
             return new SolutionPreviewResult(
+                result1.ThreadingContext,
                 result1._previews.Concat(result2._previews).ToList(),
                 result1.ChangeSummary ?? result2.ChangeSummary);
         }

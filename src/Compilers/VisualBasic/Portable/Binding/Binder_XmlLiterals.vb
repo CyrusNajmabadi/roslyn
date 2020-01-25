@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -670,7 +673,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             If memberAccess Is Nothing Then
-                memberAccess = BadExpression(syntax, ImmutableArray.Create(Of BoundNode)(receiver, name), Compilation.GetSpecialType(SpecialType.System_String))
+                memberAccess = BadExpression(syntax, ImmutableArray.Create(receiver, name), Compilation.GetSpecialType(SpecialType.System_String))
             End If
 
             Return New BoundXmlMemberAccess(syntax, memberAccess, memberAccess.Type)
@@ -730,7 +733,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             If memberAccess Is Nothing Then
-                memberAccess = BadExpression(syntax, ImmutableArray.Create(Of BoundNode)(receiver, name), ErrorTypeSymbol.UnknownResultType)
+                memberAccess = BadExpression(syntax, ImmutableArray.Create(receiver, name), ErrorTypeSymbol.UnknownResultType)
             End If
 
             Return New BoundXmlMemberAccess(syntax, memberAccess, memberAccess.Type)
@@ -1013,9 +1016,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' If the method or property group is not Nothing, bind as an invocation expression.
         ''' Otherwise return a BoundBadExpression containing the arguments.
         ''' </summary>
-        Private Function BindInvocationExpressionIfGroupNotNothing(syntax As VisualBasicSyntaxNode, groupOpt As BoundMethodOrPropertyGroup, arguments As ImmutableArray(Of BoundExpression), diagnostics As DiagnosticBag) As BoundExpression
+        Private Function BindInvocationExpressionIfGroupNotNothing(syntax As SyntaxNode, groupOpt As BoundMethodOrPropertyGroup, arguments As ImmutableArray(Of BoundExpression), diagnostics As DiagnosticBag) As BoundExpression
             If groupOpt Is Nothing Then
-                Return BadExpression(syntax, StaticCast(Of BoundNode).From(arguments), ErrorTypeSymbol.UnknownResultType)
+                Return BadExpression(syntax, arguments, ErrorTypeSymbol.UnknownResultType)
             Else
                 Return BindInvocationExpression(syntax,
                                                 syntax,
@@ -1135,7 +1138,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return namespaces
         End Function
 
-        Private Function AddXmlAttributeIfNotDuplicate(
+        Private Shared Function AddXmlAttributeIfNotDuplicate(
                                                       syntax As XmlNodeSyntax,
                                                       name As XmlName,
                                                       attribute As BoundXmlAttribute,
@@ -1673,6 +1676,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return _originalDefinition.ReturnsByRef
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
                 Return _originalDefinition.Type
@@ -1682,6 +1691,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides ReadOnly Property TypeCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 Return _originalDefinition.TypeCustomModifiers
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return _originalDefinition.RefCustomModifiers
             End Get
         End Property
 
@@ -1909,6 +1924,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End Get
             End Property
 
+            Public Overrides ReadOnly Property ReturnsByRef As Boolean
+                Get
+                    Return _originalDefinition.ReturnsByRef
+                End Get
+            End Property
+
             Public Overrides ReadOnly Property ReturnType As TypeSymbol
                 Get
                     Return _originalDefinition.ReturnType
@@ -1921,7 +1942,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End Get
             End Property
 
-            Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+            Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+                Get
+                    Return _originalDefinition.RefCustomModifiers
+                End Get
+            End Property
+
+            Friend Overrides ReadOnly Property Syntax As SyntaxNode
                 Get
                     Return _originalDefinition.Syntax
                 End Get

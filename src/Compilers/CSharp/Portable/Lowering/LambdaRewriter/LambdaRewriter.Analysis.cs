@@ -1,11 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Linq;
+using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -16,103 +19,83 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Perform a first analysis pass in preparation for removing all lambdas from a method body.  The entry point is Analyze.
         /// The results of analysis are placed in the fields seenLambda, blockParent, variableBlock, captured, and captures.
         /// </summary>
-        internal sealed class Analysis : BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
+        internal sealed partial class Analysis
         {
+            /// <summary>
+            /// If a local function is in the set, at some point in the code it is converted to a delegate and should then not be optimized to a struct closure.
+            /// Also contains all lambdas (as they are converted to delegates implicitly).
+            /// </summary>
+            public readonly PooledHashSet<MethodSymbol> MethodsConvertedToDelegates;
+
+            /// <summary>
+            /// True if the method signature can be rewritten to contain ref/out parameters.
+            /// </summary>
+            public bool CanTakeRefParameters(MethodSymbol closure) => !(closure.IsAsync
+                                                                        || closure.IsIterator
+                                                                        // We can't rewrite delegate signatures
+                                                                        || MethodsConvertedToDelegates.Contains(closure));
+
+            /// <summary>
+            /// The root of the scope tree for this method.
+            /// </summary>
+            public readonly Scope ScopeTree;
+
             private readonly MethodSymbol _topLevelMethod;
+            private readonly int _topLevelMethodOrdinal;
+            private readonly VariableSlotAllocator _slotAllocatorOpt;
+            private readonly TypeCompilationState _compilationState;
 
-            private MethodSymbol _currentParent;
-            private BoundNode _currentScope;
-
-            // Some syntactic forms have an "implicit" receiver.  When we encounter them, we set this to the
-            // syntax.  That way, in case we need to report an error about the receiver, we can use this
-            // syntax for the location when the receiver was implicit.
-            private CSharpSyntaxNode _syntaxWithReceiver;
-
-            /// <summary>
-            /// Set to true while we are analyzing the interior of an expression lambda.
-            /// </summary>
-            private bool _inExpressionLambda;
-
-            /// <summary>
-            /// Set to true of any lambda expressions were seen in the analyzed method body.
-            /// </summary>
-            public bool SeenLambda { get; private set; }
-
-            /// <summary>
-            /// For each scope that defines variables, identifies the nearest enclosing scope that defines variables.
-            /// </summary>
-            public readonly Dictionary<BoundNode, BoundNode> scopeParent = new Dictionary<BoundNode, BoundNode>();
-
-            /// <summary>
-            /// For each captured variable, identifies the scope in which it will be moved to a frame class. This is
-            /// normally the node where the variable is introduced, but method parameters are moved
-            /// to a frame class within the body of the method.
-            /// </summary>
-            public readonly Dictionary<Symbol, BoundNode> variableScope = new Dictionary<Symbol, BoundNode>();
-
-            /// <summary>
-            /// The syntax nodes associated with each captured variable.
-            /// </summary>
-            public readonly MultiDictionary<Symbol, CSharpSyntaxNode> capturedVariables = new MultiDictionary<Symbol, CSharpSyntaxNode>();
-
-            /// <summary>
-            /// For each lambda in the code, the set of variables that it captures.
-            /// </summary>
-            public readonly MultiDictionary<LambdaSymbol, Symbol> capturedVariablesByLambda = new MultiDictionary<LambdaSymbol, Symbol>();
-
-            /// <summary>
-            /// Blocks that are positioned between a block declaring some lifted variables
-            /// and a block that contains the lambda that lifts said variables.
-            /// If such block itself requires a closure, then it must lift parent frame pointer into the closure
-            /// in addition to whatever else needs to be lifted.
-            /// 
-            /// NOTE: This information is computed in addition to the regular analysis of the tree and only needed for rewriting.
-            /// If someone only needs diagnostics or information about captures, this information is not necessary.
-            /// <see cref="ComputeLambdaScopesAndFrameCaptures"/> needs to be called to compute this.
-            /// </summary>
-            public HashSet<BoundNode> needsParentFrame;
-
-            /// <summary>
-            /// Optimized locations of lambdas. 
-            /// 
-            /// Lambda does not need to be placed in a frame that corresponds to its lexical scope if lambda does not reference any local state in that scope.
-            /// It is advantageous to place lambdas higher in the scope tree, ideally in the innermost scope of all scopes that contain variables captured by a given lambda.
-            /// Doing so reduces indirections needed when captured locals are accessed. For example locals from the innermost scope can be accessed with no indirection at all.
-            /// 
-            /// NOTE: This information is computed in addition to the regular analysis of the tree and only needed for rewriting.
-            /// If someone only needs diagnostics or information about captures, this information is not necessary.
-            /// <see cref="ComputeLambdaScopesAndFrameCaptures"/> needs to be called to compute this.
-            /// </summary>
-            public Dictionary<LambdaSymbol, BoundNode> lambdaScopes;
-
-            private Analysis(MethodSymbol method)
+            private Analysis(
+                Scope scopeTree,
+                PooledHashSet<MethodSymbol> methodsConvertedToDelegates,
+                MethodSymbol topLevelMethod,
+                int topLevelMethodOrdinal,
+                VariableSlotAllocator slotAllocatorOpt,
+                TypeCompilationState compilationState)
             {
-                Debug.Assert((object)method != null);
-
-                _currentParent = _topLevelMethod = method;
+                ScopeTree = scopeTree;
+                MethodsConvertedToDelegates = methodsConvertedToDelegates;
+                _topLevelMethod = topLevelMethod;
+                _topLevelMethodOrdinal = topLevelMethodOrdinal;
+                _slotAllocatorOpt = slotAllocatorOpt;
+                _compilationState = compilationState;
             }
 
-            public static Analysis Analyze(BoundNode node, MethodSymbol method)
+            public static Analysis Analyze(
+                BoundNode node,
+                MethodSymbol method,
+                int topLevelMethodOrdinal,
+                MethodSymbol substitutedSourceMethod,
+                VariableSlotAllocator slotAllocatorOpt,
+                TypeCompilationState compilationState,
+                ArrayBuilder<ClosureDebugInfo> closureDebugInfo,
+                DiagnosticBag diagnostics)
             {
-                var analysis = new Analysis(method);
-                analysis.Analyze(node);
-                return analysis;
-            }
+                var methodsConvertedToDelegates = PooledHashSet<MethodSymbol>.GetInstance();
+                var scopeTree = ScopeTreeBuilder.Build(
+                    node,
+                    method,
+                    methodsConvertedToDelegates,
+                    diagnostics);
+                Debug.Assert(scopeTree != null);
 
-            private void Analyze(BoundNode node)
-            {
-                _currentScope = FindNodeToAnalyze(node);
+                var analysis = new Analysis(
+                    scopeTree,
+                    methodsConvertedToDelegates,
+                    method,
+                    topLevelMethodOrdinal,
+                    slotAllocatorOpt,
+                    compilationState);
 
-                Debug.Assert(!_inExpressionLambda);
-                Debug.Assert((object)_topLevelMethod != null);
-
-                foreach (ParameterSymbol parameter in _topLevelMethod.Parameters)
+                analysis.MakeAndAssignEnvironments();
+                analysis.ComputeLambdaScopesAndFrameCaptures();
+                if (compilationState.Compilation.Options.OptimizationLevel == OptimizationLevel.Release)
                 {
-                    // parameters are counted as if they are inside the block
-                    variableScope[parameter] = _currentScope;
+                    // This can affect when a variable is in scope whilst debugging, so only do this in release mode.
+                    analysis.MergeEnvironments();
                 }
-
-                Visit(node);
+                analysis.InlineThisOnlyEnvironments();
+                return analysis;
             }
 
             private static BoundNode FindNodeToAnalyze(BoundNode node)
@@ -131,7 +114,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                         case BoundKind.Block:
                         case BoundKind.StatementList:
-                        case BoundKind.FieldInitializer:
+                        case BoundKind.FieldEqualsValue:
                             return node;
 
                         case BoundKind.GlobalStatementInitializer:
@@ -145,334 +128,556 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             /// <summary>
-            /// Create the optimized plan for the location of lambda methods and whether scopes need access to parent scopes
-            ///  </summary>
-            internal void ComputeLambdaScopesAndFrameCaptures()
+            /// Must be called only after <see cref="Closure.CapturedEnvironments"/>
+            /// has been calculated.
+            ///
+            /// Finds the most optimal capture environment to place a closure in. 
+            /// This roughly corresponds to the 'highest' Scope in the tree where all
+            /// the captured variables for this closure are in scope. This minimizes
+            /// the number of indirections we may have to traverse to access captured
+            /// variables.
+            /// </summary>
+            private void ComputeLambdaScopesAndFrameCaptures()
             {
-                lambdaScopes = new Dictionary<LambdaSymbol, BoundNode>(ReferenceEqualityComparer.Instance);
-                needsParentFrame = new HashSet<BoundNode>();
-
-                foreach (var kvp in capturedVariablesByLambda)
+                VisitClosures(ScopeTree, (scope, closure) =>
                 {
-                    // get innermost and outermost scopes from which a lambda captures
-
-                    int innermostScopeDepth = -1;
-                    BoundNode innermostScope = null;
-
-                    int outermostScopeDepth = int.MaxValue;
-                    BoundNode outermostScope = null;
-
-                    foreach (var variables in kvp.Value)
+                    if (closure.CapturedEnvironments.Count > 0)
                     {
-                        BoundNode curBlock = null;
-                        int curBlockDepth;
+                        var capturedEnvs = PooledHashSet<ClosureEnvironment>.GetInstance();
+                        capturedEnvs.AddAll(closure.CapturedEnvironments);
 
-                        if (!variableScope.TryGetValue(variables, out curBlock))
+                        // Find the nearest captured class environment, if one exists
+                        var curScope = scope;
+                        while (curScope != null)
                         {
-                            // this is something that is not defined in a block, like "Me"
-                            // Since it is defined outside of the method, the depth is -1
-                            curBlockDepth = -1;
-                        }
-                        else
-                        {
-                            curBlockDepth = BlockDepth(curBlock);
-                        }
-
-                        if (curBlockDepth > innermostScopeDepth)
-                        {
-                            innermostScopeDepth = curBlockDepth;
-                            innermostScope = curBlock;
+                            var env = curScope.DeclaredEnvironment;
+                            if (!(env is null) && capturedEnvs.Remove(env) && !env.IsStruct)
+                            {
+                                closure.ContainingEnvironmentOpt = env;
+                                break;
+                            }
+                            curScope = curScope.Parent;
                         }
 
-                        if (curBlockDepth < outermostScopeDepth)
+                        // Now we need to walk up the scopes to find environment captures
+                        var oldEnv = curScope?.DeclaredEnvironment;
+                        curScope = curScope?.Parent;
+                        while (curScope != null)
                         {
-                            outermostScopeDepth = curBlockDepth;
-                            outermostScope = curBlock;
+                            if (capturedEnvs.Count == 0)
+                            {
+                                break;
+                            }
+
+                            var env = curScope.DeclaredEnvironment;
+                            if (!(env is null))
+                            {
+                                if (!env.IsStruct)
+                                {
+                                    Debug.Assert(!oldEnv.IsStruct);
+                                    oldEnv.CapturesParent = true;
+                                    oldEnv = env;
+                                }
+                                capturedEnvs.Remove(env);
+                            }
+                            curScope = curScope.Parent;
                         }
+
+                        if (capturedEnvs.Count > 0)
+                        {
+                            throw ExceptionUtilities.Unreachable;
+                        }
+
+                        capturedEnvs.Free();
+
                     }
-
-                    // 1) if there is innermost scope, lambda goes there as we cannot go any higher.
-                    // 2) scopes in [innermostScope, outermostScope) chain need to have access to the parent scope.
-                    //
-                    // Example: 
-                    //   if a lambda captures a method//s parameter and Me, 
-                    //   its innermost scope depth is 0 (method locals and parameters) 
-                    //   and outermost scope is -1
-                    //   Such lambda will be placed in a closure frame that corresponds to the method//s outer block
-                    //   and this frame will also lift original Me as a field when created by its parent.
-                    //   Note that it is completely irrelevant how deeply the lexical scope of the lambda was originally nested.
-                    if (innermostScope != null)
-                    {
-                        lambdaScopes.Add(kvp.Key, innermostScope);
-
-                        while (innermostScope != outermostScope)
-                        {
-                            needsParentFrame.Add(innermostScope);
-                            scopeParent.TryGetValue(innermostScope, out innermostScope);
-                        }
-                    }
-                }
+                });
             }
 
             /// <summary>
-            /// Compute the nesting depth of a given block.
-            /// Top-most block (where method locals and parameters are defined) are at the depth 0.
+            /// We may have ended up with a closure environment containing only
+            /// 'this'. This is basically equivalent to the containing type itself,
+            /// so we can inline the 'this' parameter into environments that
+            /// reference this one or lower closures directly onto the containing
+            /// type.
             /// </summary>
-            private int BlockDepth(BoundNode node)
+            private void InlineThisOnlyEnvironments()
             {
-                // TODO: this could be precomputed and stored by analysis phase
-                int result = -1;
-                while (node != null)
+                // First make sure 'this' even exists
+                if (!_topLevelMethod.TryGetThisParameter(out var thisParam) ||
+                    thisParam == null)
                 {
-                    result = result + 1;
-                    if (!scopeParent.TryGetValue(node, out node))
-                    {
-                        break;
-                    }
-                }
-
-                return result;
-            }
-
-            public override BoundNode VisitCatchBlock(BoundCatchBlock node)
-            {
-                var local = node.LocalOpt;
-
-                if ((object)local == null)
-                {
-                    return base.VisitCatchBlock(node);
-                }
-
-                var previousBlock = PushBlock(node, ImmutableArray.Create(local));
-                var result = base.VisitCatchBlock(node);
-                PopBlock(previousBlock);
-                return node;
-            }
-
-            private BoundNode PushBlock(BoundNode node, ImmutableArray<LocalSymbol> locals)
-            {
-                // blocks are not allowed in expression lambda
-                Debug.Assert(!_inExpressionLambda);
-
-                var previousBlock = _currentScope;
-                _currentScope = node;
-                if (_currentScope != previousBlock) // not top-level node of the method
-                {
-                    // (Except for the top-level block) record the parent-child block structure
-                    scopeParent[_currentScope] = previousBlock;
-                }
-
-                foreach (var local in locals)
-                {
-                    variableScope[local] = _currentScope;
-                }
-
-                return previousBlock;
-            }
-
-            private void PopBlock(BoundNode previousBlock)
-            {
-                _currentScope = previousBlock;
-            }
-
-            public override BoundNode VisitSwitchStatement(BoundSwitchStatement node)
-            {
-                var locals = node.InnerLocals;
-                if (locals.IsEmpty)
-                {
-                    // no variables declared inside the switch statement.
-                    return base.VisitSwitchStatement(node);
-                }
-
-                var previousBlock = PushBlock(node, locals);
-                var result = base.VisitSwitchStatement(node);
-                PopBlock(previousBlock);
-                return result;
-            }
-
-            public override BoundNode VisitBlock(BoundBlock node)
-            {
-                if (node.Locals.IsEmpty)
-                {
-                    // ignore blocks that declare no variables.
-                    return base.VisitBlock(node);
-                }
-
-                VisitBlockInternal(node);
-                return node;
-            }
-
-            private void VisitBlockInternal(BoundBlock node)
-            {
-                var previousBlock = PushBlock(node, node.Locals);
-                base.VisitBlock(node);
-                PopBlock(previousBlock);
-            }
-
-            public override BoundNode VisitSequence(BoundSequence node)
-            {
-                if (node.Locals.IsDefaultOrEmpty)
-                {
-                    // ignore blocks that declare no variables.
-                    return base.VisitSequence(node);
-                }
-
-                var previousBlock = PushBlock(node, node.Locals);
-                var result = base.VisitSequence(node);
-                PopBlock(previousBlock);
-                return result;
-            }
-
-            public override BoundNode VisitLambda(BoundLambda node)
-            {
-                Debug.Assert((object)node.Symbol != null);
-                SeenLambda = true;
-                var oldParent = _currentParent;
-                var oldBlock = _currentScope;
-                _currentParent = node.Symbol;
-                _currentScope = node.Body;
-                scopeParent[_currentScope] = oldBlock;
-                var wasInExpressionLambda = _inExpressionLambda;
-                _inExpressionLambda = _inExpressionLambda || node.Type.IsExpressionTree();
-
-                if (!_inExpressionLambda)
-                {
-                    // for the purpose of constructing frames parameters are scoped as if they are inside the lambda block
-                    foreach (var parameter in node.Symbol.Parameters)
-                    {
-                        variableScope[parameter] = _currentScope;
-                    }
-
-                    foreach (var local in node.Body.Locals)
-                    {
-                        variableScope[local] = _currentScope;
-                    }
-                }
-
-                var result = base.VisitBlock(node.Body);
-                _inExpressionLambda = wasInExpressionLambda;
-                _currentParent = oldParent;
-                _currentScope = oldBlock;
-                return result;
-            }
-
-            private void ReferenceVariable(CSharpSyntaxNode syntax, Symbol symbol)
-            {
-                var localSymbol = symbol as LocalSymbol;
-                if ((object)localSymbol != null && localSymbol.IsConst)
-                {
-                    // "constant variables" need not be captured
                     return;
                 }
 
-                LambdaSymbol lambda = _currentParent as LambdaSymbol;
-                if ((object)lambda != null && symbol.ContainingSymbol != lambda)
-                {
-                    capturedVariables.Add(symbol, syntax);
+                var env = ScopeTree.DeclaredEnvironment;
 
-                    // mark the variable as captured in each enclosing lambda up to the variable's point of declaration.
-                    for (; (object)lambda != null && symbol.ContainingSymbol != lambda; lambda = lambda.ContainingSymbol as LambdaSymbol)
+                // If it does exist, 'this' is always in the top-level environment
+                if (env is null)
+                {
+                    return;
+                }
+
+                // The environment must contain only 'this' to be inlined
+                if (env.CapturedVariables.Count > 1 ||
+                    !env.CapturedVariables.Contains(thisParam))
+                {
+                    return;
+                }
+
+                if (env.IsStruct)
+                {
+                    // If everything that captures the 'this' environment
+                    // lives in the containing type, we can remove the env
+                    bool cantRemove = CheckClosures(ScopeTree, (scope, closure) =>
                     {
-                        capturedVariablesByLambda.Add(lambda, symbol);
+                        return closure.CapturedEnvironments.Contains(env) &&
+                            closure.ContainingEnvironmentOpt != null;
+                    });
+
+                    if (!cantRemove)
+                    {
+                        RemoveEnv();
                     }
+                }
+                // If we are in a variant interface, runtime might not consider the 
+                // method synthesized directly within the interface as variant safe.
+                // For simplicity we do not perform precise analysis whether this would
+                // definitely be the case. If we are in a variant interface, we always force
+                // creation of a display class.
+                else if (VarianceSafety.GetEnclosingVariantInterface(_topLevelMethod) is null)
+                {
+                    // Class-based 'this' closures can move member functions to
+                    // the top-level type and environments which capture the 'this'
+                    // environment can capture 'this' directly.
+                    // Note: the top-level type is treated as the initial containing
+                    // environment, so by removing the 'this' environment, all
+                    // nested environments which captured a pointer to the 'this'
+                    // environment will now capture 'this'
+                    RemoveEnv();
+                    VisitClosures(ScopeTree, (scope, closure) =>
+                    {
+                        if (closure.ContainingEnvironmentOpt == env)
+                        {
+                            closure.ContainingEnvironmentOpt = null;
+                        }
+                    });
+                }
+
+                void RemoveEnv()
+                {
+                    ScopeTree.DeclaredEnvironment = null;
+                    VisitClosures(ScopeTree, (scope, closure) =>
+                    {
+                        var index = closure.CapturedEnvironments.IndexOf(env);
+                        if (index >= 0)
+                        {
+                            closure.CapturedEnvironments.RemoveAt(index);
+                        }
+                    });
                 }
             }
 
-            private BoundNode VisitSyntaxWithReceiver(CSharpSyntaxNode syntax, BoundNode receiver)
+            private void MakeAndAssignEnvironments()
             {
-                var previousSyntax = _syntaxWithReceiver;
-                _syntaxWithReceiver = syntax;
-                var result = Visit(receiver);
-                _syntaxWithReceiver = previousSyntax;
-                return result;
+                VisitScopeTree(ScopeTree, scope =>
+                {
+                    // Currently all variables declared in the same scope are added
+                    // to the same closure environment
+                    var variablesInEnvironment = scope.DeclaredVariables;
+
+                    // Don't create empty environments
+                    if (variablesInEnvironment.Count == 0)
+                    {
+                        return;
+                    }
+
+                    // First walk the nested scopes to find all closures which
+                    // capture variables from this scope. They all need to capture
+                    // this environment. This includes closures which captured local
+                    // functions that capture those variables, so multiple passes may
+                    // be needed. This will also decide if the environment is a struct
+                    // or a class.
+
+                    // If we are in a variant interface, runtime might not consider the 
+                    // method synthesized directly within the interface as variant safe.
+                    // For simplicity we do not perform precise analysis whether this would
+                    // definitely be the case. If we are in a variant interface, we always force
+                    // creation of a display class.
+                    bool isStruct = VarianceSafety.GetEnclosingVariantInterface(_topLevelMethod) is null;
+                    var closures = new SetWithInsertionOrder<Closure>();
+                    bool addedItem;
+
+                    // This loop is O(n), where n is the length of the chain
+                    //   L_1 <- L_2 <- L_3 ...
+                    // where L_1 represents a local function that directly captures the current
+                    // environment, L_2 represents a local function that directly captures L_1,
+                    // L_3 represents a local function that captures L_2, and so on.
+                    //
+                    // Each iteration of the loop runs a visitor that is proportional to the
+                    // number of closures in nested scopes, so we hope that the total number
+                    // of nested functions and function chains is small in any real-world code.
+                    do
+                    {
+                        addedItem = false;
+                        VisitClosures(scope, (closureScope, closure) =>
+                        {
+                            if (!closures.Contains(closure) &&
+                                (closure.CapturedVariables.Overlaps(scope.DeclaredVariables) ||
+                                 closure.CapturedVariables.Overlaps(closures.Select(c => c.OriginalMethodSymbol))))
+                            {
+                                closures.Add(closure);
+                                addedItem = true;
+                                isStruct &= CanTakeRefParameters(closure.OriginalMethodSymbol);
+                            }
+                        });
+                    } while (addedItem == true);
+
+                    // Next create the environment and add it to the declaration scope
+                    var env = new ClosureEnvironment(variablesInEnvironment, isStruct);
+                    Debug.Assert(scope.DeclaredEnvironment is null);
+                    scope.DeclaredEnvironment = env;
+
+                    _topLevelMethod.TryGetThisParameter(out var thisParam);
+                    foreach (var closure in closures)
+                    {
+                        closure.CapturedEnvironments.Add(env);
+                        if (thisParam != null && env.CapturedVariables.Contains(thisParam))
+                        {
+                            closure.CapturesThis = true;
+                        }
+                    }
+                });
             }
 
-            public override BoundNode VisitMethodGroup(BoundMethodGroup node)
+            /// <summary>
+            /// Calculates all closures which directly or indirectly capture a scopes variables.
+            /// </summary>
+            /// <returns></returns>
+            private PooledDictionary<Scope, PooledHashSet<Closure>> CalculateClosuresCapturingScopeVariables()
             {
-                // We only get here in error cases, as normally the enclosing node is a method group conversion
-                // whose visit (below) doesn't call this.  So we don't know which method is to be selected, and
-                // therefore don't know if the receiver is used. Assume if the receiver was provided, it is used.
-                var receiverOpt = node.ReceiverOpt;
-                if (receiverOpt != null)
+                var closuresCapturingScopeVariables = PooledDictionary<Scope, PooledHashSet<Closure>>.GetInstance();
+
+                // calculate closures which directly capture a scope
+
+                var environmentsToScopes = PooledDictionary<ClosureEnvironment, Scope>.GetInstance();
+
+                VisitScopeTree(ScopeTree, scope =>
                 {
-                    return VisitSyntaxWithReceiver(node.Syntax, receiverOpt);
+                    if (!(scope.DeclaredEnvironment is null))
+                    {
+                        closuresCapturingScopeVariables[scope] = PooledHashSet<Closure>.GetInstance();
+                        environmentsToScopes[scope.DeclaredEnvironment] = scope;
+                    }
+
+                    foreach (var closure in scope.Closures)
+                    {
+                        foreach (var env in closure.CapturedEnvironments)
+                        {
+                            // A closure should only ever capture a scope which is an ancestor of its own,
+                            // which we should have already visited
+                            Debug.Assert(environmentsToScopes.ContainsKey(env));
+
+                            closuresCapturingScopeVariables[environmentsToScopes[env]].Add(closure);
+                        }
+                    }
+                });
+
+                environmentsToScopes.Free();
+
+                // if a closure captures a scope, which captures its parent, then the closure also captures the parents scope.
+                // we update closuresCapturingScopeVariables to reflect this.
+                foreach (var (scope, capturingClosures) in closuresCapturingScopeVariables)
+                {
+                    if (scope.DeclaredEnvironment is null)
+                        continue;
+
+                    var currentScope = scope;
+                    while (currentScope.DeclaredEnvironment is null || currentScope.DeclaredEnvironment.CapturesParent)
+                    {
+                        currentScope = currentScope.Parent;
+
+                        if (currentScope == null)
+                        {
+                            throw ExceptionUtilities.Unreachable;
+                        }
+
+                        if (currentScope.DeclaredEnvironment is null ||
+                            currentScope.DeclaredEnvironment.IsStruct)
+                        {
+                            continue;
+                        }
+
+                        closuresCapturingScopeVariables[currentScope].AddAll(capturingClosures);
+                    }
+                }
+
+                return closuresCapturingScopeVariables;
+            }
+
+            /// <summary>
+            /// Must be called only after <see cref="MakeAndAssignEnvironments"/> and <see cref="ComputeLambdaScopesAndFrameCaptures"/>.
+            /// 
+            /// In order to reduce allocations, merge environments into a parent environment when it is safe to do so.
+            /// This must be done whilst preserving semantics.
+            /// 
+            /// We also have to make sure not to extend the life of any variable.
+            /// This means that we can only merge an environment into its parent if exactly the same closures directly or indirectly reference both environments.
+            /// </summary>
+            private void MergeEnvironments()
+            {
+                var closuresCapturingScopeVariables = CalculateClosuresCapturingScopeVariables();
+
+                // now we merge environments into their parent environments if it is safe to do so
+                foreach (var (scope, closuresCapturingScope) in closuresCapturingScopeVariables)
+                {
+                    if (closuresCapturingScope.Count == 0)
+                        continue;
+
+                    var scopeEnv = scope.DeclaredEnvironment;
+
+                    // structs don't allocate, so no point merging them
+                    if (scopeEnv.IsStruct)
+                        continue;
+
+                    var bestScope = scope;
+                    var currentScope = scope;
+
+                    // Walk up the scope tree, checking at each point if it is:
+                    // a) semantically safe to merge the scope's environment into it's parent scope's environment
+                    // b) doing so would not change GC behaviour
+                    // Once either of these conditions fails, we merge into the closure environment furthest up the scope tree we've found so far
+                    while (currentScope.Parent != null)
+                    {
+                        if (!currentScope.CanMergeWithParent)
+                            break;
+
+                        var parentScope = currentScope.Parent;
+
+                        // we skip any scopes which do not have any captured variables, and try to merge into the parent scope instead.
+                        // We also skip any struct environments as they don't allocate, so no point merging them
+                        var env = parentScope.DeclaredEnvironment;
+                        if (env is null || env.IsStruct)
+                        {
+                            currentScope = parentScope;
+                            continue;
+                        }
+
+                        var closuresCapturingParentScope = closuresCapturingScopeVariables[parentScope];
+
+                        // if more closures reference one scope's environments than the other scope's environments,
+                        // then merging the two environments would increase the number of objects referencing some variables, 
+                        // which may prevent the variables being garbage collected.
+                        if (!closuresCapturingParentScope.SetEquals(closuresCapturingScope))
+                            break;
+
+                        bestScope = parentScope;
+
+                        currentScope = parentScope;
+                    }
+
+
+                    if (bestScope == scope) // no better scope was found, so continue
+                        continue;
+
+                    // do the actual work of merging the closure environments
+
+                    var targetEnv = bestScope.DeclaredEnvironment;
+
+                    foreach (var variable in scopeEnv.CapturedVariables)
+                    {
+                        targetEnv.CapturedVariables.Add(variable);
+                    }
+
+                    scope.DeclaredEnvironment = null;
+
+                    foreach (var closure in closuresCapturingScope)
+                    {
+                        closure.CapturedEnvironments.Remove(scopeEnv);
+
+                        if (!closure.CapturedEnvironments.Contains(targetEnv))
+                        {
+                            closure.CapturedEnvironments.Add(targetEnv);
+                        }
+
+                        if (closure.ContainingEnvironmentOpt == scopeEnv)
+                        {
+                            closure.ContainingEnvironmentOpt = targetEnv;
+                        }
+                    }
+                }
+
+                // cleanup
+                foreach (var set in closuresCapturingScopeVariables.Values)
+                {
+                    set.Free();
+                }
+
+                closuresCapturingScopeVariables.Free();
+            }
+
+            internal DebugId GetTopLevelMethodId()
+            {
+                return _slotAllocatorOpt?.MethodId ?? new DebugId(_topLevelMethodOrdinal, _compilationState.ModuleBuilderOpt.CurrentGenerationOrdinal);
+            }
+
+            internal DebugId GetClosureId(SyntaxNode syntax, ArrayBuilder<ClosureDebugInfo> closureDebugInfo)
+            {
+                Debug.Assert(syntax != null);
+
+                DebugId closureId;
+                DebugId previousClosureId;
+                if (_slotAllocatorOpt != null && _slotAllocatorOpt.TryGetPreviousClosure(syntax, out previousClosureId))
+                {
+                    closureId = previousClosureId;
+                }
+                else
+                {
+                    closureId = new DebugId(closureDebugInfo.Count, _compilationState.ModuleBuilderOpt.CurrentGenerationOrdinal);
+                }
+
+                int syntaxOffset = _topLevelMethod.CalculateLocalSyntaxOffset(LambdaUtilities.GetDeclaratorPosition(syntax), syntax.SyntaxTree);
+                closureDebugInfo.Add(new ClosureDebugInfo(syntaxOffset, closureId));
+
+                return closureId;
+            }
+
+            /// <summary>
+            /// Walk up the scope tree looking for a variable declaration.
+            /// </summary>
+            public static Scope GetVariableDeclarationScope(Scope startingScope, Symbol variable)
+            {
+                if (variable is ParameterSymbol p && p.IsThis)
+                {
+                    return null;
+                }
+
+                var currentScope = startingScope;
+                while (currentScope != null)
+                {
+                    switch (variable.Kind)
+                    {
+                        case SymbolKind.Parameter:
+                        case SymbolKind.Local:
+                            if (currentScope.DeclaredVariables.Contains(variable))
+                            {
+                                return currentScope;
+                            }
+                            break;
+
+                        case SymbolKind.Method:
+                            foreach (var closure in currentScope.Closures)
+                            {
+                                if (closure.OriginalMethodSymbol == variable)
+                                {
+                                    return currentScope;
+                                }
+                            }
+                            break;
+
+                        default:
+                            throw ExceptionUtilities.UnexpectedValue(variable.Kind);
+                    }
+                    currentScope = currentScope.Parent;
                 }
                 return null;
             }
 
-            public override BoundNode VisitConversion(BoundConversion node)
+            /// <summary>
+            /// Find the parent <see cref="Scope"/> of the <see cref="Scope"/> corresponding to
+            /// the given <see cref="BoundNode"/>.
+            /// </summary>
+            public static Scope GetScopeParent(Scope treeRoot, BoundNode scopeNode)
             {
-                if (node.ConversionKind == ConversionKind.MethodGroup)
+                var correspondingScope = GetScopeWithMatchingBoundNode(treeRoot, scopeNode);
+                return correspondingScope.Parent;
+            }
+
+            /// <summary>
+            /// Finds a <see cref="Scope" /> with a matching <see cref="BoundNode"/>
+            /// as the one given.
+            /// </summary>
+            public static Scope GetScopeWithMatchingBoundNode(Scope treeRoot, BoundNode node)
+            {
+                return Helper(treeRoot) ?? throw ExceptionUtilities.Unreachable;
+
+                Scope Helper(Scope currentScope)
                 {
-                    if (node.IsExtensionMethod || ((object)node.SymbolOpt != null && !node.SymbolOpt.IsStatic))
+                    if (currentScope.BoundNode == node)
                     {
-                        return VisitSyntaxWithReceiver(node.Syntax, ((BoundMethodGroup)node.Operand).ReceiverOpt);
+                        return currentScope;
                     }
+
+                    foreach (var nestedScope in currentScope.NestedScopes)
+                    {
+                        var found = Helper(nestedScope);
+                        if (found != null)
+                        {
+                            return found;
+                        }
+                    }
+
                     return null;
                 }
-                else
+            }
+
+            /// <summary>
+            /// Walk up the scope tree looking for a closure.
+            /// </summary>
+            /// <returns>
+            /// A tuple of the found <see cref="Closure"/> and the <see cref="Scope"/> it was found in.
+            /// </returns>
+            public static (Closure, Scope) GetVisibleClosure(Scope startingScope, MethodSymbol closureSymbol)
+            {
+                var currentScope = startingScope;
+                while (currentScope != null)
                 {
-                    return base.VisitConversion(node);
+                    foreach (var closure in currentScope.Closures)
+                    {
+                        if (closure.OriginalMethodSymbol == closureSymbol)
+                        {
+                            return (closure, currentScope);
+                        }
+                    }
+                    currentScope = currentScope.Parent;
+                }
+                throw ExceptionUtilities.Unreachable;
+            }
+
+            /// <summary>
+            /// Finds a <see cref="Closure"/> with a matching original symbol somewhere in the given scope or nested scopes.
+            /// </summary>
+            public static Closure GetClosureInTree(Scope treeRoot, MethodSymbol closureSymbol)
+            {
+                return Helper(treeRoot) ?? throw ExceptionUtilities.Unreachable;
+
+                Closure Helper(Scope scope)
+                {
+                    foreach (var closure in scope.Closures)
+                    {
+                        if (closure.OriginalMethodSymbol == closureSymbol)
+                        {
+                            return closure;
+                        }
+                    }
+
+                    foreach (var nestedScope in scope.NestedScopes)
+                    {
+                        var found = Helper(nestedScope);
+                        if (found != null)
+                        {
+                            return found;
+                        }
+                    }
+
+                    return null;
                 }
             }
 
-            public override BoundNode VisitPropertyAccess(BoundPropertyAccess node)
+            public void Free()
             {
-                _syntaxWithReceiver = node.Syntax;
-                return base.VisitPropertyAccess(node);
-            }
-
-            public override BoundNode VisitFieldAccess(BoundFieldAccess node)
-            {
-                _syntaxWithReceiver = node.Syntax;
-                return base.VisitFieldAccess(node);
-            }
-
-            public override BoundNode VisitEventAccess(BoundEventAccess node)
-            {
-                _syntaxWithReceiver = node.Syntax;
-                return base.VisitEventAccess(node);
-            }
-
-            public override BoundNode VisitThisReference(BoundThisReference node)
-            {
-                var thisParam = _topLevelMethod.ThisParameter;
-                if (thisParam != null)
-                {
-                    ReferenceVariable(node.Syntax, thisParam);
-                }
-                else
-                {
-                    // This can occur in a delegate creation expression because the method group
-                    // in the argument can have a "this" receiver even when "this"
-                    // is not captured because a static method is selected.  But we do preserve
-                    // the method group and its receiver in the bound tree.
-                    // No need to capture "this" in such case.
-
-                    // TODO: Why don't we drop "this" while lowering if method is static? 
-                    //       Actually, considering that method group expression does not evaluate to a particular value 
-                    //       why do we have it in the lowered tree at all?
-                }
-
-                return base.VisitThisReference(node);
-            }
-
-            public override BoundNode VisitBaseReference(BoundBaseReference node)
-            {
-                ReferenceVariable(node.Syntax, _topLevelMethod.ThisParameter);
-                return base.VisitBaseReference(node);
-            }
-
-            public override BoundNode VisitParameter(BoundParameter node)
-            {
-                ReferenceVariable(node.Syntax, node.ParameterSymbol);
-                return base.VisitParameter(node);
-            }
-
-            public override BoundNode VisitLocal(BoundLocal node)
-            {
-                ReferenceVariable(node.Syntax, node.LocalSymbol);
-                return base.VisitLocal(node);
+                MethodsConvertedToDelegates.Free();
+                ScopeTree.Free();
             }
         }
     }

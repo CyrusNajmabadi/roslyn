@@ -1,7 +1,9 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Option Strict Off
-Imports Microsoft.CodeAnalysis.CodeFixes.Suppression
+Imports Microsoft.CodeAnalysis.CodeFixes
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.VisualBasic.CodeFixes.Suppression
@@ -11,12 +13,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
     Public Class VisualBasicSuppressionAllCodeTests
         Inherits AbstractSuppressionAllCodeTests
 
-        Protected Overrides Function CreateWorkspaceFromFileAsync(definition As String, parseOptions As ParseOptions) As Threading.Tasks.Task(Of TestWorkspace)
-            Return TestWorkspace.CreateVisualBasicAsync(definition, DirectCast(parseOptions, VisualBasicParseOptions))
+        Protected Overrides Function CreateWorkspaceFromFile(definition As String, parseOptions As ParseOptions) As TestWorkspace
+            Return TestWorkspace.CreateVisualBasic(definition, DirectCast(parseOptions, VisualBasicParseOptions))
         End Function
 
-        Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of Analyzer, ISuppressionFixProvider)
-            Return New Tuple(Of Analyzer, ISuppressionFixProvider)(New Analyzer(), New VisualBasicSuppressionCodeFixProvider())
+        Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of Analyzer, IConfigurationFixProvider)
+            Return New Tuple(Of Analyzer, IConfigurationFixProvider)(New Analyzer(), New VisualBasicSuppressionCodeFixProvider())
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
@@ -26,13 +28,11 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
 
         <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
         Public Async Function TestSuppressionWithAttributeOnEveryNodes() As Threading.Tasks.Task
-            Dim facts = New VisualBasicSyntaxFactsService()
-
             Await TestSuppressionWithAttributeAsync(
                 TestResource.AllInOneVisualBasicCode,
                 VisualBasicParseOptions.Default,
                 digInto:=Function(n)
-                             Dim member = facts.GetContainingMemberDeclaration(n, n.Span.Start)
+                             Dim member = VisualBasicSyntaxFactsService.Instance.GetContainingMemberDeclaration(n, n.Span.Start)
                              If member Is Nothing OrElse member Is n Then
                                  Return True
                              End If

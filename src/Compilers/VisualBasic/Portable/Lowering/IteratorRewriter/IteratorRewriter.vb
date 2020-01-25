@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -79,17 +82,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return rewriter.Rewrite()
         End Function
 
+        ''' <returns>
+        ''' Returns true if any members that we need are missing or have use-site errors.
+        ''' </returns>
         Friend Overrides Function EnsureAllSymbolsAndSignature() As Boolean
-            Dim hasErrors As Boolean = MyBase.EnsureAllSymbolsAndSignature
-
-            If Me.Method.IsSub OrElse Me._elementType.IsErrorType Then
-                hasErrors = True
+            If MyBase.EnsureAllSymbolsAndSignature OrElse Me.Method.IsSub OrElse Me._elementType.IsErrorType Then
+                Return True
             End If
 
-            ' NOTE: in current implementation these attributes must exist
-            ' TODO: change to "don't use if not found"
-            EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor, hasErrors)
-            EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Diagnostics_DebuggerNonUserCodeAttribute__ctor, hasErrors)
+            Dim bag = DiagnosticBag.GetInstance()
 
             ' NOTE: We don't ensure DebuggerStepThroughAttribute, it is just not emitted if not found
             ' EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Diagnostics_DebuggerStepThroughAttribute__ctor, hasErrors)
@@ -97,25 +98,35 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' TODO: do we need these here? They are used on the actual iterator method.
             ' EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Runtime_CompilerServices_IteratorStateMachine__ctor, hasErrors)
 
-            EnsureSpecialType(SpecialType.System_Object, hasErrors)
-            EnsureSpecialType(SpecialType.System_Boolean, hasErrors)
-            EnsureSpecialType(SpecialType.System_Int32, hasErrors)
+            EnsureSpecialType(SpecialType.System_Object, bag)
+            EnsureSpecialType(SpecialType.System_Boolean, bag)
+            EnsureSpecialType(SpecialType.System_Int32, bag)
+            EnsureSpecialType(SpecialType.System_IDisposable, bag)
+            EnsureSpecialMember(SpecialMember.System_IDisposable__Dispose, bag)
 
-            If Me.Method.ReturnType.IsDefinition Then
-                If Me._isEnumerable Then
-                    EnsureSpecialType(SpecialType.System_Collections_IEnumerator, hasErrors)
-                End If
-            Else
-                If Me._isEnumerable Then
-                    EnsureSpecialType(SpecialType.System_Collections_Generic_IEnumerator_T, hasErrors)
-                    EnsureSpecialType(SpecialType.System_Collections_IEnumerable, hasErrors)
-                End If
+            ' IEnumerator
+            EnsureSpecialType(SpecialType.System_Collections_IEnumerator, bag)
+            EnsureSpecialPropertyGetter(SpecialMember.System_Collections_IEnumerator__Current, bag)
+            EnsureSpecialMember(SpecialMember.System_Collections_IEnumerator__MoveNext, bag)
+            EnsureSpecialMember(SpecialMember.System_Collections_IEnumerator__Reset, bag)
 
-                EnsureSpecialType(SpecialType.System_Collections_IEnumerator, hasErrors)
+            ' IEnumerator(Of T)
+            EnsureSpecialType(SpecialType.System_Collections_Generic_IEnumerator_T, bag)
+            EnsureSpecialPropertyGetter(SpecialMember.System_Collections_Generic_IEnumerator_T__Current, bag)
+
+            If Me._isEnumerable Then
+                EnsureSpecialType(SpecialType.System_Collections_IEnumerable, bag)
+                EnsureSpecialMember(SpecialMember.System_Collections_IEnumerable__GetEnumerator, bag)
+                EnsureSpecialType(SpecialType.System_Collections_Generic_IEnumerable_T, bag)
+                EnsureSpecialMember(SpecialMember.System_Collections_Generic_IEnumerable_T__GetEnumerator, bag)
             End If
 
-            EnsureSpecialType(SpecialType.System_IDisposable, hasErrors)
+            Dim hasErrors As Boolean = bag.HasAnyErrors
+            If hasErrors Then
+                Me.Diagnostics.AddRange(bag)
+            End If
 
+            bag.Free()
             Return hasErrors
         End Function
 
@@ -208,7 +219,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                             F.Assignment(F.Local(resultVariable, True), F.Me),
                             If(Method.IsShared OrElse Method.MeParameter.Type.IsReferenceType,
                                     F.Goto(thisInitialized),
-                                    DirectCast(F.Block(), BoundStatement))
+                                    DirectCast(F.StatementList(), BoundStatement))
                         ),
                     elseClause:=
                         F.Assignment(F.Local(resultVariable, True), F.[New](StateMachineType.Constructor, F.Literal(0)))

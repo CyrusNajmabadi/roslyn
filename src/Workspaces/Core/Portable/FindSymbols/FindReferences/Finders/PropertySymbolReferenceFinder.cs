@@ -1,14 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.FindSymbols.FindReferences;
 using Microsoft.CodeAnalysis.LanguageServices;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.FindSymbols.Finders
 {
@@ -19,49 +21,62 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
             return true;
         }
 
-        protected override async Task<IEnumerable<ISymbol>> DetermineCascadedSymbolsAsync(
-            IPropertySymbol symbol, Solution solution, IImmutableSet<Project> projects, CancellationToken cancellationToken)
+        protected override async Task<ImmutableArray<SymbolAndProjectId>> DetermineCascadedSymbolsAsync(
+            SymbolAndProjectId<IPropertySymbol> symbolAndProjectId,
+            Solution solution,
+            IImmutableSet<Project> projects,
+            FindReferencesSearchOptions options,
+            CancellationToken cancellationToken)
         {
-            var baseSymbols = await base.DetermineCascadedSymbolsAsync(symbol, solution, projects, cancellationToken).ConfigureAwait(false);
-            baseSymbols = baseSymbols ?? SpecializedCollections.EmptyEnumerable<ISymbol>();
-            var backingField = symbol.ContainingType.GetMembers().OfType<IFieldSymbol>().Where(f => symbol.Equals(f.AssociatedSymbol));
+            var baseSymbols = await base.DetermineCascadedSymbolsAsync(
+                symbolAndProjectId, solution, projects, options, cancellationToken).ConfigureAwait(false);
 
-            var result = baseSymbols.Concat(backingField);
+            var symbol = symbolAndProjectId.Symbol;
+            var backingFields = symbol.ContainingType.GetMembers()
+                                      .OfType<IFieldSymbol>()
+                                      .Where(f => symbol.Equals(f.AssociatedSymbol))
+                                      .Select(f => (SymbolAndProjectId)symbolAndProjectId.WithSymbol(f))
+                                      .ToImmutableArray();
+
+            var result = baseSymbols.Concat(backingFields);
 
             if (symbol.GetMethod != null)
             {
-                result = result.Concat(symbol.GetMethod);
+                result = result.Add(symbolAndProjectId.WithSymbol(symbol.GetMethod));
             }
 
             if (symbol.SetMethod != null)
             {
-                result = result.Concat(symbol.SetMethod);
+                result = result.Add(symbolAndProjectId.WithSymbol(symbol.SetMethod));
             }
 
             return result;
         }
 
-        protected override async Task<IEnumerable<Document>> DetermineDocumentsToSearchAsync(
+        protected override async Task<ImmutableArray<Document>> DetermineDocumentsToSearchAsync(
             IPropertySymbol symbol,
             Project project,
             IImmutableSet<Document> documents,
+            FindReferencesSearchOptions options,
             CancellationToken cancellationToken)
         {
             var ordinaryDocuments = await FindDocumentsAsync(project, documents, cancellationToken, symbol.Name).ConfigureAwait(false);
 
             var forEachDocuments = IsForEachProperty(symbol)
                 ? await FindDocumentsWithForEachStatementsAsync(project, documents, cancellationToken).ConfigureAwait(false)
-                : SpecializedCollections.EmptyEnumerable<Document>();
+                : ImmutableArray<Document>.Empty;
 
             var elementAccessDocument = symbol.IsIndexer
                 ? await FindDocumentWithElementAccessExpressionsAsync(project, documents, cancellationToken).ConfigureAwait(false)
-                : SpecializedCollections.EmptyEnumerable<Document>();
+                : ImmutableArray<Document>.Empty;
 
             var indexerMemberCrefDocument = symbol.IsIndexer
                 ? await FindDocumentWithIndexerMemberCrefAsync(project, documents, cancellationToken).ConfigureAwait(false)
-                : SpecializedCollections.EmptyEnumerable<Document>();
+                : ImmutableArray<Document>.Empty;
 
-            return ordinaryDocuments.Concat(forEachDocuments).Concat(elementAccessDocument).Concat(indexerMemberCrefDocument);
+            return ordinaryDocuments.Concat(forEachDocuments)
+                                    .Concat(elementAccessDocument)
+                                    .Concat(indexerMemberCrefDocument);
         }
 
         private static bool IsForEachProperty(IPropertySymbol symbol)
@@ -69,99 +84,142 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
             return symbol.Name == WellKnownMemberNames.CurrentPropertyName;
         }
 
-        protected override async Task<IEnumerable<ReferenceLocation>> FindReferencesInDocumentAsync(
-            IPropertySymbol symbol,
-            Document document,
-            CancellationToken cancellationToken)
+        protected override async Task<ImmutableArray<FinderLocation>> FindReferencesInDocumentAsync(
+            IPropertySymbol symbol, Document document, SemanticModel semanticModel,
+            FindReferencesSearchOptions options, CancellationToken cancellationToken)
         {
-            var nameReferences = await FindReferencesInDocumentUsingSymbolNameAsync(symbol, document, cancellationToken).ConfigureAwait(false);
+            var nameReferences = await FindReferencesInDocumentUsingSymbolNameAsync(
+                symbol, document, semanticModel, cancellationToken).ConfigureAwait(false);
+
+            if (options.AssociatePropertyReferencesWithSpecificAccessor)
+            {
+                // We want to associate property references to a specific accessor (if an accessor
+                // is being referenced).  Check if this reference would match an accessor. If so, do
+                // not add it.  It will be added by PropertyAccessorSymbolReferenceFinder.
+                var syntaxFacts = document.GetLanguageService<ISyntaxFactsService>();
+                var semanticFacts = document.GetLanguageService<ISemanticFactsService>();
+
+                nameReferences = nameReferences.WhereAsArray(loc =>
+                {
+                    var accessors = GetReferencedAccessorSymbols(
+                        syntaxFacts, semanticFacts, semanticModel, symbol, loc.Node, cancellationToken);
+                    return accessors.IsEmpty;
+                });
+            }
 
             var forEachReferences = IsForEachProperty(symbol)
-                ? await FindReferencesInForEachStatementsAsync(symbol, document, cancellationToken).ConfigureAwait(false)
-                : SpecializedCollections.EmptyEnumerable<ReferenceLocation>();
+                ? await FindReferencesInForEachStatementsAsync(symbol, document, semanticModel, cancellationToken).ConfigureAwait(false)
+                : ImmutableArray<FinderLocation>.Empty;
 
             var elementAccessReferences = symbol.IsIndexer
-                ? await FindElementAccessReferencesAndIndexerMemberCrefReferencesAsync(symbol, document, cancellationToken).ConfigureAwait(false)
-                : SpecializedCollections.EmptyEnumerable<ReferenceLocation>();
+                ? await FindElementAccessReferencesAsync(symbol, document, semanticModel, options, cancellationToken).ConfigureAwait(false)
+                : ImmutableArray<FinderLocation>.Empty;
 
-            return nameReferences.Concat(forEachReferences).Concat(elementAccessReferences);
+            var indexerCrefReferences = symbol.IsIndexer
+                ? await FindIndexerCrefReferencesAsync(symbol, document, semanticModel, options, cancellationToken).ConfigureAwait(false)
+                : ImmutableArray<FinderLocation>.Empty;
+
+            return nameReferences.Concat(forEachReferences)
+                                 .Concat(elementAccessReferences)
+                                 .Concat(indexerCrefReferences);
         }
 
-        private Task<IEnumerable<Document>> FindDocumentWithElementAccessExpressionsAsync(
+        private Task<ImmutableArray<Document>> FindDocumentWithElementAccessExpressionsAsync(
             Project project, IImmutableSet<Document> documents, CancellationToken cancellationToken)
         {
-            return FindDocumentsAsync(project, documents, async (d, c) =>
-            {
-                var info = await SyntaxTreeInfo.GetContextInfoAsync(d, c).ConfigureAwait(false);
-                return info.ContainsElementAccessExpression;
-            }, cancellationToken);
+            return FindDocumentsWithPredicateAsync(project, documents, info => info.ContainsElementAccessExpression, cancellationToken);
         }
 
-        private Task<IEnumerable<Document>> FindDocumentWithIndexerMemberCrefAsync(
+        private Task<ImmutableArray<Document>> FindDocumentWithIndexerMemberCrefAsync(
             Project project, IImmutableSet<Document> documents, CancellationToken cancellationToken)
         {
-            return FindDocumentsAsync(project, documents, async (d, c) =>
-            {
-                var info = await SyntaxTreeInfo.GetContextInfoAsync(d, c).ConfigureAwait(false);
-                return info.ContainsIndexerMemberCref;
-            }, cancellationToken);
+            return FindDocumentsWithPredicateAsync(project, documents, info => info.ContainsIndexerMemberCref, cancellationToken);
         }
 
-        private async Task<IEnumerable<ReferenceLocation>> FindElementAccessReferencesAndIndexerMemberCrefReferencesAsync(
-            IPropertySymbol symbol,
-            Document document,
-            CancellationToken cancellationToken)
+        private async Task<ImmutableArray<FinderLocation>> FindElementAccessReferencesAsync(
+            IPropertySymbol symbol, Document document, SemanticModel semanticModel,
+            FindReferencesSearchOptions options, CancellationToken cancellationToken)
         {
+            if (options.AssociatePropertyReferencesWithSpecificAccessor)
+            {
+                // Looking for individual get/set references.  Don't find anything here. 
+                // these results will be provided by the PropertyAccessorSymbolReferenceFinder
+                return ImmutableArray<FinderLocation>.Empty;
+            }
+
             var symbolsMatch = GetStandardSymbolsNodeMatchFunction(symbol, document.Project.Solution, cancellationToken);
 
             var syntaxRoot = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             var syntaxFacts = document.GetLanguageService<ISyntaxFactsService>();
+            var semanticFacts = document.GetLanguageService<ISemanticFactsService>();
 
-            // Now that we have Doc Comments in place, We are searching for References in the Trivia as well by setting descendIntoTrivia: true
             var elementAccessExpressions = syntaxRoot.DescendantNodes().Where(syntaxFacts.IsElementAccessExpression);
-            var indexerMemberCref = syntaxRoot.DescendantNodes(descendIntoTrivia: true).Where(syntaxFacts.IsIndexerMemberCRef);
+            var locations = ArrayBuilder<FinderLocation>.GetInstance();
 
-            var elementAccessExpressionsAndIndexerMemberCref = elementAccessExpressions.Concat(indexerMemberCref);
-
-            var locations = new List<ReferenceLocation>();
-
-            foreach (var node in elementAccessExpressionsAndIndexerMemberCref)
+            foreach (var node in elementAccessExpressions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var match = symbolsMatch(node, semanticModel);
-                if (match.Item1)
+                var (matched, reason) = symbolsMatch(node, semanticModel);
+                if (matched)
                 {
-                    SyntaxNode nodeToBeReferenced = null;
+                    syntaxFacts.GetPartsOfElementAccessExpression(node, out var expression, out var argumentList);
 
-                    if (syntaxFacts.IsIndexerMemberCRef(node))
+                    if (symbolsMatch(expression, semanticModel).matched)
                     {
-                        nodeToBeReferenced = node;
-                    }
-                    else
-                    {
-                        var childNodes = node.ChildNodes();
-                        var leftOfInvocation = childNodes.First();
-                        if (symbolsMatch(leftOfInvocation, semanticModel).Item1)
-                        {
-                            // Element access with explicit member name (allowed in VB).
-                            // We have already added a reference location for the member name identifier, so skip this one.
-                            continue;
-                        }
-
-                        nodeToBeReferenced = childNodes.Skip(1).FirstOrDefault();
+                        // Element access with explicit member name (allowed in VB).
+                        // We have already added a reference location for the member name identifier, so skip this one.
+                        continue;
                     }
 
-                    if (nodeToBeReferenced != null)
-                    {
-                        var location = nodeToBeReferenced.SyntaxTree.GetLocation(new TextSpan(nodeToBeReferenced.SpanStart, 0));
-                        locations.Add(new ReferenceLocation(document, null, location, isImplicit: false, isWrittenTo: false, candidateReason: match.Item2));
-                    }
+                    var location = argumentList.SyntaxTree.GetLocation(new TextSpan(argumentList.SpanStart, 0));
+
+                    var symbolUsageInfo = GetSymbolUsageInfo(node, semanticModel, syntaxFacts, semanticFacts, cancellationToken);
+                    locations.Add(new FinderLocation(
+                        node, new ReferenceLocation(document, null, location, isImplicit: false, symbolUsageInfo, GetAdditionalFindUsagesProperties(node, semanticModel, syntaxFacts), candidateReason: reason)));
                 }
             }
 
-            return locations;
+            return locations.ToImmutableAndFree();
+        }
+
+        private async Task<ImmutableArray<FinderLocation>> FindIndexerCrefReferencesAsync(
+            IPropertySymbol symbol, Document document, SemanticModel semanticModel,
+            FindReferencesSearchOptions options, CancellationToken cancellationToken)
+        {
+            if (options.AssociatePropertyReferencesWithSpecificAccessor)
+            {
+                // can't find indexer get/set accessors in a cref.
+                return ImmutableArray<FinderLocation>.Empty;
+            }
+
+            var symbolsMatch = GetStandardSymbolsNodeMatchFunction(symbol, document.Project.Solution, cancellationToken);
+
+            var syntaxRoot = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            var syntaxFacts = document.GetLanguageService<ISyntaxFactsService>();
+            var semanticFacts = document.GetLanguageService<ISemanticFactsService>();
+
+            // Now that we have Doc Comments in place, We are searching for References in the Trivia as well by setting descendIntoTrivia: true
+            var indexerMemberCrefs = syntaxRoot.DescendantNodes(descendIntoTrivia: true)
+                                               .Where(syntaxFacts.IsIndexerMemberCRef);
+
+            var locations = ArrayBuilder<FinderLocation>.GetInstance();
+
+            foreach (var node in indexerMemberCrefs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var (matched, reason) = symbolsMatch(node, semanticModel);
+                if (matched)
+                {
+                    var location = node.SyntaxTree.GetLocation(new TextSpan(node.SpanStart, 0));
+                    var symbolUsageInfo = GetSymbolUsageInfo(node, semanticModel, syntaxFacts, semanticFacts, cancellationToken);
+                    locations.Add(new FinderLocation(
+                        node, new ReferenceLocation(document, null, location, isImplicit: false, symbolUsageInfo, GetAdditionalFindUsagesProperties(node, semanticModel, syntaxFacts), candidateReason: reason)));
+                }
+            }
+
+            return locations.ToImmutableAndFree();
         }
     }
 }

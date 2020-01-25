@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -20,7 +22,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.OnEr
             If targetToken.IsKind(SyntaxKind.ResumeKeyword) AndAlso Not context.IsInLambda AndAlso
                targetToken.Parent.IsKind(SyntaxKind.OnErrorResumeNextStatement, SyntaxKind.ResumeStatement, SyntaxKind.ResumeNextStatement) Then
                 Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Next",
-                                                                                         VBFeaturesResources.OnErrorResumeNextKeywordToolTip))
+                                                                                         VBFeaturesResources.When_a_run_time_error_occurs_execution_transfers_to_the_statement_following_the_statement_or_procedure_call_that_resulted_in_the_error))
             Else
                 Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()
             End If

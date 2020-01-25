@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -17,11 +19,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Expr
             End If
 
             If context.IsDelegateCreationContext() Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("AddressOf", VBFeaturesResources.AddressOfKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("AddressOf", VBFeaturesResources.Creates_a_delegate_procedure_instance_that_references_the_specified_procedure_AddressOf_procedureName))
             End If
 
             If context.IsAnyExpressionContext AndAlso Not context.TargetToken.Parent.IsKind(SyntaxKind.AddressOfExpression) Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("AddressOf", VBFeaturesResources.AddressOfKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("AddressOf", VBFeaturesResources.Creates_a_delegate_procedure_instance_that_references_the_specified_procedure_AddressOf_procedureName))
             End If
 
             Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()

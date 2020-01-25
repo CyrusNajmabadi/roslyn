@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
+using System;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
@@ -162,7 +165,7 @@ class Program
         foreach (var i in new C(4).IE(5, 6)) Console.Write(i);
     }
 }";
-            var compilation = CompileAndVerify(source, expectedOutput: "12324565");
+            var compilation = CompileAndVerifyWithMscorlib40(source, expectedOutput: "12324565");
 
             compilation.VerifyIL("C.<IE>d__2<T>.System.Collections.Generic.IEnumerable<T>.GetEnumerator()", @"
 {
@@ -440,7 +443,7 @@ class Program
 ");
             compilation.VerifyIL("Program.<Int0>d__0.System.IDisposable.Dispose()", @"
 {
-  // Code size      121 (0x79)
+  // Code size       76 (0x4c)
   .maxstack  2
   .locals init (int V_0)
   IL_0000:  ldarg.0
@@ -449,70 +452,63 @@ class Program
   IL_0007:  ldloc.0
   IL_0008:  ldc.i4.s   -5
   IL_000a:  sub
-  IL_000b:  switch    (
-        IL_0041,
-        IL_0041,
-        IL_0041,
-        IL_0078,
-        IL_0078,
-        IL_0078,
-        IL_0078,
-        IL_0041,
-        IL_0041,
-        IL_0041,
-        IL_0041,
-        IL_0041)
-  IL_0040:  ret
-  IL_0041:  nop
+  IL_000b:  ldc.i4.2
+  IL_000c:  ble.un.s   IL_0014
+  IL_000e:  ldloc.0
+  IL_000f:  ldc.i4.2
+  IL_0010:  sub
+  IL_0011:  ldc.i4.4
+  IL_0012:  bgt.un.s   IL_004b
+  IL_0014:  nop
   .try
   {
-    IL_0042:  ldloc.0
-    IL_0043:  ldc.i4.s   -4
-    IL_0045:  bgt.s      IL_0053
-    IL_0047:  ldloc.0
-    IL_0048:  ldc.i4.s   -5
-    IL_004a:  beq.s      IL_0067
-    IL_004c:  ldloc.0
-    IL_004d:  ldc.i4.s   -4
-    IL_004f:  beq.s      IL_005d
-    IL_0051:  leave.s    IL_0078
-    IL_0053:  ldloc.0
-    IL_0054:  ldc.i4.3
-    IL_0055:  beq.s      IL_005d
-    IL_0057:  ldloc.0
-    IL_0058:  ldc.i4.5
-    IL_0059:  beq.s      IL_0067
-    IL_005b:  leave.s    IL_0078
-    IL_005d:  nop
+    IL_0015:  ldloc.0
+    IL_0016:  ldc.i4.s   -4
+    IL_0018:  bgt.s      IL_0026
+    IL_001a:  ldloc.0
+    IL_001b:  ldc.i4.s   -5
+    IL_001d:  beq.s      IL_003a
+    IL_001f:  ldloc.0
+    IL_0020:  ldc.i4.s   -4
+    IL_0022:  beq.s      IL_0030
+    IL_0024:  leave.s    IL_004b
+    IL_0026:  ldloc.0
+    IL_0027:  ldc.i4.3
+    IL_0028:  beq.s      IL_0030
+    IL_002a:  ldloc.0
+    IL_002b:  ldc.i4.5
+    IL_002c:  beq.s      IL_003a
+    IL_002e:  leave.s    IL_004b
+    IL_0030:  nop
     .try
     {
-      IL_005e:  leave.s    IL_0078
+      IL_0031:  leave.s    IL_004b
     }
     finally
     {
-      IL_0060:  ldarg.0
-      IL_0061:  call       ""void Program.<Int0>d__0.<>m__Finally2()""
-      IL_0066:  endfinally
+      IL_0033:  ldarg.0
+      IL_0034:  call       ""void Program.<Int0>d__0.<>m__Finally2()""
+      IL_0039:  endfinally
     }
-    IL_0067:  nop
+    IL_003a:  nop
     .try
     {
-      IL_0068:  leave.s    IL_0078
+      IL_003b:  leave.s    IL_004b
     }
     finally
     {
-      IL_006a:  ldarg.0
-      IL_006b:  call       ""void Program.<Int0>d__0.<>m__Finally3()""
-      IL_0070:  endfinally
+      IL_003d:  ldarg.0
+      IL_003e:  call       ""void Program.<Int0>d__0.<>m__Finally3()""
+      IL_0043:  endfinally
     }
   }
   finally
   {
-    IL_0071:  ldarg.0
-    IL_0072:  call       ""void Program.<Int0>d__0.<>m__Finally1()""
-    IL_0077:  endfinally
+    IL_0044:  ldarg.0
+    IL_0045:  call       ""void Program.<Int0>d__0.<>m__Finally1()""
+    IL_004a:  endfinally
   }
-  IL_0078:  ret
+  IL_004b:  ret
 }
 ");
         }
@@ -1031,7 +1027,8 @@ struct S : IEnumerable
 }");
         }
 
-        [Fact, WorkItem(544908, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544908")]
+        [ConditionalFact(typeof(DesktopOnly))]
+        [WorkItem(544908, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544908")]
         public void TestIteratorWithNullableAsCollectionVariable_Null()
         {
             var source = @"
@@ -1929,7 +1926,7 @@ using System.Collections.Generic;
 
 class Program
 {
-    public static IEnumerable<int> Foo()
+    public static IEnumerable<int> Goo()
     {
         yield return 1;
     }
@@ -1939,7 +1936,7 @@ class Program
             var parsed = new[] { Parse(source) };
             var comp = CreateCompilationWithMscorlib45(parsed);
             var verifier = this.CompileAndVerify(comp);
-            var il = verifier.VisualizeIL("Program.<Foo>d__0.System.Collections.Generic.IEnumerable<int>.GetEnumerator()");
+            var il = verifier.VisualizeIL("Program.<Goo>d__0.System.Collections.Generic.IEnumerable<int>.GetEnumerator()");
             Assert.Contains("System.Environment.CurrentManagedThreadId.get", il, StringComparison.Ordinal);
         }
 
@@ -1953,7 +1950,7 @@ using System.Collections.Generic;
 
 class Program
 {
-    public static IEnumerable<int> Foo()
+    public static IEnumerable<int> Goo()
     {
         yield return 1;
     }
@@ -1969,10 +1966,10 @@ namespace System
 
 ";
             var parsed = new[] { Parse(source) };
-            var comp = CreateCompilationWithMscorlib(parsed);
+            var comp = CreateCompilation(parsed);
             comp.MakeMemberMissing(WellKnownMember.System_Threading_Thread__ManagedThreadId);
             var verifier = this.CompileAndVerify(comp);
-            var il = verifier.VisualizeIL("Program.<Foo>d__0.System.Collections.Generic.IEnumerable<int>.GetEnumerator()");
+            var il = verifier.VisualizeIL("Program.<Goo>d__0.System.Collections.Generic.IEnumerable<int>.GetEnumerator()");
             Assert.Contains("System.Environment.CurrentManagedThreadId.get", il, StringComparison.Ordinal);
         }
 
@@ -2325,6 +2322,680 @@ class Program
   IL_00af:  ret
 }");
             Assert.True(expectedIL.IndexOf("<>_", StringComparison.Ordinal) < 0);
+        }
+
+        [Fact, WorkItem(9167, "https://github.com/dotnet/roslyn/issues/9167")]
+        public void IteratorShouldCompileWithoutOptionalAttributes()
+        {
+            #region IL for corlib without CompilerGeneratedAttribute or DebuggerNonUserCodeAttribute
+            var corlib = @"
+namespace System
+{
+    public class Object { }
+    public struct Int32 { }
+    public struct Boolean { }
+    public class String { }
+    public class Exception { }
+    public class NotSupportedException : Exception { }
+    public class ValueType { }
+    public class Enum { }
+    public struct Void { }
+    public interface IDisposable
+    {
+        void Dispose();
+    }
+}
+
+namespace System.Collections
+{
+    public interface IEnumerable
+    {
+        IEnumerator GetEnumerator();
+    }
+
+    public interface IEnumerator
+    {
+        bool MoveNext();
+        object Current { get; }
+        void Reset();
+    }
+
+    namespace Generic
+    {
+        public interface IEnumerable<T> : IEnumerable
+        {
+            new IEnumerator<T> GetEnumerator();
+        }
+
+        public interface IEnumerator<T> : IEnumerator
+        {
+            new T Current { get; }
+        }
+    }
+}";
+            #endregion
+
+            var source = @"
+public class C
+{
+    public System.Collections.IEnumerable SomeNumbers()
+    {
+        yield return 42;
+    }
+}";
+            // The compilation succeeds even though CompilerGeneratedAttribute and DebuggerNonUserCodeAttribute are not available.
+            var compilation = CreateEmptyCompilation(new[] { Parse(source), Parse(corlib) });
+            var verifier = CompileAndVerify(compilation, verify: Verification.Fails);
+            verifier.VerifyDiagnostics(
+                // warning CS8021: No value for RuntimeMetadataVersion found. No assembly containing System.Object was found nor was a value for RuntimeMetadataVersion specified through options.
+                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1));
+        }
+
+        [Fact, WorkItem(9463, "https://github.com/dotnet/roslyn/issues/9463")]
+        public void IEnumerableIteratorReportsDiagnosticsWhenCoreTypesAreMissing()
+        {
+            // Note that IDisposable.Dispose, IEnumerator.Current and other types are missing
+            // Also, IEnumerator<T> doesn't have a get accessor
+            var source = @"
+namespace System
+{
+    public class Object { }
+    public struct Int32 { }
+    public struct Boolean { }
+    public class String { }
+    public class Exception { }
+    public class ValueType { }
+    public class Enum { }
+    public struct Void { }
+    public interface IDisposable { }
+}
+
+namespace System.Collections
+{
+    public interface IEnumerable { }
+    public interface IEnumerator { }
+}
+
+namespace System.Collections.Generic
+{
+    public interface IEnumerator<T>
+    {
+        T Current { set; }
+    }
+}
+
+public class C
+{
+    public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+}";
+            var compilation = CreateEmptyCompilation(new[] { Parse(source) });
+
+            compilation.VerifyEmitDiagnostics(
+                // warning CS8021: No value for RuntimeMetadataVersion found. No assembly containing System.Object was found nor was a value for RuntimeMetadataVersion specified through options.
+                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1),
+                // (31,57): error CS0656: Missing compiler required member 'System.IDisposable.Dispose'
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.IDisposable", "Dispose").WithLocation(31, 57),
+                // (31,57): error CS0154: The property or indexer 'IEnumerator<T>.Current' cannot be used in this context because it lacks the get accessor
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_PropertyLacksGet, "{ yield return 42; }").WithArguments("System.Collections.Generic.IEnumerator<T>.Current").WithLocation(31, 57),
+                // (31,57): error CS0656: Missing compiler required member 'System.Collections.IEnumerator.Current'
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.IEnumerator", "Current").WithLocation(31, 57),
+                // (31,57): error CS0656: Missing compiler required member 'System.Collections.IEnumerator.MoveNext'
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.IEnumerator", "MoveNext").WithLocation(31, 57),
+                // (31,57): error CS0656: Missing compiler required member 'System.Collections.IEnumerator.Reset'
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.IEnumerator", "Reset").WithLocation(31, 57),
+                // (31,57): error CS0656: Missing compiler required member 'System.Collections.IEnumerable.GetEnumerator'
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.IEnumerable", "GetEnumerator").WithLocation(31, 57),
+                // (31,57): error CS0518: Predefined type 'System.Collections.Generic.IEnumerable`1' is not defined or imported
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_PredefinedTypeNotFound, "{ yield return 42; }").WithArguments("System.Collections.Generic.IEnumerable`1").WithLocation(31, 57),
+                // (31,57): error CS0656: Missing compiler required member 'System.Collections.Generic.IEnumerable`1.GetEnumerator'
+                //     public System.Collections.IEnumerable SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.Generic.IEnumerable`1", "GetEnumerator").WithLocation(31, 57));
+        }
+
+        [Fact, WorkItem(9463, "https://github.com/dotnet/roslyn/issues/9463")]
+        public void IEnumeratorIteratorReportsDiagnosticsWhenCoreTypesAreMissing()
+        {
+            // Note that IDisposable.Dispose and other types are missing
+            // Also IEnumerator.Current lacks a get accessor
+            var source = @"
+namespace System
+{
+    public class Object { }
+    public struct Int32 { }
+    public struct Boolean { }
+    public class String { }
+    public class Exception { }
+    public class ValueType { }
+    public class Enum { }
+    public struct Void { }
+
+    public interface IDisposable { }
+}
+
+namespace System.Collections
+{
+    public interface IEnumerable { }
+    public interface IEnumerator
+    {
+        Object Current { set; }
+    }
+}
+
+public class C
+{
+    public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+}";
+            var compilation = CreateEmptyCompilation(new[] { Parse(source) });
+
+            // No error about IEnumerable
+            compilation.VerifyEmitDiagnostics(
+                // (27,57): error CS0656: Missing compiler required member 'System.IDisposable.Dispose'
+                //     public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.IDisposable", "Dispose").WithLocation(27, 57),
+                // (27,57): error CS0518: Predefined type 'System.Collections.Generic.IEnumerator`1' is not defined or imported
+                //     public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_PredefinedTypeNotFound, "{ yield return 42; }").WithArguments("System.Collections.Generic.IEnumerator`1").WithLocation(27, 57),
+                // (27,57): error CS0656: Missing compiler required member 'System.Collections.Generic.IEnumerator`1.Current'
+                //     public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.Generic.IEnumerator`1", "Current").WithLocation(27, 57),
+                // (27,57): error CS0154: The property or indexer 'IEnumerator.Current' cannot be used in this context because it lacks the get accessor
+                //     public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_PropertyLacksGet, "{ yield return 42; }").WithArguments("System.Collections.IEnumerator.Current").WithLocation(27, 57),
+                // (27,57): error CS0656: Missing compiler required member 'System.Collections.IEnumerator.MoveNext'
+                //     public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.IEnumerator", "MoveNext").WithLocation(27, 57),
+                // (27,57): error CS0656: Missing compiler required member 'System.Collections.IEnumerator.Reset'
+                //     public System.Collections.IEnumerator SomeNumbers() { yield return 42; }
+                Diagnostic(ErrorCode.ERR_MissingPredefinedMember, "{ yield return 42; }").WithArguments("System.Collections.IEnumerator", "Reset").WithLocation(27, 57),
+                // warning CS8021: No value for RuntimeMetadataVersion found. No assembly containing System.Object was found nor was a value for RuntimeMetadataVersion specified through options.
+                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1));
+        }
+
+        [Fact, WorkItem(21077, "https://github.com/dotnet/roslyn/issues/21077")]
+        public void NoExtraCapturing_01()
+        {
+            // Note that the variable i is not captured in any of these three async methods.
+            var source =
+@"using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Method1(bool value)
+    {
+        int i = 42;
+        int j = i;
+        await Task.Yield();
+    }
+
+    static async Task Method2(bool value)
+    {
+        int i = 42;
+        if (value)
+        {
+            int j = i;
+            await Task.Yield();
+        }
+        else
+        {
+            await Task.Yield();
+        }
+    }
+
+    static async Task Method3(bool value)
+    {
+        int i = 42;
+        if (value)
+        {
+            await Task.Yield();
+        }
+        else
+        {
+            int j = i;
+            await Task.Yield();
+        }
+    }
+}";
+            var v = CompileAndVerify(source, options: TestOptions.ReleaseDll);
+            v.VerifyIL("Program.<Method1>d__0.System.Runtime.CompilerServices.IAsyncStateMachine.MoveNext()",
+@"{
+  // Code size      148 (0x94)
+  .maxstack  3
+  .locals init (int V_0,
+                System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter V_1,
+                System.Runtime.CompilerServices.YieldAwaitable V_2,
+                System.Exception V_3)
+  IL_0000:  ldarg.0
+  IL_0001:  ldfld      ""int Program.<Method1>d__0.<>1__state""
+  IL_0006:  stloc.0
+  .try
+  {
+    IL_0007:  ldloc.0
+    IL_0008:  brfalse.s  IL_0044
+    IL_000a:  ldc.i4.s   42
+    IL_000c:  pop
+    IL_000d:  call       ""System.Runtime.CompilerServices.YieldAwaitable System.Threading.Tasks.Task.Yield()""
+    IL_0012:  stloc.2
+    IL_0013:  ldloca.s   V_2
+    IL_0015:  call       ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter System.Runtime.CompilerServices.YieldAwaitable.GetAwaiter()""
+    IL_001a:  stloc.1
+    IL_001b:  ldloca.s   V_1
+    IL_001d:  call       ""bool System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.IsCompleted.get""
+    IL_0022:  brtrue.s   IL_0060
+    IL_0024:  ldarg.0
+    IL_0025:  ldc.i4.0
+    IL_0026:  dup
+    IL_0027:  stloc.0
+    IL_0028:  stfld      ""int Program.<Method1>d__0.<>1__state""
+    IL_002d:  ldarg.0
+    IL_002e:  ldloc.1
+    IL_002f:  stfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method1>d__0.<>u__1""
+    IL_0034:  ldarg.0
+    IL_0035:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method1>d__0.<>t__builder""
+    IL_003a:  ldloca.s   V_1
+    IL_003c:  ldarg.0
+    IL_003d:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitUnsafeOnCompleted<System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, Program.<Method1>d__0>(ref System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, ref Program.<Method1>d__0)""
+    IL_0042:  leave.s    IL_0093
+    IL_0044:  ldarg.0
+    IL_0045:  ldfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method1>d__0.<>u__1""
+    IL_004a:  stloc.1
+    IL_004b:  ldarg.0
+    IL_004c:  ldflda     ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method1>d__0.<>u__1""
+    IL_0051:  initobj    ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter""
+    IL_0057:  ldarg.0
+    IL_0058:  ldc.i4.m1
+    IL_0059:  dup
+    IL_005a:  stloc.0
+    IL_005b:  stfld      ""int Program.<Method1>d__0.<>1__state""
+    IL_0060:  ldloca.s   V_1
+    IL_0062:  call       ""void System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.GetResult()""
+    IL_0067:  leave.s    IL_0080
+  }
+  catch System.Exception
+  {
+    IL_0069:  stloc.3
+    IL_006a:  ldarg.0
+    IL_006b:  ldc.i4.s   -2
+    IL_006d:  stfld      ""int Program.<Method1>d__0.<>1__state""
+    IL_0072:  ldarg.0
+    IL_0073:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method1>d__0.<>t__builder""
+    IL_0078:  ldloc.3
+    IL_0079:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.SetException(System.Exception)""
+    IL_007e:  leave.s    IL_0093
+  }
+  IL_0080:  ldarg.0
+  IL_0081:  ldc.i4.s   -2
+  IL_0083:  stfld      ""int Program.<Method1>d__0.<>1__state""
+  IL_0088:  ldarg.0
+  IL_0089:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method1>d__0.<>t__builder""
+  IL_008e:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.SetResult()""
+  IL_0093:  ret
+}");
+            v.VerifyIL("Program.<Method2>d__1.System.Runtime.CompilerServices.IAsyncStateMachine.MoveNext()",
+@"{
+  // Code size      260 (0x104)
+  .maxstack  3
+  .locals init (int V_0,
+                int V_1, //i
+                System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter V_2,
+                System.Runtime.CompilerServices.YieldAwaitable V_3,
+                System.Exception V_4)
+  IL_0000:  ldarg.0
+  IL_0001:  ldfld      ""int Program.<Method2>d__1.<>1__state""
+  IL_0006:  stloc.0
+  .try
+  {
+    IL_0007:  ldloc.0
+    IL_0008:  brfalse.s  IL_0056
+    IL_000a:  ldloc.0
+    IL_000b:  ldc.i4.1
+    IL_000c:  beq        IL_00b2
+    IL_0011:  ldc.i4.s   42
+    IL_0013:  stloc.1
+    IL_0014:  ldarg.0
+    IL_0015:  ldfld      ""bool Program.<Method2>d__1.value""
+    IL_001a:  brfalse.s  IL_007b
+    IL_001c:  call       ""System.Runtime.CompilerServices.YieldAwaitable System.Threading.Tasks.Task.Yield()""
+    IL_0021:  stloc.3
+    IL_0022:  ldloca.s   V_3
+    IL_0024:  call       ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter System.Runtime.CompilerServices.YieldAwaitable.GetAwaiter()""
+    IL_0029:  stloc.2
+    IL_002a:  ldloca.s   V_2
+    IL_002c:  call       ""bool System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.IsCompleted.get""
+    IL_0031:  brtrue.s   IL_0072
+    IL_0033:  ldarg.0
+    IL_0034:  ldc.i4.0
+    IL_0035:  dup
+    IL_0036:  stloc.0
+    IL_0037:  stfld      ""int Program.<Method2>d__1.<>1__state""
+    IL_003c:  ldarg.0
+    IL_003d:  ldloc.2
+    IL_003e:  stfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method2>d__1.<>u__1""
+    IL_0043:  ldarg.0
+    IL_0044:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method2>d__1.<>t__builder""
+    IL_0049:  ldloca.s   V_2
+    IL_004b:  ldarg.0
+    IL_004c:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitUnsafeOnCompleted<System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, Program.<Method2>d__1>(ref System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, ref Program.<Method2>d__1)""
+    IL_0051:  leave      IL_0103
+    IL_0056:  ldarg.0
+    IL_0057:  ldfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method2>d__1.<>u__1""
+    IL_005c:  stloc.2
+    IL_005d:  ldarg.0
+    IL_005e:  ldflda     ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method2>d__1.<>u__1""
+    IL_0063:  initobj    ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter""
+    IL_0069:  ldarg.0
+    IL_006a:  ldc.i4.m1
+    IL_006b:  dup
+    IL_006c:  stloc.0
+    IL_006d:  stfld      ""int Program.<Method2>d__1.<>1__state""
+    IL_0072:  ldloca.s   V_2
+    IL_0074:  call       ""void System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.GetResult()""
+    IL_0079:  br.s       IL_00d5
+    IL_007b:  call       ""System.Runtime.CompilerServices.YieldAwaitable System.Threading.Tasks.Task.Yield()""
+    IL_0080:  stloc.3
+    IL_0081:  ldloca.s   V_3
+    IL_0083:  call       ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter System.Runtime.CompilerServices.YieldAwaitable.GetAwaiter()""
+    IL_0088:  stloc.2
+    IL_0089:  ldloca.s   V_2
+    IL_008b:  call       ""bool System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.IsCompleted.get""
+    IL_0090:  brtrue.s   IL_00ce
+    IL_0092:  ldarg.0
+    IL_0093:  ldc.i4.1
+    IL_0094:  dup
+    IL_0095:  stloc.0
+    IL_0096:  stfld      ""int Program.<Method2>d__1.<>1__state""
+    IL_009b:  ldarg.0
+    IL_009c:  ldloc.2
+    IL_009d:  stfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method2>d__1.<>u__1""
+    IL_00a2:  ldarg.0
+    IL_00a3:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method2>d__1.<>t__builder""
+    IL_00a8:  ldloca.s   V_2
+    IL_00aa:  ldarg.0
+    IL_00ab:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitUnsafeOnCompleted<System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, Program.<Method2>d__1>(ref System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, ref Program.<Method2>d__1)""
+    IL_00b0:  leave.s    IL_0103
+    IL_00b2:  ldarg.0
+    IL_00b3:  ldfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method2>d__1.<>u__1""
+    IL_00b8:  stloc.2
+    IL_00b9:  ldarg.0
+    IL_00ba:  ldflda     ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method2>d__1.<>u__1""
+    IL_00bf:  initobj    ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter""
+    IL_00c5:  ldarg.0
+    IL_00c6:  ldc.i4.m1
+    IL_00c7:  dup
+    IL_00c8:  stloc.0
+    IL_00c9:  stfld      ""int Program.<Method2>d__1.<>1__state""
+    IL_00ce:  ldloca.s   V_2
+    IL_00d0:  call       ""void System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.GetResult()""
+    IL_00d5:  leave.s    IL_00f0
+  }
+  catch System.Exception
+  {
+    IL_00d7:  stloc.s    V_4
+    IL_00d9:  ldarg.0
+    IL_00da:  ldc.i4.s   -2
+    IL_00dc:  stfld      ""int Program.<Method2>d__1.<>1__state""
+    IL_00e1:  ldarg.0
+    IL_00e2:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method2>d__1.<>t__builder""
+    IL_00e7:  ldloc.s    V_4
+    IL_00e9:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.SetException(System.Exception)""
+    IL_00ee:  leave.s    IL_0103
+  }
+  IL_00f0:  ldarg.0
+  IL_00f1:  ldc.i4.s   -2
+  IL_00f3:  stfld      ""int Program.<Method2>d__1.<>1__state""
+  IL_00f8:  ldarg.0
+  IL_00f9:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method2>d__1.<>t__builder""
+  IL_00fe:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.SetResult()""
+  IL_0103:  ret
+}");
+            v.VerifyIL("Program.<Method3>d__2.System.Runtime.CompilerServices.IAsyncStateMachine.MoveNext()",
+@"{
+  // Code size      260 (0x104)
+  .maxstack  3
+  .locals init (int V_0,
+                int V_1, //i
+                System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter V_2,
+                System.Runtime.CompilerServices.YieldAwaitable V_3,
+                System.Exception V_4)
+  IL_0000:  ldarg.0
+  IL_0001:  ldfld      ""int Program.<Method3>d__2.<>1__state""
+  IL_0006:  stloc.0
+  .try
+  {
+    IL_0007:  ldloc.0
+    IL_0008:  brfalse.s  IL_0056
+    IL_000a:  ldloc.0
+    IL_000b:  ldc.i4.1
+    IL_000c:  beq        IL_00b2
+    IL_0011:  ldc.i4.s   42
+    IL_0013:  stloc.1
+    IL_0014:  ldarg.0
+    IL_0015:  ldfld      ""bool Program.<Method3>d__2.value""
+    IL_001a:  brfalse.s  IL_007b
+    IL_001c:  call       ""System.Runtime.CompilerServices.YieldAwaitable System.Threading.Tasks.Task.Yield()""
+    IL_0021:  stloc.3
+    IL_0022:  ldloca.s   V_3
+    IL_0024:  call       ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter System.Runtime.CompilerServices.YieldAwaitable.GetAwaiter()""
+    IL_0029:  stloc.2
+    IL_002a:  ldloca.s   V_2
+    IL_002c:  call       ""bool System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.IsCompleted.get""
+    IL_0031:  brtrue.s   IL_0072
+    IL_0033:  ldarg.0
+    IL_0034:  ldc.i4.0
+    IL_0035:  dup
+    IL_0036:  stloc.0
+    IL_0037:  stfld      ""int Program.<Method3>d__2.<>1__state""
+    IL_003c:  ldarg.0
+    IL_003d:  ldloc.2
+    IL_003e:  stfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method3>d__2.<>u__1""
+    IL_0043:  ldarg.0
+    IL_0044:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method3>d__2.<>t__builder""
+    IL_0049:  ldloca.s   V_2
+    IL_004b:  ldarg.0
+    IL_004c:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitUnsafeOnCompleted<System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, Program.<Method3>d__2>(ref System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, ref Program.<Method3>d__2)""
+    IL_0051:  leave      IL_0103
+    IL_0056:  ldarg.0
+    IL_0057:  ldfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method3>d__2.<>u__1""
+    IL_005c:  stloc.2
+    IL_005d:  ldarg.0
+    IL_005e:  ldflda     ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method3>d__2.<>u__1""
+    IL_0063:  initobj    ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter""
+    IL_0069:  ldarg.0
+    IL_006a:  ldc.i4.m1
+    IL_006b:  dup
+    IL_006c:  stloc.0
+    IL_006d:  stfld      ""int Program.<Method3>d__2.<>1__state""
+    IL_0072:  ldloca.s   V_2
+    IL_0074:  call       ""void System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.GetResult()""
+    IL_0079:  br.s       IL_00d5
+    IL_007b:  call       ""System.Runtime.CompilerServices.YieldAwaitable System.Threading.Tasks.Task.Yield()""
+    IL_0080:  stloc.3
+    IL_0081:  ldloca.s   V_3
+    IL_0083:  call       ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter System.Runtime.CompilerServices.YieldAwaitable.GetAwaiter()""
+    IL_0088:  stloc.2
+    IL_0089:  ldloca.s   V_2
+    IL_008b:  call       ""bool System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.IsCompleted.get""
+    IL_0090:  brtrue.s   IL_00ce
+    IL_0092:  ldarg.0
+    IL_0093:  ldc.i4.1
+    IL_0094:  dup
+    IL_0095:  stloc.0
+    IL_0096:  stfld      ""int Program.<Method3>d__2.<>1__state""
+    IL_009b:  ldarg.0
+    IL_009c:  ldloc.2
+    IL_009d:  stfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method3>d__2.<>u__1""
+    IL_00a2:  ldarg.0
+    IL_00a3:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method3>d__2.<>t__builder""
+    IL_00a8:  ldloca.s   V_2
+    IL_00aa:  ldarg.0
+    IL_00ab:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitUnsafeOnCompleted<System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, Program.<Method3>d__2>(ref System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter, ref Program.<Method3>d__2)""
+    IL_00b0:  leave.s    IL_0103
+    IL_00b2:  ldarg.0
+    IL_00b3:  ldfld      ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method3>d__2.<>u__1""
+    IL_00b8:  stloc.2
+    IL_00b9:  ldarg.0
+    IL_00ba:  ldflda     ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter Program.<Method3>d__2.<>u__1""
+    IL_00bf:  initobj    ""System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter""
+    IL_00c5:  ldarg.0
+    IL_00c6:  ldc.i4.m1
+    IL_00c7:  dup
+    IL_00c8:  stloc.0
+    IL_00c9:  stfld      ""int Program.<Method3>d__2.<>1__state""
+    IL_00ce:  ldloca.s   V_2
+    IL_00d0:  call       ""void System.Runtime.CompilerServices.YieldAwaitable.YieldAwaiter.GetResult()""
+    IL_00d5:  leave.s    IL_00f0
+  }
+  catch System.Exception
+  {
+    IL_00d7:  stloc.s    V_4
+    IL_00d9:  ldarg.0
+    IL_00da:  ldc.i4.s   -2
+    IL_00dc:  stfld      ""int Program.<Method3>d__2.<>1__state""
+    IL_00e1:  ldarg.0
+    IL_00e2:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method3>d__2.<>t__builder""
+    IL_00e7:  ldloc.s    V_4
+    IL_00e9:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.SetException(System.Exception)""
+    IL_00ee:  leave.s    IL_0103
+  }
+  IL_00f0:  ldarg.0
+  IL_00f1:  ldc.i4.s   -2
+  IL_00f3:  stfld      ""int Program.<Method3>d__2.<>1__state""
+  IL_00f8:  ldarg.0
+  IL_00f9:  ldflda     ""System.Runtime.CompilerServices.AsyncTaskMethodBuilder Program.<Method3>d__2.<>t__builder""
+  IL_00fe:  call       ""void System.Runtime.CompilerServices.AsyncTaskMethodBuilder.SetResult()""
+  IL_0103:  ret
+}");
+        }
+
+        [Fact, WorkItem(5062, "https://github.com/dotnet/roslyn/issues/5062")]
+        public void LocalLiftingVsSwitch()
+        {
+            var source =
+@"using System;
+using System.Collections.Generic;
+
+class Program
+{
+    static void Main()
+    {
+        foreach (var s in Iter1(0)) Console.Write(s);
+        foreach (var s in Iter1(1)) Console.Write(s);
+        foreach (var s in Iter2(0)) Console.Write(s);
+        foreach (var s in Iter2(1)) Console.Write(s);
+    }
+
+    static IEnumerable<string> Iter1(int i)
+    {
+        bool result;
+        switch (i)
+        {
+            case 1: result = true; break;
+            default: result = false; break;
+        }
+        yield return result.ToString();
+    }
+
+    static IEnumerable<string> Iter2(int i)
+    {
+        bool result;
+        if (i == 1)
+            result = true;
+        else
+            result = false;
+        yield return result.ToString();
+    }
+}";
+            var compilation = CompileAndVerify(source, expectedOutput: "FalseTrueFalseTrue", options: TestOptions.ReleaseExe);
+            compilation.VerifyIL("Program.<Iter1>d__1.System.Collections.IEnumerator.MoveNext()", @"{
+  // Code size       69 (0x45)
+  .maxstack  2
+  .locals init (int V_0,
+                bool V_1) //result
+  IL_0000:  ldarg.0
+  IL_0001:  ldfld      ""int Program.<Iter1>d__1.<>1__state""
+  IL_0006:  stloc.0
+  IL_0007:  ldloc.0
+  IL_0008:  brfalse.s  IL_0010
+  IL_000a:  ldloc.0
+  IL_000b:  ldc.i4.1
+  IL_000c:  beq.s      IL_003c
+  IL_000e:  ldc.i4.0
+  IL_000f:  ret
+  IL_0010:  ldarg.0
+  IL_0011:  ldc.i4.m1
+  IL_0012:  stfld      ""int Program.<Iter1>d__1.<>1__state""
+  IL_0017:  ldarg.0
+  IL_0018:  ldfld      ""int Program.<Iter1>d__1.i""
+  IL_001d:  ldc.i4.1
+  IL_001e:  bne.un.s   IL_0024
+  IL_0020:  ldc.i4.1
+  IL_0021:  stloc.1
+  IL_0022:  br.s       IL_0026
+  IL_0024:  ldc.i4.0
+  IL_0025:  stloc.1
+  IL_0026:  ldarg.0
+  IL_0027:  ldloca.s   V_1
+  IL_0029:  call       ""string bool.ToString()""
+  IL_002e:  stfld      ""string Program.<Iter1>d__1.<>2__current""
+  IL_0033:  ldarg.0
+  IL_0034:  ldc.i4.1
+  IL_0035:  stfld      ""int Program.<Iter1>d__1.<>1__state""
+  IL_003a:  ldc.i4.1
+  IL_003b:  ret
+  IL_003c:  ldarg.0
+  IL_003d:  ldc.i4.m1
+  IL_003e:  stfld      ""int Program.<Iter1>d__1.<>1__state""
+  IL_0043:  ldc.i4.0
+  IL_0044:  ret
+}");
+            compilation.VerifyIL("Program.<Iter2>d__2.System.Collections.IEnumerator.MoveNext()", @"{
+  // Code size       69 (0x45)
+  .maxstack  2
+  .locals init (int V_0,
+                bool V_1) //result
+  IL_0000:  ldarg.0
+  IL_0001:  ldfld      ""int Program.<Iter2>d__2.<>1__state""
+  IL_0006:  stloc.0
+  IL_0007:  ldloc.0
+  IL_0008:  brfalse.s  IL_0010
+  IL_000a:  ldloc.0
+  IL_000b:  ldc.i4.1
+  IL_000c:  beq.s      IL_003c
+  IL_000e:  ldc.i4.0
+  IL_000f:  ret
+  IL_0010:  ldarg.0
+  IL_0011:  ldc.i4.m1
+  IL_0012:  stfld      ""int Program.<Iter2>d__2.<>1__state""
+  IL_0017:  ldarg.0
+  IL_0018:  ldfld      ""int Program.<Iter2>d__2.i""
+  IL_001d:  ldc.i4.1
+  IL_001e:  bne.un.s   IL_0024
+  IL_0020:  ldc.i4.1
+  IL_0021:  stloc.1
+  IL_0022:  br.s       IL_0026
+  IL_0024:  ldc.i4.0
+  IL_0025:  stloc.1
+  IL_0026:  ldarg.0
+  IL_0027:  ldloca.s   V_1
+  IL_0029:  call       ""string bool.ToString()""
+  IL_002e:  stfld      ""string Program.<Iter2>d__2.<>2__current""
+  IL_0033:  ldarg.0
+  IL_0034:  ldc.i4.1
+  IL_0035:  stfld      ""int Program.<Iter2>d__2.<>1__state""
+  IL_003a:  ldc.i4.1
+  IL_003b:  ret
+  IL_003c:  ldarg.0
+  IL_003d:  ldc.i4.m1
+  IL_003e:  stfld      ""int Program.<Iter2>d__2.<>1__state""
+  IL_0043:  ldc.i4.0
+  IL_0044:  ret
+}");
         }
     }
 }

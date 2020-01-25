@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Threading;
@@ -20,8 +22,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var node = SyntaxFactory.IdentifierName(SyntaxFactory.Identifier("Hi"));
 
             var path = new SyntaxPath(node);
-            SyntaxNode recovered;
-            Assert.True(path.TryResolve(node, out recovered));
+            Assert.True(path.TryResolve(node, out SyntaxNode recovered));
             Assert.Equal(node, recovered);
         }
 
@@ -31,53 +32,46 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var node = SyntaxFactory.IdentifierName(SyntaxFactory.Identifier("Hi"));
 
             var path = new SyntaxPath(node);
-            SyntaxNode recovered;
-            Assert.False(path.TryResolve(SyntaxFactory.ParseExpression("Foo()"), out recovered));
+            Assert.False(path.TryResolve(SyntaxFactory.ParseExpression("Goo()"), out SyntaxNode recovered));
         }
 
         [Fact]
         public void RecoverChild()
         {
-            var node = SyntaxFactory.ParseExpression("Foo()");
+            var node = SyntaxFactory.ParseExpression("Goo()");
             var child = ((InvocationExpressionSyntax)node).ArgumentList;
             var path = new SyntaxPath(child);
-            SyntaxNode recovered;
-            Assert.True(path.TryResolve(node, out recovered));
+            Assert.True(path.TryResolve(node, out SyntaxNode recovered));
             Assert.Equal(child, recovered);
         }
 
         [Fact]
         public void FailChildCount()
         {
-            var root = SyntaxFactory.ParseExpression("Foo(a, b)");
+            var root = SyntaxFactory.ParseExpression("Goo(a, b)");
             var path = new SyntaxPath(((InvocationExpressionSyntax)root).ArgumentList.Arguments.Last());
 
-            var root2 = SyntaxFactory.ParseExpression("Foo(a)");
-
-            SyntaxNode recovered;
-            Assert.False(path.TryResolve(root2, out recovered));
+            var root2 = SyntaxFactory.ParseExpression("Goo(a)");
+            Assert.False(path.TryResolve(root2, out SyntaxNode recovered));
         }
 
         [Fact]
         public void FailChildType()
         {
-            var root = SyntaxFactory.ParseExpression("Foo(a)");
+            var root = SyntaxFactory.ParseExpression("Goo(a)");
             var path = new SyntaxPath(((InvocationExpressionSyntax)root).ArgumentList.Arguments.First().Expression);
 
-            var root2 = SyntaxFactory.ParseExpression("Foo(3)");
-            SyntaxNode recovered;
-            Assert.False(path.TryResolve(root2, out recovered));
+            var root2 = SyntaxFactory.ParseExpression("Goo(3)");
+            Assert.False(path.TryResolve(root2, out SyntaxNode recovered));
         }
 
         [Fact]
         public void RecoverGeneric()
         {
-            var root = SyntaxFactory.ParseExpression("Foo()");
+            var root = SyntaxFactory.ParseExpression("Goo()");
             var node = ((InvocationExpressionSyntax)root).ArgumentList;
             var path = new SyntaxPath(node);
-
-            ArgumentListSyntax recovered;
-            Assert.True(path.TryResolve(root, out recovered));
+            Assert.True(path.TryResolve(root, out ArgumentListSyntax recovered));
             Assert.Equal(node, recovered);
         }
 
@@ -87,9 +81,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var tree = SyntaxFactory.ParseSyntaxTree(string.Empty);
             var root = tree.GetRoot();
             var path = new SyntaxPath(root);
-
-            SyntaxNode node;
-            Assert.True(path.TryResolve(tree, CancellationToken.None, out node));
+            Assert.True(path.TryResolve(tree, CancellationToken.None, out SyntaxNode node));
             Assert.Equal(root, node);
         }
 
@@ -103,9 +95,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 
             var newText = text.WithChanges(new TextChange(new TextSpan(0, 0), "class C {}"));
             var newTree = tree.WithChangedText(newText);
-
-            SyntaxNode node;
-            Assert.True(path.TryResolve(newTree, CancellationToken.None, out node));
+            Assert.True(path.TryResolve(newTree, CancellationToken.None, out SyntaxNode node));
             Assert.Equal(SyntaxKind.CompilationUnit, node.Kind());
         }
 
@@ -119,9 +109,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 
             var newText = text.WithChanges(new TextChange(new TextSpan(0, text.Length), ""));
             var newTree = tree.WithChangedText(newText);
-
-            SyntaxNode node;
-            Assert.True(path.TryResolve(newTree, CancellationToken.None, out node));
+            Assert.True(path.TryResolve(newTree, CancellationToken.None, out SyntaxNode node));
             Assert.Equal(SyntaxKind.CompilationUnit, node.Kind());
         }
 
@@ -134,9 +122,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path = new SyntaxPath(root);
 
             tree = WithReplaceFirst(tree, "C", "D");
-
-            SyntaxNode node;
-            Assert.True(path.TryResolve(tree, CancellationToken.None, out node));
+            Assert.True(path.TryResolve(tree, CancellationToken.None, out SyntaxNode node));
             Assert.Equal(SyntaxKind.CompilationUnit, node.Kind());
         }
 
@@ -171,13 +157,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path3 = new SyntaxPath(member3);
 
             tree = WithReplaceFirst(WithReplaceFirst(WithReplaceFirst(tree, "i1", "j1"), "i2", "j2"), "i3", "j3");
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            SyntaxNode n3;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.True(path2.TryResolve(tree, CancellationToken.None, out n2));
-            Assert.True(path3.TryResolve(tree, CancellationToken.None, out n3));
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.True(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
+            Assert.True(path3.TryResolve(tree, CancellationToken.None, out SyntaxNode n3));
 
             Assert.Equal(SyntaxKind.MethodDeclaration, n1.Kind());
             Assert.Equal("M1", ((MethodDeclarationSyntax)n1).Identifier.ValueText);
@@ -208,12 +190,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path1 = new SyntaxPath(class1);
             var path2 = new SyntaxPath(class2);
 
-            tree = WithReplaceFirst(tree, "C {", "C : Foo {");
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.True(path2.TryResolve(tree, CancellationToken.None, out n2));
+            tree = WithReplaceFirst(tree, "C {", "C : Goo {");
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.True(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, n1.Kind());
             Assert.Equal("C", ((TypeDeclarationSyntax)n1).Identifier.ValueText);
@@ -247,11 +226,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path2 = new SyntaxPath(member2);
 
             tree = WithReplaceFirst(tree, "bool", "int field; bool");
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.True(path2.TryResolve(tree, CancellationToken.None, out n2));
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.True(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
 
             Assert.Equal(SyntaxKind.MethodDeclaration, n1.Kind());
             Assert.Equal("M1", ((MethodDeclarationSyntax)n1).Identifier.ValueText);
@@ -280,11 +256,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path2 = new SyntaxPath(class2);
 
             tree = WithReplaceFirst(tree, "class", "struct");
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.False(path2.TryResolve(tree, CancellationToken.None, out n2));
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.False(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, n1.Kind());
             Assert.Equal("D", ((TypeDeclarationSyntax)n1).Identifier.ValueText);
@@ -296,7 +269,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var text =
 @"namespace N {
     class C {
-      void Foo();
+      void Goo();
     }
     class D {
     }
@@ -313,13 +286,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path3 = new SyntaxPath(method1);
 
             tree = WithReplaceFirst(tree, "class", "struct");
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            SyntaxNode n3;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.False(path2.TryResolve(tree, CancellationToken.None, out n2));
-            Assert.False(path3.TryResolve(tree, CancellationToken.None, out n3));
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.False(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
+            Assert.False(path3.TryResolve(tree, CancellationToken.None, out SyntaxNode n3));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, n1.Kind());
             Assert.Equal("D", ((TypeDeclarationSyntax)n1).Identifier.ValueText);
@@ -346,11 +315,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path2 = new SyntaxPath(class2);
 
             tree = WithReplace(tree, 0, text.Length, text2);
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.True(path2.TryResolve(tree, CancellationToken.None, out n2));
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.True(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, n1.Kind());
             Assert.Equal("C", ((TypeDeclarationSyntax)n1).Identifier.ValueText);
@@ -377,12 +343,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path1 = new SyntaxPath(class1);
             var path2 = new SyntaxPath(class2);
 
-            tree = WithReplaceFirst(WithReplaceFirst(tree, "class", "/* foo */ class"), "struct", "/* bar */ struct");
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.True(path2.TryResolve(tree, CancellationToken.None, out n2));
+            tree = WithReplaceFirst(WithReplaceFirst(tree, "class", "/* goo */ class"), "struct", "/* bar */ struct");
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.True(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, n1.Kind());
             Assert.Equal("C", ((TypeDeclarationSyntax)n1).Identifier.ValueText);
@@ -420,11 +383,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             var path2 = new SyntaxPath(class2);
 
             tree = WithReplace(tree, 0, text.Length, text2);
-
-            SyntaxNode n1;
-            SyntaxNode n2;
-            Assert.True(path1.TryResolve(tree, CancellationToken.None, out n1));
-            Assert.True(path2.TryResolve(tree, CancellationToken.None, out n2));
+            Assert.True(path1.TryResolve(tree, CancellationToken.None, out SyntaxNode n1));
+            Assert.True(path2.TryResolve(tree, CancellationToken.None, out SyntaxNode n2));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, n1.Kind());
             Assert.Equal("C", ((TypeDeclarationSyntax)n1).Identifier.ValueText);
@@ -442,9 +402,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 
             var newText = WithReplaceFirst(text, "using X;", "");
             var newTree = tree.WithChangedText(newText);
-
-            SyntaxNode node;
-            Assert.True(path.TryResolve(newTree, CancellationToken.None, out node));
+            Assert.True(path.TryResolve(newTree, CancellationToken.None, out SyntaxNode node));
 
             Assert.Equal(SyntaxKind.ClassDeclaration, node.Kind());
         }
@@ -452,8 +410,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         internal static SourceText WithReplaceFirst(SourceText text, string oldText, string newText)
         {
             var oldFullText = text.ToString();
-            int offset = oldFullText.IndexOf(oldText, StringComparison.Ordinal);
-            int length = oldText.Length;
+            var offset = oldFullText.IndexOf(oldText, StringComparison.Ordinal);
+            var length = oldText.Length;
             var span = new TextSpan(offset, length);
             var newFullText = oldFullText.Substring(0, offset) + newText + oldFullText.Substring(span.End);
             return SourceText.From(newFullText);

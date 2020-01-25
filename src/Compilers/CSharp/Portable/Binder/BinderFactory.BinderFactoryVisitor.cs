@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
@@ -16,6 +18,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         private sealed class BinderFactoryVisitor : CSharpSyntaxVisitor<Binder>
         {
             private int _position;
+            private CSharpSyntaxNode _memberDeclarationOpt;
+            private Symbol _memberOpt;
             private readonly BinderFactory _factory;
 
             internal BinderFactoryVisitor(BinderFactory factory)
@@ -23,12 +27,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                 _factory = factory;
             }
 
-            internal int Position
+            internal void Initialize(int position, CSharpSyntaxNode memberDeclarationOpt, Symbol memberOpt)
             {
-                set
-                {
-                    _position = value;
-                }
+                Debug.Assert((memberDeclarationOpt == null) == (memberOpt == null));
+
+                _position = position;
+                _memberDeclarationOpt = memberDeclarationOpt;
+                _memberOpt = memberOpt;
             }
 
             private CSharpCompilation compilation
@@ -130,7 +135,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         resultBinder = VisitCore(methodDecl.Parent);
                     }
 
-                    SourceMethodSymbol method = null;
+                    SourceMemberMethodSymbol method = null;
 
                     if (usage != NodeUsage.Normal && methodDecl.TypeParameterList != null)
                     {
@@ -206,6 +211,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // Destructors have neither parameters nor type parameters, so there's nothing special to do here.
                     resultBinder = VisitCore(parent.Parent);
 
+                    SourceMemberMethodSymbol method = GetMethodSymbol(parent, resultBinder);
+                    resultBinder = new InMethodBinder(method, resultBinder);
+
                     resultBinder = resultBinder.WithUnsafeRegionIfNecessary(parent.Modifiers);
 
                     binderCache.TryAdd(key, resultBinder);
@@ -222,8 +230,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return VisitCore(parent.Parent);
                 }
 
-                bool inBlock = LookupPosition.IsInBlock(_position, parent.Body);
-                var extraInfo = inBlock ? NodeUsage.AccessorBody : NodeUsage.Normal;  // extra info for the cache.
+                bool inBody = LookupPosition.IsInBody(_position, parent);
+                var extraInfo = inBody ? NodeUsage.AccessorBody : NodeUsage.Normal;  // extra info for the cache.
                 var key = CreateBinderCacheKey(parent, extraInfo);
 
                 Binder resultBinder;
@@ -231,7 +239,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     resultBinder = VisitCore(parent.Parent);
 
-                    if (inBlock)
+                    if (inBody)
                     {
                         var propertyOrEventDecl = parent.Parent.Parent;
                         MethodSymbol accessor = null;
@@ -447,8 +455,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             // Get the correct methods symbol within container that corresponds to the given method syntax.
-            private SourceMethodSymbol GetMethodSymbol(BaseMethodDeclarationSyntax baseMethodDeclarationSyntax, Binder outerBinder)
+            private SourceMemberMethodSymbol GetMethodSymbol(BaseMethodDeclarationSyntax baseMethodDeclarationSyntax, Binder outerBinder)
             {
+                if (baseMethodDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourceMemberMethodSymbol)_memberOpt;
+                }
+
                 NamedTypeSymbol container = GetContainerType(outerBinder, baseMethodDeclarationSyntax);
                 if ((object)container == null)
                 {
@@ -456,12 +469,17 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
 
                 string methodName = GetMethodName(baseMethodDeclarationSyntax, outerBinder);
-                return (SourceMethodSymbol)GetMemberSymbol(methodName, baseMethodDeclarationSyntax.FullSpan, container, SymbolKind.Method);
+                return (SourceMemberMethodSymbol)GetMemberSymbol(methodName, baseMethodDeclarationSyntax.FullSpan, container, SymbolKind.Method);
             }
 
             private SourcePropertySymbol GetPropertySymbol(BasePropertyDeclarationSyntax basePropertyDeclarationSyntax, Binder outerBinder)
             {
                 Debug.Assert(basePropertyDeclarationSyntax.Kind() == SyntaxKind.PropertyDeclaration || basePropertyDeclarationSyntax.Kind() == SyntaxKind.IndexerDeclaration);
+
+                if (basePropertyDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourcePropertySymbol)_memberOpt;
+                }
 
                 NamedTypeSymbol container = GetContainerType(outerBinder, basePropertyDeclarationSyntax);
                 if ((object)container == null)
@@ -475,6 +493,11 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             private SourceEventSymbol GetEventSymbol(EventDeclarationSyntax eventDeclarationSyntax, Binder outerBinder)
             {
+                if (eventDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourceEventSymbol)_memberOpt;
+                }
+
                 NamedTypeSymbol container = GetContainerType(outerBinder, eventDeclarationSyntax);
                 if ((object)container == null)
                 {
@@ -514,15 +537,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                             }
                         }
                     }
-                    else
+                    else if (InSpan(sym.Locations, this.syntaxTree, memberSpan))
                     {
-                        foreach (Location loc in sym.Locations)
-                        {
-                            if (InSpan(loc, this.syntaxTree, memberSpan))
-                            {
-                                return sym;
-                            }
-                        }
+                        return sym;
                     }
                 }
 
@@ -536,6 +553,22 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 Debug.Assert(syntaxTree != null);
                 return (location.SourceTree == syntaxTree) && span.Contains(location.SourceSpan);
+            }
+
+            /// <summary>
+            /// Returns true if one of the locations is within the syntax tree and span.
+            /// </summary>
+            private static bool InSpan(ImmutableArray<Location> locations, SyntaxTree syntaxTree, TextSpan span)
+            {
+                Debug.Assert(syntaxTree != null);
+                foreach (var loc in locations)
+                {
+                    if (InSpan(loc, syntaxTree, span))
+                    {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             public override Binder VisitDelegateDeclaration(DelegateDeclarationSyntax parent)

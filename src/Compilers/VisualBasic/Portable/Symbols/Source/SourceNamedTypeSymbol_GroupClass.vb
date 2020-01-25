@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -33,7 +36,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     If attributeSyntax.SyntaxTree.IsMyTemplate Then
                         defaultInstances = If(attributeData.GetConstructorArgument(Of String)(3, Microsoft.CodeAnalysis.SpecialType.System_String), "").Split(separatorComma, StringSplitOptions.None)
                     Else
-                        defaultInstances = SpecializedCollections.EmptyArray(Of String)()
+                        defaultInstances = Array.Empty(Of String)()
                     End If
 
                     ' Types matching each name in baseTypeNames will be grouped together in the builder below and groups will be separated by Nothing item.

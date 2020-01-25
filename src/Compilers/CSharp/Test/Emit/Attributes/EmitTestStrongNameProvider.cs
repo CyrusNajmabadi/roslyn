@@ -1,61 +1,61 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using System;
+using System.Collections.Immutable;
 using System.IO;
+using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Roslyn.Test.Utilities;
 using Xunit;
+using static Roslyn.Test.Utilities.SigningTestHelpers;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
     public partial class InternalsVisibleToAndStrongNameTests : CSharpTestBase
     {
-        /// <summary>
-        /// A strong name provider which throws an IOException while creating
-        /// the input stream.
-        /// </summary>
-        private class StrongNameProviderWithBadInputStream : StrongNameProvider
+        [Fact]
+        [WorkItem(209695, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=209694")]
+        public void ExceptionInReadAllBytes()
         {
-            private StrongNameProvider _underlyingProvider;
-            public StrongNameProviderWithBadInputStream(StrongNameProvider underlyingProvider)
+            var ex = new Exception("Crazy exception you could never have predicted!");
+            var fileSystem = new TestStrongNameFileSystem()
             {
-                _underlyingProvider = underlyingProvider;
-            }
+                ReadAllBytesFunc = _ => throw ex
+            };
+            var provider = new TestDesktopStrongNameProvider(fileSystem: fileSystem);
 
-            public override bool Equals(object other) => this == other;
+            var src = @"class C {}";
+            var keyFile = Temp.CreateFile().WriteAllBytes(TestResources.General.snKey).Path;
+            var options = TestOptions.DebugDll
+                .WithStrongNameProvider(provider)
+                .WithCryptoKeyFile(keyFile);
 
-            public override int GetHashCode() => _underlyingProvider.GetHashCode();
-
-            internal override Stream CreateInputStream()
-            {
-                throw new IOException("This is a test IOException");
-            }
-
-            internal override StrongNameKeys CreateKeys(string keyFilePath, string keyContainerName, CommonMessageProvider messageProvider) =>
-                _underlyingProvider.CreateKeys(keyFilePath, keyContainerName, messageProvider);
-
-            internal override void SignAssembly(StrongNameKeys keys, Stream inputStream, Stream outputStream) =>
-                _underlyingProvider.SignAssembly(keys, inputStream, outputStream);
+            var comp = CreateCompilation(src, options: options);
+            comp.VerifyEmitDiagnostics(
+                // error CS7027: Error signing output with public key from file '{0}' -- '{1}'
+                Diagnostic(ErrorCode.ERR_PublicKeyFileFailure).WithArguments(keyFile, ex.Message).WithLocation(1, 1));
         }
 
         [Fact]
-        public void BadInputStream()
+        public void ExceptionInReadKeysFromContainer()
         {
-            string src = @"
-class C
-{
-    public static void Main(string[] args) { }
-}";
-            var testProvider = new StrongNameProviderWithBadInputStream(s_defaultProvider);
-            var options = TestOptions.DebugExe
-                .WithStrongNameProvider(testProvider)
+            var ex = new Exception("Crazy exception you could never have predicted!");
+            var provider = new TestDesktopStrongNameProvider()
+            {
+                ReadKeysFromContainerFunc = (string _, out ImmutableArray<byte> publicKey) => throw ex
+            };
+
+            var src = @"class C {}";
+            var options = TestOptions.DebugDll
+                .WithStrongNameProvider(provider)
                 .WithCryptoKeyContainer("RoslynTestContainer");
 
-            var comp = CreateCompilationWithMscorlib(src,
-                options: options);
-
+            var comp = CreateCompilation(src, options: options);
             comp.VerifyEmitDiagnostics(
-    // error CS7028: Error signing output with public key from container 'RoslynTestContainer' -- This is a test IOException
-    Diagnostic(ErrorCode.ERR_PublicKeyContainerFailure).WithArguments("RoslynTestContainer", "This is a test IOException").WithLocation(1, 1));
+                // error CS7028: Error signing output with public key from container 'RoslynTestContainer' -- Crazy exception you could never have predicted!
+                Diagnostic(ErrorCode.ERR_PublicKeyContainerFailure).WithArguments("RoslynTestContainer", ex.Message).WithLocation(1, 1));
         }
     }
 }

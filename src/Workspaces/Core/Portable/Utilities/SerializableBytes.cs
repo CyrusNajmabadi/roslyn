@@ -1,12 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Roslyn.Utilities;
 
-namespace Roslyn.Utilities
+namespace Microsoft.CodeAnalysis
 {
     /// <summary>
     /// Helpers to create temporary streams backed by pooled memory
@@ -15,46 +19,40 @@ namespace Roslyn.Utilities
     {
         private const int ChunkSize = SharedPools.ByteBufferSize;
 
-        internal static PooledStream CreateReadableStream(byte[] bytes, CancellationToken cancellationToken)
+        internal static PooledStream CreateReadableStream(byte[] bytes)
+            => CreateReadableStream(bytes, bytes.Length);
+
+
+        internal static PooledStream CreateReadableStream(byte[] bytes, int length)
         {
             var stream = CreateWritableStream();
-            stream.Write(bytes, 0, bytes.Length);
+            stream.Write(bytes, 0, length);
 
             stream.Position = 0;
             return stream;
         }
 
-        internal static PooledStream CreateReadableStream(Stream stream, CancellationToken cancellationToken)
+        internal async static Task<PooledStream> CreateReadableStreamAsync(Stream stream, CancellationToken cancellationToken)
         {
-            return CreateReadableStream(stream, /*length*/ -1, cancellationToken);
-        }
+            var length = stream.Length;
 
-        internal static PooledStream CreateReadableStream(Stream stream, long length, CancellationToken cancellationToken)
-        {
-            if (length == -1)
-            {
-                length = stream.Length;
-            }
-
-            long chunkCount = (length + ChunkSize - 1) / ChunkSize;
-            byte[][] chunks = new byte[chunkCount][];
+            var chunkCount = (length + ChunkSize - 1) / ChunkSize;
+            var chunks = new byte[chunkCount][];
 
             try
             {
                 for (long i = 0, c = 0; i < length; i += ChunkSize, c++)
                 {
-                    int count = (int)Math.Min(ChunkSize, length - i);
+                    var count = (int)Math.Min(ChunkSize, length - i);
                     var chunk = SharedPools.ByteArray.Allocate();
 
-                    int chunkOffset = 0;
+                    var chunkOffset = 0;
                     while (count > 0)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        int bytesRead = stream.Read(chunk, chunkOffset, count);
+                        var bytesRead = await stream.ReadAsync(chunk, chunkOffset, count, cancellationToken).ConfigureAwait(false);
                         if (bytesRead > 0)
                         {
-                            count = count - bytesRead;
+                            count -= bytesRead;
                             chunkOffset += bytesRead;
                         }
                         else
@@ -66,57 +64,7 @@ namespace Roslyn.Utilities
                     chunks[c] = chunk;
                 }
 
-                var result = new PooledStream(length, chunks);
-                chunks = null;
-                return result;
-            }
-            finally
-            {
-                BlowChunks(chunks);
-            }
-        }
-
-        internal static Task<PooledStream> CreateReadableStreamAsync(Stream stream, CancellationToken cancellationToken)
-        {
-            return CreateReadableStreamAsync(stream, /*length*/ -1, cancellationToken);
-        }
-
-        internal static async Task<PooledStream> CreateReadableStreamAsync(Stream stream, long length, CancellationToken cancellationToken)
-        {
-            if (length == -1)
-            {
-                length = stream.Length;
-            }
-
-            long chunkCount = (length + ChunkSize - 1) / ChunkSize;
-            byte[][] chunks = new byte[chunkCount][];
-
-            try
-            {
-                for (long i = 0, c = 0; i < length; i += ChunkSize, c++)
-                {
-                    int count = (int)Math.Min(ChunkSize, length - i);
-                    var chunk = SharedPools.ByteArray.Allocate();
-
-                    int chunkOffset = 0;
-                    while (count > 0)
-                    {
-                        int bytesRead = await stream.ReadAsync(chunk, chunkOffset, count, cancellationToken).ConfigureAwait(false);
-                        if (bytesRead > 0)
-                        {
-                            count = count - bytesRead;
-                            chunkOffset += bytesRead;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-
-                    chunks[c] = chunk;
-                }
-
-                var result = new PooledStream(length, chunks);
+                var result = new ReadStream(length, chunks);
                 chunks = null;
                 return result;
             }
@@ -154,18 +102,11 @@ namespace Roslyn.Utilities
             protected long position;
             protected long length;
 
-            public PooledStream(long length, byte[][] chunks)
+            protected PooledStream(long length, List<byte[]> chunks)
             {
                 this.position = 0;
                 this.length = length;
-                this.chunks = new List<byte[]>(chunks);
-            }
-
-            protected PooledStream()
-            {
-                this.position = 0;
-                this.length = 0;
-                this.chunks = new List<byte[]>();
+                this.chunks = chunks;
             }
 
             public override long Length
@@ -176,20 +117,11 @@ namespace Roslyn.Utilities
                 }
             }
 
-            public override bool CanRead
-            {
-                get { return true; }
-            }
+            public override bool CanRead => true;
 
-            public override bool CanSeek
-            {
-                get { return true; }
-            }
+            public override bool CanSeek => true;
 
-            public override bool CanWrite
-            {
-                get { return false; }
-            }
+            public override bool CanWrite => false;
 
             public override void Flush()
             {
@@ -219,23 +151,13 @@ namespace Roslyn.Utilities
                 long target;
                 try
                 {
-                    switch (origin)
+                    target = origin switch
                     {
-                        case SeekOrigin.Begin:
-                            target = offset;
-                            break;
-
-                        case SeekOrigin.Current:
-                            target = checked(offset + position);
-                            break;
-
-                        case SeekOrigin.End:
-                            target = checked(offset + length);
-                            break;
-
-                        default:
-                            throw new ArgumentOutOfRangeException(nameof(origin));
-                    }
+                        SeekOrigin.Begin => offset,
+                        SeekOrigin.Current => checked(offset + position),
+                        SeekOrigin.End => checked(offset + length),
+                        _ => throw new ArgumentOutOfRangeException(nameof(origin)),
+                    };
                 }
                 catch (OverflowException)
                 {
@@ -290,7 +212,7 @@ namespace Roslyn.Utilities
                     var chunk = chunks[GetChunkIndex(position)];
                     var currentOffset = GetChunkOffset(position);
 
-                    int copyCount = Math.Min(Math.Min(ChunkSize - currentOffset, count), (int)(length - position));
+                    var copyCount = Math.Min(Math.Min(ChunkSize - currentOffset, count), (int)(length - position));
                     Array.Copy(chunk, currentOffset, buffer, index, copyCount);
 
                     position += copyCount;
@@ -306,7 +228,7 @@ namespace Roslyn.Utilities
             {
                 if (this.Length == 0)
                 {
-                    return SpecializedCollections.EmptyBytes;
+                    return Array.Empty<byte>();
                 }
 
                 var array = new byte[this.Length];
@@ -314,6 +236,12 @@ namespace Roslyn.Utilities
                 // read entire array
                 Read(this.chunks, 0, this.length, array, 0, array.Length);
                 return array;
+            }
+
+            public ImmutableArray<byte> ToImmutableArray()
+            {
+                var array = ToArray();
+                return ImmutableArrayExtensions.DangerousCreateFromUnderlyingArray(ref array);
             }
 
             protected int CurrentChunkIndex { get { return GetChunkIndex(this.position); } }
@@ -355,17 +283,25 @@ namespace Roslyn.Utilities
             }
         }
 
+        private class ReadStream : PooledStream
+        {
+            public ReadStream(long length, byte[][] chunks)
+                : base(length, new List<byte[]>(chunks))
+            {
+
+            }
+        }
+
         private class ReadWriteStream : PooledStream
         {
             public ReadWriteStream()
-                : base()
+                : base(length: 0, chunks: SharedPools.BigDefault<List<byte[]>>().AllocateAndClear())
             {
+                // growing list on EnsureSize shown as perf bottleneck. reuse shared list so that
+                // we don't re-allocate as much.
             }
 
-            public override bool CanWrite
-            {
-                get { return true; }
-            }
+            public override bool CanWrite => true;
 
             public override long Position
             {
@@ -397,6 +333,36 @@ namespace Roslyn.Utilities
                 }
             }
 
+            public override void SetLength(long value)
+            {
+                EnsureCapacity(value);
+
+                if (value < length)
+                {
+                    // truncate the stream
+
+                    var chunkIndex = GetChunkIndex(value);
+                    var chunkOffset = GetChunkOffset(value);
+
+                    Array.Clear(chunks[chunkIndex], chunkOffset, chunks[chunkIndex].Length - chunkOffset);
+
+                    var trimIndex = chunkIndex + 1;
+                    for (int i = trimIndex; i < chunks.Count; i++)
+                    {
+                        SharedPools.ByteArray.Free(chunks[i]);
+                    }
+
+                    chunks.RemoveRange(trimIndex, chunks.Count - trimIndex);
+                }
+
+                length = value;
+
+                if (position > value)
+                {
+                    position = value;
+                }
+            }
+
             public override void WriteByte(byte value)
             {
                 EnsureCapacity(this.position + 1);
@@ -425,7 +391,7 @@ namespace Roslyn.Utilities
                     var chunk = chunks[CurrentChunkIndex];
                     var currentOffset = CurrentChunkOffset;
 
-                    int writeCount = Math.Min(ChunkSize - currentOffset, countLeft);
+                    var writeCount = Math.Min(ChunkSize - currentOffset, countLeft);
                     Array.Copy(buffer, currentIndex, chunk, currentOffset, writeCount);
 
                     this.position += writeCount;
@@ -438,6 +404,15 @@ namespace Roslyn.Utilities
                 {
                     this.length = this.position;
                 }
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                var temp = this.chunks;
+
+                base.Dispose(disposing);
+
+                SharedPools.BigDefault<List<byte[]>>().ClearAndFree(temp);
             }
         }
     }

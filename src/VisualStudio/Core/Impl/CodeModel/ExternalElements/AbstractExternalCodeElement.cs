@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
@@ -86,8 +88,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
                 return string.Empty;
             }
 
-            XElement xml;
-            if (!TryParseDocCommentXml(documentationCommentXml, out xml))
+            if (!TryParseDocCommentXml(documentationCommentXml, out var xml))
             {
                 // If we failed to parse, maybe it was because the XML fragment represents multiple elements.
                 // Try surrounding with <doc></doc> and parse again.

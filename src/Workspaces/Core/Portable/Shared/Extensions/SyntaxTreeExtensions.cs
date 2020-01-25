@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System;
 using System.Threading;
@@ -9,7 +13,7 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Shared.Extensions
 {
-    internal static class SyntaxTreeExtensions
+    internal static partial class SyntaxTreeExtensions
     {
         public static bool IsScript(this SyntaxTree syntaxTree)
         {
@@ -50,7 +54,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
             if (position >= syntaxTree.Length)
             {
-                return default(SyntaxToken);
+                return default;
             }
 
             var root = await syntaxTree.GetRootAsync(cancellationToken).ConfigureAwait(false);
@@ -69,25 +73,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             }
 
             // SyntaxKind = None
-            return default(SyntaxToken);
-        }
-
-        public static bool OverlapsHiddenPosition(this SyntaxTree tree, TextSpan span, CancellationToken cancellationToken)
-        {
-            if (tree == null)
-            {
-                return false;
-            }
-
-            var text = tree.GetText(cancellationToken);
-
-            return text.OverlapsHiddenPosition(span, (position, cancellationToken2) =>
-                {
-                    // implements the ASP.Net IsHidden rule
-                    var lineVisibility = tree.GetLineVisibility(position, cancellationToken2);
-                    return lineVisibility == LineVisibility.Hidden || lineVisibility == LineVisibility.BeforeFirstLineDirective;
-                },
-                cancellationToken);
+            return default;
         }
 
         public static bool IsEntirelyHidden(this SyntaxTree tree, TextSpan span, CancellationToken cancellationToken)
@@ -115,20 +101,6 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             return true;
         }
 
-        /// <summary>
-        /// Returns <c>true</c> if the provided position is in a hidden region inaccessible to the user.
-        /// </summary>
-        public static bool IsHiddenPosition(this SyntaxTree tree, int position, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            if (!tree.HasHiddenRegions())
-            {
-                return false;
-            }
-
-            var lineVisibility = tree.GetLineVisibility(position, cancellationToken);
-            return lineVisibility == LineVisibility.Hidden || lineVisibility == LineVisibility.BeforeFirstLineDirective;
-        }
-
         public static async Task<bool> IsBeforeFirstTokenAsync(
             this SyntaxTree syntaxTree, int position, CancellationToken cancellationToken)
         {
@@ -144,7 +116,6 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             Contract.ThrowIfNull(syntaxTree);
 
             var root = syntaxTree.GetRoot(cancellationToken);
-            var compilationUnit = root as ICompilationUnitSyntax;
             var result = root.FindToken(position, findInsideTrivia: true);
             if (result.RawKind != 0)
             {
@@ -156,6 +127,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             // b) pp directive
             // c) file
 
+            var compilationUnit = (ICompilationUnitSyntax)root;
             var triviaList = compilationUnit.EndOfFileToken.LeadingTrivia;
             foreach (var trivia in triviaList.Reverse())
             {
@@ -174,14 +146,13 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
                 return compilationUnit.EndOfFileToken;
             }
 
-            return default(SyntaxToken);
+            return default;
         }
 
         internal static SyntaxTrivia FindTriviaAndAdjustForEndOfFile(
             this SyntaxTree syntaxTree, int position, CancellationToken cancellationToken, bool findInsideTrivia = false)
         {
             var root = syntaxTree.GetRoot(cancellationToken);
-            var compilationUnit = root as ICompilationUnitSyntax;
             var trivia = root.FindTrivia(position, findInsideTrivia);
 
             // If we ask right at the end of the file, we'll get back nothing.
@@ -189,6 +160,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             // work at the end of a file.
             if (position == root.FullWidth())
             {
+                var compilationUnit = (ICompilationUnitSyntax)root;
                 var endOfFileToken = compilationUnit.EndOfFileToken;
                 if (endOfFileToken.HasLeadingTrivia)
                 {

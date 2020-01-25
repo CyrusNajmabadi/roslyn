@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -3174,6 +3176,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         EndOfInterpolatedStringToken = 787                              ' PunctuationSyntax : SyntaxToken
 
-    End Enum
+        ''' <summary>
+        ''' Represents tuple literal expression.
+        ''' </summary>
+        TupleExpression = 788
 
+        ''' <summary>
+        ''' Represents tuple type.
+        ''' </summary>
+        TupleType = 789
+
+        ''' <summary>
+        ''' Represents an element of a tuple type supplying only the type
+        ''' </summary>
+        TypedTupleElement = 790
+
+        ''' <summary>
+        ''' Represents an element of a tuple type supplying element name and optionally a type.
+        ''' </summary>
+        NamedTupleElement = 791
+
+        ''' <summary>
+        ''' Trivia created when merge conflict markers (like "&lt;&lt;&lt;&lt;&lt;&lt;&lt;") are detected in source code
+        ''' </summary>
+        ConflictMarkerTrivia = 792
+
+    End Enum
 End Namespace

@@ -1,13 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Expressions
     Public Class GetTypeKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function GetTypeHelpTextTest() As Task
             Await VerifyRecommendationDescriptionTextIsAsync(<MethodBody>Return |</MethodBody>, "GetType",
-$"{VBFeaturesResources.GettypeFunction}
-{ReturnsSystemTypeObject}
-GetType({VBWorkspaceResources.Typename}) As Type")
+$"{VBFeaturesResources.GetType_function}
+{VBWorkspaceResources.Returns_a_System_Type_object_for_the_specified_type_name}
+GetType({VBWorkspaceResources.typeName}) As Type")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
@@ -27,22 +29,22 @@ GetType({VBWorkspaceResources.Typename}) As Type")
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function GetTypeAfterArgument1Test() As Task
-            Await VerifyRecommendationsContainAsync(<MethodBody>Foo(|</MethodBody>, "GetType")
+            Await VerifyRecommendationsContainAsync(<MethodBody>Goo(|</MethodBody>, "GetType")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function GetTypeAfterArgument2Test() As Task
-            Await VerifyRecommendationsContainAsync(<MethodBody>Foo(bar, |</MethodBody>, "GetType")
+            Await VerifyRecommendationsContainAsync(<MethodBody>Goo(bar, |</MethodBody>, "GetType")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function GetTypeAfterBinaryExpressionTest() As Task
-            Await VerifyRecommendationsContainAsync(<MethodBody>Foo(bar + |</MethodBody>, "GetType")
+            Await VerifyRecommendationsContainAsync(<MethodBody>Goo(bar + |</MethodBody>, "GetType")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function GetTypeAfterNotTest() As Task
-            Await VerifyRecommendationsContainAsync(<MethodBody>Foo(Not |</MethodBody>, "GetType")
+            Await VerifyRecommendationsContainAsync(<MethodBody>Goo(Not |</MethodBody>, "GetType")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
@@ -121,10 +123,10 @@ Loop Until |</MethodBody>, "GetType")
 <File>
 Module Program
     Sub Main(args As String())
-        Dim f1 As New Foo2( |
+        Dim f1 As New Goo2( |
     End Sub
 
-    Delegate Sub Foo2()
+    Delegate Sub Goo2()
 
     Function Bar2() As Object
         Return Nothing

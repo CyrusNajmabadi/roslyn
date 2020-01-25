@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,6 +11,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -22,13 +26,15 @@ namespace Microsoft.CodeAnalysis
     /// <typeparam name="TAssemblySymbol">Language specific representation for an assembly symbol.</typeparam>
     internal abstract partial class CommonReferenceManager<TCompilation, TAssemblySymbol>
         where TCompilation : Compilation
-        where TAssemblySymbol : class, IAssemblySymbol
+#nullable enable
+        where TAssemblySymbol : class, IAssemblySymbolInternal
+#nullable restore
     {
         protected abstract CommonMessageProvider MessageProvider { get; }
 
         protected abstract AssemblyData CreateAssemblyDataForFile(
             PEAssembly assembly,
-            WeakList<IAssemblySymbol> cachedSymbols,
+            WeakList<IAssemblySymbolInternal> cachedSymbols,
             DocumentationProvider documentationProvider,
             string sourceAssemblySimpleName,
             MetadataImportOptions importOptions,
@@ -63,6 +69,8 @@ namespace Microsoft.CodeAnalysis
                 Debug.Assert(index >= 0);
                 _index = index + 1;
                 _kind = kind;
+                _aliasesOpt = default(ImmutableArray<string>);
+                _recursiveAliasesOpt = default(ImmutableArray<string>);
             }
 
             // initialized aliases
@@ -192,7 +200,7 @@ namespace Microsoft.CodeAnalysis
             TCompilation compilation,
             [Out] Dictionary<string, List<ReferencedAssemblyIdentity>> assemblyReferencesBySimpleName,
             out ImmutableArray<MetadataReference> references,
-            out IDictionary<ValueTuple<string, string>, MetadataReference> boundReferenceDirectiveMap,
+            out IDictionary<(string, string), MetadataReference> boundReferenceDirectiveMap,
             out ImmutableArray<MetadataReference> boundReferenceDirectives,
             out ImmutableArray<AssemblyData> assemblies,
             out ImmutableArray<PEModule> modules,
@@ -310,7 +318,7 @@ namespace Microsoft.CodeAnalysis
                     {
                         case MetadataImageKind.Assembly:
                             var assemblyMetadata = (AssemblyMetadata)metadata;
-                            WeakList<IAssemblySymbol> cachedSymbols = assemblyMetadata.CachedSymbols;
+                            WeakList<IAssemblySymbolInternal> cachedSymbols = assemblyMetadata.CachedSymbols;
 
                             if (assemblyMetadata.IsValidAssembly())
                             {
@@ -465,17 +473,16 @@ namespace Microsoft.CodeAnalysis
             Diagnostic newDiagnostic = null;
             try
             {
-                newMetadata = peReference.GetMetadata();
+                newMetadata = peReference.GetMetadataNoCopy();
 
                 // make sure basic structure of the PE image is valid:
-                var assemblyMetadata = newMetadata as AssemblyMetadata;
-                if (assemblyMetadata != null)
+                if (newMetadata is AssemblyMetadata assemblyMetadata)
                 {
-                    bool dummy = assemblyMetadata.IsValidAssembly();
+                    _ = assemblyMetadata.IsValidAssembly();
                 }
                 else
                 {
-                    bool dummy = ((ModuleMetadata)newMetadata).Module.IsLinkedModule;
+                    _ = ((ModuleMetadata)newMetadata).Module.IsLinkedModule;
                 }
             }
             catch (Exception e) when (e is BadImageFormatException || e is IOException)
@@ -519,6 +526,27 @@ namespace Microsoft.CodeAnalysis
 
             metadata = null;
             return false;
+        }
+
+        internal AssemblyMetadata GetAssemblyMetadata(PortableExecutableReference peReference, DiagnosticBag diagnostics)
+        {
+            var metadata = GetMetadata(peReference, MessageProvider, Location.None, diagnostics);
+            Debug.Assert(metadata != null || diagnostics.HasAnyErrors());
+
+            if (metadata == null)
+            {
+                return null;
+            }
+
+            // require the metadata to be a valid assembly metadata:
+            var assemblyMetadata = metadata as AssemblyMetadata;
+            if (assemblyMetadata?.IsValidAssembly() != true)
+            {
+                diagnostics.Add(MessageProvider.CreateDiagnostic(MessageProvider.ERR_MetadataFileNotAssembly, Location.None, peReference.Display));
+                return null;
+            }
+
+            return assemblyMetadata;
         }
 
         /// <summary>
@@ -744,7 +772,7 @@ namespace Microsoft.CodeAnalysis
             TCompilation compilation,
             DiagnosticBag diagnostics,
             out ImmutableArray<MetadataReference> references,
-            out IDictionary<ValueTuple<string, string>, MetadataReference> boundReferenceDirectives,
+            out IDictionary<(string, string), MetadataReference> boundReferenceDirectives,
             out ImmutableArray<Location> referenceDirectiveLocations)
         {
             boundReferenceDirectives = null;
@@ -763,7 +791,7 @@ namespace Microsoft.CodeAnalysis
                     }
 
                     // we already successfully bound #r with the same value:
-                    if (boundReferenceDirectives != null && boundReferenceDirectives.ContainsKey(ValueTuple.Create(referenceDirective.Location.SourceTree.FilePath, referenceDirective.File)))
+                    if (boundReferenceDirectives != null && boundReferenceDirectives.ContainsKey((referenceDirective.Location.SourceTree.FilePath, referenceDirective.File)))
                     {
                         continue;
                     }
@@ -777,13 +805,13 @@ namespace Microsoft.CodeAnalysis
 
                     if (boundReferenceDirectives == null)
                     {
-                        boundReferenceDirectives = new Dictionary<ValueTuple<string, string>, MetadataReference>();
+                        boundReferenceDirectives = new Dictionary<(string, string), MetadataReference>();
                         referenceDirectiveLocationsBuilder = ArrayBuilder<Location>.GetInstance();
                     }
 
                     referencesBuilder.Add(boundReference);
                     referenceDirectiveLocationsBuilder.Add(referenceDirective.Location);
-                    boundReferenceDirectives.Add(ValueTuple.Create(referenceDirective.Location.SourceTree.FilePath, referenceDirective.File), boundReference);
+                    boundReferenceDirectives.Add((referenceDirective.Location.SourceTree.FilePath, referenceDirective.File), boundReference);
                 }
 
                 // add external reference at the end, so that they are processed first:
@@ -799,7 +827,7 @@ namespace Microsoft.CodeAnalysis
                 if (boundReferenceDirectives == null)
                 {
                     // no directive references resolved successfully:
-                    boundReferenceDirectives = SpecializedCollections.EmptyDictionary<ValueTuple<string, string>, MetadataReference>();
+                    boundReferenceDirectives = SpecializedCollections.EmptyDictionary<(string, string), MetadataReference>();
                 }
 
                 references = referencesBuilder.ToImmutable();

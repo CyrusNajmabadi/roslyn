@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -12,72 +14,74 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Extensions
 {
     internal static partial class ITextBufferExtensions
     {
-        public static IEnumerable<DocumentId> GetOpenDocumentIds(this ITextBuffer buffer)
+        internal static bool GetFeatureOnOffOption(this ITextBuffer buffer, Option<bool> option)
         {
-            var container = buffer.AsTextContainer();
+            var document = buffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges();
 
-            Workspace workspace;
-            if (Workspace.TryGetWorkspace(container, out workspace))
+            if (document != null)
             {
-                return workspace.GetRelatedDocumentIds(container);
-            }
-
-            return SpecializedCollections.EmptyEnumerable<DocumentId>();
-        }
-
-        internal static OptionSet TryGetOptions(this ITextBuffer textBuffer)
-        {
-            Workspace workspace;
-
-            if (Workspace.TryGetWorkspace(textBuffer.AsTextContainer(), out workspace))
-            {
-                var service = workspace.Services.GetService<IOptionService>();
-
-                if (service != null)
-                {
-                    return service.GetOptions();
-                }
-            }
-
-            return null;
-        }
-
-        internal static T GetOption<T>(this ITextBuffer buffer, Option<T> option)
-        {
-            var options = TryGetOptions(buffer);
-
-            if (options != null)
-            {
-                return options.GetOption(option);
+                return document.Project.Solution.Options.GetOption(option);
             }
 
             return option.DefaultValue;
         }
 
-        internal static T GetOption<T>(this ITextBuffer buffer, PerLanguageOption<T> option)
+        internal static bool GetFeatureOnOffOption(this ITextBuffer buffer, PerLanguageOption<bool> option)
         {
             // Add a FailFast to help diagnose 984249.  Hopefully this will let us know what the issue is.
             try
             {
-                Workspace workspace;
-                if (!Workspace.TryGetWorkspace(buffer.AsTextContainer(), out workspace))
+                var document = buffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges();
+
+                if (document != null)
                 {
-                    return option.DefaultValue;
+                    return document.Project.Solution.Options.GetOption(option, document.Project.Language);
                 }
 
-                var service = workspace.Services.GetService<IOptionService>();
-                if (service == null)
-                {
-                    return option.DefaultValue;
-                }
-
-                var language = workspace.Services.GetLanguageServices(buffer).Language;
-                return service.GetOption(option, language);
+                return option.DefaultValue;
             }
             catch (Exception e) when (FatalError.Report(e))
             {
                 throw ExceptionUtilities.Unreachable;
             }
+        }
+
+        internal static bool TryGetWorkspace(this ITextBuffer buffer, out Workspace workspace)
+            => Workspace.TryGetWorkspace(buffer.AsTextContainer(), out workspace);
+
+        /// <summary>
+        /// Checks if a buffer supports refactorings.
+        /// </summary>
+        internal static bool SupportsRefactorings(this ITextBuffer buffer)
+            => TryGetSupportsFeatureService(buffer, out var service) && service.SupportsRefactorings(buffer);
+
+        /// <summary>
+        /// Checks if a buffer supports rename.
+        /// </summary>
+        internal static bool SupportsRename(this ITextBuffer buffer)
+            => TryGetSupportsFeatureService(buffer, out var service) && service.SupportsRename(buffer);
+
+        /// <summary>
+        /// Checks if a buffer supports code fixes.
+        /// </summary>
+        internal static bool SupportsCodeFixes(this ITextBuffer buffer)
+            => TryGetSupportsFeatureService(buffer, out var service) && service.SupportsCodeFixes(buffer);
+
+        /// <summary>
+        /// Checks if a buffer supports navigation.
+        /// </summary>
+        internal static bool SupportsNavigationToAnyPosition(this ITextBuffer buffer)
+            => TryGetSupportsFeatureService(buffer, out var service) && service.SupportsNavigationToAnyPosition(buffer);
+
+        private static bool TryGetSupportsFeatureService(ITextBuffer buffer, out ITextBufferSupportsFeatureService service)
+        {
+            service = null;
+            if (buffer.TryGetWorkspace(out var workspace))
+            {
+                service = workspace.Services.GetService<ITextBufferSupportsFeatureService>();
+            }
+
+            return service != null;
         }
     }
 }

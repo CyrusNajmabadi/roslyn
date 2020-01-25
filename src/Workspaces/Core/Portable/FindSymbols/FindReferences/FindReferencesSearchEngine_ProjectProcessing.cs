@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,31 +11,33 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.FindSymbols
 {
+    using DocumentMap = MultiDictionary<Document, (SymbolAndProjectId symbolAndProjectId, IReferenceFinder finder)>;
+    using ProjectToDocumentMap = Dictionary<Project, MultiDictionary<Document, (SymbolAndProjectId symbolAndProjectId, IReferenceFinder finder)>>;
+
     internal partial class FindReferencesSearchEngine
     {
         private async Task ProcessProjectsAsync(
-            IEnumerable<ProjectId> projectSet,
-            Dictionary<Project, Dictionary<Document, List<ValueTuple<ISymbol, IReferenceFinder>>>> projectMap,
-            ProgressWrapper wrapper)
+            IEnumerable<ProjectId> connectedProjectSet,
+            ProjectToDocumentMap projectToDocumentMap)
         {
             var visitedProjects = new HashSet<ProjectId>();
 
             // Make sure we process each project in the set.  Process each project in depth first
             // order.  That way when we process a project, the compilations for all projects that it
             // depends on will have been created already.
-            foreach (var projectId in projectSet)
+            foreach (var projectId in connectedProjectSet)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
-                await ProcessProjectAsync(projectId, projectMap, visitedProjects, wrapper).ConfigureAwait(false);
+                await ProcessProjectAsync(
+                    projectId, projectToDocumentMap, visitedProjects).ConfigureAwait(false);
             }
         }
 
         private async Task ProcessProjectAsync(
             ProjectId projectId,
-            Dictionary<Project, Dictionary<Document, List<ValueTuple<ISymbol, IReferenceFinder>>>> projectMap,
-            HashSet<ProjectId> visitedProjects,
-            ProgressWrapper wrapper)
+            ProjectToDocumentMap projectToDocumentMap,
+            HashSet<ProjectId> visitedProjects)
         {
             // Don't visit projects more than once.  
             if (visitedProjects.Add(projectId))
@@ -46,55 +50,60 @@ namespace Microsoft.CodeAnalysis.FindSymbols
                 {
                     _cancellationToken.ThrowIfCancellationRequested();
 
-                    await ProcessProjectAsync(dependent.ProjectId, projectMap, visitedProjects, wrapper).ConfigureAwait(false);
+                    await ProcessProjectAsync(
+                        dependent.ProjectId, projectToDocumentMap, visitedProjects).ConfigureAwait(false);
                 }
 
-                await ProcessProjectAsync(project, projectMap, wrapper).ConfigureAwait(false);
+                await ProcessProjectAsync(project, projectToDocumentMap).ConfigureAwait(false);
             }
         }
 
         private async Task ProcessProjectAsync(
             Project project,
-            Dictionary<Project, Dictionary<Document, List<ValueTuple<ISymbol, IReferenceFinder>>>> projectMap,
-            ProgressWrapper wrapper)
+            ProjectToDocumentMap projectToDocumentMap)
         {
-            Dictionary<Document, List<ValueTuple<ISymbol, IReferenceFinder>>> map;
-            if (!projectMap.TryGetValue(project, out map))
+            if (!projectToDocumentMap.TryGetValue(project, out var documentMap))
             {
                 // No files in this project to process.  We can bail here.  We'll have cached our
                 // compilation if there are any projects left to process that depend on us.
                 return;
             }
 
-            // Now actually process the project.
-            await ProcessProjectAsync(project, map, wrapper).ConfigureAwait(false);
+            projectToDocumentMap.Remove(project);
 
-            // We've now finished working on the project.  Remove it from the set of remaining items.
-            projectMap.Remove(project);
+            // Now actually process the project.
+            await ProcessProjectAsync(project, documentMap).ConfigureAwait(false);
         }
 
         private async Task ProcessProjectAsync(
             Project project,
-            Dictionary<Document, List<ValueTuple<ISymbol, IReferenceFinder>>> map,
-            ProgressWrapper wrapper)
+            DocumentMap documentMap)
         {
             using (Logger.LogBlock(FunctionId.FindReference_ProcessProjectAsync, project.Name, _cancellationToken))
             {
-                // make sure we hold onto compilation while we search documents belong to this project
-                var compilation = await project.GetCompilationAsync(_cancellationToken).ConfigureAwait(false);
-
-                var documentTasks = new List<Task>();
-                foreach (var kvp in map)
+                if (project.SupportsCompilation)
                 {
-                    var document = kvp.Key;
-                    var documentQueue = kvp.Value;
+                    // make sure we hold onto compilation while we search documents belong to this project
+                    var compilation = await project.GetCompilationAsync(_cancellationToken).ConfigureAwait(false);
 
-                    documentTasks.Add(Task.Run(async () => await ProcessDocumentQueueAsync(document, documentQueue, wrapper).ConfigureAwait(false), _cancellationToken));
+                    var documentTasks = new List<Task>();
+                    foreach (var kvp in documentMap)
+                    {
+                        var document = kvp.Key;
+
+                        if (document.Project == project)
+                        {
+                            var documentQueue = kvp.Value;
+
+                            documentTasks.Add(Task.Run(() => ProcessDocumentQueueAsync(
+                                document, documentQueue), _cancellationToken));
+                        }
+                    }
+
+                    await Task.WhenAll(documentTasks).ConfigureAwait(false);
+
+                    GC.KeepAlive(compilation);
                 }
-
-                await Task.WhenAll(documentTasks).ConfigureAwait(false);
-
-                GC.KeepAlive(compilation);
             }
         }
     }

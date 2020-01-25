@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Reflection.Metadata
@@ -27,39 +29,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private ReadOnly Property IArrayTypeReferenceLowerBounds As IEnumerable(Of Integer) Implements Cci.IArrayTypeReference.LowerBounds
+        Private ReadOnly Property IArrayTypeReferenceLowerBounds As ImmutableArray(Of Integer) Implements Cci.IArrayTypeReference.LowerBounds
             Get
-                Dim lowerBounds = Me.LowerBounds
-
-                If lowerBounds.IsDefault Then
-                    Return Linq.Enumerable.Repeat(0, Me.Rank)
-                End If
-
-                Return lowerBounds
+                Return LowerBounds
             End Get
         End Property
 
-        Private ReadOnly Property IArrayTypeReferenceRank As UInteger Implements Cci.IArrayTypeReference.Rank
+        Private ReadOnly Property IArrayTypeReferenceRank As Integer Implements Cci.IArrayTypeReference.Rank
             Get
-                Return CType(Me.Rank, UInteger)
+                Return Rank
             End Get
         End Property
 
-        Private ReadOnly Property IArrayTypeReferenceSizes As IEnumerable(Of ULong) Implements Cci.IArrayTypeReference.Sizes
+        Private ReadOnly Property IArrayTypeReferenceSizes As ImmutableArray(Of Integer) Implements Cci.IArrayTypeReference.Sizes
             Get
-                If Me.Sizes.IsEmpty Then
-                    Return SpecializedCollections.EmptyEnumerable(Of ULong)()
-                End If
-
-                Return GetSizes()
+                Return Sizes
             End Get
         End Property
-
-        Private Iterator Function GetSizes() As IEnumerable(Of ULong)
-            For Each size In Me.Sizes
-                Yield CType(size, ULong)
-            Next
-        End Function
 
         Private ReadOnly Property ITypeReferenceIsEnum As Boolean Implements Cci.ITypeReference.IsEnum
             Get
@@ -77,9 +63,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return Nothing
         End Function
 
-        Private Function ITypeReferenceTypeCode(context As EmitContext) As Cci.PrimitiveTypeCode Implements Cci.ITypeReference.TypeCode
-            Return Cci.PrimitiveTypeCode.NotPrimitive
-        End Function
+        Private ReadOnly Property ITypeReferenceTypeCode As Cci.PrimitiveTypeCode Implements Cci.ITypeReference.TypeCode
+            Get
+                Return Cci.PrimitiveTypeCode.NotPrimitive
+            End Get
+        End Property
 
         Private ReadOnly Property ITypeReferenceTypeDef As TypeDefinitionHandle Implements Cci.ITypeReference.TypeDef
             Get

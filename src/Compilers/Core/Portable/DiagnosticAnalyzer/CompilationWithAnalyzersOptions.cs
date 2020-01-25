@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 
@@ -51,16 +53,32 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// </summary>
         /// <param name="options">Options that are passed to analyzers.</param>
         /// <param name="onAnalyzerException">Action to invoke if an analyzer throws an exception.</param>
-        /// <param name="analyzerExceptionFilter">Action to invoke if an analyzer throws an exception as an exception filter.</param>
         /// <param name="concurrentAnalysis">Flag indicating whether analysis can be performed concurrently on multiple threads.</param>
         /// <param name="logAnalyzerExecutionTime">Flag indicating whether analyzer execution time should be logged.</param>
         public CompilationWithAnalyzersOptions(
             AnalyzerOptions options,
             Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException,
-            Func<Exception, bool> analyzerExceptionFilter,
             bool concurrentAnalysis,
             bool logAnalyzerExecutionTime)
-            : this(options, onAnalyzerException, analyzerExceptionFilter, concurrentAnalysis, logAnalyzerExecutionTime, reportSuppressedDiagnostics: false)
+            : this(options, onAnalyzerException, concurrentAnalysis, logAnalyzerExecutionTime, reportSuppressedDiagnostics: false)
+        {
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="CompilationWithAnalyzersOptions"/>.
+        /// </summary>
+        /// <param name="options">Options that are passed to analyzers.</param>
+        /// <param name="onAnalyzerException">Action to invoke if an analyzer throws an exception.</param>
+        /// <param name="concurrentAnalysis">Flag indicating whether analysis can be performed concurrently on multiple threads.</param>
+        /// <param name="logAnalyzerExecutionTime">Flag indicating whether analyzer execution time should be logged.</param>
+        /// <param name="reportSuppressedDiagnostics">Flag indicating whether analyzer diagnostics with <see cref="Diagnostic.IsSuppressed"/> should be reported.</param>
+        public CompilationWithAnalyzersOptions(
+            AnalyzerOptions options,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException,
+            bool concurrentAnalysis,
+            bool logAnalyzerExecutionTime,
+            bool reportSuppressedDiagnostics)
+            : this(options, onAnalyzerException, concurrentAnalysis, logAnalyzerExecutionTime, reportSuppressedDiagnostics, analyzerExceptionFilter: null)
         {
         }
 
@@ -76,10 +94,10 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         public CompilationWithAnalyzersOptions(
             AnalyzerOptions options,
             Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException,
-            Func<Exception, bool> analyzerExceptionFilter,
             bool concurrentAnalysis,
             bool logAnalyzerExecutionTime,
-            bool reportSuppressedDiagnostics)
+            bool reportSuppressedDiagnostics,
+            Func<Exception, bool> analyzerExceptionFilter)
         {
             _options = options;
             _onAnalyzerException = onAnalyzerException;

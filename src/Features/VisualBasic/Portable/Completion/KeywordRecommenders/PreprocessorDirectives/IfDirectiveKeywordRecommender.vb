@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -13,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Prep
 
         Protected Overrides Function RecommendKeywords(context As VisualBasicSyntaxContext, cancellationToken As CancellationToken) As IEnumerable(Of RecommendedKeyword)
             If context.IsPreprocessorStartContext AndAlso Not context.SyntaxTree.IsEnumMemberNameContext(context) Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("#If", VBFeaturesResources.IfCCKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("#If", VBFeaturesResources.Conditionally_compiles_selected_blocks_of_code_depending_on_the_value_of_an_expression))
             End If
 
             Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -16,7 +18,7 @@ namespace Microsoft.CodeAnalysis
         private readonly ImmutableArray<string> _aliases;
         private readonly bool _embedInteropTypes;
 
-        public ProjectReference(ProjectId projectId, ImmutableArray<string> aliases = default(ImmutableArray<string>), bool embedInteropTypes = false)
+        public ProjectReference(ProjectId projectId, ImmutableArray<string> aliases = default, bool embedInteropTypes = false)
         {
             Contract.ThrowIfNull(projectId);
 
@@ -25,17 +27,17 @@ namespace Microsoft.CodeAnalysis
             _embedInteropTypes = embedInteropTypes;
         }
 
-        public ProjectId ProjectId { get { return _projectId; } }
+        public ProjectId ProjectId => _projectId;
 
         /// <summary>
         /// Aliases for the reference. Empty if the reference has no aliases.
         /// </summary>
-        public ImmutableArray<string> Aliases { get { return _aliases; } }
+        public ImmutableArray<string> Aliases => _aliases;
 
         /// <summary>
         /// True if interop types defined in the referenced project should be embedded into the referencing project.
         /// </summary>
-        public bool EmbedInteropTypes { get { return _embedInteropTypes; } }
+        public bool EmbedInteropTypes => _embedInteropTypes;
 
         public override bool Equals(object obj)
         {

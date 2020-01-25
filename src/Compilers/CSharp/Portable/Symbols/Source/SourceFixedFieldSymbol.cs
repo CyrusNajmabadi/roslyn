@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -8,11 +10,12 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
-    internal class SourceFixedFieldSymbol : SourceMemberFieldSymbol
+    internal class SourceFixedFieldSymbol : SourceMemberFieldSymbolFromDeclarator
     {
         private const int FixedSizeNotInitialized = -1;
 
@@ -29,12 +32,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             // Checked in parser: a fixed field declaration requires a length in square brackets
 
-            Debug.Assert(this.IsFixed);
+            Debug.Assert(this.IsFixedSizeBuffer);
         }
 
-        internal override void AddSynthesizedAttributes(ModuleCompilationState compilationState, ref ArrayBuilder<SynthesizedAttributeData> attributes)
+        internal override void AddSynthesizedAttributes(PEModuleBuilder moduleBuilder, ref ArrayBuilder<SynthesizedAttributeData> attributes)
         {
-            base.AddSynthesizedAttributes(compilationState, ref attributes);
+            base.AddSynthesizedAttributes(moduleBuilder, ref attributes);
 
             var compilation = this.DeclaringCompilation;
             var systemType = compilation.GetWellKnownType(WellKnownType.System_Type);
@@ -55,8 +58,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     DiagnosticBag diagnostics = DiagnosticBag.GetInstance();
                     int size = 0;
 
-                    VariableDeclaratorSyntax declarator = this.VariableDeclaratorNode;
-
+                    VariableDeclaratorSyntax declarator = VariableDeclaratorNode;
                     if (declarator.ArgumentList == null)
                     {
                         // Diagnostic reported by parser.
@@ -80,6 +82,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                             BinderFactory binderFactory = this.DeclaringCompilation.GetBinderFactory(SyntaxTree);
                             Binder binder = binderFactory.GetBinder(sizeExpression);
+                            binder = new ExecutableCodeBinder(sizeExpression, binder.ContainingMemberOrLambda, binder).GetBinder(sizeExpression);
 
                             TypeSymbol intType = binder.GetSpecialType(SpecialType.System_Int32, diagnostics, sizeExpression);
                             BoundExpression boundSizeExpression = binder.GenerateConversionForAssignment(
@@ -122,11 +125,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     if (Interlocked.CompareExchange(ref _fixedSize, size, FixedSizeNotInitialized) == FixedSizeNotInitialized)
                     {
                         this.AddDeclarationDiagnostics(diagnostics);
-                        if (state.NotePartComplete(CompletionPart.FixedSize))
-                        {
-                            // FixedSize is the last completion part for fields.
-                            DeclaringCompilation.SymbolDeclaredEvent(this);
-                        }
+                        state.NotePartComplete(CompletionPart.FixedSize);
                     }
 
                     diagnostics.Free();
@@ -202,9 +201,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return _internalField; }
         }
 
-        internal override void AddSynthesizedAttributes(ModuleCompilationState compilationState, ref ArrayBuilder<SynthesizedAttributeData> attributes)
+        internal override void AddSynthesizedAttributes(PEModuleBuilder moduleBuilder, ref ArrayBuilder<SynthesizedAttributeData> attributes)
         {
-            base.AddSynthesizedAttributes(compilationState, ref attributes);
+            base.AddSynthesizedAttributes(moduleBuilder, ref attributes);
             var compilation = ContainingSymbol.DeclaringCompilation;
             AddSynthesizedAttribute(ref attributes, compilation.TrySynthesizeAttribute(WellKnownMember.System_Runtime_CompilerServices_UnsafeValueTypeAttribute__ctor));
         }
@@ -233,8 +232,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         internal override NamedTypeSymbol BaseTypeNoUseSiteDiagnostics
-        {
-            get { return ContainingAssembly.GetSpecialType(SpecialType.System_ValueType); }
-        }
+            => ContainingAssembly.GetSpecialType(SpecialType.System_ValueType);
+
+        public sealed override bool AreLocalsZeroed
+            => throw ExceptionUtilities.Unreachable;
     }
 }

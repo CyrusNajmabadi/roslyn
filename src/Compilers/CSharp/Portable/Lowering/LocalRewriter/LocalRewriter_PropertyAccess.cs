@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -22,7 +24,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         private BoundExpression MakePropertyAccess(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenReceiverOpt,
             PropertySymbol propertySymbol,
             LookupResultKind resultKind,
@@ -47,7 +49,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            if (isLeftOfAssignment)
+            if (isLeftOfAssignment && propertySymbol.RefKind == RefKind.None)
             {
                 // This is a property set access. We return a BoundPropertyAccess node here.
                 // This node will be rewritten with MakePropertyAssignment when rewriting the enclosing BoundAssignmentOperator.
@@ -63,13 +65,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private BoundExpression MakePropertyGetAccess(CSharpSyntaxNode syntax, BoundExpression rewrittenReceiver, PropertySymbol property, BoundPropertyAccess oldNodeOpt)
+        private BoundExpression MakePropertyGetAccess(SyntaxNode syntax, BoundExpression rewrittenReceiver, PropertySymbol property, BoundPropertyAccess oldNodeOpt)
         {
             return MakePropertyGetAccess(syntax, rewrittenReceiver, property, ImmutableArray<BoundExpression>.Empty, null, oldNodeOpt);
         }
 
         private BoundExpression MakePropertyGetAccess(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenReceiver,
             PropertySymbol property,
             ImmutableArray<BoundExpression> rewrittenArguments,

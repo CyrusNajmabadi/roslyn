@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -17,8 +19,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Opti
             End If
 
             If context.TargetToken.IsKind(SyntaxKind.CompareKeyword) Then
-                Return {New RecommendedKeyword("Binary", VBFeaturesResources.BinaryKeywordToolTip),
-                        New RecommendedKeyword("Text", VBFeaturesResources.TextKeywordToolTip)}
+                Return {New RecommendedKeyword("Binary", VBFeaturesResources.Sets_the_string_comparison_method_specified_in_Option_Compare_to_a_strict_binary_sort_order),
+                        New RecommendedKeyword("Text", VBFeaturesResources.Sets_the_string_comparison_method_specified_in_Option_Compare_to_a_text_sort_order_that_is_not_case_sensitive)}
             Else
                 Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()
             End If

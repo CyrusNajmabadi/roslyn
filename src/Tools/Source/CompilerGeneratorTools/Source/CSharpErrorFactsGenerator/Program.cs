@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -10,23 +12,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Internal.CSharpErrorFactsGenerator
 {
     public static class Program
     {
-        public static void Main()
+        public static int Main(string[] args)
         {
-            var args = Environment.GetCommandLineArgs();
-
-            if (args.Length != 3)
+            if (args.Length != 2)
             {
                 Console.WriteLine(
-@"Usage: {0} input output
+@"Usage: CSharpErrorFactsGenerator.exe input output
   input     The path to ErrorCode.cs
-  output    The path to GeneratedErrorFacts.cs",
-                Path.GetFileNameWithoutExtension(args[0]));
+  output    The path to GeneratedErrorFacts.cs");
 
-                Environment.Exit(-1);
+                return -1;
             }
 
-            string inputPath = args[1];
-            string outputPath = args[2];
+            string inputPath = args[0];
+            string outputPath = args[1];
 
             var outputText = new StringBuilder();
             outputText.AppendLine("namespace Microsoft.CodeAnalysis.CSharp");
@@ -131,7 +130,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Internal.CSharpErrorFactsGenerator
             outputText.AppendLine("    }");
             outputText.AppendLine("}");
 
-            File.WriteAllText(outputPath, outputText.ToString());
+            File.WriteAllText(outputPath, outputText.ToString(), Encoding.UTF8);
+
+            return 0;
         }
     }
 }

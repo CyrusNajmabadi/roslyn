@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Linq;
@@ -35,9 +37,9 @@ namespace Microsoft.CodeAnalysis.ImplementInterface
 
                 // While implementing just one default action, like in the case of pressing enter after interface name in VB,
                 // choose to implement with the dispose pattern as that's the Dev12 behavior.
-                var action = ShouldImplementDisposePattern(document, state, explicitly: false) ?
-                             ImplementInterfaceWithDisposePatternCodeAction.CreateImplementWithDisposePatternCodeAction(this, document, state) :
-                             ImplementInterfaceCodeAction.CreateImplementCodeAction(this, document, state);
+                var action = ShouldImplementDisposePattern(document, state, explicitly: false)
+                    ? ImplementInterfaceWithDisposePatternCodeAction.CreateImplementWithDisposePatternCodeAction(this, document, state)
+                    : ImplementInterfaceCodeAction.CreateImplementCodeAction(this, document, state);
 
                 return await action.GetUpdatedDocumentAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -56,7 +58,7 @@ namespace Microsoft.CodeAnalysis.ImplementInterface
                 yield break;
             }
 
-            if (state.UnimplementedMembers != null && state.UnimplementedMembers.Count > 0)
+            if (state.UnimplementedMembers.Length > 0)
             {
                 yield return ImplementInterfaceCodeAction.CreateImplementCodeAction(this, document, state);
 
@@ -77,7 +79,7 @@ namespace Microsoft.CodeAnalysis.ImplementInterface
                 }
             }
 
-            if (state.UnimplementedExplicitMembers != null && state.UnimplementedExplicitMembers.Count > 0)
+            if (state.UnimplementedExplicitMembers.Length > 0)
             {
                 yield return ImplementInterfaceCodeAction.CreateImplementExplicitlyCodeAction(this, document, state);
 

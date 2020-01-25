@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Runtime.InteropServices;
@@ -60,8 +62,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
                 return false;
             }
 
-            SyntaxNode attributeNode;
-            if (!CodeModelService.TryGetAttributeNode(parentNode, _name, _ordinal, out attributeNode))
+            if (!CodeModelService.TryGetAttributeNode(parentNode, _name, _ordinal, out var attributeNode))
             {
                 return false;
             }
@@ -75,15 +76,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             get { return EnvDTE.vsCMElement.vsCMElementAttribute; }
         }
 
-        public override object Parent
-        {
-            get
-            {
-                return _parent != null
-                    ? _parent
-                    : (object)this.FileCodeModel;
-            }
-        }
+        public override object Parent => _parent ?? (object)this.FileCodeModel;
 
         public EnvDTE.CodeElements Arguments
         {
@@ -139,9 +132,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             {
                 name = null;
             }
-            else if (nameObj is string)
+            else if (nameObj is string s)
             {
-                name = (string)nameObj;
+                name = s;
             }
             else
             {

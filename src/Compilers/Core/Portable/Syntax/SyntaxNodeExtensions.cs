@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -332,6 +334,13 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <summary>
+        /// Creates a new token from this token without leading or trailing trivia.
+        /// </summary>
+        public static SyntaxToken WithoutTrivia(this SyntaxToken token)
+            => token.WithTrailingTrivia(default(SyntaxTriviaList))
+                    .WithLeadingTrivia(default(SyntaxTriviaList));
+
+        /// <summary>
         /// Creates a new node from this node with the leading trivia replaced.
         /// </summary>
         public static TSyntax WithLeadingTrivia<TSyntax>(
@@ -402,9 +411,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Creates a new node from this node with the trailing trivia removed.
         /// </summary>
-        public static TSyntax WithoutTrailingTrivia<TSyntax>(
-            this TSyntax node
-            ) where TSyntax : SyntaxNode
+        public static TSyntax WithoutTrailingTrivia<TSyntax>(this TSyntax node) where TSyntax : SyntaxNode
         {
             return node.WithTrailingTrivia((IEnumerable<SyntaxTrivia>)null);
         }
@@ -417,6 +424,14 @@ namespace Microsoft.CodeAnalysis
             params SyntaxTrivia[] trivia) where TSyntax : SyntaxNode
         {
             return node.WithTrailingTrivia((IEnumerable<SyntaxTrivia>)trivia);
+        }
+
+        /// <summary>
+        /// Attaches the node to a SyntaxTree that the same options as <paramref name="oldTree"/>
+        /// </summary>
+        internal static SyntaxNode AsRootOfNewTreeWithOptionsFrom(this SyntaxNode node, SyntaxTree oldTree)
+        {
+            return node != null ? oldTree.WithRootAndOptions(node, oldTree.Options).GetRoot() : null;
         }
     }
 }

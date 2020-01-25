@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -152,7 +154,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
 ";
 
 
-            var compilation1 = CreateCompilationWithCustomILSource("", iLSource);
+            var compilation1 = CreateCompilationWithILAndMscorlib40("", iLSource);
 
             var c3 = compilation1.GetTypeByMetadataName("C3");
 
@@ -357,7 +359,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
 ";
 
 
-            var compilation1 = CreateCompilationWithCustomILSource("", iLSource);
+            var compilation1 = CreateCompilationWithILAndMscorlib40("", iLSource);
 
             var c3 = compilation1.GetTypeByMetadataName("C3");
 
@@ -392,9 +394,6 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.False(vector.HasUnsupportedMetadata);
 
             //unsupported MD in the return type should propagate up to the method.
-            var front = vector.GetMember("front");
-            Assert.True(front.HasUnsupportedMetadata);
-
             var begin = vector.GetMember("begin");
             Assert.True(begin.HasUnsupportedMetadata);
 
@@ -403,10 +402,6 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             var typeX = compilation1.GetTypeByMetadataName("X");
             //unsupported MD in members doesn't propagate up to the type.
             Assert.False(typeX.HasUnsupportedMetadata);
-
-            //unsupported MD in the return type should propagate up to the method.
-            var tok = typeX.GetMember("Token");
-            Assert.True(tok.HasUnsupportedMetadata);
         }
     }
 }

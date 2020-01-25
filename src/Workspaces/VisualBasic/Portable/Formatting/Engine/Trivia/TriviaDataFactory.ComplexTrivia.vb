@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -81,19 +83,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
 
                 Debug.Assert(Me.SecondTokenIsFirstTokenOnLine OrElse beginningOfNewLine)
 
+                If Me.OptionSet.GetOption(FormattingOptions.UseTabs, LanguageNames.VisualBasic) Then
+                    Return True
+                End If
+
                 Return CodeShapeAnalyzer.ShouldFormatMultiLine(context, beginningOfNewLine, list)
             End Function
 
             Public Overrides Sub Format(context As FormattingContext,
                                         formattingRules As ChainedFormattingRules,
-                                        formattingResultApplier As Action(Of Integer, TriviaData),
+                                        formattingResultApplier As Action(Of Integer, TokenStream, TriviaData),
                                         cancellationToken As CancellationToken,
                                         Optional tokenPairIndex As Integer = TokenPairIndexNotNeeded)
                 If Not ShouldFormat(context) Then
                     Return
                 End If
 
-                formattingResultApplier(tokenPairIndex, Format(context, formattingRules, Me.LineBreaks, Me.Spaces, cancellationToken))
+                formattingResultApplier(tokenPairIndex, context.TokenStream, Format(context, formattingRules, Me.LineBreaks, Me.Spaces, cancellationToken))
             End Sub
 
             Public Overrides Function GetTextChanges(span As TextSpan) As IEnumerable(Of TextChange)

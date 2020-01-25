@@ -1,15 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Immutable;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeFixes.Suppression
 {
-    internal abstract partial class AbstractSuppressionCodeFixProvider : ISuppressionFixProvider
+    internal abstract partial class AbstractSuppressionCodeFixProvider : IConfigurationFixProvider
     {
         private class SuppressionFixAllProvider : FixAllProvider
         {
@@ -21,8 +20,13 @@ namespace Microsoft.CodeAnalysis.CodeFixes.Suppression
 
             public async override Task<CodeAction> GetFixAsync(FixAllContext fixAllContext)
             {
-                var batchFixer = (BatchFixAllProvider)WellKnownFixAllProviders.BatchFixer;
-                var fixMultipleContext = fixAllContext as FixMultipleContext;
+                // currently there's no FixAll support for local suppression, just bail out
+                if (NestedSuppressionCodeAction.IsEquivalenceKeyForLocalSuppression(fixAllContext.CodeActionEquivalenceKey))
+                {
+                    return null;
+                }
+
+                var batchFixer = WellKnownFixAllProviders.BatchFixer;
                 var suppressionFixer = (AbstractSuppressionCodeFixProvider)((WrapperCodeFixProvider)fixAllContext.CodeFixProvider).SuppressionFixProvider;
                 var isGlobalSuppression = NestedSuppressionCodeAction.IsEquivalenceKeyForGlobalSuppression(fixAllContext.CodeActionEquivalenceKey);
                 if (!isGlobalSuppression)
@@ -38,23 +42,23 @@ namespace Microsoft.CodeAnalysis.CodeFixes.Suppression
                 var title = fixAllContext.CodeActionEquivalenceKey;
                 if (fixAllContext.Document != null)
                 {
-                    var documentsAndDiagnosticsToFixMap = fixMultipleContext != null ?
-                        fixMultipleContext.DocumentDiagnosticsToFix :
-                        await batchFixer.GetDocumentDiagnosticsToFixAsync(fixAllContext).ConfigureAwait(false);
+                    var documentsAndDiagnosticsToFixMap =
+                        await fixAllContext.GetDocumentDiagnosticsToFixAsync().ConfigureAwait(false);
 
-                    return !isGlobalSuppression ?
-                        await batchFixer.GetFixAsync(documentsAndDiagnosticsToFixMap, fixAllContext).ConfigureAwait(false) :
-                        GlobalSuppressMessageFixAllCodeAction.Create(title, suppressionFixer, fixAllContext.Document, documentsAndDiagnosticsToFixMap);
+                    return !isGlobalSuppression
+                        ? await batchFixer.GetFixAsync(
+                            documentsAndDiagnosticsToFixMap, fixAllContext.State, fixAllContext.CancellationToken).ConfigureAwait(false)
+                        : GlobalSuppressMessageFixAllCodeAction.Create(title, suppressionFixer, fixAllContext.Document, documentsAndDiagnosticsToFixMap);
                 }
                 else
                 {
-                    var projectsAndDiagnosticsToFixMap = fixMultipleContext != null ?
-                        fixMultipleContext.ProjectDiagnosticsToFix :
-                        await batchFixer.GetProjectDiagnosticsToFixAsync(fixAllContext).ConfigureAwait(false);
+                    var projectsAndDiagnosticsToFixMap =
+                        await fixAllContext.GetProjectDiagnosticsToFixAsync().ConfigureAwait(false);
 
-                    return !isGlobalSuppression ?
-                        await batchFixer.GetFixAsync(projectsAndDiagnosticsToFixMap, fixAllContext).ConfigureAwait(false) :
-                        GlobalSuppressMessageFixAllCodeAction.Create(title, suppressionFixer, fixAllContext.Project, projectsAndDiagnosticsToFixMap);
+                    return !isGlobalSuppression
+                        ? await batchFixer.GetFixAsync(
+                            projectsAndDiagnosticsToFixMap, fixAllContext.State, fixAllContext.CancellationToken).ConfigureAwait(false)
+                        : GlobalSuppressMessageFixAllCodeAction.Create(title, suppressionFixer, fixAllContext.Project, projectsAndDiagnosticsToFixMap);
                 }
             }
         }

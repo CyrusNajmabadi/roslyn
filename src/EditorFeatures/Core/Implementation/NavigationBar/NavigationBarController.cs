@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -44,10 +46,12 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
         private Workspace _workspace;
 
         public NavigationBarController(
+            IThreadingContext threadingContext,
             INavigationBarPresenter presenter,
             ITextBuffer subjectBuffer,
             IWaitIndicator waitIndicator,
             IAsynchronousOperationListener asyncListener)
+            : base(threadingContext)
         {
             _presenter = presenter;
             _subjectBuffer = subjectBuffer;
@@ -68,7 +72,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
             _modelTask = Task.FromResult(
                 new NavigationBarModel(
                     SpecializedCollections.EmptyList<NavigationBarItem>(),
-                    default(VersionStamp),
+                    default,
                     null));
 
             _selectedItemInfoTask = Task.FromResult(new NavigationBarSelectedTypeAndMember(null, null));
@@ -92,8 +96,6 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
 
         private void ConnectToWorkspace(Workspace workspace)
         {
-            AssertIsForeground();
-
             // If we disconnected before the workspace ever connected, just disregard
             if (_disconnected)
             {
@@ -103,8 +105,26 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
             _workspace = workspace;
             _workspace.WorkspaceChanged += this.OnWorkspaceChanged;
 
-            // For the first time you open the file, we'll start immediately
-            StartModelUpdateAndSelectedItemUpdateTasks(modelUpdateDelay: 0, selectedItemUpdateDelay: 0, updateUIWhenDone: true);
+            void connectToNewWorkspace()
+            {
+                // For the first time you open the file, we'll start immediately
+                StartModelUpdateAndSelectedItemUpdateTasks(modelUpdateDelay: 0, selectedItemUpdateDelay: 0, updateUIWhenDone: true);
+            }
+
+            if (IsForeground())
+            {
+                connectToNewWorkspace();
+            }
+            else
+            {
+                var asyncToken = _asyncListener.BeginAsyncOperation(nameof(ConnectToWorkspace));
+                Task.Run(async () =>
+                {
+                    await ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    connectToNewWorkspace();
+                }).CompletesAsyncOperation(asyncToken);
+            }
         }
 
         private void DisconnectFromWorkspace()
@@ -202,8 +222,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
 
             // Refresh the drop downs to their full information
             _waitIndicator.Wait(
-                EditorFeaturesResources.NavigationBars,
-                EditorFeaturesResources.RefreshingNavigationBars,
+                EditorFeaturesResources.Navigation_Bars,
+                EditorFeaturesResources.Refreshing_navigation_bars,
                 allowCancel: true,
                 action: context => UpdateDropDownsSynchronously(context.CancellationToken));
         }
@@ -236,9 +256,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
                 _selectedItemInfoTask.Wait(cancellationToken);
             }
 
-            IList<NavigationBarProjectItem> projectItems;
-            NavigationBarProjectItem selectedProjectItem;
-            GetProjectItems(out projectItems, out selectedProjectItem);
+            GetProjectItems(out var projectItems, out var selectedProjectItem);
 
             _presenter.PresentItems(
                 projectItems,
@@ -312,21 +330,23 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
 
             if (oldRight != null)
             {
-                newRight = new NavigationBarPresentedItem(oldRight.Text, oldRight.Glyph, oldRight.Spans, oldRight.ChildItems, oldRight.Bolded, oldRight.Grayed || selectedItems.ShowMemberItemGrayed);
-                newRight.TrackingSpans = oldRight.TrackingSpans;
+                newRight = new NavigationBarPresentedItem(oldRight.Text, oldRight.Glyph, oldRight.Spans, oldRight.ChildItems, oldRight.Bolded, oldRight.Grayed || selectedItems.ShowMemberItemGrayed)
+                {
+                    TrackingSpans = oldRight.TrackingSpans
+                };
                 listOfRight.Add(newRight);
             }
 
             if (oldLeft != null)
             {
-                newLeft = new NavigationBarPresentedItem(oldLeft.Text, oldLeft.Glyph, oldLeft.Spans, listOfRight, oldLeft.Bolded, oldLeft.Grayed || selectedItems.ShowTypeItemGrayed);
-                newLeft.TrackingSpans = oldLeft.TrackingSpans;
+                newLeft = new NavigationBarPresentedItem(oldLeft.Text, oldLeft.Glyph, oldLeft.Spans, listOfRight, oldLeft.Bolded, oldLeft.Grayed || selectedItems.ShowTypeItemGrayed)
+                {
+                    TrackingSpans = oldLeft.TrackingSpans
+                };
                 listOfLeft.Add(newLeft);
             }
 
-            IList<NavigationBarProjectItem> projectItems;
-            NavigationBarProjectItem selectedProjectItem;
-            GetProjectItems(out projectItems, out selectedProjectItem);
+            GetProjectItems(out var projectItems, out var selectedProjectItem);
 
             _presenter.PresentItems(
                 projectItems,
@@ -342,8 +362,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
             AssertIsForeground();
 
             _waitIndicator.Wait(
-                EditorFeaturesResources.NavigationBars,
-                EditorFeaturesResources.RefreshingNavigationBars,
+                EditorFeaturesResources.Navigation_Bars,
+                EditorFeaturesResources.Refreshing_navigation_bars,
                 allowCancel: true,
                 action: context => ProcessItemSelectionSynchronously(e.Item, context.CancellationToken));
         }
@@ -357,8 +377,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
         {
             AssertIsForeground();
 
-            var presentedItem = item as NavigationBarPresentedItem;
-            if (presentedItem != null)
+            if (item is NavigationBarPresentedItem)
             {
                 // Presented items are not navigable, but they may be selected due to a race
                 // documented in Bug #1174848. Protect all INavigationBarItemService implementers
@@ -366,8 +385,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
                 return;
             }
 
-            var projectItem = item as NavigationBarProjectItem;
-            if (projectItem != null)
+            if (item is NavigationBarProjectItem projectItem)
             {
                 projectItem.SwitchToContext();
 
@@ -378,7 +396,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar
                 var document = _subjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges();
                 if (document != null)
                 {
-                    var languageService = document.Project.LanguageServices.GetService<INavigationBarItemService>();
+                    var languageService = document.GetLanguageService<INavigationBarItemService>();
 
                     NavigateToItem(item, document, _subjectBuffer.CurrentSnapshot, languageService, cancellationToken);
                 }

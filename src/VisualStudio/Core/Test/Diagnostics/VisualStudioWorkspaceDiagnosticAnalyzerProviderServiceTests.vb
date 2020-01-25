@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis
@@ -13,27 +15,27 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Diagnostics
         <Fact>
         Public Sub GetHostAnalyzerPackagesWithNameTest()
             Dim extensionManager = New MockExtensionManager("Microsoft.VisualStudio.Analyzer", "$RootFolder$\test\test.dll", "$ShellFolder$\test\test.dll", "test\test.dll")
-            Dim packages = VisualStudioWorkspaceDiagnosticAnalyzerProviderService.GetHostAnalyzerPackagesWithName(extensionManager)
+            Dim packages = VisualStudioDiagnosticAnalyzerProvider.GetHostAnalyzerPackagesWithName(extensionManager, GetType(MockExtensionManager.MockContent))
 
             Assert.Equal(packages.Count(), 3)
 
             Assert.Equal(packages(0).Name, "Vsix")
-            Assert.Equal(packages(0).Assemblies.Length, 1)
+            Assert.Equal(packages(0).Assemblies.Length, 3)
             Assert.Equal(packages(0).Assemblies(0), "ResolvedRootFolder\test\test.dll")
 
             Assert.Equal(packages(1).Name, "Vsix")
-            Assert.Equal(packages(1).Assemblies.Length, 1)
+            Assert.Equal(packages(1).Assemblies.Length, 3)
             Assert.Equal(packages(1).Assemblies(0), "ResolvedShellFolder\test\test.dll")
 
             Assert.Equal(packages(2).Name, "Vsix")
-            Assert.Equal(packages(2).Assemblies.Length, 1)
+            Assert.Equal(packages(2).Assemblies.Length, 3)
             Assert.Equal(packages(2).Assemblies(0), "\InstallPath\test\test.dll")
         End Sub
 
         <Fact>
         Public Sub GetHostAnalyzerPackagesTest()
             Dim extensionManager = New MockExtensionManager("Microsoft.VisualStudio.Analyzer", "installPath1", "installPath2", "installPath3")
-            Dim packages = VisualStudioWorkspaceDiagnosticAnalyzerProviderService.GetHostAnalyzerPackages(extensionManager)
+            Dim packages = VisualStudioDiagnosticAnalyzerProvider.GetHostAnalyzerPackages(extensionManager)
 
             Assert.Equal(packages.Count(), 1)
 
@@ -48,12 +50,15 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Diagnostics
         Public Sub TestHostAnalyzerAssemblyLoader()
             Using tempRoot = New TempRoot
                 Dim dir = tempRoot.CreateDirectory
-                Dim analyzerFile = TestHelpers.CreateCSharpAnalyzerAssemblyWithTestAnalyzer(dir, "TestAnalyzer")
+                Dim analyzerFile = DesktopTestHelpers.CreateCSharpAnalyzerAssemblyWithTestAnalyzer(dir, "TestAnalyzer")
                 Dim analyzerPackage = New HostDiagnosticAnalyzerPackage("MyPackage", ImmutableArray.Create(analyzerFile.Path))
-                Dim analyzerPackages = SpecializedCollections.SingletonEnumerable(analyzerPackage)
-                Dim analyzerLoader = VisualStudioWorkspaceDiagnosticAnalyzerProviderService.GetLoader()
-                Dim hostAnalyzerManager = New HostAnalyzerManager(analyzerPackages, analyzerLoader, hostDiagnosticUpdateSource:=Nothing)
-                Dim analyzerReferenceMap = hostAnalyzerManager.GetHostDiagnosticAnalyzersPerReference(LanguageNames.CSharp)
+                Dim analyzerPackages = ImmutableArray.Create(analyzerPackage)
+                Dim analyzerLoader = VisualStudioDiagnosticAnalyzerProvider.GetLoader()
+                Dim hostAnalyzerManager = New DiagnosticAnalyzerInfoCache(New Lazy(Of ImmutableArray(Of HostDiagnosticAnalyzerPackage))(
+                                                                  Function() analyzerPackages), analyzerLoader,
+                                                                  hostDiagnosticUpdateSource:=Nothing,
+                                                                  primaryWorkspace:=Nothing)
+                Dim analyzerReferenceMap = hostAnalyzerManager.GetOrCreateHostDiagnosticAnalyzersPerReference(LanguageNames.CSharp)
                 Assert.Single(analyzerReferenceMap)
                 Dim analyzers = analyzerReferenceMap.Single().Value
                 Assert.Single(analyzers)

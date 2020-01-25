@@ -1,15 +1,23 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Rename.ConflictEngine
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename.VisualBasic
+    <[UseExportProvider]>
     Public Class ImplicitReferenceConflictTests
+        Private ReadOnly _outputHelper As Abstractions.ITestOutputHelper
+
+        Public Sub New(outputHelper As Abstractions.ITestOutputHelper)
+            _outputHelper = outputHelper
+        End Sub
 
         <Fact>
         <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameMoveNextCausesConflictInForEach()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -47,7 +55,7 @@ End Class
         <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameMoveNextToChangeCasingDoesntCauseConflictInForEach()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -84,7 +92,7 @@ End Class
         <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameMoveNextToChangeCasingInCSDoesntCauseConflictInForEach()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
 
                     <Project Language="C#" AssemblyName="Project1" CommonReferences="true">
@@ -135,7 +143,7 @@ End Class
         <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameMoveNextInCSCauseConflictInForEach()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
 
                     <Project Language="C#" AssemblyName="Project1" CommonReferences="true">

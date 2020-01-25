@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -22,15 +24,15 @@ namespace Microsoft.CodeAnalysis
         private readonly PEModule _module;
 
         private ModuleMetadata(PEReader peReader)
-            : base(isImageOwner: true, id: new MetadataId())
+            : base(isImageOwner: true, id: MetadataId.CreateNewId())
         {
-            _module = new PEModule(this, peReader: peReader, metadataOpt: IntPtr.Zero, metadataSizeOpt: 0);
+            _module = new PEModule(this, peReader: peReader, metadataOpt: IntPtr.Zero, metadataSizeOpt: 0, includeEmbeddedInteropTypes: false, ignoreAssemblyRefs: false);
         }
 
-        private ModuleMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes)
-            : base(isImageOwner: true, id: new MetadataId())
+        private ModuleMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes, bool ignoreAssemblyRefs)
+            : base(isImageOwner: true, id: MetadataId.CreateNewId())
         {
-            _module = new PEModule(this, peReader: null, metadataOpt: metadata, metadataSizeOpt: size, includeEmbeddedInteropTypes: includeEmbeddedInteropTypes);
+            _module = new PEModule(this, peReader: null, metadataOpt: metadata, metadataSizeOpt: size, includeEmbeddedInteropTypes: includeEmbeddedInteropTypes, ignoreAssemblyRefs: ignoreAssemblyRefs);
         }
 
         // creates a copy
@@ -60,14 +62,14 @@ namespace Microsoft.CodeAnalysis
                 throw new ArgumentOutOfRangeException(CodeAnalysisResources.SizeHasToBePositive, nameof(size));
             }
 
-            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes: false);
+            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes: false, ignoreAssemblyRefs: false);
         }
 
-        internal static ModuleMetadata CreateFromMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes)
+        internal static ModuleMetadata CreateFromMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes, bool ignoreAssemblyRefs = false)
         {
             Debug.Assert(metadata != IntPtr.Zero);
             Debug.Assert(size > 0);
-            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes);
+            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes, ignoreAssemblyRefs);
         }
 
         /// <summary>
@@ -229,7 +231,10 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        internal bool IsDisposed
+        /// <summary>
+        /// True if the module has been disposed.
+        /// </summary>
+        public bool IsDisposed
         {
             get { return _isDisposed || _module.IsDisposed; }
         }
@@ -290,10 +295,9 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         /// <exception cref="ObjectDisposedException">Module has been disposed.</exception>
         /// <exception cref="BadImageFormatException">When an invalid module name is encountered.</exception>
-        internal MetadataReader MetadataReader
-        {
-            get { return Module.MetadataReader; }
-        }
+        public MetadataReader GetMetadataReader() => MetadataReader;
+
+        internal MetadataReader MetadataReader => Module.MetadataReader;
 
         /// <summary>
         /// Creates a reference to the module metadata.

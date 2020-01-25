@@ -1,85 +1,71 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Diagnostics.RemoveUnnecessaryCast
 {
-    internal abstract class RemoveUnnecessaryCastDiagnosticAnalyzerBase<TLanguageKindEnum> : DiagnosticAnalyzer, IBuiltInAnalyzer where TLanguageKindEnum : struct
+    internal abstract class RemoveUnnecessaryCastDiagnosticAnalyzerBase<
+        TLanguageKindEnum,
+        TCastExpression> : AbstractBuiltInCodeStyleDiagnosticAnalyzer
+        where TLanguageKindEnum : struct
+        where TCastExpression : SyntaxNode
     {
-        private static readonly LocalizableString s_localizableTitle = new LocalizableResourceString(nameof(FeaturesResources.RemoveUnnecessaryCast), FeaturesResources.ResourceManager, typeof(FeaturesResources));
-        private static readonly LocalizableString s_localizableMessage = new LocalizableResourceString(nameof(WorkspacesResources.CastIsRedundant), WorkspacesResources.ResourceManager, typeof(WorkspacesResources));
-
-        private static readonly DiagnosticDescriptor s_descriptor = new DiagnosticDescriptor(IDEDiagnosticIds.RemoveUnnecessaryCastDiagnosticId,
-                                                                    s_localizableTitle,
-                                                                    s_localizableMessage,
-                                                                    DiagnosticCategory.Style,
-                                                                    DiagnosticSeverity.Hidden,
-                                                                    isEnabledByDefault: true,
-                                                                    customTags: DiagnosticCustomTags.Unnecessary);
-
-        #region Interface methods
-
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+        protected RemoveUnnecessaryCastDiagnosticAnalyzerBase()
+            : base(IDEDiagnosticIds.RemoveUnnecessaryCastDiagnosticId,
+                   option: null,
+                   new LocalizableResourceString(nameof(FeaturesResources.Remove_Unnecessary_Cast), FeaturesResources.ResourceManager, typeof(FeaturesResources)),
+                   new LocalizableResourceString(nameof(WorkspacesResources.Cast_is_redundant), WorkspacesResources.ResourceManager, typeof(WorkspacesResources)))
         {
-            get
+        }
+
+        protected abstract ImmutableArray<TLanguageKindEnum> SyntaxKindsOfInterest { get; }
+        protected abstract TextSpan GetFadeSpan(TCastExpression node);
+        protected abstract bool IsUnnecessaryCast(SemanticModel model, TCastExpression node, CancellationToken cancellationToken);
+
+        public override DiagnosticAnalyzerCategory GetAnalyzerCategory()
+            => DiagnosticAnalyzerCategory.SemanticSpanAnalysis;
+
+        protected override void InitializeWorker(AnalysisContext context)
+            => context.RegisterSyntaxNodeAction(AnalyzeSyntax, SyntaxKindsOfInterest);
+
+        private void AnalyzeSyntax(SyntaxNodeAnalysisContext context)
+        {
+            var diagnostic = TryRemoveCastExpression(
+                context.SemanticModel,
+                (TCastExpression)context.Node,
+                context.CancellationToken);
+
+            if (diagnostic != null)
             {
-                return ImmutableArray.Create(s_descriptor);
+                context.ReportDiagnostic(diagnostic);
             }
         }
 
-        public override void Initialize(AnalysisContext context)
+        private Diagnostic TryRemoveCastExpression(SemanticModel model, TCastExpression node, CancellationToken cancellationToken)
         {
-            context.RegisterSyntaxNodeAction(
-                (nodeContext) =>
-                    {
-                        Diagnostic diagnostic;
-                        if (TryRemoveCastExpression(nodeContext.SemanticModel, nodeContext.Node, out diagnostic, nodeContext.CancellationToken))
-                        {
-                            nodeContext.ReportDiagnostic(diagnostic);
-                        }
-                    },
-                this.SyntaxKindsOfInterest.ToArray());
-        }
-
-        public abstract ImmutableArray<TLanguageKindEnum> SyntaxKindsOfInterest { get; }
-
-        #endregion
-
-        protected abstract bool IsUnnecessaryCast(SemanticModel model, SyntaxNode node, CancellationToken cancellationToken);
-        protected abstract TextSpan GetDiagnosticSpan(SyntaxNode node);
-
-        private bool TryRemoveCastExpression(
-            SemanticModel model, SyntaxNode node, out Diagnostic diagnostic, CancellationToken cancellationToken)
-        {
-            diagnostic = default(Diagnostic);
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (!IsUnnecessaryCast(model, node, cancellationToken))
             {
-                return false;
+                return null;
             }
 
             var tree = model.SyntaxTree;
-            var span = GetDiagnosticSpan(node);
-            if (tree.OverlapsHiddenPosition(span, cancellationToken))
+            if (tree.OverlapsHiddenPosition(node.Span, cancellationToken))
             {
-                return false;
+                return null;
             }
 
-            diagnostic = Diagnostic.Create(s_descriptor, tree.GetLocation(span));
-            return true;
-        }
-
-        public DiagnosticAnalyzerCategory GetAnalyzerCategory()
-        {
-            return DiagnosticAnalyzerCategory.SemanticSpanAnalysis;
+            return Diagnostic.Create(
+                UnnecessaryWithSuggestionDescriptor,
+                node.SyntaxTree.GetLocation(GetFadeSpan(node)),
+                ImmutableArray.Create(node.GetLocation()));
         }
     }
 }

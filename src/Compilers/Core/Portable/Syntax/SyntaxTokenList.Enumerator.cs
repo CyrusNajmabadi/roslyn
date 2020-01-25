@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections;
@@ -16,7 +18,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// A structure for enumerating a <see cref="SyntaxTokenList"/>
         /// </summary>
-        [SuppressMessage("Performance", "RS0008", Justification = "Equality not actually implemented")]
+        [SuppressMessage("Performance", "CA1067", Justification = "Equality not actually implemented")]
         [StructLayout(LayoutKind.Auto)]
         public struct Enumerator
         {
@@ -54,7 +56,7 @@ namespace Microsoft.CodeAnalysis
             private GreenNode _current;
             private int _position;
 
-            internal Enumerator(ref SyntaxTokenList list)
+            internal Enumerator(in SyntaxTokenList list)
             {
                 _parent = list._parent;
                 _singleNodeOrList = list.Node;
@@ -129,9 +131,9 @@ namespace Microsoft.CodeAnalysis
             private Enumerator _enumerator;
 
             // SyntaxTriviaList is a relatively big struct so is passed by ref
-            internal EnumeratorImpl(ref SyntaxTokenList list)
+            internal EnumeratorImpl(in SyntaxTokenList list)
             {
-                _enumerator = new Enumerator(ref list);
+                _enumerator = new Enumerator(in list);
             }
 
             public SyntaxToken Current => _enumerator.Current;

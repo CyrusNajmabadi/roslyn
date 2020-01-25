@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
@@ -27,10 +29,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             this.FullWidth = this.Text.Length;
         }
 
-        internal override Func<ObjectReader, object> GetReader()
+        static SyntaxTrivia()
         {
-            return r => new SyntaxTrivia(r);
+            ObjectBinder.RegisterTypeReader(typeof(SyntaxTrivia), r => new SyntaxTrivia(r));
         }
+
+        public override bool IsTrivia => true;
+
+        internal override bool ShouldReuseInSerialization => this.Kind == SyntaxKind.WhitespaceTrivia &&
+                                                             FullWidth < Lexer.MaxCachedTokenSize;
 
         internal override void WriteTo(ObjectWriter writer)
         {
@@ -97,7 +104,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             visitor.VisitTrivia(this);
         }
 
-        protected internal override void WriteTo(System.IO.TextWriter writer, bool leading, bool trailing)
+        protected override void WriteTriviaTo(System.IO.TextWriter writer)
         {
             writer.Write(Text);
         }

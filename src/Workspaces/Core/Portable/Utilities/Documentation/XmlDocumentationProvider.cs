@@ -1,7 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading;
@@ -11,16 +14,46 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
-    internal abstract class XmlDocumentationProvider : DocumentationProvider
+    /// <summary>
+    /// A class used to provide XML documentation to the compiler for members from metadata from an XML document source.
+    /// </summary>
+    public abstract class XmlDocumentationProvider : DocumentationProvider
     {
         private readonly NonReentrantLock _gate = new NonReentrantLock();
         private Dictionary<string, string> _docComments;
 
+        /// <summary>
+        /// Gets the source stream for the XML document.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns></returns>
         protected abstract Stream GetSourceStream(CancellationToken cancellationToken);
 
-        public static XmlDocumentationProvider Create(byte[] xmlDocCommentBytes)
+        /// <summary>
+        /// Creates an <see cref="XmlDocumentationProvider"/> from bytes representing XML documentation data.
+        /// </summary>
+        /// <param name="xmlDocCommentBytes">The XML document bytes.</param>
+        /// <returns>An <see cref="XmlDocumentationProvider"/>.</returns>
+        public static XmlDocumentationProvider CreateFromBytes(byte[] xmlDocCommentBytes)
         {
             return new ContentBasedXmlDocumentationProvider(xmlDocCommentBytes);
+        }
+
+        private static XmlDocumentationProvider DefaultXmlDocumentationProvider { get; } = new NullXmlDocumentationProvider();
+
+        /// <summary>
+        /// Creates an <see cref="XmlDocumentationProvider"/> from an XML documentation file.
+        /// </summary>
+        /// <param name="xmlDocCommentFilePath">The path to the XML file.</param>
+        /// <returns>An <see cref="XmlDocumentationProvider"/>.</returns>
+        public static XmlDocumentationProvider CreateFromFile(string xmlDocCommentFilePath)
+        {
+            if (!File.Exists(xmlDocCommentFilePath))
+            {
+                return DefaultXmlDocumentationProvider;
+            }
+
+            return new FileBasedXmlDocumentationProvider(xmlDocCommentFilePath);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.FxCop.Rules.Security.Xml.SecurityXmlRules", "CA3053:UseXmlSecureResolver",
@@ -31,14 +64,12 @@ However, the said XmlResolver property no longer exists in .NET portable framewo
 So we suppress this error until the reporting for CA3053 has been updated to account for .NET portable framework.")]
         private XDocument GetXDocument(CancellationToken cancellationToken)
         {
-            using (var stream = GetSourceStream(cancellationToken))
-            using (var xmlReader = XmlReader.Create(stream, s_xmlSettings))
-            {
-                return XDocument.Load(xmlReader);
-            }
+            using var stream = GetSourceStream(cancellationToken);
+            using var xmlReader = XmlReader.Create(stream, s_xmlSettings);
+            return XDocument.Load(xmlReader);
         }
 
-        protected override string GetDocumentationForSymbol(string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default(CancellationToken))
+        protected override string GetDocumentationForSymbol(string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default)
         {
             if (_docComments == null)
             {
@@ -48,12 +79,14 @@ So we suppress this error until the reporting for CA3053 has been updated to acc
                     {
                         _docComments = new Dictionary<string, string>();
 
-                        XDocument doc = this.GetXDocument(cancellationToken);
+                        var doc = GetXDocument(cancellationToken);
                         foreach (var e in doc.Descendants("member"))
                         {
                             if (e.Attribute("name") != null)
                             {
-                                _docComments[e.Attribute("name").Value] = string.Concat(e.Nodes());
+                                using var reader = e.CreateReader();
+                                reader.MoveToContent();
+                                _docComments[e.Attribute("name").Value] = reader.ReadInnerXml();
                             }
                         }
                     }
@@ -63,8 +96,7 @@ So we suppress this error until the reporting for CA3053 has been updated to acc
                 }
             }
 
-            string docComment;
-            return _docComments.TryGetValue(documentationMemberID, out docComment) ? docComment : "";
+            return _docComments.TryGetValue(documentationMemberID, out var docComment) ? docComment : "";
         }
 
         private static readonly XmlReaderSettings s_xmlSettings = new XmlReaderSettings()
@@ -85,7 +117,7 @@ So we suppress this error until the reporting for CA3053 has been updated to acc
 
             protected override Stream GetSourceStream(CancellationToken cancellationToken)
             {
-                return SerializableBytes.CreateReadableStream(_xmlDocCommentBytes, cancellationToken);
+                return SerializableBytes.CreateReadableStream(_xmlDocCommentBytes);
             }
 
             public override bool Equals(object obj)
@@ -108,7 +140,7 @@ So we suppress this error until the reporting for CA3053 has been updated to acc
                     return false;
                 }
 
-                for (int i = 0; i < _xmlDocCommentBytes.Length; i++)
+                for (var i = 0; i < _xmlDocCommentBytes.Length; i++)
                 {
                     if (_xmlDocCommentBytes[i] != other._xmlDocCommentBytes[i])
                     {
@@ -122,6 +154,62 @@ So we suppress this error until the reporting for CA3053 has been updated to acc
             public override int GetHashCode()
             {
                 return Hash.CombineValues(_xmlDocCommentBytes);
+            }
+        }
+
+        private sealed class FileBasedXmlDocumentationProvider : XmlDocumentationProvider
+        {
+            private readonly string _filePath;
+
+            public FileBasedXmlDocumentationProvider(string filePath)
+            {
+                Contract.ThrowIfNull(filePath);
+                Debug.Assert(PathUtilities.IsAbsolute(filePath));
+
+                _filePath = filePath;
+            }
+
+            protected override Stream GetSourceStream(CancellationToken cancellationToken)
+            {
+                return new FileStream(_filePath, FileMode.Open, FileAccess.Read);
+            }
+
+            public override bool Equals(object obj)
+            {
+                var other = obj as FileBasedXmlDocumentationProvider;
+                return other != null && _filePath == other._filePath;
+            }
+
+            public override int GetHashCode()
+            {
+                return _filePath.GetHashCode();
+            }
+        }
+
+        /// <summary>
+        /// A trivial XmlDocumentationProvider which never returns documentation.
+        /// </summary>
+        private sealed class NullXmlDocumentationProvider : XmlDocumentationProvider
+        {
+            protected override string GetDocumentationForSymbol(string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default)
+            {
+                return "";
+            }
+
+            protected override Stream GetSourceStream(CancellationToken cancellationToken)
+            {
+                return new MemoryStream();
+            }
+
+            public override bool Equals(object obj)
+            {
+                // Only one instance is expected to exist, so reference equality is fine.
+                return (object)this == obj;
+            }
+
+            public override int GetHashCode()
+            {
+                return 0;
             }
         }
     }

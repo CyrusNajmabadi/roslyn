@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -20,7 +22,9 @@ namespace Microsoft.CodeAnalysis.CSharp
             out IEnumerable<Symbol> readOutside,
             out IEnumerable<Symbol> writtenOutside,
             out IEnumerable<Symbol> captured,
-            out IEnumerable<Symbol> unsafeAddressTaken)
+            out IEnumerable<Symbol> unsafeAddressTaken,
+            out IEnumerable<Symbol> capturedInside,
+            out IEnumerable<Symbol> capturedOutside)
         {
             var walker = new ReadWriteWalker(compilation, member, node, firstInRegion, lastInRegion, unassignedVariableAddressOfSyntaxes);
             try
@@ -29,7 +33,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 walker.Analyze(ref badRegion);
                 if (badRegion)
                 {
-                    readInside = writtenInside = readOutside = writtenOutside = captured = unsafeAddressTaken = Enumerable.Empty<Symbol>();
+                    readInside = writtenInside = readOutside = writtenOutside = captured = unsafeAddressTaken = capturedInside = capturedOutside = Enumerable.Empty<Symbol>();
                 }
                 else
                 {
@@ -39,6 +43,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                     writtenOutside = walker._writtenOutside;
 
                     captured = walker.GetCaptured();
+                    capturedInside = walker.GetCapturedInside();
+                    capturedOutside = walker.GetCapturedOutside();
+
                     unsafeAddressTaken = walker.GetUnsafeAddressTaken();
                 }
             }
@@ -61,7 +68,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         protected override void EnterRegion()
         {
-            for (MethodSymbol m = this.currentMethodOrLambda; (object)m != null; m = m.ContainingSymbol as MethodSymbol)
+            for (var m = this.CurrentSymbol as MethodSymbol; (object)m != null; m = m.ContainingSymbol as MethodSymbol)
             {
                 foreach (var p in m.Parameters)
                 {
@@ -97,7 +104,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             base.NoteWrite(variable, value, read);
         }
 
-        protected override void CheckAssigned(BoundExpression expr, FieldSymbol fieldSymbol, CSharpSyntaxNode node)
+        protected override void CheckAssigned(BoundExpression expr, FieldSymbol fieldSymbol, SyntaxNode node)
         {
             base.CheckAssigned(expr, fieldSymbol, node);
             if (!IsInside && node.Span.Contains(RegionSpan) && (expr.Kind == BoundKind.FieldAccess))
@@ -172,7 +179,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        protected override void AssignImpl(BoundNode node, BoundExpression value, RefKind refKind, bool written, bool read)
+        protected override void AssignImpl(BoundNode node, BoundExpression value, bool isRef, bool written, bool read)
         {
             switch (node.Kind)
             {
@@ -182,7 +189,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 case BoundKind.QueryClause:
                     {
-                        base.AssignImpl(node, value, refKind, written, read);
+                        base.AssignImpl(node, value, isRef, written, read);
                         var symbol = ((BoundQueryClause)node).DefinedSymbol;
                         if ((object)symbol != null)
                         {
@@ -193,7 +200,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 case BoundKind.FieldAccess:
                     {
-                        base.AssignImpl(node, value, refKind, written, read);
+                        base.AssignImpl(node, value, isRef, written, read);
                         var fieldAccess = node as BoundFieldAccess;
                         if (!IsInside && node.Syntax != null && node.Syntax.Span.Contains(RegionSpan))
                         {
@@ -203,7 +210,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     break;
 
                 default:
-                    base.AssignImpl(node, value, refKind, written, read);
+                    base.AssignImpl(node, value, isRef, written, read);
                     break;
             }
         }
@@ -211,16 +218,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         public override BoundNode VisitUnboundLambda(UnboundLambda node)
         {
             return VisitLambda(node.BindForErrorRecovery());
-        }
-
-        public override void VisitForEachIterationVariable(BoundForEachStatement node)
-        {
-            var local = node.IterationVariable;
-            if ((object)local != null)
-            {
-                GetOrCreateSlot(local);
-                Assign(node, value: null);
-            }
         }
 
         public override BoundNode VisitRangeVariable(BoundRangeVariable node)
@@ -235,7 +232,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Compute the underlying lambda parameter symbol for a range variable, if any.
         /// </summary>
         /// <param name="underlying">The bound node for the expansion of the range variable</param>
-        private ParameterSymbol GetRangeVariableUnderlyingParameter(BoundNode underlying)
+        private static ParameterSymbol GetRangeVariableUnderlyingParameter(BoundNode underlying)
         {
             while (underlying != null)
             {

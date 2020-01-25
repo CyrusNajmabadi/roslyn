@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.CodeGeneration
@@ -51,7 +53,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Dim declaration = GeneratePropertyDeclarationWorker([property], destination, options)
 
             Return AddAnnotationsTo([property],
-                AddCleanupAnnotationsTo(
+                AddFormatterAndCodeGeneratorAnnotationsTo(
                     ConditionallyAddDocumentationCommentTo(declaration, [property], options)))
         End Function
 
@@ -143,7 +145,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
 
         Private Function GenerateAccessorStatements(accessor As IMethodSymbol) As SyntaxList(Of StatementSyntax)
             Dim statementsOpt = CodeGenerationMethodInfo.GetStatements(accessor)
-            If statementsOpt IsNot Nothing Then
+            If Not statementsOpt.IsDefault Then
                 Return SyntaxFactory.List(statementsOpt.OfType(Of StatementSyntax))
             Else
                 Return Nothing

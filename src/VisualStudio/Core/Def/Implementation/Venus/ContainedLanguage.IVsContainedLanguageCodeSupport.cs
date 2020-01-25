@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,14 +11,12 @@ using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.TextManager.Interop;
-using Roslyn.Utilities;
 using TextSpan = Microsoft.VisualStudio.TextManager.Interop.TextSpan;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
 {
-    internal partial class ContainedLanguage<TPackage, TLanguageService, TProject> : IVsContainedLanguageCodeSupport
+    internal partial class ContainedLanguage : IVsContainedLanguageCodeSupport
     {
         public int CreateUniqueEventName(string pszClassName, string pszObjectName, string pszNameOfEvent, out string pbstrEventHandlerName)
         {
@@ -81,8 +81,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
         public int GetBaseClassName(string pszClassName, out string pbstrBaseClassName)
         {
             var result = false;
-            string baseClassName = null;
             var waitIndicator = this.ComponentModel.GetService<IWaitIndicator>();
+            string baseClassName = null;
             waitIndicator.Wait(
                 "Intellisense",
                 allowCancel: false,
@@ -132,7 +132,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
         public int GetMemberNavigationPoint(string pszClassName, string pszUniqueMemberID, TextSpan[] pSpanNavPoint, out uint pItemID)
         {
             uint itemId = 0;
-            TextSpan textSpan = default(TextSpan);
+            TextSpan textSpan = default;
             var succeeded = false;
 
             var waitIndicator = this.ComponentModel.GetService<IWaitIndicator>();
@@ -141,8 +141,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
                 allowCancel: false,
                 action: c =>
                 {
-                    Document targetDocument;
-                    if (ContainedLanguageCodeSupport.TryGetMemberNavigationPoint(GetThisDocument(), pszClassName, pszUniqueMemberID, out textSpan, out targetDocument, c.CancellationToken))
+                    if (ContainedLanguageCodeSupport.TryGetMemberNavigationPoint(GetThisDocument(), pszClassName, pszUniqueMemberID, out textSpan, out var targetDocument, c.CancellationToken))
                     {
                         succeeded = true;
                         itemId = this.ContainedDocument.FindItemIdOfDocument(targetDocument);
@@ -179,7 +178,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Venus
 
         public int OnRenamed(ContainedLanguageRenameType clrt, string bstrOldID, string bstrNewID)
         {
-            int result = 0;
+            var result = 0;
 
             var waitIndicator = this.ComponentModel.GetService<IWaitIndicator>();
             waitIndicator.Wait(

@@ -1,23 +1,27 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Completion.Providers
 {
-    internal abstract class AbstractObjectInitializerCompletionProvider : CompletionListProvider
+    internal abstract class AbstractObjectInitializerCompletionProvider : CommonCompletionProvider
     {
-        protected abstract TextSpan GetTextChangeSpan(SourceText text, int position);
         protected abstract Tuple<ITypeSymbol, Location> GetInitializedType(Document document, SemanticModel semanticModel, int position, CancellationToken cancellationToken);
         protected abstract HashSet<string> GetInitializedMembers(SyntaxTree tree, int position, CancellationToken cancellationToken);
+        protected abstract string EscapeIdentifier(ISymbol symbol);
 
-        public override async Task ProduceCompletionListAsync(CompletionListContext context)
+        public override async Task ProvideCompletionsAsync(CompletionContext context)
         {
             var document = context.Document;
             var position = context.Position;
@@ -32,23 +36,24 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
                 return;
             }
 
-            var initializedType = typeAndLocation.Item1 as INamedTypeSymbol;
             var initializerLocation = typeAndLocation.Item2;
-            if (initializedType == null)
+            if (!(typeAndLocation.Item1 is INamedTypeSymbol initializedType))
             {
                 return;
             }
 
             if (await IsExclusiveAsync(document, position, cancellationToken).ConfigureAwait(false))
             {
-                context.MakeExclusive(true);
+                context.IsExclusive = true;
             }
-            var enclosing = semanticModel.GetEnclosingNamedTypeOrAssembly(position, cancellationToken);
+
+            var enclosing = semanticModel.GetEnclosingNamedType(position, cancellationToken);
+
             // Find the members that can be initialized. If we have a NamedTypeSymbol, also get the overridden members.
             IEnumerable<ISymbol> members = semanticModel.LookupSymbols(position, initializedType);
-            members = members.Where(m => IsInitializable(m, initializedType) &&
+            members = members.Where(m => IsInitializable(m, enclosing) &&
                                          m.CanBeReferencedByName &&
-                                         IsLegalFieldOrProperty(m, enclosing) &&
+                                         IsLegalFieldOrProperty(m) &&
                                          !m.IsImplicitlyDeclared);
 
             // Filter out those members that have already been typed
@@ -58,41 +63,31 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             uninitializedMembers = uninitializedMembers.Where(m => m.IsEditorBrowsable(document.ShouldHideAdvancedMembers(), semanticModel.Compilation));
 
             var text = await semanticModel.SyntaxTree.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var filterSpan = GetTextChangeSpan(text, position);
 
             foreach (var uninitializedMember in uninitializedMembers)
             {
-                context.AddItem(CreateItem(
-                    workspace,
-                    uninitializedMember.Name,
-                    filterSpan,
-                    CommonCompletionUtilities.CreateDescriptionFactory(workspace, semanticModel, initializerLocation.SourceSpan.Start, uninitializedMember),
-                    uninitializedMember.GetGlyph()));
+                context.AddItem(SymbolCompletionItem.CreateWithSymbolId(
+                    displayText: EscapeIdentifier(uninitializedMember),
+                    displayTextSuffix: "",
+                    insertionText: null,
+                    symbols: ImmutableArray.Create(uninitializedMember),
+                    contextPosition: initializerLocation.SourceSpan.Start,
+                    rules: s_rules));
             }
         }
+
+        protected override Task<CompletionDescription> GetDescriptionWorkerAsync(Document document, CompletionItem item, CancellationToken cancellationToken)
+            => SymbolCompletionItem.GetDescriptionAsync(item, document, cancellationToken);
 
         protected abstract Task<bool> IsExclusiveAsync(Document document, int position, CancellationToken cancellationToken);
 
-        private bool IsLegalFieldOrProperty(ISymbol symbol, ISymbol within)
+        private bool IsLegalFieldOrProperty(ISymbol symbol)
         {
-            var type = symbol.GetMemberType();
-            if (type != null && type.CanSupportCollectionInitializer(within))
-            {
-                return true;
-            }
-
-            return symbol.IsWriteableFieldOrProperty();
+            return symbol.IsWriteableFieldOrProperty()
+                || CanSupportObjectInitializer(symbol);
         }
 
-        protected CompletionItem CreateItem(
-            Workspace workspace,
-            string displayText,
-            TextSpan filterSpan,
-            Func<CancellationToken, Task<ImmutableArray<SymbolDisplayPart>>> descriptionFactory,
-            Glyph? glyph)
-        {
-            return new CompletionItem(this, displayText, filterSpan, descriptionFactory, glyph, rules: ObjectInitializerCompletionItemRules.Instance);
-        }
+        private static readonly CompletionItemRules s_rules = CompletionItemRules.Create(enterKeyRule: EnterKeyRule.Never);
 
         protected virtual bool IsInitializable(ISymbol member, INamedTypeSymbol containingType)
         {
@@ -100,6 +95,22 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
                 !member.IsStatic &&
                 member.MatchesKind(SymbolKind.Field, SymbolKind.Property) &&
                 member.IsAccessibleWithin(containingType);
+        }
+
+        private static bool CanSupportObjectInitializer(ISymbol symbol)
+        {
+            Debug.Assert(!symbol.IsWriteableFieldOrProperty(), "Assertion failed - expected writable field/property check before calling this method.");
+
+            if (symbol is IFieldSymbol fieldSymbol)
+            {
+                return !fieldSymbol.Type.IsStructType();
+            }
+            else if (symbol is IPropertySymbol propertySymbol)
+            {
+                return !propertySymbol.Type.IsStructType();
+            }
+
+            throw ExceptionUtilities.Unreachable;
         }
     }
 }

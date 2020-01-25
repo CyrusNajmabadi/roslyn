@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
@@ -66,7 +68,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
                 lastTokenAnnotation)
         End Sub
 
-        Protected Overrides Function UnderAsyncAnonymousMethod(token As SyntaxToken, firstToken As SyntaxToken, lastToken As SyntaxToken) As Boolean
+        Protected Overrides Function UnderAnonymousOrLocalMethod(token As SyntaxToken, firstToken As SyntaxToken, lastToken As SyntaxToken) As Boolean
             Dim current = token.Parent
 
             While current IsNot Nothing
@@ -93,21 +95,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             End If
 
             Dim node = CType(Me.GetContainingScope(), SyntaxNode)
-            Return node.TypeSwitch(
-                Function(methodBlock As MethodBlockBaseSyntax) As Boolean
-                    If methodBlock.BlockStatement IsNot Nothing Then
-                        Return methodBlock.BlockStatement.Modifiers.Any(SyntaxKind.AsyncKeyword)
-                    End If
+            If TypeOf node Is MethodBlockBaseSyntax Then
+                Dim methodBlock = DirectCast(node, MethodBlockBaseSyntax)
+                If methodBlock.BlockStatement IsNot Nothing Then
+                    Return methodBlock.BlockStatement.Modifiers.Any(SyntaxKind.AsyncKeyword)
+                End If
 
-                    Return False
-                End Function,
-                Function(lambda As LambdaExpressionSyntax) As Boolean
-                    If lambda.SubOrFunctionHeader IsNot Nothing Then
-                        Return lambda.SubOrFunctionHeader.Modifiers.Any(SyntaxKind.AsyncKeyword)
-                    End If
+                Return False
+            ElseIf TypeOf node Is LambdaExpressionSyntax Then
+                Dim lambda = DirectCast(node, LambdaExpressionSyntax)
+                If lambda.SubOrFunctionHeader IsNot Nothing Then
+                    Return lambda.SubOrFunctionHeader.Modifiers.Any(SyntaxKind.AsyncKeyword)
+                End If
+            End If
 
-                    Return False
-                End Function)
+            Return False
         End Function
 
         Public Overrides Function GetContainingScope() As SyntaxNode
@@ -188,7 +190,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             End If
 
             ' use FormattableString if conversion between String And FormattableString
-            If info.Type?.SpecialType = SpecialType.System_String AndAlso
+            If (info.Type?.SpecialType = SpecialType.System_String).GetValueOrDefault() AndAlso
                info.ConvertedType?.IsFormattableString() Then
 
                 Return info.ConvertedType

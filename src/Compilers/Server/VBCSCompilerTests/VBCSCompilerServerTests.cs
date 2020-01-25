@@ -1,10 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CommandLine;
+using Roslyn.Test.Utilities;
 using System;
-using System.Collections;
+using System.Collections.Specialized;
+using System.IO;
 using System.IO.Pipes;
-using System.Text;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -13,16 +17,36 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
 {
     public class VBCSCompilerServerTests
     {
+        public class StartupTests : VBCSCompilerServerTests
+        {
+            [Fact]
+            [WorkItem(217709, "https://devdiv.visualstudio.com/DevDiv/_workitems/edit/217709")]
+            public async Task ShadowCopyAnalyzerAssemblyLoaderMissingDirectory()
+            {
+                var baseDirectory = Path.Combine(Path.GetTempPath(), TestBase.GetUniqueName());
+                var loader = new ShadowCopyAnalyzerAssemblyLoader(baseDirectory);
+                var task = loader.DeleteLeftoverDirectoriesTask;
+                await task;
+                Assert.False(task.IsFaulted);
+            }
+        }
+
         public class ShutdownTests : VBCSCompilerServerTests
         {
+            private static Task<int> RunShutdownAsync(string pipeName, bool waitForProcess = true, TimeSpan? timeout = null, CancellationToken cancellationToken = default(CancellationToken))
+            {
+                var appSettings = new NameValueCollection();
+                return new BuildServerController(appSettings).RunShutdownAsync(pipeName, waitForProcess, timeout, cancellationToken);
+            }
+
             [Fact]
             public async Task Standard()
             {
-                using (var serverData = ServerUtil.CreateServer())
+                using (var serverData = await ServerUtil.CreateServer())
                 {
                     // Make sure the server is listening for this particular test. 
                     await serverData.ListenTask;
-                    var exitCode = await VBCSCompiler.RunShutdownAsync(serverData.PipeName, waitForProcess: false).ConfigureAwait(false);
+                    var exitCode = await RunShutdownAsync(serverData.PipeName, waitForProcess: false).ConfigureAwait(false);
                     Assert.Equal(CommonCompiler.Succeeded, exitCode);
                     await serverData.Verify(connections: 1, completed: 1);
                 }
@@ -37,25 +61,26 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
             public async Task NoServerMutex()
             {
                 var pipeName = Guid.NewGuid().ToString();
-                var exitCode = await VBCSCompiler.RunShutdownAsync(pipeName, waitForProcess: false).ConfigureAwait(false);
+                var exitCode = await RunShutdownAsync(pipeName, waitForProcess: false).ConfigureAwait(false);
                 Assert.Equal(CommonCompiler.Succeeded, exitCode);
             }
 
             [Fact]
+            [WorkItem(34880, "https://github.com/dotnet/roslyn/issues/34880")]
             public async Task NoServerConnection()
             {
                 using (var readyMre = new ManualResetEvent(initialState: false))
                 using (var doneMre = new ManualResetEvent(initialState: false))
                 {
                     var pipeName = Guid.NewGuid().ToString();
-                    var mutexName = BuildProtocolConstants.GetServerMutexName(pipeName);
+                    var mutexName = BuildServerConnection.GetServerMutexName(pipeName);
                     bool created = false;
                     bool connected = false;
 
                     var thread = new Thread(() =>
                     {
                         using (var mutex = new Mutex(initiallyOwned: true, name: mutexName, createdNew: out created))
-                        using (var stream = new NamedPipeServerStream(pipeName))
+                        using (var stream = NamedPipeUtil.CreateServer(pipeName))
                         {
                             readyMre.Set();
 
@@ -73,7 +98,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
                     thread.Start();
                     readyMre.WaitOne();
 
-                    var exitCode = await VBCSCompiler.RunShutdownAsync(pipeName, waitForProcess: false);
+                    var exitCode = await RunShutdownAsync(pipeName, waitForProcess: false);
 
                     // Let the fake server exit.
                     doneMre.Set();
@@ -91,19 +116,20 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
             /// </summary>
             /// <returns></returns>
             [Fact]
+            [WorkItem(34880, "https://github.com/dotnet/roslyn/issues/34880")]
             public async Task ServerShutdownsDuringProcessing()
             {
                 using (var readyMre = new ManualResetEvent(initialState: false))
                 using (var doneMre = new ManualResetEvent(initialState: false))
                 {
                     var pipeName = Guid.NewGuid().ToString();
-                    var mutexName = BuildProtocolConstants.GetServerMutexName(pipeName);
+                    var mutexName = BuildServerConnection.GetServerMutexName(pipeName);
                     bool created = false;
                     bool connected = false;
 
                     var thread = new Thread(() =>
                     {
-                        using (var stream = new NamedPipeServerStream(pipeName))
+                        using (var stream = NamedPipeUtil.CreateServer(pipeName))
                         {
                             var mutex = new Mutex(initiallyOwned: true, name: mutexName, createdNew: out created);
                             readyMre.Set();
@@ -125,7 +151,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
                     thread.Start();
                     readyMre.WaitOne();
 
-                    var exitCode = await VBCSCompiler.RunShutdownAsync(pipeName, waitForProcess: false);
+                    var exitCode = await RunShutdownAsync(pipeName, waitForProcess: false);
 
                     // Let the fake server exit.
                     doneMre.Set();
@@ -134,6 +160,21 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
                     Assert.Equal(CommonCompiler.Succeeded, exitCode);
                     Assert.True(connected);
                     Assert.True(created);
+                }
+            }
+
+            [Fact]
+            public async Task RunServerWithLongTempPath()
+            {
+                string pipeName = BuildServerConnection.GetPipeNameForPathOpt(Guid.NewGuid().ToString());
+                string tempPath = new string('a', 100);
+                using (var serverData = await ServerUtil.CreateServer(pipeName, tempPath: tempPath))
+                {
+                    // Make sure the server is listening for this particular test.
+                    await serverData.ListenTask;
+                    var exitCode = await RunShutdownAsync(serverData.PipeName, waitForProcess: false).ConfigureAwait(false);
+                    Assert.Equal(CommonCompiler.Succeeded, exitCode);
+                    await serverData.Verify(connections: 1, completed: 1);
                 }
             }
         }
@@ -145,7 +186,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
 
             private bool Parse(params string[] args)
             {
-                return VBCSCompiler.ParseCommandLine(args, out _pipeName, out _shutdown);
+                return BuildServerController.ParseCommandLine(args, out _pipeName, out _shutdown);
             }
 
             [Fact]

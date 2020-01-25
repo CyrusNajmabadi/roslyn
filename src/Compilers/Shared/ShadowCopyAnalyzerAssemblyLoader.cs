@@ -1,14 +1,25 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
+// The ShadowCopyAnalyzerAssemblyLoader derives from DesktopAnalyzerAssemblyLoader (NET472) OR CoreClrAnalyzerAssemblyLoader (NETCOREAPP2_1)
+#if NET472 || NETCOREAPP2_1
+
 namespace Microsoft.CodeAnalysis
 {
-    internal sealed class ShadowCopyAnalyzerAssemblyLoader : AbstractAnalyzerAssemblyLoader
+    internal sealed class ShadowCopyAnalyzerAssemblyLoader :
+#if NET472
+        DesktopAnalyzerAssemblyLoader
+#else
+        CoreClrAnalyzerAssemblyLoader
+#endif
     {
         /// <summary>
         /// The base directory for shadow copies. Each instance of
@@ -18,15 +29,16 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         private readonly string _baseDirectory;
 
-        /// <summary>
-        /// The directory where this instance of <see cref="ShadowCopyAnalyzerAssemblyLoader"/>
-        /// will shadow-copy assemblies.
-        /// </summary>
-        private string _shadowCopyDirectory;
-        private Mutex _shadowCopyDirectoryMutex;
+        internal readonly Task DeleteLeftoverDirectoriesTask;
 
         /// <summary>
-        /// Used to generate unique names for per-assembly directories.
+        /// The directory where this instance of <see cref="ShadowCopyAnalyzerAssemblyLoader"/>
+        /// will shadow-copy assemblies, and the mutex created to mark that the owner of it is still active.
+        /// </summary>
+        private readonly Lazy<(string directory, Mutex)> _shadowCopyDirectoryAndMutex;
+
+        /// <summary>
+        /// Used to generate unique names for per-assembly directories. Should be updated with <see cref="Interlocked.Increment(ref int)"/>.
         /// </summary>
         private int _assemblyDirectoryId;
 
@@ -41,12 +53,25 @@ namespace Microsoft.CodeAnalysis
                 _baseDirectory = Path.Combine(Path.GetTempPath(), "CodeAnalysis", "AnalyzerShadowCopies");
             }
 
-            Task.Run((Action)DeleteLeftoverDirectories);
+            _shadowCopyDirectoryAndMutex = new Lazy<(string directory, Mutex)>(
+                () => CreateUniqueDirectoryForProcess(), LazyThreadSafetyMode.ExecutionAndPublication);
+
+            DeleteLeftoverDirectoriesTask = Task.Run((Action)DeleteLeftoverDirectories);
         }
 
         private void DeleteLeftoverDirectories()
         {
-            foreach (var subDirectory in Directory.EnumerateDirectories(_baseDirectory))
+            IEnumerable<string> subDirectories;
+            try
+            {
+                subDirectories = Directory.EnumerateDirectories(_baseDirectory);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return;
+            }
+
+            foreach (var subDirectory in subDirectories)
             {
                 string name = Path.GetFileName(subDirectory).ToLowerInvariant();
                 Mutex mutex = null;
@@ -75,26 +100,15 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods",
-            MessageId = "System.Reflection.Assembly.LoadFrom",
-            Justification = @"We need to call Assembly.LoadFrom in order to load analyzer assemblies. 
-We can't use Assembly.Load(AssemblyName) because we need to be able to load assemblies outside of the csc/vbc/vbcscompiler/VS binding paths.
-We can't use Assembly.Load(byte[]) because VS won't load resource assemblies for those due to an assembly binding optimization.
-That leaves Assembly.LoadFrom(string) as the only option that works everywhere.")]
-        protected override Assembly LoadCore(string fullPath)
+        protected override Assembly LoadImpl(string fullPath)
         {
-            if (_shadowCopyDirectory == null)
-            {
-                _shadowCopyDirectory = CreateUniqueDirectoryForProcess();
-            }
-
             string assemblyDirectory = CreateUniqueDirectoryForAssembly();
             string shadowCopyPath = CopyFileAndResources(fullPath, assemblyDirectory);
 
-            return Assembly.LoadFrom(shadowCopyPath);
+            return base.LoadImpl(shadowCopyPath);
         }
 
-        private string CopyFileAndResources(string fullPath, string assemblyDirectory)
+        private static string CopyFileAndResources(string fullPath, string assemblyDirectory)
         {
             string fileNameWithExtension = Path.GetFileName(fullPath);
             string shadowCopyPath = Path.Combine(assemblyDirectory, fileNameWithExtension);
@@ -128,7 +142,7 @@ That leaves Assembly.LoadFrom(string) as the only option that works everywhere."
             return shadowCopyPath;
         }
 
-        private void CopyFile(string originalPath, string shadowCopyPath)
+        private static void CopyFile(string originalPath, string shadowCopyPath)
         {
             var directory = Path.GetDirectoryName(shadowCopyPath);
             Directory.CreateDirectory(directory);
@@ -138,7 +152,7 @@ That leaves Assembly.LoadFrom(string) as the only option that works everywhere."
             ClearReadOnlyFlagOnFile(new FileInfo(shadowCopyPath));
         }
 
-        private void ClearReadOnlyFlagOnFiles(string directoryPath)
+        private static void ClearReadOnlyFlagOnFiles(string directoryPath)
         {
             DirectoryInfo directory = new DirectoryInfo(directoryPath);
 
@@ -148,7 +162,7 @@ That leaves Assembly.LoadFrom(string) as the only option that works everywhere."
             }
         }
 
-        private void ClearReadOnlyFlagOnFile(FileInfo fileInfo)
+        private static void ClearReadOnlyFlagOnFile(FileInfo fileInfo)
         {
             try
             {
@@ -165,24 +179,28 @@ That leaves Assembly.LoadFrom(string) as the only option that works everywhere."
 
         private string CreateUniqueDirectoryForAssembly()
         {
-            int directoryId = _assemblyDirectoryId++;
+            int directoryId = Interlocked.Increment(ref _assemblyDirectoryId);
 
-            string directory = Path.Combine(_shadowCopyDirectory, directoryId.ToString());
+            string directory = Path.Combine(_shadowCopyDirectoryAndMutex.Value.directory, directoryId.ToString());
 
             Directory.CreateDirectory(directory);
             return directory;
         }
 
-        private string CreateUniqueDirectoryForProcess()
+        private (string directory, Mutex mutex) CreateUniqueDirectoryForProcess()
         {
             string guid = Guid.NewGuid().ToString("N").ToLowerInvariant();
             string directory = Path.Combine(_baseDirectory, guid);
 
-            _shadowCopyDirectoryMutex = new Mutex(initiallyOwned: false, name: guid);
+            var mutex = new Mutex(initiallyOwned: false, name: guid);
 
             Directory.CreateDirectory(directory);
 
-            return directory;
+            return (directory, mutex);
         }
     }
 }
+
+#elif !NETSTANDARD2_0
+#error unsupported configuration
+#endif

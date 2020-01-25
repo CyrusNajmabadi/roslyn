@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -53,7 +55,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
             var previousOne = root.ConvertToTokenPair(spans[0]);
 
             // iterate through each spans and make sure each one doesn't overlap each other
-            for (int i = 1; i < spans.Count; i++)
+            for (var i = 1; i < spans.Count; i++)
             {
                 var currentOne = root.ConvertToTokenPair(spans[i]);
                 if (currentOne.Item1.SpanStart <= previousOne.Item2.Span.End)
@@ -366,6 +368,19 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
         public static bool IsNotNull<T>(T t) where T : class
         {
             return !IsNull(t);
+        }
+
+        public static TextSpan GetFormattingSpan(SyntaxNode root, TextSpan span)
+        {
+            Contract.ThrowIfNull(root);
+
+            var startToken = root.FindToken(span.Start).GetPreviousToken();
+            var endToken = root.FindTokenFromEnd(span.End).GetNextToken();
+
+            var startPosition = startToken.SpanStart;
+            var endPosition = endToken.RawKind == 0 ? root.Span.End : endToken.Span.End;
+
+            return TextSpan.FromBounds(startPosition, endPosition);
         }
     }
 }

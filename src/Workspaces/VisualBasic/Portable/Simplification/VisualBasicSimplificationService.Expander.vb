@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
@@ -58,9 +60,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 Return AddCast(expression, targetType, semanticModel)
             End Function
 
-            Private Shared Function AddCast(expression As ExpressionSyntax, targetType As ITypeSymbol, semanticModel As SemanticModel) As ExpressionSyntax
+            Private Function AddCast(expression As ExpressionSyntax, targetType As ITypeSymbol, semanticModel As SemanticModel) As ExpressionSyntax
                 Dim wasCastAdded As Boolean = False
-                Dim result = expression.CastIfPossible(targetType, expression.SpanStart, semanticModel, wasCastAdded)
+                Dim result = expression.CastIfPossible(targetType, expression.SpanStart, semanticModel, wasCastAdded, _cancellationToken)
 
                 If wasCastAdded Then
                     result = result.Parenthesize()
@@ -295,6 +297,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
 
                 Dim newSimpleArgument = DirectCast(MyBase.VisitSimpleArgument(node), SimpleArgumentSyntax)
 
+                If node.NameColonEquals Is Nothing Then
+                    Dim tuple = TryCast(node.Parent, TupleExpressionSyntax)
+                    If tuple IsNot Nothing Then
+                        Dim inferredName = node.Expression.TryGetInferredMemberName()
+                        If CanMakeNameExplicitInTuple(tuple, inferredName) Then
+                            Dim identifier = SyntaxFactory.Identifier(inferredName)
+                            identifier = TryEscapeIdentifierToken(identifier, _semanticModel)
+
+                            newSimpleArgument = newSimpleArgument.
+                                WithLeadingTrivia().
+                                WithNameColonEquals(SyntaxFactory.NameColonEquals(SyntaxFactory.IdentifierName(identifier))).
+                                WithAdditionalAnnotations(Simplifier.Annotation).
+                                WithLeadingTrivia(node.GetLeadingTrivia())
+                        End If
+                    End If
+                End If
+
                 ' We need to be careful here. if this is a local, field or property passed to a ByRef argument, we shouldn't
                 ' parenthesize to avoid breaking copy-back semantics.
                 Dim symbol = _semanticModel.GetSymbolInfo(node.Expression, _cancellationToken).Symbol
@@ -324,6 +343,50 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                     .WithAdditionalAnnotations(Simplifier.Annotation)
 
                 Return newSimpleArgument
+            End Function
+
+            Private Function CanMakeNameExplicitInTuple(tuple As TupleExpressionSyntax, name As String) As Boolean
+                If name Is Nothing OrElse SyntaxFacts.IsReservedTupleElementName(name) Then
+                    Return False
+                End If
+
+                Dim found = False
+
+                For Each argument In tuple.Arguments
+                    Dim elementName = Nothing
+                    If argument.NameColonEquals IsNot Nothing Then
+                        elementName = argument.NameColonEquals.Name.Identifier.ValueText
+                    Else
+                        elementName = argument.Expression?.TryGetInferredMemberName()
+                    End If
+
+                    If CaseInsensitiveComparison.Equals(elementName, name) Then
+                        If found Then
+                            ' No duplicate names allowed
+                            Return False
+                        End If
+                        found = True
+                    End If
+                Next
+
+                Return True
+            End Function
+
+            Public Overrides Function VisitInferredFieldInitializer(node As InferredFieldInitializerSyntax) As SyntaxNode
+                Dim newInitializer = TryCast(MyBase.VisitInferredFieldInitializer(node), InferredFieldInitializerSyntax)
+                If newInitializer IsNot Nothing Then
+                    Dim inferredName = node.Expression.TryGetInferredMemberName()
+                    If inferredName IsNot Nothing Then
+                        Dim identifier = SyntaxFactory.Identifier(inferredName)
+                        identifier = TryEscapeIdentifierToken(identifier, _semanticModel)
+
+                        Return SyntaxFactory.NamedFieldInitializer(SyntaxFactory.IdentifierName(identifier), newInitializer.Expression.WithoutLeadingTrivia()).
+                            WithLeadingTrivia(node.GetLeadingTrivia()).
+                            WithAdditionalAnnotations(Simplifier.Annotation)
+                    End If
+                End If
+
+                Return newInitializer
             End Function
 
             Public Overrides Function VisitGenericName(node As GenericNameSyntax) As SyntaxNode
@@ -592,7 +655,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                             replaceNode:=False)
                     Else
                         Dim left As ExpressionSyntax
-                        If _semanticModel.GetEnclosingNamedType(originalSimpleName.SpanStart, _cancellationToken) IsNot symbol.ContainingType Then
+                        If Not Equals(_semanticModel.GetEnclosingNamedType(originalSimpleName.SpanStart, _cancellationToken), symbol.ContainingType) Then
                             left = SyntaxFactory.MyBaseExpression()
                         Else
                             left = SyntaxFactory.MeExpression()
@@ -622,14 +685,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                     If DirectCast(symbol, IMethodSymbol).TypeArguments.Length <> 0 Then
                         Dim typeArguments = DirectCast(symbol, IMethodSymbol).TypeArguments
 
-                        newNode = SyntaxFactory.GenericName(
+                        Dim genericName = SyntaxFactory.GenericName(
                                         DirectCast(newNode, IdentifierNameSyntax).Identifier,
                                         SyntaxFactory.TypeArgumentList(
                                             SyntaxFactory.SeparatedList(typeArguments.Select(Function(p) SyntaxFactory.ParseTypeName(p.ToDisplayParts(typeNameFormatWithGenerics).ToDisplayString()))))) _
                             .WithLeadingTrivia(newNode.GetLeadingTrivia()) _
                             .WithTrailingTrivia(newNode.GetTrailingTrivia()) _
                             .WithAdditionalAnnotations(Simplifier.Annotation)
-
+                        genericName = newNode.CopyAnnotationsTo(genericName)
+                        Return genericName
                     End If
                 End If
 

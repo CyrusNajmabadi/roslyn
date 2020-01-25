@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -132,7 +134,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
             Public Overrides Function Visit(node As SyntaxNode) As SyntaxNode
                 _cancellationToken.ThrowIfCancellationRequested()
 
-                If node Is Nothing OrElse Not Me._spans.IntersectsWith(node.FullSpan) Then
+                If node Is Nothing OrElse Not Me._spans.HasIntervalThatIntersectsWith(node.FullSpan) Then
                     Return node
                 End If
 
@@ -142,7 +144,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
             Public Overrides Function VisitToken(token As SyntaxToken) As SyntaxToken
                 _cancellationToken.ThrowIfCancellationRequested()
 
-                If Not Me._spans.IntersectsWith(token.FullSpan) Then
+                If Not Me._spans.HasIntervalThatIntersectsWith(token.FullSpan) Then
                     Return token
                 End If
 

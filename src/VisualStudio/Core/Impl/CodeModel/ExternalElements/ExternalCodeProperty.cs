@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Runtime.InteropServices;
@@ -31,13 +33,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         EnvDTE.CodeElements ICodeElementContainer<ExternalCodeParameter>.GetCollection()
         {
             return this.Parameters;
-        }
-
-        protected override EnvDTE.CodeElements GetParameters()
-        {
-            // TODO: Need to figure out what to do here. This comes from CodeProperty2, but C# apparently never
-            // that interface for external code elements.
-            throw new NotImplementedException();
         }
 
         public override EnvDTE.vsCMElement Kind
@@ -123,23 +118,61 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         {
             get
             {
-                throw new NotImplementedException();
+                var symbol = PropertySymbol;
+                var result = EnvDTE80.vsCMOverrideKind.vsCMOverrideKindNone;
+
+                if (symbol.IsAbstract)
+                {
+                    result |= EnvDTE80.vsCMOverrideKind.vsCMOverrideKindAbstract;
+                }
+
+                if (symbol.IsVirtual)
+                {
+                    result |= EnvDTE80.vsCMOverrideKind.vsCMOverrideKindVirtual;
+                }
+
+                if (symbol.IsOverride)
+                {
+                    result |= EnvDTE80.vsCMOverrideKind.vsCMOverrideKindOverride;
+                }
+
+                if (symbol.IsSealed)
+                {
+                    result |= EnvDTE80.vsCMOverrideKind.vsCMOverrideKindSealed;
+                }
+
+                return result;
             }
 
             set
             {
-                throw new NotImplementedException();
+                throw Exceptions.ThrowEFail();
             }
         }
 
         public EnvDTE.CodeElement Parent2
         {
-            get { throw new NotImplementedException(); }
+            get { return (EnvDTE.CodeElement)base.Parent; }
         }
 
         public EnvDTE80.vsCMPropertyKind ReadWrite
         {
-            get { throw new NotImplementedException(); }
+            get
+            {
+                var symbol = PropertySymbol;
+                if (symbol.GetMethod != null)
+                {
+                    return symbol.SetMethod != null
+                        ? EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadWrite
+                        : EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadOnly;
+                }
+                else if (symbol.SetMethod != null)
+                {
+                    return EnvDTE80.vsCMPropertyKind.vsCMPropertyKindWriteOnly;
+                }
+
+                throw Exceptions.ThrowEUnexpected();
+            }
         }
     }
 }

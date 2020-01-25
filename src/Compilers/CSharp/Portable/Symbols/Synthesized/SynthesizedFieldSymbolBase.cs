@@ -1,14 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
     /// <summary>
-    /// Represents a compiler generated field.
+    /// Represents a compiler generated field or captured variable.
     /// </summary>
     internal abstract class SynthesizedFieldSymbolBase : FieldSymbol
     {
@@ -33,39 +36,55 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 (isStatic ? DeclarationModifiers.Static : DeclarationModifiers.None);
         }
 
-        internal override void AddSynthesizedAttributes(ModuleCompilationState compilationState, ref ArrayBuilder<SynthesizedAttributeData> attributes)
+        internal abstract bool SuppressDynamicAttribute
         {
-            base.AddSynthesizedAttributes(compilationState, ref attributes);
+            get;
+        }
 
-            // do not emit Dynamic or CompilerGenerated attributes for fields inside compiler generated types:
-            if (_containingType.IsImplicitlyDeclared)
-            {
-                return;
-            }
+        internal override void AddSynthesizedAttributes(PEModuleBuilder moduleBuilder, ref ArrayBuilder<SynthesizedAttributeData> attributes)
+        {
+            base.AddSynthesizedAttributes(moduleBuilder, ref attributes);
 
             CSharpCompilation compilation = this.DeclaringCompilation;
+            var typeWithAnnotations = this.TypeWithAnnotations;
+            var type = typeWithAnnotations.Type;
 
-            // Assume that someone checked earlier that the attribute ctor is available and has no use-site errors.
-            AddSynthesizedAttribute(ref attributes, compilation.TrySynthesizeAttribute(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor));
-
-            // TODO (tomat): do we need to emit dynamic attribute on any synthesized field?
-            if (this.Type.ContainsDynamic())
+            // do not emit CompilerGenerated attributes for fields inside compiler generated types:
+            if (!_containingType.IsImplicitlyDeclared)
             {
-                // Assume that someone checked earlier that the attribute ctor is available and has no use-site errors.
-                AddSynthesizedAttribute(ref attributes, compilation.SynthesizeDynamicAttribute(this.Type, customModifiersCount: 0));
+                AddSynthesizedAttribute(ref attributes, compilation.TrySynthesizeAttribute(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor));
+            }
+
+            if (!this.SuppressDynamicAttribute &&
+                type.ContainsDynamic() &&
+                compilation.HasDynamicEmitAttributes() &&
+                compilation.CanEmitBoolean())
+            {
+                AddSynthesizedAttribute(ref attributes, compilation.SynthesizeDynamicAttribute(type, typeWithAnnotations.CustomModifiers.Length));
+            }
+
+            if (type.ContainsTupleNames() &&
+                compilation.HasTupleNamesAttributes &&
+                compilation.CanEmitSpecialType(SpecialType.System_String))
+            {
+                AddSynthesizedAttribute(ref attributes,
+                    compilation.SynthesizeTupleNamesAttribute(Type));
+            }
+
+            if (compilation.ShouldEmitNullableAttributes(this))
+            {
+                AddSynthesizedAttribute(ref attributes, moduleBuilder.SynthesizeNullableAttributeIfNecessary(this, ContainingType.GetNullableContextValue(), typeWithAnnotations));
             }
         }
 
-        internal abstract override TypeSymbol GetFieldType(ConsList<FieldSymbol> fieldsBeingBound);
+        internal abstract override TypeWithAnnotations GetFieldType(ConsList<FieldSymbol> fieldsBeingBound);
+
+        public override FlowAnalysisAnnotations FlowAnalysisAnnotations
+            => FlowAnalysisAnnotations.None;
 
         public override string Name
         {
             get { return _name; }
-        }
-
-        public override ImmutableArray<CustomModifier> CustomModifiers
-        {
-            get { return ImmutableArray<CustomModifier>.Empty; }
         }
 
         public override Symbol AssociatedSymbol

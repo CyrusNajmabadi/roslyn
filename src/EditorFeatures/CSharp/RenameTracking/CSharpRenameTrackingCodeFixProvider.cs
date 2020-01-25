@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Composition;
@@ -12,7 +14,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.RenameTracking
     // TODO: Remove the ExtensionOrder attributes once a better ordering mechanism is available
 
     [ExportCodeFixProvider(LanguageNames.CSharp, Name = PredefinedCodeFixProviderNames.RenameTracking), Shared]
-    [ExtensionOrder(After = PredefinedCodeFixProviderNames.AddUsingOrImport)]
+    [ExtensionOrder(After = PredefinedCodeFixProviderNames.AddImport)]
     [ExtensionOrder(Before = PredefinedCodeFixProviderNames.AddMissingReference)]
     [ExtensionOrder(Before = PredefinedCodeFixProviderNames.FullyQualify)]
     [ExtensionOrder(Before = PredefinedCodeFixProviderNames.FixIncorrectExitContinue)]
@@ -34,10 +36,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.RenameTracking
     {
         [ImportingConstructor]
         public CSharpRenameTrackingCodeFixProvider(
-            IWaitIndicator waitIndicator,
             ITextUndoHistoryRegistry undoHistoryRegistry,
             [ImportMany] IEnumerable<IRefactorNotifyService> refactorNotifyServices)
-            : base(waitIndicator, undoHistoryRegistry, refactorNotifyServices)
+            : base(undoHistoryRegistry, refactorNotifyServices)
         {
         }
     }

@@ -1,13 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.LanguageServices;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -86,6 +87,14 @@ namespace Microsoft.CodeAnalysis.Rename.ConflictEngine
             _newSolution = _intermediateSolutionContainingOnlyModifiedDocuments;
         }
 
+        internal void RenameDocumentToMatchNewSymbol(Document document)
+        {
+            var extension = Path.GetExtension(document.Name);
+            var newName = Path.ChangeExtension(ReplacementText, extension);
+
+            _newSolution = _newSolution.WithDocumentName(document.Id, newName);
+        }
+
         /// <summary>
         /// The list of all symbol locations that are referenced either by the original symbol or
         /// the renamed symbol. This includes both resolved and unresolved conflicts.
@@ -98,13 +107,7 @@ namespace Microsoft.CodeAnalysis.Rename.ConflictEngine
             }
         }
 
-        public RenamedSpansTracker RenamedSpansTracker
-        {
-            get
-            {
-                return _renamedSpansTracker;
-            }
-        }
+        public RenamedSpansTracker RenamedSpansTracker => _renamedSpansTracker;
 
         public int GetAdjustedTokenStartingPosition(
             int startingPosition,
@@ -113,24 +116,10 @@ namespace Microsoft.CodeAnalysis.Rename.ConflictEngine
             return _renamedSpansTracker.GetAdjustedPosition(startingPosition, documentId);
         }
 
-        // test hook only
-        public TextSpan GetResolutionTextSpan(
-            TextSpan originalSpan,
-            DocumentId documentId)
-        {
-            return _renamedSpansTracker.GetResolutionTextSpan(originalSpan, documentId);
-        }
-
         /// <summary>
         /// The list of all document ids of documents that have been touched for this rename operation.
         /// </summary>
-        public IEnumerable<DocumentId> DocumentIds
-        {
-            get
-            {
-                return _renamedSpansTracker.DocumentIds;
-            }
-        }
+        public IEnumerable<DocumentId> DocumentIds => _renamedSpansTracker.DocumentIds;
 
         public IEnumerable<RelatedLocation> GetRelatedLocationsForDocument(DocumentId documentId)
         {
@@ -168,24 +157,12 @@ namespace Microsoft.CodeAnalysis.Rename.ConflictEngine
         /// <summary>
         /// The new workspace snapshot
         /// </summary>
-        public Solution NewSolution
-        {
-            get
-            {
-                return _newSolution;
-            }
-        }
+        public Solution NewSolution => _newSolution;
 
         /// <summary>
         /// The base workspace snapshot
         /// </summary>
-        public Solution OldSolution
-        {
-            get
-            {
-                return _oldSolution;
-            }
-        }
+        public Solution OldSolution => _oldSolution;
 
         /// <summary>
         /// Whether the text that was resolved with was even valid. This may be false if the
@@ -197,5 +174,25 @@ namespace Microsoft.CodeAnalysis.Rename.ConflictEngine
         /// The original text that is the rename replacement.
         /// </summary>
         public string ReplacementText { get; }
+
+        internal TestAccessor GetTestAccessor()
+            => new TestAccessor(this);
+
+        internal readonly struct TestAccessor
+        {
+            private readonly ConflictResolution _conflictResolution;
+
+            public TestAccessor(ConflictResolution conflictResolution)
+            {
+                _conflictResolution = conflictResolution;
+            }
+
+            internal TextSpan GetResolutionTextSpan(
+                TextSpan originalSpan,
+                DocumentId documentId)
+            {
+                return _conflictResolution._renamedSpansTracker.GetTestAccessor().GetResolutionTextSpan(originalSpan, documentId);
+            }
+        }
     }
 }

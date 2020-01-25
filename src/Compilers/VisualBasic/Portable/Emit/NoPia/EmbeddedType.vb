@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Emit
@@ -19,7 +21,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             Debug.Assert(Not underlyingNamedType.IsGenericType)
         End Sub
 
-        Public Sub EmbedAllMembersOfImplementedInterface(syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag)
+        Public Sub EmbedAllMembersOfImplementedInterface(syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag)
             Debug.Assert(UnderlyingNamedType.IsInterfaceType())
 
             If _embeddedAllMembersOfImplementedInterface Then
@@ -55,7 +57,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             End Get
         End Property
 
-        Protected Overrides Function GetBaseClass(moduleBuilder As PEModuleBuilder, syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag) As Cci.ITypeReference
+        Protected Overrides Function GetBaseClass(moduleBuilder As PEModuleBuilder, syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag) As Cci.ITypeReference
             Dim baseType = UnderlyingNamedType.BaseTypeNoUseSiteDiagnostics
             Return If(baseType IsNot Nothing, moduleBuilder.Translate(baseType, syntaxNodeOpt, diagnostics), Nothing)
         End Function
@@ -76,13 +78,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             Return UnderlyingNamedType.GetPropertiesToEmit()
         End Function
 
-        Protected Overrides Iterator Function GetInterfaces(context As EmitContext) As IEnumerable(Of Cci.ITypeReference)
+        Protected Overrides Iterator Function GetInterfaces(context As EmitContext) As IEnumerable(Of Cci.TypeReferenceWithAttributes)
             Debug.Assert(TypeManager.ModuleBeingBuilt Is context.Module)
 
             Dim moduleBeingBuilt = DirectCast(context.Module, PEModuleBuilder)
 
             For Each [interface] In UnderlyingNamedType.GetInterfacesToEmit()
-                Yield moduleBeingBuilt.Translate([interface], DirectCast(context.SyntaxNodeOpt, VisualBasicSyntaxNode), context.Diagnostics)
+                Dim typeRef = moduleBeingBuilt.Translate([interface],
+                                                            DirectCast(context.SyntaxNodeOpt, VisualBasicSyntaxNode),
+                                                            context.Diagnostics)
+
+                Yield [interface].GetTypeRefWithAttributes(UnderlyingNamedType.DeclaringCompilation, typeRef)
             Next
         End Function
 
@@ -113,6 +119,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
         Protected Overrides ReadOnly Property IsInterface As Boolean
             Get
                 Return UnderlyingNamedType.IsInterfaceType()
+            End Get
+        End Property
+
+        Protected Overrides ReadOnly Property IsDelegate As Boolean
+            Get
+                Return UnderlyingNamedType.IsDelegateType()
             End Get
         End Property
 
@@ -150,17 +162,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             End Get
         End Property
 
-        Protected Overrides Function GetCustomAttributesToEmit(compilationState As ModuleCompilationState) As IEnumerable(Of VisualBasicAttributeData)
-            Return UnderlyingNamedType.GetCustomAttributesToEmit(compilationState)
+        Protected Overrides Function GetCustomAttributesToEmit(moduleBuilder As PEModuleBuilder) As IEnumerable(Of VisualBasicAttributeData)
+            Return UnderlyingNamedType.GetCustomAttributesToEmit(moduleBuilder.CompilationState)
         End Function
 
-        Protected Overrides Function CreateCompilerGeneratedAttribute() As VisualBasicAttributeData
-            Debug.Assert(WellKnownMembers.IsSynthesizedAttributeOptional(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor))
-            Dim compilation = TypeManager.ModuleBeingBuilt.Compilation
-            Return compilation.TrySynthesizeAttribute(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor)
-        End Function
-
-        Protected Overrides Function CreateTypeIdentifierAttribute(hasGuid As Boolean, syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag) As VisualBasicAttributeData
+        Protected Overrides Function CreateTypeIdentifierAttribute(hasGuid As Boolean, syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag) As VisualBasicAttributeData
             Dim member = If(hasGuid,
                 WellKnownMember.System_Runtime_InteropServices_TypeIdentifierAttribute__ctor,
                 WellKnownMember.System_Runtime_InteropServices_TypeIdentifierAttribute__ctorStringString)
@@ -195,11 +201,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             Return Nothing
         End Function
 
-        Protected Overrides Sub ReportMissingAttribute(description As AttributeDescription, syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag)
+        Protected Overrides Sub ReportMissingAttribute(description As AttributeDescription, syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag)
             EmbeddedTypesManager.ReportDiagnostic(diagnostics, ERRID.ERR_NoPIAAttributeMissing2, syntaxNodeOpt, UnderlyingNamedType, description.FullName)
         End Sub
 
-        Protected Overrides Sub EmbedDefaultMembers(defaultMember As String, syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag)
+        Protected Overrides Sub EmbedDefaultMembers(defaultMember As String, syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag)
             For Each s In UnderlyingNamedType.GetMembers(defaultMember)
                 Select Case s.Kind
                     Case SymbolKind.Field

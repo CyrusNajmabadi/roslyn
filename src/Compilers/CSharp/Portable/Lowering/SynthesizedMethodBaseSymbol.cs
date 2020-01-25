@@ -1,32 +1,36 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Emit;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
     /// <summary>
     /// A base method symbol used as a base class for lambda method symbol and base method wrapper symbol.
     /// </summary>
-    internal abstract class SynthesizedMethodBaseSymbol : SourceMethodSymbol
+    internal abstract class SynthesizedMethodBaseSymbol : SourceMemberMethodSymbol
     {
         protected readonly MethodSymbol BaseMethod;
-        protected TypeMap TypeMap { get; private set; }
+        internal TypeMap TypeMap { get; private set; }
 
         private readonly string _name;
         private ImmutableArray<TypeParameterSymbol> _typeParameters;
         private ImmutableArray<ParameterSymbol> _parameters;
+        private TypeWithAnnotations.Boxed _iteratorElementType;
 
         protected SynthesizedMethodBaseSymbol(NamedTypeSymbol containingType,
                                               MethodSymbol baseMethod,
                                               SyntaxReference syntaxReference,
-                                              SyntaxReference blockSyntaxReference,
                                               Location location,
                                               string name,
                                               DeclarationModifiers declarationModifiers)
-            : base(containingType, syntaxReference, blockSyntaxReference, location)
+            : base(containingType, syntaxReference, location)
         {
             Debug.Assert((object)containingType != null);
             Debug.Assert((object)baseMethod != null);
@@ -57,9 +61,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             // TODO: move more functionality into here, making these symbols more lazy
         }
 
-        internal override void AddSynthesizedAttributes(ModuleCompilationState compilationState, ref ArrayBuilder<SynthesizedAttributeData> attributes)
+        internal override void AddSynthesizedAttributes(PEModuleBuilder moduleBuilder, ref ArrayBuilder<SynthesizedAttributeData> attributes)
         {
-            base.AddSynthesizedAttributes(compilationState, ref attributes);
+            base.AddSynthesizedAttributes(moduleBuilder, ref attributes);
 
             // do not generate attributes for members of compiler-generated types:
             if (ContainingType.IsImplicitlyDeclared)
@@ -78,9 +82,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return _typeParameters; }
         }
 
+        public sealed override ImmutableArray<TypeParameterConstraintClause> GetTypeParameterConstraintClauses()
+            => ImmutableArray<TypeParameterConstraintClause>.Empty;
+
         internal override int ParameterCount
         {
-            get { return this.BaseMethod.ParameterCount; }
+            get { return this.Parameters.Length; }
         }
 
         public sealed override ImmutableArray<ParameterSymbol> Parameters
@@ -95,6 +102,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
+        protected virtual ImmutableArray<TypeSymbol> ExtraSynthesizedRefParameters
+        {
+            get { return default(ImmutableArray<TypeSymbol>); }
+        }
+
         protected virtual ImmutableArray<ParameterSymbol> BaseMethodParameters
         {
             get { return this.BaseMethod.Parameters; }
@@ -107,15 +119,34 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             var parameters = this.BaseMethodParameters;
             foreach (var p in parameters)
             {
-                builder.Add(new SynthesizedParameterSymbol(this, this.TypeMap.SubstituteType(p.OriginalDefinition.Type).Type, ordinal++, p.RefKind, p.Name));
+                builder.Add(SynthesizedParameterSymbol.Create(this, this.TypeMap.SubstituteType(p.OriginalDefinition.TypeWithAnnotations), ordinal++, p.RefKind, p.Name));
+            }
+            var extraSynthed = ExtraSynthesizedRefParameters;
+            if (!extraSynthed.IsDefaultOrEmpty)
+            {
+                foreach (var extra in extraSynthed)
+                {
+                    builder.Add(SynthesizedParameterSymbol.Create(this, this.TypeMap.SubstituteType(extra), ordinal++, RefKind.Ref));
+                }
             }
             return builder.ToImmutableAndFree();
         }
 
-        public sealed override TypeSymbol ReturnType
+        public sealed override RefKind RefKind
         {
-            get { return this.TypeMap.SubstituteType(this.BaseMethod.OriginalDefinition.ReturnType).Type; }
+            get { return this.BaseMethod.RefKind; }
         }
+
+        public sealed override TypeWithAnnotations ReturnTypeWithAnnotations
+        {
+            get { return this.TypeMap.SubstituteType(this.BaseMethod.OriginalDefinition.ReturnTypeWithAnnotations); }
+        }
+
+        public sealed override FlowAnalysisAnnotations ReturnTypeFlowAnalysisAnnotations => BaseMethod.ReturnTypeFlowAnalysisAnnotations;
+
+        public sealed override ImmutableHashSet<string> ReturnNotNullIfParameterNotNull => BaseMethod.ReturnNotNullIfParameterNotNull;
+
+        public sealed override FlowAnalysisAnnotations FlowAnalysisAnnotations => FlowAnalysisAnnotations.None;
 
         public sealed override bool IsVararg
         {
@@ -135,6 +166,26 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         internal override bool IsExpressionBodied
         {
             get { return false; }
+        }
+
+        internal override TypeWithAnnotations IteratorElementTypeWithAnnotations
+        {
+            get
+            {
+                if (_iteratorElementType is null)
+                {
+                    Interlocked.CompareExchange(ref _iteratorElementType,
+                                                new TypeWithAnnotations.Boxed(TypeMap.SubstituteType(BaseMethod.IteratorElementTypeWithAnnotations.Type)),
+                                                null);
+                }
+
+                return _iteratorElementType.Value;
+            }
+            set
+            {
+                Debug.Assert(!value.IsDefault);
+                Interlocked.Exchange(ref _iteratorElementType, new TypeWithAnnotations.Boxed(value));
+            }
         }
     }
 }

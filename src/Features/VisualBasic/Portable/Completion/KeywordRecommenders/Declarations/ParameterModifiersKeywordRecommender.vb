@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -42,15 +44,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
 
             ' Compute a simple list of the "standard" recommendations assuming nothing special is going on
             Dim defaultRecommendations As New List(Of RecommendedKeyword)
-            defaultRecommendations.Add(New RecommendedKeyword("ByVal", VBFeaturesResources.ByValKeywordToolTip))
+            defaultRecommendations.Add(New RecommendedKeyword("ByVal", VBFeaturesResources.Specifies_that_an_argument_is_passed_in_such_a_way_that_the_called_procedure_or_property_cannot_change_the_underlying_value_of_the_argument_in_the_calling_code))
 
             If byRefAllowed Then
-                defaultRecommendations.Add(New RecommendedKeyword("ByRef", VBFeaturesResources.ByRefKeywordToolTip))
+                defaultRecommendations.Add(New RecommendedKeyword("ByRef", VBFeaturesResources.Specifies_that_an_argument_is_passed_in_such_a_way_that_the_called_procedure_can_change_the_underlying_value_of_the_argument_in_the_calling_code))
             End If
 
             If optionalAndParamArrayAllowed Then
-                defaultRecommendations.Add(New RecommendedKeyword("Optional", VBFeaturesResources.OptionalKeywordToolTip))
-                defaultRecommendations.Add(New RecommendedKeyword("ParamArray", VBFeaturesResources.ParamArrayKeywordToolTip))
+                defaultRecommendations.Add(New RecommendedKeyword("Optional", VBFeaturesResources.Specifies_that_a_procedure_argument_can_be_omitted_when_the_procedure_is_called))
+                defaultRecommendations.Add(New RecommendedKeyword("ParamArray", VBFeaturesResources.Specifies_that_a_procedure_parameter_takes_an_optional_array_of_elements_of_the_specified_type))
             End If
 
             If methodDeclaration.ParameterList.OpenParenToken = targetToken Then
@@ -61,7 +63,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
                     ' If a previous one had a ParamArray, then nothing is valid anymore, since the ParamArray must
                     ' always be the last parameter
                     If parameter.Modifiers.Any(Function(modifier) modifier.Kind = SyntaxKind.ParamArrayKeyword) Then
-                        Return Enumerable.Empty(Of RecommendedKeyword)()
+                        Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()
                     End If
 
                     ' If a previous one had an Optional, then all following must be optional. Following Dev10 behavior,

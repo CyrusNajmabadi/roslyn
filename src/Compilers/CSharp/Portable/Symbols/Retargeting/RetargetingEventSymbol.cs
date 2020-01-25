@@ -1,10 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using System.Diagnostics;
@@ -14,17 +17,12 @@ using Microsoft.CodeAnalysis.CSharp.Emit;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
 {
-    internal sealed class RetargetingEventSymbol : EventSymbol
+    internal sealed class RetargetingEventSymbol : WrappedEventSymbol
     {
         /// <summary>
         /// Owning RetargetingModuleSymbol.
         /// </summary>
         private readonly RetargetingModuleSymbol _retargetingModule;
-
-        /// <summary>
-        /// The underlying EventSymbol, cannot be another RetargetingEventSymbol.
-        /// </summary>
-        private readonly EventSymbol _underlyingEvent;
 
         //we want to compute this lazily since it may be expensive for the underlying symbol
         private ImmutableArray<EventSymbol> _lazyExplicitInterfaceImplementations;
@@ -32,13 +30,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
         private DiagnosticInfo _lazyUseSiteDiagnostic = CSDiagnosticInfo.EmptyErrorInfo; // Indicates unknown state. 
 
         public RetargetingEventSymbol(RetargetingModuleSymbol retargetingModule, EventSymbol underlyingEvent)
+            : base(underlyingEvent)
         {
             Debug.Assert((object)retargetingModule != null);
-            Debug.Assert((object)underlyingEvent != null);
             Debug.Assert(!(underlyingEvent is RetargetingEventSymbol));
 
             _retargetingModule = retargetingModule;
-            _underlyingEvent = underlyingEvent;
         }
 
         private RetargetingModuleSymbol.RetargetingSymbolTranslator RetargetingTranslator
@@ -49,35 +46,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
             }
         }
 
-        public EventSymbol UnderlyingEvent
+        public override TypeWithAnnotations TypeWithAnnotations
         {
             get
             {
-                return _underlyingEvent;
-            }
-        }
-
-        public override bool IsImplicitlyDeclared
-        {
-            get
-            {
-                return _underlyingEvent.IsImplicitlyDeclared;
-            }
-        }
-
-        internal override bool HasSpecialName
-        {
-            get
-            {
-                return _underlyingEvent.HasSpecialName;
-            }
-        }
-
-        public override TypeSymbol Type
-        {
-            get
-            {
-                return this.RetargetingTranslator.Retarget(_underlyingEvent.Type, RetargetOptions.RetargetPrimitiveTypesByTypeCode);
+                return this.RetargetingTranslator.Retarget(_underlyingEvent.TypeWithAnnotations, RetargetOptions.RetargetPrimitiveTypesByTypeCode);
             }
         }
 
@@ -180,107 +153,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
             }
         }
 
-        public override string Name
-        {
-            get
-            {
-                return _underlyingEvent.Name;
-            }
-        }
-
-        public override string GetDocumentationCommentXml(CultureInfo preferredCulture = null, bool expandIncludes = false, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return _underlyingEvent.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken);
-        }
-
-        public override ImmutableArray<Location> Locations
-        {
-            get
-            {
-                return _underlyingEvent.Locations;
-            }
-        }
-
-        public override ImmutableArray<SyntaxReference> DeclaringSyntaxReferences
-        {
-            get
-            {
-                return _underlyingEvent.DeclaringSyntaxReferences;
-            }
-        }
-
-        public override Accessibility DeclaredAccessibility
-        {
-            get
-            {
-                return _underlyingEvent.DeclaredAccessibility;
-            }
-        }
-
-        public override bool IsStatic
-        {
-            get
-            {
-                return _underlyingEvent.IsStatic;
-            }
-        }
-
-        public override bool IsVirtual
-        {
-            get
-            {
-                return _underlyingEvent.IsVirtual;
-            }
-        }
-
-        public override bool IsOverride
-        {
-            get
-            {
-                return _underlyingEvent.IsOverride;
-            }
-        }
-
-        public override bool IsAbstract
-        {
-            get
-            {
-                return _underlyingEvent.IsAbstract;
-            }
-        }
-
-        public override bool IsSealed
-        {
-            get
-            {
-                return _underlyingEvent.IsSealed;
-            }
-        }
-
-        public override bool IsExtern
-        {
-            get
-            {
-                return _underlyingEvent.IsExtern;
-            }
-        }
-
-        internal override ObsoleteAttributeData ObsoleteAttributeData
-        {
-            get
-            {
-                return _underlyingEvent.ObsoleteAttributeData;
-            }
-        }
-
         public override ImmutableArray<CSharpAttributeData> GetAttributes()
         {
             return _underlyingEvent.GetAttributes();
         }
 
-        internal override IEnumerable<CSharpAttributeData> GetCustomAttributesToEmit(ModuleCompilationState compilationState)
+        internal override IEnumerable<CSharpAttributeData> GetCustomAttributesToEmit(PEModuleBuilder moduleBuilder)
         {
-            return this.RetargetingTranslator.RetargetAttributes(_underlyingEvent.GetCustomAttributesToEmit(compilationState));
+            return this.RetargetingTranslator.RetargetAttributes(_underlyingEvent.GetCustomAttributesToEmit(moduleBuilder));
         }
 
         internal override bool MustCallMethodsDirectly
@@ -301,22 +181,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
             }
 
             return _lazyUseSiteDiagnostic;
-        }
-
-        public override bool IsWindowsRuntimeEvent
-        {
-            get
-            {
-                return _underlyingEvent.IsWindowsRuntimeEvent;
-            }
-        }
-
-        internal override bool HasRuntimeSpecialName
-        {
-            get
-            {
-                return _underlyingEvent.HasRuntimeSpecialName;
-            }
         }
 
         internal sealed override CSharpCompilation DeclaringCompilation // perf, not correctness

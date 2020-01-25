@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -248,6 +250,10 @@ lSelect:
                 Me.Visit(node.ReceiverOpt)
             End If
 
+            If IsInExpressionLambda And method.ReturnsByRef Then
+                GenerateDiagnostic(ERRID.ERR_RefReturningCallInExpressionTree, node)
+            End If
+
             Me.VisitList(node.Arguments)
             Return Nothing
         End Function
@@ -256,6 +262,10 @@ lSelect:
             Dim [property] As PropertySymbol = node.PropertySymbol
             If Not [property].IsShared Then
                 Me.Visit(node.ReceiverOpt)
+            End If
+
+            If IsInExpressionLambda AndAlso [property].ReturnsByRef Then
+                GenerateDiagnostic(ERRID.ERR_RefReturningCallInExpressionTree, node)
             End If
 
             Me.VisitList(node.Arguments)
@@ -303,7 +313,7 @@ lSelect:
             End If
 
             If Me.IsInExpressionLambda AndAlso (node.ConversionKind And ConversionKind.Lambda) <> 0 Then
-                VisitLambdaConversion(node.Operand, node.RelaxationLambdaOpt)
+                VisitLambdaConversion(node.Operand, DirectCast(node.ExtendedInfoOpt, BoundRelaxationLambda)?.Lambda)
             Else
                 MyBase.VisitConversion(node)
             End If

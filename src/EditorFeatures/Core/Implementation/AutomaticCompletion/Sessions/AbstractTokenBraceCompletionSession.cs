@@ -1,11 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Threading;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Text.BraceCompletion;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion.Sessions
 {
@@ -63,7 +64,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion.Sessi
             var document = session.SubjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges();
             if (document != null)
             {
-                var root = document.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+                var root = document.GetSyntaxRootSynchronously(cancellationToken);
                 var position = session.ClosingPoint.GetPosition(session.SubjectBuffer.CurrentSnapshot);
 
                 return root.FindTokenFromEnd(position, includeZeroWidth: false, findInsideTrivia: true).RawKind == this.ClosingTokenKind;
@@ -78,7 +79,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion.Sessi
             if (document != null)
             {
                 // make sure auto closing is called from a valid position
-                var tree = document.GetSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+                var tree = document.GetSyntaxRootSynchronously(cancellationToken).SyntaxTree;
 
                 return !_syntaxFactsService.IsInNonUserCode(tree, session.GetCaretPosition().Value, cancellationToken);
             }

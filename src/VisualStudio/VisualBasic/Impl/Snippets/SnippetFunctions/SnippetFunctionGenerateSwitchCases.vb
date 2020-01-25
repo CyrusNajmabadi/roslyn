@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
@@ -52,7 +54,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Snippets.SnippetFu
                 Return False
             End If
 
-            Dim syntaxTree = document.GetSyntaxTreeAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+            Dim syntaxTree = document.GetSyntaxTreeSynchronously(CancellationToken.None)
             Dim token = syntaxTree.FindTokenOnRightOfPosition(subjectBufferFieldSpan.Start.Position, cancellationToken)
             Dim expressionNode = token.FirstAncestorOrSelf(Function(n) n.Span = subjectBufferFieldSpan.Span.ToTextSpan())
 
@@ -74,10 +76,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Snippets.SnippetFu
             Dim textChange = New TextChange(New TextSpan(startPosition, endPosition - startPosition), str)
             Dim typeSpanToAnnotate = New TextSpan(startPosition + "Case ".Length, fullyQualifiedTypeName.Length)
 
-            Dim textWithCaseAdded = document.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken).WithChanges(textChange)
+            Dim textWithCaseAdded = document.GetTextSynchronously(cancellationToken).WithChanges(textChange)
             Dim documentWithCaseAdded = document.WithText(textWithCaseAdded)
 
-            Dim syntaxRoot = documentWithCaseAdded.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(cancellationToken)
+            Dim syntaxRoot = documentWithCaseAdded.GetSyntaxRootSynchronously(cancellationToken)
             Dim nodeToReplace = syntaxRoot.DescendantNodes().FirstOrDefault(Function(n) n.Span = typeSpanToAnnotate)
 
             If nodeToReplace Is Nothing Then
@@ -88,9 +90,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Snippets.SnippetFu
             Dim documentWithAnnotations = documentWithCaseAdded.WithSyntaxRoot(updatedRoot)
 
             Dim simplifiedDocument = Simplifier.ReduceAsync(documentWithAnnotations, cancellationToken:=cancellationToken).WaitAndGetResult(cancellationToken)
-            simplifiedTypeName = simplifiedDocument.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(cancellationToken).GetAnnotatedNodesAndTokens(typeAnnotation).Single().ToString()
+            simplifiedTypeName = simplifiedDocument.GetSyntaxRootSynchronously(cancellationToken).GetAnnotatedNodesAndTokens(typeAnnotation).Single().ToString()
             Return True
         End Function
-
     End Class
 End Namespace

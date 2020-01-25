@@ -1,25 +1,21 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
-using System.ComponentModel.Composition;
 using System.Composition;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editor.Extensibility.NavigationBar;
 using Microsoft.CodeAnalysis.Editor.Implementation.NavigationBar;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Roslyn.Utilities;
@@ -29,6 +25,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
     [ExportLanguageService(typeof(INavigationBarItemService), LanguageNames.CSharp), Shared]
     internal class CSharpNavigationBarItemService : AbstractNavigationBarItemService
     {
+        private static readonly SymbolDisplayFormat s_typeFormat =
+            SymbolDisplayFormat.CSharpErrorMessageFormat.AddGenericsOptions(SymbolDisplayGenericsOptions.IncludeVariance);
+
         private static readonly SymbolDisplayFormat s_memberFormat =
             new SymbolDisplayFormat(
                 genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -39,7 +38,14 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
                                   SymbolDisplayParameterOptions.IncludeName |
                                   SymbolDisplayParameterOptions.IncludeDefaultValue |
                                   SymbolDisplayParameterOptions.IncludeParamsRefOut,
-                miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+                miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
+                                      SymbolDisplayMiscellaneousOptions.AllowDefaultLiteral |
+                                      SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
+        [ImportingConstructor]
+        public CSharpNavigationBarItemService()
+        {
+        }
 
         public override async Task<IList<NavigationBarItem>> GetItemsAsync(Document document, CancellationToken cancellationToken)
         {
@@ -143,11 +149,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
                     }
 
                     var node = nodesToVisit.Pop();
-
-                    var type = node.TypeSwitch(
-                        (BaseTypeDeclarationSyntax t) => semanticModel.GetDeclaredSymbol(t, cancellationToken),
-                        (EnumDeclarationSyntax e) => semanticModel.GetDeclaredSymbol(e, cancellationToken),
-                        (DelegateDeclarationSyntax d) => semanticModel.GetDeclaredSymbol(d, cancellationToken));
+                    var type = GetType(semanticModel, node, cancellationToken);
 
                     if (type != null)
                     {
@@ -174,8 +176,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
             }
         }
 
-        private static readonly SymbolDisplayFormat s_typeFormat =
-            SymbolDisplayFormat.CSharpErrorMessageFormat.AddGenericsOptions(SymbolDisplayGenericsOptions.IncludeVariance);
+        private static ISymbol GetType(SemanticModel semanticModel, SyntaxNode node, CancellationToken cancellationToken)
+            => node switch
+            {
+                BaseTypeDeclarationSyntax t => semanticModel.GetDeclaredSymbol(t, cancellationToken),
+                DelegateDeclarationSyntax d => semanticModel.GetDeclaredSymbol(d, cancellationToken),
+                _ => null,
+            };
 
         private static bool IsAccessor(ISymbol member)
         {
@@ -248,8 +255,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
 
             var declaringNode = reference.GetSyntax();
 
-            int spanStart = declaringNode.SpanStart;
-            int spanEnd = declaringNode.Span.End;
+            var spanStart = declaringNode.SpanStart;
+            var spanEnd = declaringNode.Span.End;
 
             var fieldDeclaration = declaringNode.GetAncestor<FieldDeclarationSyntax>();
             if (fieldDeclaration != null)
@@ -281,8 +288,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
             }
 
             var declaringNode = reference.GetSyntax();
-            var enumMember = declaringNode as EnumMemberDeclarationSyntax;
-            if (enumMember != null)
+            if (declaringNode is EnumMemberDeclarationSyntax enumMember)
             {
                 var enumDeclaration = enumMember.GetAncestor<EnumDeclarationSyntax>();
 
@@ -323,7 +329,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
                 }
             }
 
-            var location = symbol.Locations.FirstOrDefault(l => l.SourceTree.Equals(document.GetSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken)));
+            var syntaxTree = document.GetSyntaxTreeSynchronously(cancellationToken);
+            var location = symbol.Locations.FirstOrDefault(l => l.SourceTree.Equals(syntaxTree));
 
             if (location == null)
             {
@@ -341,7 +348,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.NavigationBar
         [Conditional("DEBUG")]
         private static void ValidateSpanFromBounds(ITextSnapshot snapshot, int start, int end)
         {
-            Contract.Requires(start >= 0 && end <= snapshot.Length && start <= end);
+            Debug.Assert(start >= 0 && end <= snapshot.Length && start <= end);
         }
 
         [Conditional("DEBUG")]

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Roslyn.Utilities;
 using System;
@@ -46,7 +48,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
                     // Otherwise, assume that the environment variable specifies the name of the log file.
                     if (Directory.Exists(loggingFileName))
                     {
-                        loggingFileName = Path.Combine(loggingFileName, $"server.{loggingFileName}.{GetCurrentProcessId()}.log");
+                        loggingFileName = Path.Combine(loggingFileName, $"server.{GetCurrentProcessId()}.log");
                     }
 
                     // Open allowing sharing. We allow multiple processes to log to the same file, so we use share mode to allow that.

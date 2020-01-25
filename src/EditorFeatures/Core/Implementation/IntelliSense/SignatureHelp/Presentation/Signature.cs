@@ -1,15 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using System.Linq;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.SignatureHelp;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
-using System.Threading;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHelp.Presentation
 {
@@ -50,15 +53,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             }
         }
 
-        private IList<SymbolDisplayPart> _displayParts;
-        internal IList<SymbolDisplayPart> DisplayParts => InitializedThis._displayParts;
+        private IList<TaggedText> _displayParts;
+        internal IList<TaggedText> DisplayParts => InitializedThis._displayParts;
 
         public ITrackingSpan ApplicableToSpan { get; }
 
         private string _content;
         public string Content => InitializedThis._content;
 
-        private int _parameterIndex = -1;
+        private readonly int _parameterIndex = -1;
         public IParameter CurrentParameter
         {
             get
@@ -91,27 +94,16 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             }
         }
 
-        private IList<SymbolDisplayPart> _prettyPrintedDisplayParts;
-        internal IList<SymbolDisplayPart> PrettyPrintedDisplayParts
-        {
-            get
-            {
-                return InitializedThis._prettyPrintedDisplayParts;
-            }
-
-            set
-            {
-                _prettyPrintedDisplayParts = value;
-            }
-        }
+        private IList<TaggedText> _prettyPrintedDisplayParts;
+        internal IList<TaggedText> PrettyPrintedDisplayParts => InitializedThis._prettyPrintedDisplayParts;
 
         private void Initialize()
         {
             var content = new StringBuilder();
             var prettyPrintedContent = new StringBuilder();
 
-            var parts = new List<SymbolDisplayPart>();
-            var prettyPrintedParts = new List<SymbolDisplayPart>();
+            var parts = new List<TaggedText>();
+            var prettyPrintedParts = new List<TaggedText>();
 
             var parameters = new List<IParameter>();
 
@@ -124,21 +116,22 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             var separatorParts = _signatureHelpItem.SeparatorDisplayParts;
             var separatorContent = separatorParts.GetFullText();
 
-            var newLinePart = new SymbolDisplayPart(SymbolDisplayPartKind.LineBreak, null, "\r\n");
+            var newLinePart = new TaggedText(TextTags.LineBreak, "\r\n");
             var newLineContent = newLinePart.ToString();
-            var spacerPart = new SymbolDisplayPart(SymbolDisplayPartKind.Space, null, new string(' ', signaturePrefixContent.Length));
+            var spacerPart = new TaggedText(TextTags.Space, new string(' ', signaturePrefixContent.Length));
             var spacerContent = spacerPart.ToString();
 
             var paramColumnCount = 0;
 
-            for (int i = 0; i < _signatureHelpItem.Parameters.Length; i++)
+            for (var i = 0; i < _signatureHelpItem.Parameters.Length; i++)
             {
                 var sigHelpParameter = _signatureHelpItem.Parameters[i];
 
                 var parameterPrefixParts = sigHelpParameter.PrefixDisplayParts;
                 var parameterPrefixContext = sigHelpParameter.PrefixDisplayParts.GetFullText();
 
-                var parameterParts = AddOptionalBrackets(sigHelpParameter.IsOptional, sigHelpParameter.DisplayParts);
+                var parameterParts = AddOptionalBrackets(
+                    sigHelpParameter.IsOptional, sigHelpParameter.DisplayParts);
                 var parameterContent = parameterParts.GetFullText();
 
                 var parameterSuffixParts = sigHelpParameter.SuffixDisplayParts;
@@ -205,7 +198,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             _parameters = parameters.ToReadOnlyCollection();
         }
 
-        private void AddRange(IList<SymbolDisplayPart> values, List<SymbolDisplayPart> parts, List<SymbolDisplayPart> prettyPrintedParts)
+        private void AddRange(IList<TaggedText> values, List<TaggedText> parts, List<TaggedText> prettyPrintedParts)
         {
             parts.AddRange(values);
             prettyPrintedParts.AddRange(values);
@@ -217,14 +210,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             prettyPrintedContent.Append(text);
         }
 
-        private IList<SymbolDisplayPart> AddOptionalBrackets(bool isOptional, IList<SymbolDisplayPart> list)
+        private IList<TaggedText> AddOptionalBrackets(bool isOptional, IList<TaggedText> list)
         {
             if (isOptional)
             {
-                var result = new List<SymbolDisplayPart>();
-                result.Add(new SymbolDisplayPart(SymbolDisplayPartKind.Punctuation, null, "["));
+                var result = new List<TaggedText>();
+                result.Add(new TaggedText(TextTags.Punctuation, "["));
                 result.AddRange(list);
-                result.Add(new SymbolDisplayPart(SymbolDisplayPartKind.Punctuation, null, "]"));
+                result.Add(new TaggedText(TextTags.Punctuation, "]"));
                 return result;
             }
 

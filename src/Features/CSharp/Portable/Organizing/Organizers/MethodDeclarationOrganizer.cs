@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Composition;
 using System.Threading;
@@ -10,20 +12,27 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing.Organizers
     [ExportSyntaxNodeOrganizer(LanguageNames.CSharp), Shared]
     internal class MethodDeclarationOrganizer : AbstractSyntaxNodeOrganizer<MethodDeclarationSyntax>
     {
+        [ImportingConstructor]
+        public MethodDeclarationOrganizer()
+        {
+        }
+
         protected override MethodDeclarationSyntax Organize(
             MethodDeclarationSyntax syntax,
             CancellationToken cancellationToken)
         {
-            return syntax.Update(syntax.AttributeLists,
-                ModifiersOrganizer.Organize(syntax.Modifiers),
-                syntax.ReturnType,
-                syntax.ExplicitInterfaceSpecifier,
-                syntax.Identifier,
-                syntax.TypeParameterList,
-                syntax.ParameterList,
-                syntax.ConstraintClauses,
-                syntax.Body,
-                syntax.SemicolonToken);
+            return syntax.Update(
+                attributeLists: syntax.AttributeLists,
+                modifiers: ModifiersOrganizer.Organize(syntax.Modifiers),
+                returnType: syntax.ReturnType,
+                explicitInterfaceSpecifier: syntax.ExplicitInterfaceSpecifier,
+                identifier: syntax.Identifier,
+                typeParameterList: syntax.TypeParameterList,
+                parameterList: syntax.ParameterList,
+                constraintClauses: syntax.ConstraintClauses,
+                body: syntax.Body,
+                expressionBody: syntax.ExpressionBody,
+                semicolonToken: syntax.SemicolonToken);
         }
     }
 }

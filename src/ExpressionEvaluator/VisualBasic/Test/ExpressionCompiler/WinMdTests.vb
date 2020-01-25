@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Reflection.Metadata
@@ -31,7 +33,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
     Shared Sub M(f As Windows.Storage.StorageFolder, p As Windows.Foundation.Collections.PropertySet)
     End Sub
 End Class"
-            Dim comp = CreateCompilationWithMscorlib({source}, options:=TestOptions.DebugDll, references:=WinRtRefs)
+            Dim comp = CreateEmptyCompilation({source}, options:=TestOptions.DebugDll, references:=WinRtRefs)
             Dim runtimeAssemblies = ExpressionCompilerTestHelpers.GetRuntimeWinMds("Windows.Storage", "Windows.Foundation.Collections")
             Assert.True(runtimeAssemblies.Length >= 2)
 
@@ -116,7 +118,7 @@ End Class"
     Shared Sub M(a As LibraryA.A, b As LibraryB.B, t As Windows.Data.Text.TextSegment, f As Windows.Storage.StorageFolder)
     End Sub
 End Class"
-            Dim c0 = CreateCompilationWithMscorlib({source}, compileReferences, TestOptions.DebugDll)
+            Dim c0 = CreateEmptyCompilation({source}, compileReferences, TestOptions.DebugDll)
             WithRuntimeInstance(c0, runtimeReferences,
                 Sub(runtime)
                     Dim context = CreateMethodContext(runtime, "C.M")
@@ -194,7 +196,7 @@ End Class"
     End Sub
 End Class"
 
-            Dim comp = CreateCompilationWithMscorlib({source}, WinRtRefs, TestOptions.DebugDll)
+            Dim comp = CreateEmptyCompilation({source}, WinRtRefs, TestOptions.DebugDll)
             Dim runtimeAssemblies = ExpressionCompilerTestHelpers.GetRuntimeWinMds("Windows.Storage", "Windows.Foundation.Collections")
             WithRuntimeInstance(comp, {MscorlibRef}.Concat(runtimeAssemblies),
                 Sub(runtime)

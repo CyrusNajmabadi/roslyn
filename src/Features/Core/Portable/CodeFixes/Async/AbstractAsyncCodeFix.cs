@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Linq;
 using System.Threading;
@@ -11,25 +13,26 @@ namespace Microsoft.CodeAnalysis.CodeFixes.Async
 {
     internal abstract partial class AbstractAsyncCodeFix : CodeFixProvider
     {
-        protected abstract Task<CodeAction> GetCodeFix(SyntaxNode root, SyntaxNode node, Document document, Diagnostic diagnostic, CancellationToken cancellationToken);
+        public override abstract FixAllProvider GetFixAllProvider();
+
+        protected abstract Task<CodeAction> GetCodeActionAsync(
+            SyntaxNode root, SyntaxNode node, Document document, Diagnostic diagnostic, CancellationToken cancellationToken);
 
         public sealed override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
             var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-
-            SyntaxNode node;
-            if (!TryGetNode(root, context.Span, out node))
+            if (!TryGetNode(root, context.Span, out var node))
             {
                 return;
             }
 
             var diagnostic = context.Diagnostics.FirstOrDefault();
 
-            var codeAction = await GetCodeFix(root, node, context.Document, diagnostic, context.CancellationToken).ConfigureAwait(false);
-
+            var codeAction = await GetCodeActionAsync(
+                root, node, context.Document, diagnostic, context.CancellationToken).ConfigureAwait(false);
             if (codeAction != null)
             {
-                context.RegisterCodeFix(codeAction, diagnostic);
+                context.RegisterCodeFix(codeAction, context.Diagnostics);
             }
         }
 

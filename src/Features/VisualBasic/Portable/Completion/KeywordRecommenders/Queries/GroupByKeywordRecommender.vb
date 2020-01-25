@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -20,7 +22,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Quer
             If context.TargetToken.IsChildToken(Of GroupByClauseSyntax)(Function(groupBy) groupBy.GroupKeyword) OrElse
                context.SyntaxTree.IsFollowingCompleteExpression(Of GroupByClauseSyntax)(
                    context.Position, context.TargetToken, Function(groupBy) groupBy.Items.LastRangeExpression(), cancellationToken) Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("By", VBFeaturesResources.ByQueryKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("By", VBFeaturesResources.Specifies_the_element_keys_used_for_grouping_in_Group_By_or_sort_order_in_Order_By))
             End If
 
             Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()

@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,11 +11,12 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Utilities;
-using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.VisualStudio.Commanding;
+using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Text.Operations;
 using Microsoft.VisualStudio.Utilities;
 using Roslyn.Utilities;
@@ -23,16 +26,17 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
     /// <summary>
     /// csharp automatic line ender command handler
     /// </summary>
-    [ExportCommandHandler(PredefinedCommandHandlerNames.AutomaticLineEnder, ContentTypeNames.CSharpContentType)]
-    [Order(After = PredefinedCommandHandlerNames.Completion)]
+    [Export(typeof(ICommandHandler))]
+    [ContentType(ContentTypeNames.CSharpContentType)]
+    [Name(PredefinedCommandHandlerNames.AutomaticLineEnder)]
+    [Order(After = PredefinedCompletionNames.CompletionCommandHandler)]
     internal class AutomaticLineEnderCommandHandler : AbstractAutomaticLineEnderCommandHandler
     {
         [ImportingConstructor]
         public AutomaticLineEnderCommandHandler(
-            IWaitIndicator waitIndicator,
             ITextUndoHistoryRegistry undoRegistry,
             IEditorOperationsFactoryService editorOperations)
-            : base(waitIndicator, undoRegistry, editorOperations)
+            : base(undoRegistry, editorOperations)
         {
         }
 
@@ -43,7 +47,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
 
         protected override bool TreatAsReturn(Document document, int position, CancellationToken cancellationToken)
         {
-            var root = document.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var root = document.GetSyntaxRootSynchronously(cancellationToken);
 
             var endToken = root.FindToken(position);
             if (endToken.IsMissing)
@@ -77,7 +81,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
 
         protected override void FormatAndApply(Document document, int position, CancellationToken cancellationToken)
         {
-            var root = document.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var root = document.GetSyntaxRootSynchronously(cancellationToken);
 
             var endToken = root.FindToken(position);
             if (endToken.IsMissing)
@@ -97,7 +101,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
                 return;
             }
 
-            var changes = Formatter.GetFormattedTextChanges(root, new TextSpan[] { TextSpan.FromBounds(startToken.SpanStart, endToken.Span.End) }, document.Project.Solution.Workspace, options: null, // use default
+            var options = document.GetOptionsAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+
+            var changes = Formatter.GetFormattedTextChanges(root, new TextSpan[] { TextSpan.FromBounds(startToken.SpanStart, endToken.Span.End) }, document.Project.Solution.Workspace, options,
                 rules: null, // use default
                 cancellationToken: cancellationToken);
 
@@ -107,16 +113,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
         protected override string GetEndingString(Document document, int position, CancellationToken cancellationToken)
         {
             // prepare expansive information from document
-            var tree = document.GetSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-            var root = tree.GetRootAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-            var text = tree.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var tree = document.GetSyntaxTreeSynchronously(cancellationToken);
+            var root = tree.GetRoot(cancellationToken);
+            var text = tree.GetText(cancellationToken);
             var semicolon = SyntaxFacts.GetText(SyntaxKind.SemicolonToken);
 
             // Go through the set of owning nodes in leaf to root chain.
             foreach (var owningNode in GetOwningNodes(root, position))
             {
-                SyntaxToken lastToken;
-                if (!TryGetLastToken(text, position, owningNode, out lastToken))
+                if (!TryGetLastToken(text, position, owningNode, out var lastToken))
                 {
                     // If we can't get last token, there is nothing more to do, just skip
                     // the other owning nodes and return.
@@ -134,12 +139,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
                 var textToParse = owningNode.NormalizeWhitespace().ToFullString() + semicolon;
 
                 // currently, Parsing a field is not supported. as a workaround, wrap the field in a type and parse
-                var node = owningNode.TypeSwitch(
-                    (BaseFieldDeclarationSyntax n) => SyntaxFactory.ParseCompilationUnit(WrapInType(textToParse), options: (CSharpParseOptions)tree.Options),
-                    (BaseMethodDeclarationSyntax n) => SyntaxFactory.ParseCompilationUnit(WrapInType(textToParse), options: (CSharpParseOptions)tree.Options),
-                    (BasePropertyDeclarationSyntax n) => SyntaxFactory.ParseCompilationUnit(WrapInType(textToParse), options: (CSharpParseOptions)tree.Options),
-                    (StatementSyntax n) => SyntaxFactory.ParseStatement(textToParse, options: (CSharpParseOptions)tree.Options),
-                    (UsingDirectiveSyntax n) => (SyntaxNode)SyntaxFactory.ParseCompilationUnit(textToParse, options: (CSharpParseOptions)tree.Options));
+                var node = ParseNode(tree, owningNode, textToParse);
 
                 // Insert line ender if we didn't introduce any diagnostics, if not try the next owning node.
                 if (node != null && !node.ContainsDiagnostics)
@@ -150,6 +150,18 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
 
             return null;
         }
+
+        private SyntaxNode ParseNode(SyntaxTree tree, SyntaxNode owningNode, string textToParse)
+            => owningNode switch
+            {
+                BaseFieldDeclarationSyntax n => SyntaxFactory.ParseCompilationUnit(WrapInType(textToParse), options: (CSharpParseOptions)tree.Options),
+                BaseMethodDeclarationSyntax n => SyntaxFactory.ParseCompilationUnit(WrapInType(textToParse), options: (CSharpParseOptions)tree.Options),
+                BasePropertyDeclarationSyntax n => SyntaxFactory.ParseCompilationUnit(WrapInType(textToParse), options: (CSharpParseOptions)tree.Options),
+                StatementSyntax n => SyntaxFactory.ParseStatement(textToParse, options: (CSharpParseOptions)tree.Options),
+                UsingDirectiveSyntax n => SyntaxFactory.ParseCompilationUnit(textToParse, options: (CSharpParseOptions)tree.Options),
+
+                _ => (SyntaxNode)null,
+            };
 
         /// <summary>
         /// wrap field in type
@@ -186,7 +198,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.AutomaticCompletion
             }
 
             // check whether using has contents
-            if (owningNode.TypeSwitch((UsingDirectiveSyntax u) => u.Name == null || u.Name.IsMissing))
+            if (owningNode is UsingDirectiveSyntax u &&
+                (u.Name == null || u.Name.IsMissing))
             {
                 return false;
             }

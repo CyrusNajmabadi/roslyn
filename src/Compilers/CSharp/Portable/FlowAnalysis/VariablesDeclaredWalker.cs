@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Linq;
@@ -32,16 +34,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private HashSet<Symbol> _variablesDeclared = new HashSet<Symbol>();
 
-        private void Analyze()
-        {
-            // only one pass needed.
-            regionPlace = RegionPlace.Before;
-            bool badRegion = false;
-            SetState(ReachableState());
-            Scan(ref badRegion);
-            if (badRegion) _variablesDeclared.Clear();
-        }
-
         internal VariablesDeclaredWalker(CSharpCompilation compilation, Symbol member, BoundNode node, BoundNode firstInRegion, BoundNode lastInRegion)
             : base(compilation, member, node, firstInRegion, lastInRegion)
         {
@@ -51,6 +43,54 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             base.Free();
             _variablesDeclared = null;
+        }
+
+        public override void VisitPattern(BoundPattern pattern)
+        {
+            base.VisitPattern(pattern);
+            NoteDeclaredPatternVariables(pattern);
+        }
+
+        protected override void VisitSwitchSection(BoundSwitchSection node, bool isLastSection)
+        {
+            foreach (var label in node.SwitchLabels)
+            {
+                NoteDeclaredPatternVariables(label.Pattern);
+            }
+
+            base.VisitSwitchSection(node, isLastSection);
+        }
+
+        /// <summary>
+        /// Record declared variables in the pattern.
+        /// </summary>
+        private void NoteDeclaredPatternVariables(BoundPattern pattern)
+        {
+            if (IsInside)
+            {
+                switch (pattern)
+                {
+                    case BoundDeclarationPattern decl:
+                        {
+                            // The variable may be null if it is a discard designation `_`.
+                            if (decl.Variable?.Kind == SymbolKind.Local)
+                            {
+                                // Because this API only returns local symbols and parameters,
+                                // we exclude pattern variables that have become fields in scripts.
+                                _variablesDeclared.Add(decl.Variable);
+                            }
+                        }
+                        break;
+                    case BoundRecursivePattern recur:
+                        {
+                            if (recur.Variable?.Kind == SymbolKind.Local)
+                            {
+                                _variablesDeclared.Add(recur.Variable);
+                            }
+                        }
+                        break;
+                }
+            }
         }
 
         public override BoundNode VisitLocalDeclaration(BoundLocalDeclaration node)
@@ -76,26 +116,45 @@ namespace Microsoft.CodeAnalysis.CSharp
             return base.VisitLambda(node);
         }
 
-        public override BoundNode VisitForEachStatement(BoundForEachStatement node)
+        public override BoundNode VisitLocalFunctionStatement(BoundLocalFunctionStatement node)
+        {
+            if (IsInside && !node.WasCompilerGenerated)
+            {
+                foreach (var parameter in node.Symbol.Parameters)
+                {
+                    _variablesDeclared.Add(parameter);
+                }
+            }
+
+            return base.VisitLocalFunctionStatement(node);
+        }
+
+        public override void VisitForEachIterationVariables(BoundForEachStatement node)
         {
             if (IsInside)
             {
-                _variablesDeclared.Add(node.IterationVariable);
+                var deconstructionAssignment = node.DeconstructionOpt?.DeconstructionAssignment;
+
+                if (deconstructionAssignment == null)
+                {
+                    _variablesDeclared.AddAll(node.IterationVariables);
+                }
+                else
+                {
+                    // Deconstruction foreach declares multiple variables.
+                    ((BoundTupleExpression)deconstructionAssignment.Left).VisitAllElements((x, self) => self.Visit(x), this);
+                }
             }
-
-            return base.VisitForEachStatement(node);
         }
-
 
         protected override void VisitCatchBlock(BoundCatchBlock catchBlock, ref LocalState finallyState)
         {
             if (IsInside)
             {
-                var local = catchBlock.LocalOpt;
+                var local = catchBlock.Locals.FirstOrDefault();
 
-                if ((object)local != null)
+                if (local?.DeclarationKind == LocalDeclarationKind.CatchVariable)
                 {
-                    Debug.Assert(local.DeclarationKind == LocalDeclarationKind.CatchVariable);
                     _variablesDeclared.Add(local);
                 }
             }
@@ -114,6 +173,21 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             return base.VisitQueryClause(node);
+        }
+
+        protected override void VisitLvalue(BoundLocal node)
+        {
+            VisitLocal(node);
+        }
+
+        public override BoundNode VisitLocal(BoundLocal node)
+        {
+            if (IsInside && node.DeclarationKind != BoundLocalDeclarationKind.None)
+            {
+                _variablesDeclared.Add(node.LocalSymbol);
+            }
+
+            return null;
         }
     }
 }

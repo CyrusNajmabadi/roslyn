@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -8,7 +10,7 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// <summary>
     /// Represents the results of overload resolution for a single member.
     /// </summary>
-    [SuppressMessage("Performance", "RS0008", Justification = "Equality not actually implemented")]
+    [SuppressMessage("Performance", "CA1067", Justification = "Equality not actually implemented")]
     internal struct MemberResolutionResult<TMember> where TMember : Symbol
     {
         private readonly TMember _member;
@@ -80,6 +82,16 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 return Result.IsApplicable;
             }
+        }
+
+        internal MemberResolutionResult<TMember> Worse()
+        {
+            return new MemberResolutionResult<TMember>(Member, LeastOverriddenMember, MemberAnalysisResult.Worse());
+        }
+
+        internal MemberResolutionResult<TMember> Worst()
+        {
+            return new MemberResolutionResult<TMember>(Member, LeastOverriddenMember, MemberAnalysisResult.Worst());
         }
 
         internal bool HasUseSiteDiagnosticToReport

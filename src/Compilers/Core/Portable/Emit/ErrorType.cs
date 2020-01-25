@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -72,9 +74,12 @@ namespace Microsoft.CodeAnalysis.Emit
             return null;
         }
 
-        Cci.PrimitiveTypeCode Cci.ITypeReference.TypeCode(EmitContext context)
+        Cci.PrimitiveTypeCode Cci.ITypeReference.TypeCode
         {
-            return Cci.PrimitiveTypeCode.NotPrimitive;
+            get
+            {
+                return Cci.PrimitiveTypeCode.NotPrimitive;
+            }
         }
 
         TypeDefinitionHandle Cci.ITypeReference.TypeDef
@@ -177,7 +182,7 @@ namespace Microsoft.CodeAnalysis.Emit
         private sealed class ErrorAssembly : Cci.IAssemblyReference
         {
             public static readonly ErrorAssembly Singleton = new ErrorAssembly();
-            
+
             /// <summary>
             /// For the name we will use a word "Error" followed by a guid, generated on the spot.
             /// </summary>
@@ -191,6 +196,7 @@ namespace Microsoft.CodeAnalysis.Emit
                 contentType: AssemblyContentType.Default);
 
             AssemblyIdentity Cci.IAssemblyReference.Identity => s_identity;
+            Version Cci.IAssemblyReference.AssemblyVersionPattern => null;
 
             Cci.IAssemblyReference Cci.IModuleReference.GetContainingAssembly(EmitContext context)
             {

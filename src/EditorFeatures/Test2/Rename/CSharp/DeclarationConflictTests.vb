@@ -1,15 +1,23 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Rename.ConflictEngine
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename.CSharp
+    <[UseExportProvider]>
     Public Class DeclarationConflictTests
+        Private ReadOnly _outputHelper As Abstractions.ITestOutputHelper
 
-        <WpfFact(Skip:="917043")>
+        Public Sub New(outputHelper As Abstractions.ITestOutputHelper)
+            _outputHelper = outputHelper
+        End Sub
+
+        <WpfFact>
         <WorkItem(917043, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/917043")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub NoConflictForDelegate()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
@@ -31,7 +39,7 @@ class C
         <WorkItem(917043, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/917043")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub NoConflictForIsolatedScopes()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
@@ -55,13 +63,13 @@ class C
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictBetweenFields()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-class Foo
+class Goo
 {
-    int [|$$foo|];
+    int [|$$goo|];
     int {|Conflict:bar|};
 }
                             </Document>
@@ -75,13 +83,13 @@ class Foo
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictBetweenFieldAndMethodDeclaration()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-class Foo
+class Goo
 {
-    int [|$$foo|];
+    int [|$$goo|];
     int {|Conflict:bar|}() { }
 }
                             </Document>
@@ -95,14 +103,14 @@ class Foo
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictBetweenPropertyAndFieldDeclaration()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
 class Program
 {
     int {|Conflict:bar|} { get; set; }
-    int [|$$foo|]() { return 0; }
+    int [|$$goo|]() { return 0; }
 }
                             </Document>
                     </Project>
@@ -115,13 +123,13 @@ class Program
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictBetweenMethodDeclarations()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-class Foo
+class Goo
 {
-    int [|$$foo|]() { }
+    int [|$$goo|]() { }
     int {|Conflict:bar|}() { }
 }
                                </Document>
@@ -135,13 +143,13 @@ class Foo
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictBetweenParameterDeclarations()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-class Foo
+class Goo
 {
-    int f(int [|$$foo|], int {|Conflict:bar|}) { }
+    int f(int [|$$goo|], int {|Conflict:bar|}) { }
 }
                             </Document>
                     </Project>
@@ -154,13 +162,13 @@ class Foo
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub NoConflictBetweenMethodsOfDifferentSignature()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-class Foo
+class Goo
 {
-    int [|$$foo|]() { }
+    int [|$$goo|]() { }
     int bar(int parameter) { }
 }
                             </Document>
@@ -173,13 +181,13 @@ class Foo
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictBetweenMemberDeclarationsWithOutOrRefDifferenceOnly()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-class Foo
+class Goo
 {
-    int [|$$foo|](out int parameter) { }
+    int [|$$goo|](out int parameter) { }
     int {|Conflict:bar|}(int parameter) { }
 }
                             </Document>
@@ -193,13 +201,13 @@ class Foo
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub NoConflictBetweenMethodsDifferingByArity()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
-class Foo
+class Goo
 {
-    int [|$$foo|](int parameter) { }
+    int [|$$goo|](int parameter) { }
     int bar<T>(int parameter) { }
 }
                         ]]></Document>
@@ -213,11 +221,11 @@ class Foo
         <WorkItem(546429, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546429")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub NoConflictWithNamespaceDefinedInMetadata()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
-namespace [|$$Foo|] { }
+namespace [|$$Goo|] { }
                         ]]></Document>
                     </Project>
                 </Workspace>, renameTo:="System")
@@ -228,11 +236,11 @@ namespace [|$$Foo|] { }
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub NoConflictWithEquallyNamedNamespaces()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
-namespace [|$$Foo|] { }
+namespace [|$$Goo|] { }
 namespace N1 { }
                         ]]></Document>
                     </Project>
@@ -245,7 +253,7 @@ namespace N1 { }
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_ConflictInFieldInitializerOfFieldAndModuleNameResolvedThroughFullQualification()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -276,7 +284,7 @@ class [|$$C|]
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_NoConflictBetweenLambdaParameterAndField()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -296,7 +304,7 @@ class Program
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_ConflictBetweenTypeParametersInTypeDeclaration()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -317,7 +325,7 @@ class Program<{|declconflict:A|}, [|$$B|]>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_ConflictBetweenTypeParametersInMethodDeclaration()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -340,7 +348,7 @@ class Program
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_ConflictBetweenTypeParametersInMethodDeclaration_2()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -363,7 +371,7 @@ class Program
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_ConflictBetweenTypeParameterAndMember_1()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -386,7 +394,7 @@ class Program<{|declconflict:@a|}>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_ConflictBetweenTypeParameterAndMember_2()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -408,7 +416,7 @@ class Program<{|declconflict:@a|}>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_OverridingImplicitlyUsedMethod()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -435,7 +443,7 @@ class C : A
         return this;
     }
  
-    public void {|possibleImplicitConflict:$$Foo|}() { } // Rename Foo to MoveNext
+    public void {|possibleImplicitConflict:$$Goo|}() { } // Rename Goo to MoveNext
 }
                         ]]></Document>
                     </Project>
@@ -449,7 +457,7 @@ class C : A
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_OverridingImplicitlyUsedMethod_1()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -476,7 +484,7 @@ class C : A
         return this;
     }
  
-    public void [|$$Foo|]<T>() { } // Rename Foo to MoveNext
+    public void [|$$Goo|]<T>() { } // Rename Goo to MoveNext
 }
                         ]]></Document>
                     </Project>
@@ -489,7 +497,7 @@ class C : A
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub CS_OverridingImplicitlyUsedMethod_2()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -515,7 +523,7 @@ class C : A
         return this;
     }
  
-    public void [|$$Foo|]() { } // Rename Foo to MoveNext
+    public void [|$$Goo|]() { } // Rename Goo to MoveNext
 }
                         ]]></Document>
                     </Project>
@@ -527,7 +535,7 @@ class C : A
         <WorkItem(851604, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/851604")>
         <Fact, Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ConflictInsideAttributeArgument()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
@@ -550,7 +558,7 @@ class C
         <WorkItem(6306, "https://github.com/dotnet/roslyn/issues/6306")>
         <Fact, Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ResolveConflictInAnonymousTypeProperty()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -574,7 +582,7 @@ class C
         <WorkItem(6308, "https://github.com/dotnet/roslyn/issues/6308")>
         <Fact, Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub ResolveConflictWhenAnonymousTypeIsUsedAsGenericArgument()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document><![CDATA[
@@ -594,6 +602,37 @@ class C
                 result.AssertLabeledSpansAre("first", "M(new { }, (_, a) => (long)X(a))", type:=RelatedLocationType.ResolvedNonReferenceConflict)
                 result.AssertLabeledSpansAre("second", "M(new { }, (_, a) => (long)X(a))", type:=RelatedLocationType.ResolvedNonReferenceConflict)
                 result.AssertLabeledSpansAre("origin", "X", type:=RelatedLocationType.NoConflict)
+            End Using
+        End Sub
+
+        <Fact>
+        <Trait(Traits.Feature, Traits.Features.Rename)>
+        <WorkItem(18566, "https://github.com/dotnet/roslyn/issues/18566")>
+        Public Sub ParameterInPartialMethodDefinitionConflictingWithLocalInPartialMethodImplementation()
+            Using result = RenameEngineResult.Create(_outputHelper,
+                <Workspace>
+                    <Project Language="C#" CommonReferences="true">
+                        <Document>
+partial class C
+{
+    partial void M(int {|parameter0:$$x|});
+}
+                        </Document>
+                        <Document>
+partial class C
+{
+    partial void M(int {|parameter1:x|})
+    {
+        int {|local0:y|} = 1;
+    }
+}
+                        </Document>
+                    </Project>
+                </Workspace>, renameTo:="y")
+
+                result.AssertLabeledSpansAre("parameter0", "y", RelatedLocationType.NoConflict)
+                result.AssertLabeledSpansAre("parameter1", "y", RelatedLocationType.NoConflict)
+                result.AssertLabeledSpansAre("local0", type:=RelatedLocationType.UnresolvedConflict)
             End Using
         End Sub
     End Class

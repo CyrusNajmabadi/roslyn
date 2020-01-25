@@ -1,10 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 
@@ -178,7 +181,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     continue;
                 }
 
-                TypeSymbol convertsFrom = op.ParameterTypes[0];
+                TypeSymbol convertsFrom = op.GetParameterType(0);
                 TypeSymbol convertsTo = op.ReturnType;
                 Conversion fromConversion = EncompassingExplicitConversion(sourceExpression, source, convertsFrom, ref useSiteDiagnostics);
                 Conversion toConversion = EncompassingExplicitConversion(null, convertsTo, target, ref useSiteDiagnostics);
@@ -189,7 +192,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     source.IsNullableType() &&
                     EncompassingExplicitConversion(null, source.GetNullableUnderlyingType(), convertsFrom, ref useSiteDiagnostics).Exists)
                 {
-                    fromConversion = ClassifyConversion(source, convertsFrom, ref useSiteDiagnostics, builtinOnly: true);
+                    fromConversion = ClassifyBuiltInConversion(source, convertsFrom, ref useSiteDiagnostics);
                 }
 
                 // As in dev11 (and the revised spec), we also accept candidates for which the return type is encompassed by the *stripped* target type.
@@ -198,7 +201,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     target.IsNullableType() &&
                     EncompassingExplicitConversion(null, convertsTo, target.GetNullableUnderlyingType(), ref useSiteDiagnostics).Exists)
                 {
-                    toConversion = ClassifyConversion(convertsTo, target, ref useSiteDiagnostics, builtinOnly: true);
+                    toConversion = ClassifyBuiltInConversion(convertsTo, target, ref useSiteDiagnostics);
                 }
 
                 // In the corresponding implicit conversion code we can get away with first 
@@ -311,7 +314,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if ((object)source != null)
             {
-                if (u.Any(conv => conv.FromType == source))
+                if (u.Any(conv => TypeSymbol.Equals(conv.FromType, source, TypeCompareKind.ConsiderEverything2)))
                 {
                     return source;
                 }
@@ -366,7 +369,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // We have already written the "ToType" into the conversion analysis to
             // perpetuate this fiction.
 
-            if (u.Any(conv => conv.ToType == target))
+            if (u.Any(conv => TypeSymbol.Equals(conv.ToType, target, TypeCompareKind.ConsiderEverything2)))
             {
                 return target;
             }

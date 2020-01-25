@@ -1,10 +1,11 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.SolutionCrawler;
 using Microsoft.CodeAnalysis.SolutionCrawler.State;
 using Roslyn.Utilities;
@@ -17,70 +18,59 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.TodoComments
         {
             private const string FormatVersion = "1";
 
-            protected override string StateName
+            protected override string StateName => "<TodoComments>";
+
+            protected override int GetCount(Data data)
             {
-                get
-                {
-                    return "<TodoComments>";
-                }
+                return data.Items.Length;
             }
 
             protected override Data TryGetExistingData(Stream stream, Document value, CancellationToken cancellationToken)
             {
-                var list = SharedPools.Default<List<TodoItem>>().AllocateAndClear();
-                try
-                {
-                    using (var reader = new ObjectReader(stream))
-                    {
-                        var format = reader.ReadString();
-                        if (!string.Equals(format, FormatVersion))
-                        {
-                            return null;
-                        }
+                using var reader = ObjectReader.TryGetReader(stream, leaveOpen: true, cancellationToken);
 
+                if (reader != null)
+                {
+                    var format = reader.ReadString();
+                    if (string.Equals(format, FormatVersion))
+                    {
                         var textVersion = VersionStamp.ReadFrom(reader);
                         var dataVersion = VersionStamp.ReadFrom(reader);
 
+                        using var listDisposer = ArrayBuilder<TodoItem>.GetInstance(out var list);
                         AppendItems(reader, value, list, cancellationToken);
 
-                        return new Data(textVersion, dataVersion, list.ToImmutableArray<TodoItem>());
+                        return new Data(textVersion, dataVersion, list.ToImmutable());
                     }
                 }
-                catch (Exception)
-                {
-                    return null;
-                }
-                finally
-                {
-                    SharedPools.Default<List<TodoItem>>().ClearAndFree(list);
-                }
+
+                return null;
             }
 
             protected override void WriteTo(Stream stream, Data data, CancellationToken cancellationToken)
             {
-                using (var writer = new ObjectWriter(stream, cancellationToken: cancellationToken))
+                using var writer = new ObjectWriter(stream, leaveOpen: true, cancellationToken: cancellationToken);
+
+                writer.WriteString(FormatVersion);
+                data.TextVersion.WriteTo(writer);
+                data.SyntaxVersion.WriteTo(writer);
+
+                writer.WriteInt32(data.Items.Length);
+
+                foreach (var item in data.Items.OfType<TodoItem>())
                 {
-                    writer.WriteString(FormatVersion);
-                    data.TextVersion.WriteTo(writer);
-                    data.SyntaxVersion.WriteTo(writer);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                    writer.WriteInt32(data.Items.Length);
+                    writer.WriteInt32(item.Priority);
+                    writer.WriteString(item.Message);
 
-                    foreach (var item in data.Items.OfType<TodoItem>())
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
+                    writer.WriteString(item.OriginalFilePath);
+                    writer.WriteInt32(item.OriginalLine);
+                    writer.WriteInt32(item.OriginalColumn);
 
-                        writer.WriteInt32(item.Priority);
-                        writer.WriteString(item.Message);
-
-                        writer.WriteString(item.OriginalFilePath);
-                        writer.WriteInt32(item.OriginalLine);
-                        writer.WriteInt32(item.OriginalColumn);
-
-                        writer.WriteString(item.MappedFilePath);
-                        writer.WriteInt32(item.MappedLine);
-                        writer.WriteInt32(item.MappedColumn);
-                    }
+                    writer.WriteString(item.MappedFilePath);
+                    writer.WriteInt32(item.MappedLine);
+                    writer.WriteInt32(item.MappedColumn);
                 }
             }
 
@@ -91,16 +81,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.TodoComments
 
             public ImmutableArray<TodoItem> GetItems_TestingOnly(DocumentId documentId)
             {
-                Data data;
-                if (this.DataCache.TryGetValue(documentId, out data) && data != null)
+                if (this.DataCache.TryGetValue(documentId, out var entry) && entry.HasCachedData)
                 {
-                    return data.Items;
+                    return entry.Data.Items;
                 }
 
                 return ImmutableArray<TodoItem>.Empty;
             }
 
-            private void AppendItems(ObjectReader reader, Document document, List<TodoItem> list, CancellationToken cancellationToken)
+            private void AppendItems(ObjectReader reader, Document document, ArrayBuilder<TodoItem> list, CancellationToken cancellationToken)
             {
                 var count = reader.ReadInt32();
                 for (var i = 0; i < count; i++)
@@ -120,7 +109,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.TodoComments
 
                     list.Add(new TodoItem(
                         priority, message,
-                        document.Project.Solution.Workspace, document.Id,
+                        document.Id,
                         mappedLine, originalLine, mappedColumn, originalColumn, mappedFile, originalFile));
                 }
             }

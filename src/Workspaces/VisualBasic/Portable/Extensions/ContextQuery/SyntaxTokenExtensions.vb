@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -118,6 +120,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
         Friend Function MustBeginNewStatement(token As SyntaxToken, position As Integer) As Boolean
             Return token.HasColonBeforePosition(position) OrElse
                    token.HasNonContinuableEndOfLineBeforePosition(position, checkForSecondEol:=True)
+        End Function
+
+        <Extension>
+        Friend Function IsMandatoryNamedParameterPosition(token As SyntaxToken) As Boolean
+            If token.Kind() = SyntaxKind.CommaToken Then
+                Dim argumentList = TryCast(token.Parent, ArgumentListSyntax)
+                If argumentList Is Nothing Then
+                    Return False
+                End If
+
+                For Each n In argumentList.Arguments.GetWithSeparators()
+                    If n.IsToken AndAlso n.AsToken() = token Then
+                        Return False
+                    End If
+
+                    If n.IsNode AndAlso DirectCast(n.AsNode(), ArgumentSyntax).IsNamed Then
+                        Return True
+                    End If
+                Next
+            End If
+
+            Return False
         End Function
 
         <Extension()>

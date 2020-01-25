@@ -1,11 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
@@ -30,7 +33,7 @@ namespace Microsoft.CodeAnalysis
 
         internal async Task<LinkedFileMergeSessionResult> MergeDiffsAsync(IMergeConflictHandler mergeConflictHandler, CancellationToken cancellationToken)
         {
-            LinkedFileDiffMergingSessionInfo sessionInfo = new LinkedFileDiffMergingSessionInfo();
+            var sessionInfo = new LinkedFileDiffMergingSessionInfo();
 
             var linkedDocumentGroupsWithChanges = _solutionChanges
                 .GetProjectChanges()
@@ -111,7 +114,7 @@ namespace Microsoft.CodeAnalysis
 
             if (unmergedChanges.Any())
             {
-                mergeConflictHandler = mergeConflictHandler ?? _oldSolution.GetDocument(linkedDocumentGroup.First()).GetLanguageService<ILinkedFileMergeConflictCommentAdditionService>();
+                mergeConflictHandler ??= _oldSolution.GetDocument(linkedDocumentGroup.First()).GetLanguageService<ILinkedFileMergeConflictCommentAdditionService>();
                 var mergeConflictTextEdits = mergeConflictHandler.CreateEdits(originalSourceText, unmergedChanges);
 
                 allChanges = MergeChangesWithMergeFailComments(appliedChanges, mergeConflictTextEdits, mergeConflictResolutionSpan, groupSessionInfo);
@@ -128,7 +131,7 @@ namespace Microsoft.CodeAnalysis
             return new LinkedFileMergeResult(allLinkedDocuments, originalSourceText.WithChanges(allChanges), mergeConflictResolutionSpan);
         }
 
-        private static async Task<IEnumerable<TextChange>> AddDocumentMergeChangesAsync(
+        private static async Task<ImmutableArray<TextChange>> AddDocumentMergeChangesAsync(
             Document oldDocument,
             Document newDocument,
             List<TextChange> cumulativeChanges,
@@ -138,9 +141,9 @@ namespace Microsoft.CodeAnalysis
             CancellationToken cancellationToken)
         {
             var unmergedDocumentChanges = new List<TextChange>();
-            var successfullyMergedChanges = new List<TextChange>();
+            var successfullyMergedChanges = ArrayBuilder<TextChange>.GetInstance();
 
-            int cumulativeChangeIndex = 0;
+            var cumulativeChangeIndex = 0;
 
             var textchanges = await textDiffService.GetTextChangesAsync(oldDocument, newDocument, cancellationToken).ConfigureAwait(false);
             foreach (var change in textchanges)
@@ -217,7 +220,7 @@ namespace Microsoft.CodeAnalysis
                     oldDocument.Id));
             }
 
-            return successfullyMergedChanges;
+            return successfullyMergedChanges.ToImmutableAndFree();
         }
 
         private IEnumerable<TextChange> MergeChangesWithMergeFailComments(
@@ -316,68 +319,12 @@ namespace Microsoft.CodeAnalysis
 
         private void LogLinkedFileDiffMergingSessionInfo(LinkedFileDiffMergingSessionInfo sessionInfo)
         {
-            // don't report telemetry
             if (!_logSessionInfo)
             {
                 return;
             }
 
-            var sessionId = SessionLogMessage.GetNextId();
-
-            Logger.Log(FunctionId.Workspace_Solution_LinkedFileDiffMergingSession, SessionLogMessage.Create(sessionId, sessionInfo));
-
-            foreach (var groupInfo in sessionInfo.LinkedFileGroups)
-            {
-                Logger.Log(FunctionId.Workspace_Solution_LinkedFileDiffMergingSession_LinkedFileGroup, SessionLogMessage.Create(sessionId, groupInfo));
-            }
-        }
-
-        internal static class SessionLogMessage
-        {
-            private const string SessionId = nameof(SessionId);
-            private const string HasLinkedFile = nameof(HasLinkedFile);
-
-            private const string LinkedDocuments = nameof(LinkedDocuments);
-            private const string DocumentsWithChanges = nameof(DocumentsWithChanges);
-            private const string IdenticalDiffs = nameof(IdenticalDiffs);
-            private const string IsolatedDiffs = nameof(IsolatedDiffs);
-            private const string OverlappingDistinctDiffs = nameof(OverlappingDistinctDiffs);
-            private const string OverlappingDistinctDiffsWithSameSpan = nameof(OverlappingDistinctDiffsWithSameSpan);
-            private const string OverlappingDistinctDiffsWithSameSpanAndSubstringRelation = nameof(OverlappingDistinctDiffsWithSameSpanAndSubstringRelation);
-            private const string InsertedMergeConflictComments = nameof(InsertedMergeConflictComments);
-            private const string InsertedMergeConflictCommentsAtAdjustedLocation = nameof(InsertedMergeConflictCommentsAtAdjustedLocation);
-
-            public static KeyValueLogMessage Create(int sessionId, LinkedFileDiffMergingSessionInfo sessionInfo)
-            {
-                return KeyValueLogMessage.Create(m =>
-                {
-                    m[SessionId] = sessionId;
-                    m[HasLinkedFile] = sessionInfo.LinkedFileGroups.Count > 0;
-                });
-            }
-
-            public static KeyValueLogMessage Create(int sessionId, LinkedFileGroupSessionInfo groupInfo)
-            {
-                return KeyValueLogMessage.Create(m =>
-                {
-                    m[SessionId] = sessionId;
-
-                    m[LinkedDocuments] = groupInfo.LinkedDocuments;
-                    m[DocumentsWithChanges] = groupInfo.DocumentsWithChanges;
-                    m[IdenticalDiffs] = groupInfo.IdenticalDiffs;
-                    m[IsolatedDiffs] = groupInfo.IsolatedDiffs;
-                    m[OverlappingDistinctDiffs] = groupInfo.OverlappingDistinctDiffs;
-                    m[OverlappingDistinctDiffsWithSameSpan] = groupInfo.OverlappingDistinctDiffsWithSameSpan;
-                    m[OverlappingDistinctDiffsWithSameSpanAndSubstringRelation] = groupInfo.OverlappingDistinctDiffsWithSameSpanAndSubstringRelation;
-                    m[InsertedMergeConflictComments] = groupInfo.InsertedMergeConflictComments;
-                    m[InsertedMergeConflictCommentsAtAdjustedLocation] = groupInfo.InsertedMergeConflictCommentsAtAdjustedLocation;
-                });
-            }
-
-            public static int GetNextId()
-            {
-                return LogAggregator.GetNextId();
-            }
+            LinkedFileDiffMergingLogger.LogSession(this._newSolution.Workspace, sessionInfo);
         }
 
         internal class LinkedFileDiffMergingSessionInfo

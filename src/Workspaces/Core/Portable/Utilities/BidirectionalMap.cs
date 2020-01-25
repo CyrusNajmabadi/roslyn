@@ -1,7 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Roslyn.Utilities
@@ -17,7 +20,7 @@ namespace Roslyn.Utilities
         public BidirectionalMap(IEnumerable<KeyValuePair<TKey, TValue>> pairs)
         {
             _forwardMap = ImmutableDictionary.CreateRange<TKey, TValue>(pairs);
-            _backwardMap = ImmutableDictionary.CreateRange<TValue, TKey>(pairs.Select(p => KeyValuePair.Create(p.Value, p.Key)));
+            _backwardMap = ImmutableDictionary.CreateRange<TValue, TKey>(pairs.Select(p => KeyValuePairUtil.Create(p.Value, p.Key)));
         }
 
         private BidirectionalMap(ImmutableDictionary<TKey, TValue> forwardMap, ImmutableDictionary<TValue, TKey> backwardMap)
@@ -48,8 +51,7 @@ namespace Roslyn.Utilities
 
         public IBidirectionalMap<TKey, TValue> RemoveKey(TKey key)
         {
-            TValue value;
-            if (!_forwardMap.TryGetValue(key, out value))
+            if (!_forwardMap.TryGetValue(key, out var value))
             {
                 return this;
             }
@@ -61,8 +63,7 @@ namespace Roslyn.Utilities
 
         public IBidirectionalMap<TKey, TValue> RemoveValue(TValue value)
         {
-            TKey key;
-            if (!_backwardMap.TryGetValue(value, out key))
+            if (!_backwardMap.TryGetValue(value, out var key))
             {
                 return this;
             }
@@ -79,21 +80,9 @@ namespace Roslyn.Utilities
                 _backwardMap.Add(value, key));
         }
 
-        public IEnumerable<TKey> Keys
-        {
-            get
-            {
-                return _forwardMap.Keys;
-            }
-        }
+        public IEnumerable<TKey> Keys => _forwardMap.Keys;
 
-        public IEnumerable<TValue> Values
-        {
-            get
-            {
-                return _backwardMap.Keys;
-            }
-        }
+        public IEnumerable<TValue> Values => _backwardMap.Keys;
 
         public bool IsEmpty
         {
@@ -107,31 +96,29 @@ namespace Roslyn.Utilities
         {
             get
             {
-                Contract.Requires(_forwardMap.Count == _backwardMap.Count);
+                Debug.Assert(_forwardMap.Count == _backwardMap.Count);
                 return _backwardMap.Count;
             }
         }
 
         public TValue GetValueOrDefault(TKey key)
         {
-            TValue result;
-            if (TryGetValue(key, out result))
+            if (TryGetValue(key, out var result))
             {
                 return result;
             }
 
-            return default(TValue);
+            return default;
         }
 
         public TKey GetKeyOrDefault(TValue value)
         {
-            TKey result;
-            if (TryGetKey(value, out result))
+            if (TryGetKey(value, out var result))
             {
                 return result;
             }
 
-            return default(TKey);
+            return default;
         }
     }
 }

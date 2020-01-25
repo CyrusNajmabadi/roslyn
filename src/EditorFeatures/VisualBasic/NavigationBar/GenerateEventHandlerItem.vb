@@ -1,12 +1,13 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.CodeGeneration
 Imports Microsoft.CodeAnalysis.Editing
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Microsoft.VisualStudio.Text
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.NavigationBar
     Friend Class GenerateEventHandlerItem
@@ -26,8 +27,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.NavigationBar
 
         Protected Overrides Async Function GetGeneratedDocumentCoreAsync(document As Document, codeGenerationOptions As CodeGenerationOptions, cancellationToken As CancellationToken) As Task(Of Document)
             Dim compilation = Await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(False)
-            Dim eventSymbol = TryCast(_eventSymbolKey.Resolve(compilation).Symbol, IEventSymbol)
-            Dim destinationType = TryCast(_destinationTypeSymbolKey.Resolve(compilation).Symbol, INamedTypeSymbol)
+            Dim eventSymbol = TryCast(_eventSymbolKey.Resolve(compilation).GetAnySymbol(), IEventSymbol)
+            Dim destinationType = TryCast(_destinationTypeSymbolKey.Resolve(compilation).GetAnySymbol(), INamedTypeSymbol)
 
             If eventSymbol Is Nothing OrElse destinationType Is Nothing Then
                 Return Nothing
@@ -57,11 +58,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.NavigationBar
                 accessibility:=Accessibility.Private,
                 modifiers:=New DeclarationModifiers(),
                 returnType:=delegateInvokeMethod.ReturnType,
-                explicitInterfaceSymbol:=Nothing,
+                refKind:=delegateInvokeMethod.RefKind,
+                explicitInterfaceImplementations:=Nothing,
                 name:=methodName,
                 typeParameters:=Nothing,
-                parameters:=delegateInvokeMethod.Parameters.OfType(Of IParameterSymbol).ToList(),
-                handlesExpressions:={handlesSyntax})
+                parameters:=delegateInvokeMethod.RemoveInaccessibleAttributesAndAttributesOfTypes(destinationType).Parameters,
+                handlesExpressions:=ImmutableArray.Create(Of SyntaxNode)(handlesSyntax))
             methodSymbol = GeneratedSymbolAnnotation.AddAnnotationToSymbol(methodSymbol)
 
             Return Await CodeGenerator.AddMethodDeclarationAsync(document.Project.Solution,

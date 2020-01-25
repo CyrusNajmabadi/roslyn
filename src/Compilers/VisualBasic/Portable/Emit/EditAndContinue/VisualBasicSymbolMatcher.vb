@@ -1,10 +1,14 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Emit
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
@@ -22,10 +26,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                       sourceContext As EmitContext,
                       otherAssembly As SourceAssemblySymbol,
                       otherContext As EmitContext,
-                      otherSynthesizedMembersOpt As ImmutableDictionary(Of Cci.ITypeDefinition, ImmutableArray(Of Cci.ITypeDefinitionMember)))
+                      otherSynthesizedMembersOpt As ImmutableDictionary(Of ISymbolInternal, ImmutableArray(Of ISymbolInternal)))
 
-            Me._defs = New MatchDefsToSource(sourceContext, otherContext)
-            Me._symbols = New MatchSymbols(anonymousTypeMap, sourceAssembly, otherAssembly, otherSynthesizedMembersOpt, New DeepTranslator(otherAssembly.GetSpecialType(SpecialType.System_Object)))
+            _defs = New MatchDefsToSource(sourceContext, otherContext)
+            _symbols = New MatchSymbols(anonymousTypeMap, sourceAssembly, otherAssembly, otherSynthesizedMembersOpt, New DeepTranslator(otherAssembly.GetSpecialType(SpecialType.System_Object)))
         End Sub
 
         Public Sub New(anonymousTypeMap As IReadOnlyDictionary(Of AnonymousTypeKey, AnonymousTypeValue),
@@ -33,28 +37,34 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                       sourceContext As EmitContext,
                       otherAssembly As PEAssemblySymbol)
 
-            Me._defs = New MatchDefsToMetadata(sourceContext, otherAssembly)
-            Me._symbols = New MatchSymbols(anonymousTypeMap, sourceAssembly, otherAssembly, otherSynthesizedMembersOpt:=Nothing, deepTranslatorOpt:=Nothing)
+            _defs = New MatchDefsToMetadata(sourceContext, otherAssembly)
+            _symbols = New MatchSymbols(anonymousTypeMap, sourceAssembly, otherAssembly, otherSynthesizedMembersOpt:=Nothing, deepTranslatorOpt:=Nothing)
         End Sub
 
-        Public Overrides Function MapDefinition(def As Cci.IDefinition) As Cci.IDefinition
-            Dim symbol As symbol = TryCast(def, symbol)
+        Public Overrides Function MapDefinition(definition As Cci.IDefinition) As Cci.IDefinition
+            Dim symbol As Symbol = TryCast(definition, Symbol)
             If symbol IsNot Nothing Then
-                Return DirectCast(Me._symbols.Visit(symbol), Cci.IDefinition)
+                Return DirectCast(_symbols.Visit(symbol), Cci.IDefinition)
             End If
-            Return Me._defs.VisitDef(def)
+
+            Return _defs.VisitDef(definition)
+        End Function
+
+        Public Overrides Function MapNamespace([namespace] As Cci.INamespace) As Cci.INamespace
+            Debug.Assert(TypeOf [namespace] Is NamespaceSymbol)
+            Return DirectCast(_symbols.Visit(CType([namespace], NamespaceSymbol)), Cci.INamespace)
         End Function
 
         Public Overrides Function MapReference(reference As Cci.ITypeReference) As Cci.ITypeReference
-            Dim symbol As symbol = TryCast(reference, symbol)
+            Dim symbol As Symbol = TryCast(reference, Symbol)
             If symbol IsNot Nothing Then
-                Return DirectCast(Me._symbols.Visit(symbol), Cci.ITypeReference)
+                Return DirectCast(_symbols.Visit(symbol), Cci.ITypeReference)
             End If
             Return Nothing
         End Function
 
-        Friend Function TryGetAnonymousTypeName(template As NamedTypeSymbol, <Out()> ByRef name As String, <Out()> ByRef index As Integer) As Boolean
-            Return Me._symbols.TryGetAnonymousTypeName(template, name, index)
+        Friend Function TryGetAnonymousTypeName(template As AnonymousTypeManager.AnonymousTypeOrDelegateTemplateSymbol, <Out> ByRef name As String, <Out> ByRef index As Integer) As Boolean
+            Return _symbols.TryGetAnonymousTypeName(template, name, index)
         End Function
 
         Private MustInherit Class MatchDefs
@@ -87,7 +97,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                         Return Nothing
                     End If
 
-                    Return Me.VisitTypeMembers(otherContainer, nestedType, AddressOf GetNestedTypes, Function(a, b) s_nameComparer.Equals(a.Name, b.Name))
+                    Return VisitTypeMembers(otherContainer, nestedType, AddressOf GetNestedTypes, Function(a, b) s_nameComparer.Equals(a.Name, b.Name))
                 End If
 
                 Dim member = TryCast(def, Cci.ITypeDefinitionMember)
@@ -99,7 +109,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
                     Dim field = TryCast(def, Cci.IFieldDefinition)
                     If field IsNot Nothing Then
-                        Return Me.VisitTypeMembers(otherContainer, field, AddressOf GetFields, Function(a, b) s_nameComparer.Equals(a.Name, b.Name))
+                        Return VisitTypeMembers(otherContainer, field, AddressOf GetFields, Function(a, b) s_nameComparer.Equals(a.Name, b.Name))
                     End If
                 End If
 
@@ -139,7 +149,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 Return Me._lazyTopLevelTypes
             End Function
 
-            Private Function VisitTypeMembers(Of T As {Class, Cci.ITypeDefinitionMember})(
+            Private Shared Function VisitTypeMembers(Of T As {Class, Cci.ITypeDefinitionMember})(
                 otherContainer As Cci.ITypeDefinition,
                 member As T,
                 getMembers As Func(Of Cci.ITypeDefinition, IEnumerable(Of T)),
@@ -194,19 +204,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
             Public Sub New(sourceContext As EmitContext, otherContext As EmitContext)
                 MyBase.New(sourceContext)
-                Me._otherContext = otherContext
+                _otherContext = otherContext
             End Sub
 
             Protected Overrides Function GetTopLevelTypes() As IEnumerable(Of Cci.INamespaceTypeDefinition)
-                Return Me._otherContext.Module.GetTopLevelTypes(Me._otherContext)
+                Return _otherContext.Module.GetTopLevelTypeDefinitions(_otherContext)
             End Function
 
             Protected Overrides Function GetNestedTypes(def As Cci.ITypeDefinition) As IEnumerable(Of Cci.INestedTypeDefinition)
-                Return def.GetNestedTypes(Me._otherContext)
+                Return def.GetNestedTypes(_otherContext)
             End Function
 
             Protected Overrides Function GetFields(def As Cci.ITypeDefinition) As IEnumerable(Of Cci.IFieldDefinition)
-                Return def.GetFields(Me._otherContext)
+                Return def.GetFields(_otherContext)
             End Function
         End Class
 
@@ -219,18 +229,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
             Private ReadOnly _sourceAssembly As SourceAssemblySymbol
             Private ReadOnly _otherAssembly As AssemblySymbol
-            Private ReadOnly _otherSynthesizedMembersOpt As ImmutableDictionary(Of Cci.ITypeDefinition, ImmutableArray(Of Cci.ITypeDefinitionMember))
+            Private ReadOnly _otherSynthesizedMembersOpt As ImmutableDictionary(Of ISymbolInternal, ImmutableArray(Of ISymbolInternal))
 
             ' A cache of members per type, populated when the first member for a given
             ' type Is needed. Within each type, members are indexed by name. The reason
             ' for caching, And indexing by name, Is to avoid searching sequentially
             ' through all members of a given kind each time a member Is matched.
-            Private ReadOnly _typeMembers As ConcurrentDictionary(Of NamedTypeSymbol, IReadOnlyDictionary(Of String, ImmutableArray(Of Cci.ITypeDefinitionMember)))
+            Private ReadOnly _otherMembers As ConcurrentDictionary(Of ISymbolInternal, IReadOnlyDictionary(Of String, ImmutableArray(Of ISymbolInternal)))
 
             Public Sub New(anonymousTypeMap As IReadOnlyDictionary(Of AnonymousTypeKey, AnonymousTypeValue),
                            sourceAssembly As SourceAssemblySymbol,
                            otherAssembly As AssemblySymbol,
-                           otherSynthesizedMembersOpt As ImmutableDictionary(Of Cci.ITypeDefinition, ImmutableArray(Of Cci.ITypeDefinitionMember)),
+                           otherSynthesizedMembersOpt As ImmutableDictionary(Of ISymbolInternal, ImmutableArray(Of ISymbolInternal)),
                            deepTranslatorOpt As DeepTranslator)
 
                 _anonymousTypeMap = anonymousTypeMap
@@ -239,10 +249,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 _otherSynthesizedMembersOpt = otherSynthesizedMembersOpt
                 _comparer = New SymbolComparer(Me, deepTranslatorOpt)
                 _matches = New ConcurrentDictionary(Of Symbol, Symbol)(ReferenceEqualityComparer.Instance)
-                _typeMembers = New ConcurrentDictionary(Of NamedTypeSymbol, IReadOnlyDictionary(Of String, ImmutableArray(Of Cci.ITypeDefinitionMember)))()
+                _otherMembers = New ConcurrentDictionary(Of ISymbolInternal, IReadOnlyDictionary(Of String, ImmutableArray(Of ISymbolInternal)))(ReferenceEqualityComparer.Instance)
             End Sub
 
-            Friend Function TryGetAnonymousTypeName(type As NamedTypeSymbol, <Out()> ByRef name As String, <Out()> ByRef index As Integer) As Boolean
+            Friend Function TryGetAnonymousTypeName(type As AnonymousTypeManager.AnonymousTypeOrDelegateTemplateSymbol, <Out> ByRef name As String, <Out> ByRef index As Integer) As Boolean
                 Dim otherType As AnonymousTypeValue = Nothing
                 If TryFindAnonymousType(type, otherType) Then
                     name = otherType.Name
@@ -320,19 +330,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 Return Nothing
             End Function
 
-            Public Overrides Function VisitAssembly(symbol As AssemblySymbol) As Symbol
-                If symbol.IsLinked Then
-                    Return symbol
+            Public Overrides Function VisitAssembly(assembly As AssemblySymbol) As Symbol
+                If assembly.IsLinked Then
+                    Return assembly
                 End If
 
-                ' the current source assembly:
-                If symbol.Identity.Equals(_sourceAssembly.Identity) Then
+                ' When we map synthesized symbols from previous generations to the latest compilation 
+                ' we might encounter a symbol that is defined in arbitrary preceding generation, 
+                ' not just the immediately preceding generation. If the source assembly uses time-based 
+                ' versioning assemblies of preceding generations might differ in their version number.
+                If IdentityEqualIgnoringVersionWildcard(assembly, _sourceAssembly) Then
                     Return _otherAssembly
                 End If
 
-                ' find a referenced assembly with the exactly same identity:
+                ' find a referenced assembly with the exactly same source identity:
                 For Each otherReferencedAssembly In _otherAssembly.Modules(0).ReferencedAssemblySymbols
-                    If symbol.Identity.Equals(otherReferencedAssembly.Identity) Then
+                    If IdentityEqualIgnoringVersionWildcard(assembly, otherReferencedAssembly) Then
                         Return otherReferencedAssembly
                     End If
                 Next
@@ -340,17 +353,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 Return Nothing
             End Function
 
-            Public Overrides Function VisitNamespace([namespace] As NamespaceSymbol) As Symbol
-                Dim otherContainer As Symbol = Me.Visit([namespace].ContainingSymbol)
-                Dim kind As SymbolKind = otherContainer.Kind
-                If kind = SymbolKind.NetModule Then
-                    Return (DirectCast(otherContainer, ModuleSymbol)).GlobalNamespace
-                End If
-                If kind <> SymbolKind.Namespace Then
-                    Throw ExceptionUtilities.UnexpectedValue(kind)
-                End If
+            Private Shared Function IdentityEqualIgnoringVersionWildcard(left As AssemblySymbol, right As AssemblySymbol) As Boolean
+                Dim leftIdentity = left.Identity
+                Dim rightIdentity = right.Identity
+                Return AssemblyIdentityComparer.SimpleNameComparer.Equals(leftIdentity.Name, rightIdentity.Name) AndAlso
+                       If(left.AssemblyVersionPattern, leftIdentity.Version).Equals(If(right.AssemblyVersionPattern, rightIdentity.Version)) AndAlso
+                       AssemblyIdentity.EqualIgnoringNameAndVersion(leftIdentity, rightIdentity)
+            End Function
 
-                Return FindMatchingNamespaceMember(DirectCast(otherContainer, NamespaceSymbol), [namespace], Function(s As NamespaceSymbol, o As NamespaceSymbol) True)
+
+            Public Overrides Function VisitNamespace([namespace] As NamespaceSymbol) As Symbol
+                Dim otherContainer As Symbol = Visit([namespace].ContainingSymbol)
+                Debug.Assert(otherContainer IsNot Nothing)
+
+                Select Case otherContainer.Kind
+                    Case SymbolKind.NetModule
+                        Return DirectCast(otherContainer, ModuleSymbol).GlobalNamespace
+
+                    Case SymbolKind.Namespace
+                        Return FindMatchingMember(otherContainer, [namespace], AddressOf AreNamespacesEqual)
+
+                    Case Else
+                        Throw ExceptionUtilities.UnexpectedValue(otherContainer.Kind)
+
+                End Select
             End Function
 
             Public Overrides Function VisitNamedType(type As NamedTypeSymbol) As Symbol
@@ -384,6 +410,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
                     Dim typeMap = TypeSubstitution.Create(otherDef, otherTypeParameters, otherTypeArguments, False)
                     Return otherDef.Construct(typeMap)
+                ElseIf type.IsTupleType Then
+                    Dim otherDef = DirectCast(Me.Visit(type.TupleUnderlyingType), NamedTypeSymbol)
+                    If otherDef Is Nothing OrElse Not otherDef.IsTupleOrCompatibleWithTupleOfCardinality(type.TupleElementTypes.Length) Then
+                        Return Nothing
+                    End If
+
+                    Return otherDef
                 End If
 
                 Debug.Assert(type.IsDefinition)
@@ -395,25 +428,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                     Return Nothing
                 End If
 
-                Dim kind As SymbolKind = otherContainer.Kind
-                Select Case kind
+                Select Case otherContainer.Kind
                     Case SymbolKind.Namespace
-                        If AnonymousTypeManager.IsAnonymousTypeTemplate(type) Then
+                        Dim template = TryCast(type, AnonymousTypeManager.AnonymousTypeOrDelegateTemplateSymbol)
+                        If template IsNot Nothing Then
                             Debug.Assert(otherContainer Is _otherAssembly.GlobalNamespace)
                             Dim value As AnonymousTypeValue = Nothing
-                            TryFindAnonymousType(type, value)
+                            TryFindAnonymousType(template, value)
                             Return DirectCast(value.Type, NamedTypeSymbol)
-                        ElseIf type.IsAnonymousType Then
-                            Return Me.Visit(AnonymousTypeManager.TranslateAnonymousTypeSymbol(type))
-                        Else
-                            Return FindMatchingNamespaceMember(DirectCast(otherContainer, NamespaceSymbol), type, AddressOf Me.AreNamedTypesEqual)
                         End If
 
+                        If type.IsAnonymousType Then
+                            Return Visit(AnonymousTypeManager.TranslateAnonymousTypeSymbol(type))
+                        End If
+
+                        Return FindMatchingMember(otherContainer, type, AddressOf AreNamedTypesEqual)
+
                     Case SymbolKind.NamedType
-                        Return Me.FindMatchingNamedTypeMember(DirectCast(otherContainer, NamedTypeSymbol), type, AddressOf Me.AreNamedTypesEqual)
+                        Return FindMatchingMember(otherContainer, type, AddressOf AreNamedTypesEqual)
 
                     Case Else
-                        Throw ExceptionUtilities.UnexpectedValue(kind)
+                        Throw ExceptionUtilities.UnexpectedValue(otherContainer.Kind)
                 End Select
             End Function
 
@@ -463,38 +498,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                     VisualBasicCustomModifier.CreateRequired(type))
             End Function
 
-            Friend Function TryFindAnonymousType(type As NamedTypeSymbol, <Out()> ByRef otherType As AnonymousTypeValue) As Boolean
+            Friend Function TryFindAnonymousType(type As AnonymousTypeManager.AnonymousTypeOrDelegateTemplateSymbol, <Out> ByRef otherType As AnonymousTypeValue) As Boolean
                 Debug.Assert(type.ContainingSymbol Is _sourceAssembly.GlobalNamespace)
-                Debug.Assert(AnonymousTypeManager.IsAnonymousTypeTemplate(type))
 
-                Dim key = AnonymousTypeManager.GetAnonymousTypeKey(type)
-                Return _anonymousTypeMap.TryGetValue(key, otherType)
-            End Function
-
-            Private Shared Function FindMatchingNamespaceMember(Of T As Symbol)(otherNamespace As NamespaceSymbol, sourceMember As T, predicate As Func(Of T, T, Boolean)) As T
-                For Each otherMember In otherNamespace.GetMembers(sourceMember.Name)
-                    If sourceMember.Kind = otherMember.Kind Then
-                        Dim other As T = DirectCast(otherMember, T)
-                        If predicate(sourceMember, other) Then
-                            Return other
-                        End If
-                    End If
-                Next
-                Return Nothing
+                Return _anonymousTypeMap.TryGetValue(type.GetAnonymousTypeKey(), otherType)
             End Function
 
             Private Function VisitNamedTypeMember(Of T As Symbol)(member As T, predicate As Func(Of T, T, Boolean)) As Symbol
-                Dim otherType As NamedTypeSymbol = DirectCast(Me.Visit(member.ContainingType), NamedTypeSymbol)
+                Dim otherType As NamedTypeSymbol = DirectCast(Visit(member.ContainingType), NamedTypeSymbol)
                 If otherType Is Nothing Then
                     Return Nothing
                 End If
-                Return Me.FindMatchingNamedTypeMember(otherType, member, predicate)
+                Return FindMatchingMember(otherType, member, predicate)
             End Function
 
-            Private Function FindMatchingNamedTypeMember(Of T As Symbol)(otherType As NamedTypeSymbol, sourceMember As T, predicate As Func(Of T, T, Boolean)) As T
-                Dim otherMembersByName = Me._typeMembers.GetOrAdd(otherType, AddressOf GetOtherTypeMembers)
+            Private Function FindMatchingMember(Of T As Symbol)(otherTypeOrNamespace As ISymbolInternal, sourceMember As T, predicate As Func(Of T, T, Boolean)) As T
+                Dim otherMembersByName = _otherMembers.GetOrAdd(otherTypeOrNamespace, AddressOf GetAllEmittedMembers)
 
-                Dim otherMembers As ImmutableArray(Of Cci.ITypeDefinitionMember) = Nothing
+                Dim otherMembers As ImmutableArray(Of ISymbolInternal) = Nothing
                 If otherMembersByName.TryGetValue(sourceMember.Name, otherMembers) Then
                     For Each otherMember In otherMembers
                         Dim other = TryCast(otherMember, T)
@@ -534,7 +555,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
                 Return Me._comparer.Equals(method.ReturnType, other.ReturnType) AndAlso
                     method.Parameters.SequenceEqual(other.Parameters, AddressOf Me.AreParametersEqual) AndAlso
-                    method.TypeArguments.SequenceEqual(other.TypeArguments, AddressOf Me.AreTypesEqual)
+                    method.TypeParameters.SequenceEqual(other.TypeParameters, AddressOf Me.AreTypesEqual)
             End Function
 
             Private Shared Function SubstituteTypeParameters(method As MethodSymbol) As MethodSymbol
@@ -551,7 +572,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 Debug.Assert(s_nameComparer.Equals(type.Name, other.Name))
                 Debug.Assert(Not type.HasTypeArgumentsCustomModifiers)
                 Debug.Assert(Not other.HasTypeArgumentsCustomModifiers)
+
+                ' Tuple types should be unwrapped to their underlying type before getting here (see MatchSymbols.VisitNamedType)
+                Debug.Assert(Not type.IsTupleType)
+                Debug.Assert(Not other.IsTupleType)
+
                 Return type.TypeArgumentsNoUseSiteDiagnostics.SequenceEqual(other.TypeArgumentsNoUseSiteDiagnostics, AddressOf Me.AreTypesEqual)
+            End Function
+
+            Private Function AreNamespacesEqual([namespace] As NamespaceSymbol, other As NamespaceSymbol) As Boolean
+                Debug.Assert(s_nameComparer.Equals([namespace].Name, other.Name))
+                Return True
             End Function
 
             Private Function AreParametersEqual(parameter As ParameterSymbol, other As ParameterSymbol) As Boolean
@@ -565,7 +596,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                     [property].Parameters.SequenceEqual(other.Parameters, AddressOf Me.AreParametersEqual)
             End Function
 
-            Private Function AreTypeParametersEqual(type As TypeParameterSymbol, other As TypeParameterSymbol) As Boolean
+            Private Shared Function AreTypeParametersEqual(type As TypeParameterSymbol, other As TypeParameterSymbol) As Boolean
                 Debug.Assert(type.Ordinal = other.Ordinal)
                 Debug.Assert(s_nameComparer.Equals(type.Name, other.Name))
                 ' Comparing constraints is unnecessary: two methods cannot differ by
@@ -598,21 +629,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 End Select
             End Function
 
-            Private Function GetOtherTypeMembers(otherType As NamedTypeSymbol) As IReadOnlyDictionary(Of String, ImmutableArray(Of Cci.ITypeDefinitionMember))
-                Dim members = ArrayBuilder(Of Cci.ITypeDefinitionMember).GetInstance()
+            Private Function GetAllEmittedMembers(symbol As ISymbolInternal) As IReadOnlyDictionary(Of String, ImmutableArray(Of ISymbolInternal))
+                Dim members = ArrayBuilder(Of ISymbolInternal).GetInstance()
 
-                members.AddRange(otherType.GetEventsToEmit())
-                members.AddRange(otherType.GetFieldsToEmit())
-                members.AddRange(otherType.GetMethodsToEmit())
-                members.AddRange(otherType.GetTypeMembers())
-                members.AddRange(otherType.GetPropertiesToEmit())
+                If symbol.Kind = SymbolKind.NamedType Then
+                    Dim type = CType(symbol, NamedTypeSymbol)
+                    members.AddRange(type.GetEventsToEmit())
+                    members.AddRange(type.GetFieldsToEmit())
+                    members.AddRange(type.GetMethodsToEmit())
+                    members.AddRange(type.GetTypeMembers())
+                    members.AddRange(type.GetPropertiesToEmit())
+                Else
+                    members.AddRange(CType(symbol, NamespaceSymbol).GetMembers())
+                End If
 
-                Dim synthesizedMembers As ImmutableArray(Of Cci.ITypeDefinitionMember) = Nothing
-                If _otherSynthesizedMembersOpt IsNot Nothing AndAlso _otherSynthesizedMembersOpt.TryGetValue(otherType, synthesizedMembers) Then
+                Dim synthesizedMembers As ImmutableArray(Of ISymbolInternal) = Nothing
+                If _otherSynthesizedMembersOpt IsNot Nothing AndAlso _otherSynthesizedMembersOpt.TryGetValue(symbol, synthesizedMembers) Then
                     members.AddRange(synthesizedMembers)
                 End If
 
-                Dim result = members.ToDictionary(Function(s) DirectCast(s, Symbol).Name, s_nameComparer)
+                Dim result = members.ToDictionary(Function(s) s.Name, s_nameComparer)
                 members.Free()
                 Return result
             End Function
@@ -628,10 +664,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
                 End Sub
 
                 Public Overloads Function Equals(source As TypeSymbol, other As TypeSymbol) As Boolean
-                    Dim visitedSource = _matcher.Visit(source)
-                    Dim visitedOther = If(_deepTranslatorOpt IsNot Nothing, _deepTranslatorOpt.Visit(other), other)
+                    Dim visitedSource = DirectCast(_matcher.Visit(source), TypeSymbol)
+                    Dim visitedOther = If(_deepTranslatorOpt IsNot Nothing, DirectCast(_deepTranslatorOpt.Visit(other), TypeSymbol), other)
 
-                    Return visitedSource = visitedOther
+                    ' If both visitedSource and visitedOther are Nothing, return false meaning that the method was not able to verify the equality.
+                    Return visitedSource IsNot Nothing AndAlso visitedOther IsNot Nothing AndAlso visitedSource.IsSameType(visitedOther, TypeCompareKind.IgnoreTupleNames)
                 End Function
             End Class
         End Class
@@ -668,6 +705,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
             End Function
 
             Public Overrides Function VisitNamedType(type As NamedTypeSymbol) As Symbol
+                If type.IsTupleType Then
+                    type = type.TupleUnderlyingType
+                    Debug.Assert(Not type.IsTupleType)
+                End If
+
                 Dim originalDef As NamedTypeSymbol = type.OriginalDefinition
                 If originalDef IsNot type Then
                     Dim translatedTypeArguments = type.GetAllTypeArgumentsWithModifiers().SelectAsArray(Function(t, v) New TypeWithModifiers(DirectCast(v.Visit(t.Type), TypeSymbol),

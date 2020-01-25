@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
@@ -12,16 +14,19 @@ namespace Microsoft.CodeAnalysis.Diagnostics
     /// </summary>
     internal sealed class SymbolDeclaredCompilationEvent : CompilationEvent
     {
+        private readonly Lazy<ImmutableArray<SyntaxReference>> _lazyCachedDeclaringReferences;
+
         public SymbolDeclaredCompilationEvent(Compilation compilation, ISymbol symbol) : base(compilation)
         {
             this.Symbol = symbol;
-            this.DeclaringSyntaxReferences = symbol.DeclaringSyntaxReferences;
+            this._lazyCachedDeclaringReferences = new Lazy<ImmutableArray<SyntaxReference>>(() => symbol.DeclaringSyntaxReferences);
         }
 
         public SymbolDeclaredCompilationEvent(Compilation compilation, ISymbol symbol, Lazy<SemanticModel> lazySemanticModel) : this(compilation, symbol)
         {
             _lazySemanticModel = lazySemanticModel;
         }
+
         private SymbolDeclaredCompilationEvent(SymbolDeclaredCompilationEvent original, SemanticModel newSemanticModel) : this(original.Compilation, original.Symbol)
         {
             _semanticModel = newSemanticModel;
@@ -30,7 +35,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         public ISymbol Symbol { get; }
 
         // PERF: We avoid allocations in re-computing syntax references for declared symbol during event processing by caching them directly on this member.
-        public ImmutableArray<SyntaxReference> DeclaringSyntaxReferences { get; }
+        public ImmutableArray<SyntaxReference> DeclaringSyntaxReferences => _lazyCachedDeclaringReferences.Value;
 
         // At most one of these should be non-null.
         private Lazy<SemanticModel> _lazySemanticModel;
@@ -82,7 +87,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             return new SymbolDeclaredCompilationEvent(this, model);
         }
 
-        private static SymbolDisplayFormat s_displayFormat = SymbolDisplayFormat.FullyQualifiedFormat;
         public override string ToString()
         {
             var name = this.Symbol.Name;

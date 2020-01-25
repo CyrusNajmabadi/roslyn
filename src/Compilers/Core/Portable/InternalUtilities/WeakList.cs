@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -17,7 +21,7 @@ namespace Roslyn.Utilities
 
         public WeakList()
         {
-            _items = SpecializedCollections.EmptyArray<WeakReference<T>>();
+            _items = Array.Empty<WeakReference<T>>();
         }
 
         private void Resize()
@@ -123,7 +127,7 @@ namespace Roslyn.Utilities
             {
                 while (j < oldSize)
                 {
-                    _items[j++] = null;
+                    _items[j++] = null!;
                 }
             }
         }
@@ -186,7 +190,7 @@ namespace Roslyn.Utilities
 
             if (alive == 0)
             {
-                _items = SpecializedCollections.EmptyArray<WeakReference<T>>();
+                _items = Array.Empty<WeakReference<T>>();
                 _size = 0;
             }
             else if (alive < _items.Length / 4)

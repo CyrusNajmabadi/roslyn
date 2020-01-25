@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +8,7 @@ using System.ComponentModel.Composition;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Editor.FindUsages;
 using Microsoft.CodeAnalysis.Editor.Peek;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Navigation;
@@ -20,12 +23,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Peek
         private readonly IMetadataAsSourceFileService _metadataAsSourceFileService;
 
         [ImportingConstructor]
-        private PeekableItemFactory(IMetadataAsSourceFileService metadataAsSourceFileService)
+        public PeekableItemFactory(IMetadataAsSourceFileService metadataAsSourceFileService)
         {
             _metadataAsSourceFileService = metadataAsSourceFileService;
         }
 
-        public async Task<IEnumerable<IPeekableItem>> GetPeekableItemsAsync(ISymbol symbol, Project project, IPeekResultFactory peekResultFactory, CancellationToken cancellationToken)
+        public async Task<IEnumerable<IPeekableItem>> GetPeekableItemsAsync(
+            ISymbol symbol, Project project,
+            IPeekResultFactory peekResultFactory,
+            CancellationToken cancellationToken)
         {
             if (symbol == null)
             {
@@ -55,21 +61,19 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Peek
                 project = originatingProject ?? project;
             }
 
-            string filePath;
-            int lineNumber;
-            int charOffset;
-
             var symbolNavigationService = solution.Workspace.Services.GetService<ISymbolNavigationService>();
+            var definitionItem = symbol.ToNonClassifiedDefinitionItem(project, includeHiddenLocations: true);
 
-            if (symbolNavigationService.WouldNavigateToSymbol(symbol, solution, out filePath, out lineNumber, out charOffset))
+            if (symbolNavigationService.WouldNavigateToSymbol(
+                    definitionItem, solution, cancellationToken,
+                    out var filePath, out var lineNumber, out var charOffset))
             {
                 var position = new LinePosition(lineNumber, charOffset);
                 results.Add(new ExternalFilePeekableItem(new FileLinePositionSpan(filePath, position, position), PredefinedPeekRelationships.Definitions, peekResultFactory));
             }
             else
             {
-                var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-                var symbolKey = SymbolKey.Create(symbol, compilation, cancellationToken);
+                var symbolKey = SymbolKey.Create(symbol, cancellationToken);
 
                 var firstLocation = symbol.Locations.FirstOrDefault();
                 if (firstLocation != null)

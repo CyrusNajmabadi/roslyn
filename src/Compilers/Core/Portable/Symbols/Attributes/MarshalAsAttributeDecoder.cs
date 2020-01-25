@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis.Symbols;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis
@@ -25,7 +28,7 @@ namespace Microsoft.CodeAnalysis
                     break;
 
                 case UnmanagedType.Interface:
-                case UnmanagedType.IDispatch:
+                case Cci.Constants.UnmanagedType_IDispatch:
                 case UnmanagedType.IUnknown:
                     DecodeMarshalAsComInterface(ref arguments, unmanagedType, messageProvider);
                     break;
@@ -46,7 +49,7 @@ namespace Microsoft.CodeAnalysis
 
                     break;
 
-                case UnmanagedType.SafeArray:
+                case Cci.Constants.UnmanagedType_SafeArray:
                     DecodeMarshalAsSafeArray(ref arguments, messageProvider);
                     break;
 
@@ -62,7 +65,7 @@ namespace Microsoft.CodeAnalysis
 
                     break;
 
-                case UnmanagedType.VBByRefStr:
+                case Cci.Constants.UnmanagedType_VBByRefStr:
                     if (target == AttributeTargets.Field)
                     {
                         messageProvider.ReportMarshalUnmanagedTypeNotValidForFields(arguments.Diagnostics, arguments.AttributeSyntaxOpt, 0, "VBByRefStr", arguments.Attribute);
@@ -110,7 +113,7 @@ namespace Microsoft.CodeAnalysis
         {
             Debug.Assert((object)arguments.AttributeSyntaxOpt != null);
 
-            ITypeSymbol typeSymbol = null;
+            ITypeSymbolInternal typeSymbol = null;
             string typeName = null;
             string cookie = null;
             bool hasTypeName = false;
@@ -134,7 +137,7 @@ namespace Microsoft.CodeAnalysis
                         break;
 
                     case "MarshalTypeRef":
-                        typeSymbol = namedArg.Value.DecodeValue<ITypeSymbol>(SpecialType.None);
+                        typeSymbol = namedArg.Value.DecodeValue<ITypeSymbolInternal>(SpecialType.None);
                         hasTypeSymbol = true; // even if MarshalTypeRef == null
                         break;
 
@@ -281,8 +284,8 @@ namespace Microsoft.CodeAnalysis
         {
             Debug.Assert((object)arguments.AttributeSyntaxOpt != null);
 
-            VarEnum? elementTypeVariant = null;
-            ITypeSymbol elementTypeSymbol = null;
+            Cci.VarEnum? elementTypeVariant = null;
+            ITypeSymbolInternal elementTypeSymbol = null;
             int symbolIndex = -1;
             bool hasErrors = false;
 
@@ -292,7 +295,7 @@ namespace Microsoft.CodeAnalysis
                 switch (namedArg.Key)
                 {
                     case "SafeArraySubType":
-                        elementTypeVariant = namedArg.Value.DecodeValue<VarEnum>(SpecialType.System_Enum);
+                        elementTypeVariant = namedArg.Value.DecodeValue<Cci.VarEnum>(SpecialType.System_Enum);
                         if (elementTypeVariant < 0 || (int)elementTypeVariant > MarshalPseudoCustomAttributeData.MaxMarshalInteger)
                         {
                             messageProvider.ReportInvalidNamedArgument(arguments.Diagnostics, arguments.AttributeSyntaxOpt, position, arguments.Attribute.AttributeClass, namedArg.Key);
@@ -302,7 +305,7 @@ namespace Microsoft.CodeAnalysis
                         break;
 
                     case "SafeArrayUserDefinedSubType":
-                        elementTypeSymbol = namedArg.Value.DecodeValue<ITypeSymbol>(SpecialType.None);
+                        elementTypeSymbol = namedArg.Value.DecodeValue<ITypeSymbolInternal>(SpecialType.None);
                         symbolIndex = position;
                         break;
 
@@ -320,9 +323,9 @@ namespace Microsoft.CodeAnalysis
 
             switch (elementTypeVariant)
             {
-                case VarEnum.VT_DISPATCH:
-                case VarEnum.VT_UNKNOWN:
-                case VarEnum.VT_RECORD:
+                case Cci.VarEnum.VT_DISPATCH:
+                case Cci.VarEnum.VT_UNKNOWN:
+                case Cci.VarEnum.VT_RECORD:
                     // only these variants accept specification of user defined subtype
                     break;
 

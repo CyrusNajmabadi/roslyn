@@ -1,17 +1,25 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Symbols;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
     /// <summary>
     /// Represents a namespace.
     /// </summary>
-    internal abstract partial class NamespaceSymbol : NamespaceOrTypeSymbol, INamespaceSymbol
+    internal abstract partial class NamespaceSymbol : NamespaceOrTypeSymbol, INamespaceSymbolInternal
     {
+        // PERF: initialization of the following fields will allocate, so we make them lazy
+        private ImmutableArray<NamedTypeSymbol> _lazyTypesMightContainExtensionMethods;
+        private string _lazyQualifiedName;
+
         // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // Changes to the public interface of this class should remain synchronized with the VB version.
         // Do not make any changes to the public interface without making the corresponding change
@@ -311,6 +319,22 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return null;
         }
 
+        private ImmutableArray<NamedTypeSymbol> TypesMightContainExtensionMethods
+        {
+            get
+            {
+                var typesWithExtensionMethods = this._lazyTypesMightContainExtensionMethods;
+                if (typesWithExtensionMethods.IsDefault)
+                {
+                    this._lazyTypesMightContainExtensionMethods = this.GetTypeMembersUnordered().WhereAsArray(t => t.MightContainExtensionMethods);
+                    typesWithExtensionMethods = this._lazyTypesMightContainExtensionMethods;
+                }
+
+                return typesWithExtensionMethods;
+            }
+        }
+
+
         /// <summary>
         /// Add all extension methods in this namespace to the given list. If name or arity
         /// or both are provided, only those extension methods that match are included.
@@ -332,65 +356,28 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 return;
             }
 
-            var types = this.GetTypeMembersUnordered();
-            foreach (var type in types)
+            var typesWithExtensionMethods = this.TypesMightContainExtensionMethods;
+
+            foreach (var type in typesWithExtensionMethods)
             {
-                type.GetExtensionMethods(methods, nameOpt, arity, options);
+                type.DoGetExtensionMethods(methods, nameOpt, arity, options);
             }
         }
 
-        #region INamespaceSymbol Members
-
-        IEnumerable<INamespaceOrTypeSymbol> INamespaceSymbol.GetMembers()
-        {
-            return this.GetMembers().OfType<INamespaceOrTypeSymbol>();
-        }
-
-        IEnumerable<INamespaceOrTypeSymbol> INamespaceSymbol.GetMembers(string name)
-        {
-            return this.GetMembers(name).OfType<INamespaceOrTypeSymbol>();
-        }
-
-        IEnumerable<INamespaceSymbol> INamespaceSymbol.GetNamespaceMembers()
-        {
-            return this.GetNamespaceMembers();
-        }
-
-        NamespaceKind INamespaceSymbol.NamespaceKind
-        {
-            get { return this.NamespaceKind; }
-        }
-
-        Compilation INamespaceSymbol.ContainingCompilation
+        internal string QualifiedName
         {
             get
             {
-                return this.ContainingCompilation;
+                return _lazyQualifiedName ??
+                    (_lazyQualifiedName = this.ToDisplayString(SymbolDisplayFormat.QualifiedNameOnlyFormat));
             }
         }
 
-        ImmutableArray<INamespaceSymbol> INamespaceSymbol.ConstituentNamespaces
+        protected sealed override ISymbol CreateISymbol()
         {
-            get
-            {
-                return StaticCast<INamespaceSymbol>.From(this.ConstituentNamespaces);
-            }
+            return new PublicModel.NamespaceSymbol(this);
         }
 
-        #endregion
-
-        #region ISymbol Members
-
-        public override void Accept(SymbolVisitor visitor)
-        {
-            visitor.VisitNamespace(this);
-        }
-
-        public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
-        {
-            return visitor.VisitNamespace(this);
-        }
-
-        #endregion
+        bool INamespaceSymbolInternal.IsGlobalNamespace => this.IsGlobalNamespace;
     }
 }

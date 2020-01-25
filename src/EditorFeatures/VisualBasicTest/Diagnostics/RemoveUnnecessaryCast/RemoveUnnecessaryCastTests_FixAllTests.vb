@@ -1,10 +1,7 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Threading.Tasks
-Imports Microsoft.CodeAnalysis.CodeFixes
-Imports Microsoft.CodeAnalysis.Diagnostics
-Imports Microsoft.CodeAnalysis.VisualBasic.CodeFixes.RemoveUnnecessaryCast
-Imports Microsoft.CodeAnalysis.VisualBasic.Diagnostics.RemoveUnnecessaryCast
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.RemoveUnnecessaryCast
     Partial Public Class RemoveUnnecessaryCastTests
@@ -168,7 +165,7 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=Nothing)
+            Await TestInRegularAndScriptAsync(input, expected)
         End Function
 
         <Fact>
@@ -305,7 +302,7 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=Nothing)
+            Await TestInRegularAndScriptAsync(input, expected)
         End Function
 
         <Fact>
@@ -442,7 +439,7 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=Nothing)
+            Await TestInRegularAndScriptAsync(input, expected)
         End Function
     End Class
 End Namespace

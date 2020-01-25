@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -63,15 +65,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking
 
             private IEnumerable<ITagSpan<T>> GetTags<T>(NormalizedSnapshotSpanCollection spans, T tag) where T : ITag
             {
-                if (!_stateMachine.Buffer.GetOption(InternalFeatureOnOffOptions.RenameTracking))
+                if (!_stateMachine.Buffer.GetFeatureOnOffOption(InternalFeatureOnOffOptions.RenameTracking))
                 {
                     // Changes aren't being triggered by the buffer, but there may still be taggers
                     // out there which we should prevent from doing work.
                     yield break;
                 }
 
-                TrackingSession trackingSession;
-                if (_stateMachine.CanInvokeRename(out trackingSession, isSmartTagCheck: true))
+                if (_stateMachine.CanInvokeRename(out var trackingSession, isSmartTagCheck: true))
                 {
                     foreach (var span in spans)
                     {

@@ -1,9 +1,12 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
+using System.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -16,28 +19,50 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
     [ExportWorkspaceService(typeof(ISolutionCrawlerRegistrationService), ServiceLayer.Host), Shared]
     internal partial class SolutionCrawlerRegistrationService : ISolutionCrawlerRegistrationService
     {
+        private const string Default = "*";
+
         private readonly object _gate;
         private readonly SolutionCrawlerProgressReporter _progressReporter;
 
         private readonly IAsynchronousOperationListener _listener;
-        private readonly ImmutableArray<Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>> _analyzerProviders;
         private readonly Dictionary<Workspace, WorkCoordinator> _documentWorkCoordinatorMap;
+
+        private ImmutableDictionary<string, ImmutableArray<Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>>> _analyzerProviders;
 
         [ImportingConstructor]
         public SolutionCrawlerRegistrationService(
             [ImportMany] IEnumerable<Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>> analyzerProviders,
-            [ImportMany] IEnumerable<Lazy<IAsynchronousOperationListener, FeatureMetadata>> asyncListeners)
+            IAsynchronousOperationListenerProvider listenerProvider)
         {
             _gate = new object();
 
-            _analyzerProviders = analyzerProviders.ToImmutableArray();
-            _documentWorkCoordinatorMap = new Dictionary<Workspace, WorkCoordinator>(ReferenceEqualityComparer.Instance);
-            _listener = new AggregateAsynchronousOperationListener(asyncListeners, FeatureAttribute.SolutionCrawler);
+            _analyzerProviders = analyzerProviders.GroupBy(kv => kv.Metadata.Name).ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray());
+            AssertAnalyzerProviders(_analyzerProviders);
 
-            _progressReporter = new SolutionCrawlerProgressReporter(_listener);
+            _documentWorkCoordinatorMap = new Dictionary<Workspace, WorkCoordinator>(ReferenceEqualityComparer.Instance);
+            _listener = listenerProvider.GetListener(FeatureAttribute.SolutionCrawler);
+
+            _progressReporter = new SolutionCrawlerProgressReporter();
         }
 
         public void Register(Workspace workspace)
+        {
+            EnsureRegistration(workspace, initializeLazily: true);
+        }
+
+        /// <summary>
+        /// make sure solution cralwer is registered for the given workspace.
+        /// </summary>
+        /// <param name="workspace"><see cref="Workspace"/> this solution crawler runs for</param>
+        /// <param name="initializeLazily">
+        /// when true, solution crawler will be initialized when there is the first workspace event fired. 
+        /// otherwise, it will be initialized when workspace is registered right away. 
+        /// something like "Build" will use initializeLazily:false to make sure diagnostic analyzer engine (incremental analyzer)
+        /// is initialized. otherwise, if build is called before workspace is fully populated, we will think some errors from build
+        /// doesn't belong to us since diagnostic analyzer engine is not there yet and 
+        /// let project system to take care of these unknown errors.
+        /// </param>
+        public void EnsureRegistration(Workspace workspace, bool initializeLazily)
         {
             var correlationId = LogAggregator.GetNextId();
 
@@ -51,7 +76,8 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
 
                 var coordinator = new WorkCoordinator(
                     _listener,
-                    _analyzerProviders.Where(l => l.Metadata.WorkspaceKinds.Any(wk => wk == workspace.Kind)),
+                    GetAnalyzerProviders(workspace),
+                    initializeLazily,
                     new Registration(correlationId, workspace, _progressReporter));
 
                 _documentWorkCoordinatorMap.Add(workspace, coordinator);
@@ -79,52 +105,169 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
             SolutionCrawlerLogger.LogUnregistration(coordinator.CorrelationId);
         }
 
+        public void AddAnalyzerProvider(IIncrementalAnalyzerProvider provider, IncrementalAnalyzerProviderMetadata metadata)
+        {
+            // now update all existing work coordinator
+            lock (_gate)
+            {
+                var lazyProvider = new Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>(() => provider, metadata);
+
+                // update existing map for future solution crawler registration - no need for interlock but this makes add or update easier
+                ImmutableInterlocked.AddOrUpdate(ref _analyzerProviders, metadata.Name, n => ImmutableArray.Create(lazyProvider), (n, v) => v.Add(lazyProvider));
+
+                // assert map integrity
+                AssertAnalyzerProviders(_analyzerProviders);
+
+                // find existing coordinator to update
+                var lazyProviders = _analyzerProviders[metadata.Name];
+                foreach (var kv in _documentWorkCoordinatorMap)
+                {
+                    var workspace = kv.Key;
+                    var coordinator = kv.Value;
+                    if (!TryGetProvider(workspace.Kind, lazyProviders, out var picked) || picked != lazyProvider)
+                    {
+                        // check whether new provider belong to current workspace
+                        continue;
+                    }
+
+                    var analyzer = lazyProvider.Value.CreateIncrementalAnalyzer(workspace);
+                    if (analyzer != null)
+                    {
+                        coordinator.AddAnalyzer(analyzer, metadata.HighPriorityForActiveFile);
+                    }
+                }
+            }
+        }
+
         public void Reanalyze(Workspace workspace, IIncrementalAnalyzer analyzer, IEnumerable<ProjectId> projectIds, IEnumerable<DocumentId> documentIds, bool highPriority)
         {
             lock (_gate)
             {
-                var coordinator = default(WorkCoordinator);
-                if (!_documentWorkCoordinatorMap.TryGetValue(workspace, out coordinator))
+                if (!_documentWorkCoordinatorMap.TryGetValue(workspace, out var coordinator))
                 {
-                    throw new ArgumentException("workspace");
+                    // this can happen if solution crawler is already unregistered from workspace.
+                    // one of those example will be VS shutting down so roslyn package is disposed but there is a pending
+                    // async operation.
+                    return;
                 }
 
                 // no specific projects or documents provided
                 if (projectIds == null && documentIds == null)
                 {
-                    coordinator.Reanalyze(analyzer, workspace.CurrentSolution.Projects.SelectMany(p => p.DocumentIds).ToSet(), highPriority);
+                    coordinator.Reanalyze(analyzer, new ReanalyzeScope(workspace.CurrentSolution.Id), highPriority);
                     return;
                 }
 
-                // specific documents provided
-                if (projectIds == null)
-                {
-                    coordinator.Reanalyze(analyzer, documentIds.ToSet(), highPriority);
-                    return;
-                }
-
-                var solution = workspace.CurrentSolution;
-                var set = new HashSet<DocumentId>(documentIds ?? SpecializedCollections.EmptyEnumerable<DocumentId>());
-                set.UnionWith(projectIds.Select(id => solution.GetProject(id)).SelectMany(p => p.DocumentIds));
-
-                coordinator.Reanalyze(analyzer, set, highPriority);
+                coordinator.Reanalyze(analyzer, new ReanalyzeScope(projectIds, documentIds), highPriority);
             }
         }
 
         internal void WaitUntilCompletion_ForTestingPurposesOnly(Workspace workspace, ImmutableArray<IIncrementalAnalyzer> workers)
         {
-            if (_documentWorkCoordinatorMap.ContainsKey(workspace))
+            if (_documentWorkCoordinatorMap.TryGetValue(workspace, out var coordinator))
             {
-                _documentWorkCoordinatorMap[workspace].WaitUntilCompletion_ForTestingPurposesOnly(workers);
+                coordinator.WaitUntilCompletion_ForTestingPurposesOnly(workers);
             }
         }
 
         internal void WaitUntilCompletion_ForTestingPurposesOnly(Workspace workspace)
         {
-            if (_documentWorkCoordinatorMap.ContainsKey(workspace))
+            if (_documentWorkCoordinatorMap.TryGetValue(workspace, out var coordinator))
             {
-                _documentWorkCoordinatorMap[workspace].WaitUntilCompletion_ForTestingPurposesOnly();
+                coordinator.WaitUntilCompletion_ForTestingPurposesOnly();
             }
+        }
+
+        private IEnumerable<Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>> GetAnalyzerProviders(Workspace workspace)
+        {
+            foreach (var kv in _analyzerProviders)
+            {
+                var lazyProviders = kv.Value;
+
+                // try get provider for the specific workspace kind
+                if (TryGetProvider(workspace.Kind, lazyProviders, out var lazyProvider))
+                {
+                    yield return lazyProvider;
+                    continue;
+                }
+
+                // try get default provider
+                if (TryGetProvider(Default, lazyProviders, out lazyProvider))
+                {
+                    yield return lazyProvider;
+                }
+            }
+        }
+
+        private bool TryGetProvider(
+            string kind,
+            ImmutableArray<Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>> lazyProviders,
+            out Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata> lazyProvider)
+        {
+            // set out param
+            lazyProvider = null;
+
+            // try find provider for specific workspace kind
+            if (kind != Default)
+            {
+                foreach (var provider in lazyProviders)
+                {
+                    if (provider.Metadata.WorkspaceKinds?.Any(wk => wk == kind) == true)
+                    {
+                        lazyProvider = provider;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // try find default provider
+            foreach (var provider in lazyProviders)
+            {
+                if (IsDefaultProvider(provider.Metadata))
+                {
+                    lazyProvider = provider;
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+
+        [Conditional("DEBUG")]
+        private static void AssertAnalyzerProviders(
+            ImmutableDictionary<string, ImmutableArray<Lazy<IIncrementalAnalyzerProvider, IncrementalAnalyzerProviderMetadata>>> analyzerProviders)
+        {
+#if DEBUG
+            // make sure there is duplicated provider defined for same workspace.
+            var set = new HashSet<string>();
+            foreach (var kv in analyzerProviders)
+            {
+                foreach (var lazyProvider in kv.Value)
+                {
+                    if (IsDefaultProvider(lazyProvider.Metadata))
+                    {
+                        Debug.Assert(set.Add(Default));
+                        continue;
+                    }
+
+                    foreach (var kind in lazyProvider.Metadata.WorkspaceKinds)
+                    {
+                        Debug.Assert(set.Add(kind));
+                    }
+                }
+
+                set.Clear();
+            }
+#endif
+        }
+
+        private static bool IsDefaultProvider(IncrementalAnalyzerProviderMetadata providerMetadata)
+        {
+            return providerMetadata.WorkspaceKinds == null || providerMetadata.WorkspaceKinds.Count == 0;
         }
 
         private class Registration
@@ -140,10 +283,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                 ProgressReporter = progressReporter;
             }
 
-            public Solution CurrentSolution
-            {
-                get { return Workspace.CurrentSolution; }
-            }
+            public Solution CurrentSolution => Workspace.CurrentSolution;
 
             public TService GetService<TService>() where TService : IWorkspaceService
             {

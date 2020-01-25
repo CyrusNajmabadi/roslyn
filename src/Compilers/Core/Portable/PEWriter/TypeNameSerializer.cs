@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.PooledObjects;
 using System.Text;
 using System.Diagnostics;
 
@@ -56,22 +59,13 @@ namespace Microsoft.Cci
                 goto done;
             }
 
-            IManagedPointerTypeReference reference = typeReference as IManagedPointerTypeReference;
-            if (reference != null)
-            {
-                typeReference = reference.GetTargetType(context);
-                bool isAssemQual = false;
-                AppendSerializedTypeName(sb, typeReference, ref isAssemQual, context);
-                sb.Append('&');
-                goto done;
-            }
-
             INamespaceTypeReference namespaceType = typeReference.AsNamespaceTypeReference;
             if (namespaceType != null)
             {
-                if (namespaceType.NamespaceName.Length != 0)
+                var name = namespaceType.NamespaceName;
+                if (name.Length != 0)
                 {
-                    sb.Append(namespaceType.NamespaceName);
+                    sb.Append(name);
                     sb.Append('.');
                 }
 
@@ -79,9 +73,10 @@ namespace Microsoft.Cci
                 goto done;
             }
 
+
             if (typeReference.IsTypeSpecification())
             {
-                ITypeReference uninstantiatedTypeReference = typeReference.GetUninstantiatedGenericType();
+                ITypeReference uninstantiatedTypeReference = typeReference.GetUninstantiatedGenericType(context);
 
                 ArrayBuilder<ITypeReference> consolidatedTypeArguments = ArrayBuilder<ITypeReference>.GetInstance();
                 typeReference.GetConsolidatedTypeArguments(consolidatedTypeArguments, context);
@@ -120,8 +115,8 @@ namespace Microsoft.Cci
                 goto done;
             }
 
-        // TODO: error
-        done:
+// TODO: error
+done:
             if (isAssemblyQualified)
             {
                 AppendAssemblyQualifierIfNecessary(sb, UnwrapTypeReference(typeReference, context), out isAssemblyQualified, context);
@@ -157,7 +152,7 @@ namespace Microsoft.Cci
             IGenericTypeInstanceReference genInst = typeReference.AsGenericTypeInstanceReference;
             if (genInst != null)
             {
-                AppendAssemblyQualifierIfNecessary(sb, genInst.GenericType, out isAssemQualified, context);
+                AppendAssemblyQualifierIfNecessary(sb, genInst.GetGenericType(context), out isAssemQualified, context);
                 return;
             }
 
@@ -170,13 +165,6 @@ namespace Microsoft.Cci
 
             IPointerTypeReference pointer = typeReference as IPointerTypeReference;
             if (pointer != null)
-            {
-                AppendAssemblyQualifierIfNecessary(sb, pointer.GetTargetType(context), out isAssemQualified, context);
-                return;
-            }
-
-            IManagedPointerTypeReference reference = typeReference as IManagedPointerTypeReference;
-            if (reference != null)
             {
                 AppendAssemblyQualifierIfNecessary(sb, pointer.GetTargetType(context), out isAssemQualified, context);
                 return;
@@ -245,13 +233,6 @@ namespace Microsoft.Cci
                 if (pointer != null)
                 {
                     typeReference = pointer.GetTargetType(context);
-                    continue;
-                }
-
-                IManagedPointerTypeReference reference = typeReference as IManagedPointerTypeReference;
-                if (reference != null)
-                {
-                    typeReference = reference.GetTargetType(context);
                     continue;
                 }
 

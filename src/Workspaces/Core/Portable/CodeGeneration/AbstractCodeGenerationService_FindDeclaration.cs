@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -53,13 +55,10 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
         }
 
         public bool CanAddTo(SyntaxNode destination, Solution solution, CancellationToken cancellationToken)
-        {
-            IList<bool> availableIndices;
-            return CanAddTo(destination, solution, cancellationToken, out availableIndices);
-        }
+            => CanAddTo(destination, solution, cancellationToken, out var availableIndices);
 
         private bool CanAddTo(SyntaxNode destination, Solution solution, CancellationToken cancellationToken,
-            out IList<bool> availableIndices, Func<Document, bool> isGeneratedDocument = null)
+            out IList<bool> availableIndices, bool checkGeneratedCode = false)
         {
             availableIndices = null;
             if (destination == null)
@@ -76,7 +75,7 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
             }
 
             // check for generated files if needed.
-            if (isGeneratedDocument != null && isGeneratedDocument(document))
+            if (checkGeneratedCode && document.IsGeneratedCode(cancellationToken))
             {
                 return false;
             }
@@ -111,13 +110,30 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
             return availableIndices != null && availableIndices.Any(b => b);
         }
 
-        private async Task<Tuple<SyntaxNode, IList<bool>>> FindMostRelevantDeclarationAsync(
+        /// <summary>
+        /// Return the most relevant declaration to namespaceOrType,
+        /// it will first search the context node contained within,
+        /// then the declaration in the same file, then non auto-generated file,
+        /// then all the potential location. Return null if no declaration.
+        /// </summary>
+        public async Task<SyntaxNode> FindMostRelevantNameSpaceOrTypeDeclarationAsync(
             Solution solution,
             INamespaceOrTypeSymbol namespaceOrType,
             CodeGenerationOptions options,
             CancellationToken cancellationToken)
         {
-            SyntaxNode declaration = default(SyntaxNode);
+            var option = options ?? CodeGenerationOptions.Default;
+            var (declaration, _) = await FindMostRelevantDeclarationAsync(solution, namespaceOrType, option, cancellationToken).ConfigureAwait(false);
+            return declaration;
+        }
+
+        private async Task<(SyntaxNode declaration, IList<bool> availableIndices)> FindMostRelevantDeclarationAsync(
+            Solution solution,
+            INamespaceOrTypeSymbol namespaceOrType,
+            CodeGenerationOptions options,
+            CancellationToken cancellationToken)
+        {
+            var declaration = default(SyntaxNode);
             IList<bool> availableIndices = null;
 
             var symbol = namespaceOrType;
@@ -160,28 +176,25 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
                 fallbackDeclaration = declaration;
                 if (CanAddTo(declaration, solution, cancellationToken, out availableIndices))
                 {
-                    return Tuple.Create(declaration, availableIndices);
+                    return (declaration, availableIndices);
                 }
 
                 // Then, prefer a declaration from the same file.
                 declaration = await SelectFirstOrDefaultAsync(declarations.Where(r => r.SyntaxTree == locationOpt.SourceTree), node => true, cancellationToken).ConfigureAwait(false);
-                fallbackDeclaration = fallbackDeclaration ?? declaration;
+                fallbackDeclaration ??= declaration;
                 if (CanAddTo(declaration, solution, cancellationToken, out availableIndices))
                 {
-                    return Tuple.Create(declaration, availableIndices);
+                    return (declaration, availableIndices);
                 }
             }
 
             // If there is a declaration in a non auto-generated file, prefer it.
-            Func<Document, bool> isGeneratedDocument =
-                solution.Workspace.Services.GetService<IGeneratedCodeRecognitionService>().IsGeneratedCode;
-
             foreach (var decl in declarations)
             {
                 declaration = await decl.GetSyntaxAsync(cancellationToken).ConfigureAwait(false);
-                if (CanAddTo(declaration, solution, cancellationToken, out availableIndices, isGeneratedDocument))
+                if (CanAddTo(declaration, solution, cancellationToken, out availableIndices, checkGeneratedCode: true))
                 {
-                    return Tuple.Create(declaration, availableIndices);
+                    return (declaration, availableIndices);
                 }
             }
 
@@ -189,7 +202,7 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
             availableIndices = null;
             declaration = fallbackDeclaration ?? await SelectFirstOrDefaultAsync(declarations, node => true, cancellationToken).ConfigureAwait(false);
 
-            return Tuple.Create(declaration, availableIndices);
+            return (declaration, availableIndices);
         }
 
         private static async Task<SyntaxNode> SelectFirstOrDefaultAsync(IEnumerable<SyntaxReference> references, Func<SyntaxNode, bool> predicate, CancellationToken cancellationToken)

@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.ComponentModel.Composition;
@@ -22,10 +24,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
         private IVsReferenceManager _referenceManager;
 
         [Import]
-        private AnalyzerItemsTracker _tracker = null;
+        private readonly AnalyzerItemsTracker _tracker = null;
 
         [ImportingConstructor]
-        internal AnalyzerReferenceManager(
+        public AnalyzerReferenceManager(
             [Import(typeof(SVsServiceProvider))] IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
@@ -36,12 +38,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
         /// </summary>
         public void ShowDialog()
         {
-            IVsReferenceManager referenceManager = GetReferenceManager();
+            var referenceManager = GetReferenceManager();
             if (referenceManager != null &&
                 _tracker.SelectedHierarchy != null)
             {
                 referenceManager.ShowReferenceManager(this,
-                                                      SolutionExplorerShim.AddAnalyzer,
+                                                      SolutionExplorerShim.Add_Analyzer,
                                                       null,
                                                       VSConstants.FileReferenceProvider_Guid,
                                                       fForceShowDefaultProvider: false);
@@ -58,13 +60,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
             // The items selected in Solution Explorer should correspond to exactly one
             // IVsHierarchy, otherwise we shouldn't have even tried to show the dialog.
             Debug.Assert(_tracker.SelectedHierarchy != null);
-
-            EnvDTE.Project project = null;
-            if (_tracker.SelectedHierarchy.TryGetProject(out project))
+            if (_tracker.SelectedHierarchy.TryGetProject(out var project))
             {
-                var vsproject = project.Object as VSProject3;
 
-                if (vsproject != null)
+                if (project.Object is VSProject3 vsproject)
                 {
                     foreach (IVsReference reference in changedContext.References)
                     {
@@ -93,7 +92,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
         {
             // Return just the File provider context so that just the browse tab shows up.
             var context = GetReferenceManager().CreateProviderContext(VSConstants.FileReferenceProvider_Guid) as IVsFileReferenceProviderContext;
-            context.BrowseFilter = string.Format("{0} (*.dll)\0*.dll\0", SolutionExplorerShim.AnalyzerFiles);
+            context.BrowseFilter = string.Format("{0} (*.dll)\0*.dll\0", SolutionExplorerShim.Analyzer_Files);
             return new[] { context };
         }
 

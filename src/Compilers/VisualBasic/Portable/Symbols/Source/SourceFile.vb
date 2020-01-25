@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Emit
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -185,7 +188,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim optionExplicit As Boolean?
             Dim optionCompareText As Boolean?
 
-            BindOptions(compilationUnitSyntax.Options, binder, diagBag, optionStrict, optionInfer, optionExplicit, optionCompareText, filterSpan)
+            BindOptions(compilationUnitSyntax.Options, diagBag, optionStrict, optionInfer, optionExplicit, optionCompareText, filterSpan)
 
             Dim importMembersOf As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition) = Nothing
             Dim importMembersOfSyntax As ImmutableArray(Of SyntaxReference) = Nothing
@@ -200,7 +203,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ' Bind the options and return the value of how options were specified.
         ' Errors are generated for duplicate options.
         Private Shared Sub BindOptions(optionsSyntax As SyntaxList(Of OptionStatementSyntax),
-                                binder As Binder,
                                 diagBag As DiagnosticBag,
                                 ByRef optionStrict As Boolean?,
                                 ByRef optionInfer As Boolean?,
@@ -222,28 +224,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         If optionStrict.HasValue Then
                             Binder.ReportDiagnostic(diagBag, optionStmtSyntax, ERRID.ERR_DuplicateOption1, "Strict")
                         Else
-                            optionStrict = binder.DecodeOnOff(optionStmtSyntax.ValueKeyword)
+                            optionStrict = Binder.DecodeOnOff(optionStmtSyntax.ValueKeyword)
                         End If
 
                     Case SyntaxKind.InferKeyword
                         If optionInfer.HasValue Then
                             Binder.ReportDiagnostic(diagBag, optionStmtSyntax, ERRID.ERR_DuplicateOption1, "Infer")
                         Else
-                            optionInfer = binder.DecodeOnOff(optionStmtSyntax.ValueKeyword)
+                            optionInfer = Binder.DecodeOnOff(optionStmtSyntax.ValueKeyword)
                         End If
 
                     Case SyntaxKind.ExplicitKeyword
                         If optionExplicit.HasValue Then
                             Binder.ReportDiagnostic(diagBag, optionStmtSyntax, ERRID.ERR_DuplicateOption1, "Explicit")
                         Else
-                            optionExplicit = binder.DecodeOnOff(optionStmtSyntax.ValueKeyword)
+                            optionExplicit = Binder.DecodeOnOff(optionStmtSyntax.ValueKeyword)
                         End If
 
                     Case SyntaxKind.CompareKeyword
                         If optionCompareText.HasValue Then
                             Binder.ReportDiagnostic(diagBag, optionStmtSyntax, ERRID.ERR_DuplicateOption1, "Compare")
                         Else
-                            optionCompareText = binder.DecodeTextBinary(optionStmtSyntax.ValueKeyword)
+                            optionCompareText = Binder.DecodeTextBinary(optionStmtSyntax.ValueKeyword)
                         End If
                 End Select
             Next

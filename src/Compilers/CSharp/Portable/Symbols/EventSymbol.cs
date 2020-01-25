@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -11,7 +13,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
     /// <summary>
     /// Represents an event.
     /// </summary>
-    internal abstract partial class EventSymbol : Symbol, IEventSymbol
+    internal abstract partial class EventSymbol : Symbol
     {
         // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // Changes to the public interface of this class should remain synchronized with the VB version.
@@ -45,9 +47,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         /// <summary>
-        /// The type of the event. 
+        /// The type of the event along with its annotations.
         /// </summary>
-        public abstract TypeSymbol Type { get; }
+        public abstract TypeWithAnnotations TypeWithAnnotations { get; }
+
+        /// <summary>
+        /// The type of the event.
+        /// </summary>
+        public TypeSymbol Type => TypeWithAnnotations.Type;
 
         /// <summary>
         /// The 'add' accessor of the event.  Null only in error scenarios.
@@ -68,6 +75,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         /// <summary>
+        /// Returns true if this symbol requires an instance reference as the implicit receiver. This is false if the symbol is static.
+        /// </summary>
+        public virtual bool RequiresInstanceReceiver => !IsStatic;
+
+        /// <summary>
         /// True if this is a Windows Runtime-style event.
         /// 
         /// A normal C# event, "event D E", has accessors
@@ -79,6 +91,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         ///     void remove_E(EventRegistrationToken t)
         /// </summary>
         public abstract bool IsWindowsRuntimeEvent { get; }
+
+        /// <summary>
+        /// True if the event itself is excluded from code coverage instrumentation.
+        /// True for source events marked with <see cref="AttributeDescription.ExcludeFromCodeCoverageAttribute"/>.
+        /// </summary>
+        internal virtual bool IsDirectlyExcludedFromCodeCoverage { get => false; }
 
         /// <summary>
         /// True if this symbol has a special name (metadata flag SpecialName is set).
@@ -242,7 +260,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             Debug.Assert(this.IsDefinition);
             Debug.Assert(ReferenceEquals(newOwner.OriginalDefinition, this.ContainingSymbol.OriginalDefinition));
-            return (newOwner == this.ContainingSymbol) ? this : new SubstitutedEventSymbol(newOwner as SubstitutedNamedTypeSymbol, this);
+            return newOwner.IsDefinition ? this : new SubstitutedEventSymbol(newOwner as SubstitutedNamedTypeSymbol, this);
         }
 
         internal abstract bool MustCallMethodsDirectly { get; }
@@ -264,7 +282,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert(this.IsDefinition);
 
             // Check event type.
-            if (DeriveUseSiteDiagnosticFromType(ref result, this.Type))
+            if (DeriveUseSiteDiagnosticFromType(ref result, this.TypeWithAnnotations))
             {
                 return true;
             }
@@ -274,7 +292,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 // If the member is in an assembly with unified references, 
                 // we check if its definition depends on a type from a unified reference.
                 HashSet<TypeSymbol> unificationCheckedTypes = null;
-                if (this.Type.GetUnificationUseSiteDiagnosticRecursive(ref result, this, ref unificationCheckedTypes))
+                if (this.TypeWithAnnotations.GetUnificationUseSiteDiagnosticRecursive(ref result, this, ref unificationCheckedTypes))
                 {
                     return true;
                 }
@@ -302,84 +320,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         #endregion
 
-        #region IEventSymbol Members
-
-        ITypeSymbol IEventSymbol.Type
+        protected sealed override ISymbol CreateISymbol()
         {
-            get
-            {
-                return this.Type;
-            }
+            return new PublicModel.EventSymbol(this);
         }
-
-        IMethodSymbol IEventSymbol.AddMethod
-        {
-            get
-            {
-                return this.AddMethod;
-            }
-        }
-
-        IMethodSymbol IEventSymbol.RemoveMethod
-        {
-            get
-            {
-                return this.RemoveMethod;
-            }
-        }
-
-        IMethodSymbol IEventSymbol.RaiseMethod
-        {
-            get
-            {
-                // C# doesn't have raise methods for events.
-                return null;
-            }
-        }
-
-        IEventSymbol IEventSymbol.OriginalDefinition
-        {
-            get
-            {
-                return this.OriginalDefinition;
-            }
-        }
-
-        IEventSymbol IEventSymbol.OverriddenEvent
-        {
-            get
-            {
-                return this.OverriddenEvent;
-            }
-        }
-
-        ImmutableArray<IEventSymbol> IEventSymbol.ExplicitInterfaceImplementations
-        {
-            get
-            {
-                return this.ExplicitInterfaceImplementations.Cast<EventSymbol, IEventSymbol>();
-            }
-        }
-
-        #endregion
-
-        #region ISymbol Members
-
-        public override void Accept(SymbolVisitor visitor)
-        {
-            visitor.VisitEvent(this);
-        }
-
-        public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
-        {
-            return visitor.VisitEvent(this);
-        }
-
-        #endregion
 
         #region Equality
 
-        public sealed override bool Equals(object obj)
+        public override bool Equals(Symbol obj, TypeCompareKind compareKind)
         {
             EventSymbol other = obj as EventSymbol;
 
@@ -395,7 +343,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             // This checks if the events have the same definition and the type parameters on the containing types have been
             // substituted in the same way.
-            return this.ContainingType == other.ContainingType && ReferenceEquals(this.OriginalDefinition, other.OriginalDefinition);
+            return TypeSymbol.Equals(this.ContainingType, other.ContainingType, compareKind) && ReferenceEquals(this.OriginalDefinition, other.OriginalDefinition);
         }
 
         public override int GetHashCode()

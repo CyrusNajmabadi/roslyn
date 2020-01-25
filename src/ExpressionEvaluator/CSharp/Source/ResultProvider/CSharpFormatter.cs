@@ -1,24 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Text;
 using System.Collections.ObjectModel;
-using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
 
 namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 {
     internal sealed partial class CSharpFormatter : Formatter
     {
-        /// <summary>
-        /// Singleton instance of CSharpFormatter (created using default constructor).
-        /// </summary>
-        internal readonly static CSharpFormatter Instance = new CSharpFormatter();
-
         public CSharpFormatter()
-            : base(defaultFormat: "{{{0}}}",
-                   nullString: "null",
-                   staticMembersString: Resources.StaticMembers)
+            : base(defaultFormat: "{{{0}}}", nullString: "null", thisString: "this")
         {
         }
 
@@ -42,6 +36,8 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return SyntaxFacts.IsWhitespace(c);
         }
 
+        // TODO: https://github.com/dotnet/roslyn/issues/37536 
+        // This parsing is imprecise and may result in bad expressions.
         internal override string TrimAndGetFormatSpecifiers(string expression, out ReadOnlyCollection<string> formatSpecifiers)
         {
             expression = RemoveComments(expression);
@@ -55,7 +51,14 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             var builder = pooledBuilder.Builder;
             var inMultilineComment = false;
             int length = expression.Length;
-            for (int i = 0; i < length; i++)
+
+            // Workaround for https://dev.azure.com/devdiv/DevDiv/_workitems/edit/847849
+            // Do not remove any comments that might be in a string. 
+            // This won't work when there are quotes in the comment, but that's not that common.
+            int lastQuote = expression.LastIndexOf('"') + 1;
+            builder.Append(expression, 0, lastQuote);
+
+            for (int i = lastQuote; i < length; i++)
             {
                 var ch = expression[i];
                 if (inMultilineComment)

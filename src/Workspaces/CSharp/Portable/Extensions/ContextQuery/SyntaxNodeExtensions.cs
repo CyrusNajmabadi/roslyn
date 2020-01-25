@@ -1,25 +1,34 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery
 {
     internal static class SyntaxNodeExtensions
     {
-        public static bool IsDelegateOrConstructorOrMethodParameterList(this SyntaxNode node)
+        public static bool IsDelegateOrConstructorOrLocalFunctionOrMethodOrOperatorParameterList(this SyntaxNode node, bool includeOperators)
         {
             if (!node.IsKind(SyntaxKind.ParameterList))
             {
                 return false;
             }
 
-            return
-                node.IsParentKind(SyntaxKind.MethodDeclaration) ||
+            if (node.IsParentKind(SyntaxKind.MethodDeclaration) ||
+                node.IsParentKind(SyntaxKind.LocalFunctionStatement) ||
                 node.IsParentKind(SyntaxKind.ConstructorDeclaration) ||
-                node.IsParentKind(SyntaxKind.DelegateDeclaration);
+                node.IsParentKind(SyntaxKind.DelegateDeclaration))
+            {
+                return true;
+            }
+
+            if (includeOperators)
+            {
+                return
+                    node.IsParentKind(SyntaxKind.OperatorDeclaration) ||
+                    node.IsParentKind(SyntaxKind.ConversionOperatorDeclaration);
+            }
+
+            return false;
         }
     }
 }

@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -8,7 +10,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
@@ -19,7 +20,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
         internal enum SymbolKeyComparison
         {
             None = 0x0,
-            CaseSensitive = 0x1,
+            IgnoreCase = 0x1,
             IgnoreAssemblyIds = 0x2
         }
 
@@ -35,37 +36,37 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
 
         #region "Verification"
 
-        internal static void ResolveAndVerifySymbolList(IEnumerable<ISymbol> newSymbols, Compilation newCompilation, IEnumerable<ISymbol> originalSymbols, CSharpCompilation originalComp)
+        internal static void ResolveAndVerifySymbolList(IEnumerable<ISymbol> newSymbols, IEnumerable<ISymbol> originalSymbols, CSharpCompilation originalComp)
         {
             var newlist = newSymbols.OrderBy(s => s.Name).ToList();
             var origlist = originalSymbols.OrderBy(s => s.Name).ToList();
 
             Assert.Equal(origlist.Count, newlist.Count);
 
-            for (int i = 0; i < newlist.Count; i++)
+            for (var i = 0; i < newlist.Count; i++)
             {
-                ResolveAndVerifySymbol(newlist[i], newCompilation, origlist[i], originalComp);
+                ResolveAndVerifySymbol(newlist[i], origlist[i], originalComp);
             }
         }
 
         internal static void ResolveAndVerifyTypeSymbol(ExpressionSyntax node, ITypeSymbol sourceSymbol, SemanticModel model, CSharpCompilation sourceComp)
         {
             var typeinfo = model.GetTypeInfo(node);
-            ResolveAndVerifySymbol(typeinfo.Type ?? typeinfo.ConvertedType, model.Compilation, sourceSymbol, sourceComp);
+            ResolveAndVerifySymbol(typeinfo.Type ?? typeinfo.ConvertedType, sourceSymbol, sourceComp);
         }
 
         internal static void ResolveAndVerifySymbol(ExpressionSyntax node, ISymbol sourceSymbol, SemanticModel model, CSharpCompilation sourceComp, SymbolKeyComparison comparison = SymbolKeyComparison.None)
         {
             var syminfo = model.GetSymbolInfo(node);
-            ResolveAndVerifySymbol(syminfo.Symbol, model.Compilation, sourceSymbol, sourceComp, comparison);
+            ResolveAndVerifySymbol(syminfo.Symbol, sourceSymbol, sourceComp, comparison);
         }
 
-        internal static void ResolveAndVerifySymbol(ISymbol symbol1, Compilation compilation1, ISymbol symbol2, Compilation compilation2, SymbolKeyComparison comparison = SymbolKeyComparison.None)
+        internal static void ResolveAndVerifySymbol(ISymbol symbol1, ISymbol symbol2, Compilation compilation2, SymbolKeyComparison comparison = SymbolKeyComparison.None)
         {
             // same ID
-            AssertSymbolKeysEqual(symbol1, compilation1, symbol2, compilation2, comparison);
+            AssertSymbolKeysEqual(symbol1, symbol2, comparison);
 
-            var resolvedSymbol = ResolveSymbol(symbol1, compilation1, compilation2, comparison);
+            var resolvedSymbol = ResolveSymbol(symbol1, compilation2, comparison);
 
             Assert.NotNull(resolvedSymbol);
 
@@ -74,30 +75,36 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
             Assert.Equal(symbol2.GetHashCode(), resolvedSymbol.GetHashCode());
         }
 
-        internal static ISymbol ResolveSymbol(ISymbol originalSymbol, Compilation originalCompilation, Compilation targetCompilation, SymbolKeyComparison comparison)
+        internal static ISymbol ResolveSymbol(ISymbol originalSymbol, Compilation targetCompilation, SymbolKeyComparison comparison)
         {
-            var sid = SymbolKey.Create(originalSymbol, originalCompilation, CancellationToken.None);
-            var symInfo = sid.Resolve(targetCompilation, (comparison & SymbolKeyComparison.IgnoreAssemblyIds) == SymbolKeyComparison.IgnoreAssemblyIds);
+            var sid = SymbolKey.Create(originalSymbol, CancellationToken.None);
 
+            // Verify that serialization works.
+            var serialized = sid.ToString();
+            var deserialized = new SymbolKey(serialized);
+            var comparer = SymbolKey.GetComparer(ignoreCase: false, ignoreAssemblyKeys: false);
+            Assert.True(comparer.Equals(sid, deserialized));
+
+            var symInfo = sid.Resolve(targetCompilation, (comparison & SymbolKeyComparison.IgnoreAssemblyIds) == SymbolKeyComparison.IgnoreAssemblyIds);
             return symInfo.Symbol;
         }
 
-        internal static void AssertSymbolKeysEqual(ISymbol symbol1, Compilation compilation1, ISymbol symbol2, Compilation compilation2, SymbolKeyComparison comparison, bool expectEqual = true)
+        internal static void AssertSymbolKeysEqual(ISymbol symbol1, ISymbol symbol2, SymbolKeyComparison comparison, bool expectEqual = true)
         {
-            var sid1 = SymbolKey.Create(symbol1, compilation1, CancellationToken.None);
-            var sid2 = SymbolKey.Create(symbol2, compilation2, CancellationToken.None);
+            var sid1 = SymbolKey.Create(symbol1, CancellationToken.None);
+            var sid2 = SymbolKey.Create(symbol2, CancellationToken.None);
 
             // default is Insensitive
-            var isCaseSensitive = (comparison & SymbolKeyComparison.CaseSensitive) == SymbolKeyComparison.CaseSensitive;
+            var ignoreCase = (comparison & SymbolKeyComparison.IgnoreCase) == SymbolKeyComparison.IgnoreCase;
 
             // default is NOT ignore
             var ignoreAssemblyIds = (comparison & SymbolKeyComparison.IgnoreAssemblyIds) == SymbolKeyComparison.IgnoreAssemblyIds;
             var message = string.Concat(
-                isCaseSensitive ? "SymbolID CaseSensitive" : "SymbolID CaseInsensitive",
+                ignoreCase ? "SymbolID IgnoreCase" : "SymbolID",
                 ignoreAssemblyIds ? " IgnoreAssemblyIds " : " ",
                 "Compare");
 
-            var ret = CodeAnalysis.SymbolKey.GetComparer(isCaseSensitive, ignoreAssemblyIds).Equals(sid2, sid1);
+            var ret = CodeAnalysis.SymbolKey.GetComparer(ignoreCase, ignoreAssemblyIds).Equals(sid2, sid1);
             if (expectEqual)
             {
                 Assert.True(ret, message);
@@ -112,23 +119,23 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
 
         #region "Utilities"
 
-        internal static List<BlockSyntax> GetBlockSyntaxList(MethodSymbol symbol)
+        internal static List<BlockSyntax> GetBlockSyntaxList(IMethodSymbol symbol)
         {
             var list = new List<BlockSyntax>();
 
             foreach (var node in symbol.DeclaringSyntaxReferences.Select(d => d.GetSyntax()))
             {
                 BlockSyntax body = null;
-                if (node is BaseMethodDeclarationSyntax)
+                if (node is BaseMethodDeclarationSyntax baseMethod)
                 {
-                    body = (node as BaseMethodDeclarationSyntax).Body;
+                    body = baseMethod.Body;
                 }
-                else if (node is AccessorDeclarationSyntax)
+                else if (node is AccessorDeclarationSyntax accessor)
                 {
-                    body = (node as AccessorDeclarationSyntax).Body;
+                    body = accessor.Body;
                 }
 
-                if (body != null || body.Statements.Any())
+                if (body != null && body.Statements.Any())
                 {
                     list.Add(body);
                 }
@@ -142,7 +149,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
             // NYI for local symbols
             var list = GetSourceSymbols(compilation, includeLocal: false);
 
-            List<SymbolKind> kinds = new List<SymbolKind>();
+            var kinds = new List<SymbolKind>();
             if ((category & SymbolCategory.DeclaredNamespace) != 0)
             {
                 kinds.Add(SymbolKind.Namespace);
@@ -189,14 +196,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
         internal static IList<ISymbol> GetSourceSymbols(CSharpCompilation compilation, bool includeLocal)
         {
             var list = new List<ISymbol>();
-            LocalSymbolDumper localDumper = includeLocal ? new LocalSymbolDumper(compilation) : null;
-            GetSourceMemberSymbols(compilation.SourceModule.GlobalNamespace, list, localDumper);
+            var localDumper = includeLocal ? new LocalSymbolDumper(compilation) : null;
+            GetSourceMemberSymbols(compilation.SourceModule.GlobalNamespace.GetPublicSymbol(), list, localDumper);
 
             // ??
             // if (includeLocal)
             GetSourceAliasSymbols(compilation, list);
-            list.Add(compilation.Assembly);
-            list.AddRange(compilation.Assembly.Modules);
+            Compilation c = compilation;
+            list.Add(c.Assembly);
+            list.AddRange(c.Assembly.Modules);
 
             return list;
         }
@@ -205,7 +213,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
 
         #region "Private Helpers"
 
-        private static void GetSourceMemberSymbols(NamespaceOrTypeSymbol symbol, List<ISymbol> list, LocalSymbolDumper localDumper)
+        private static void GetSourceMemberSymbols(INamespaceOrTypeSymbol symbol, List<ISymbol> list, LocalSymbolDumper localDumper)
         {
             foreach (var memberSymbol in symbol.GetMembers())
             {
@@ -215,10 +223,10 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
                 {
                     case SymbolKind.NamedType:
                     case SymbolKind.Namespace:
-                        GetSourceMemberSymbols((NamespaceOrTypeSymbol)memberSymbol, list, localDumper);
+                        GetSourceMemberSymbols((INamespaceOrTypeSymbol)memberSymbol, list, localDumper);
                         break;
                     case SymbolKind.Method:
-                        var method = (MethodSymbol)memberSymbol;
+                        var method = (IMethodSymbol)memberSymbol;
                         foreach (var parameter in method.Parameters)
                         {
                             list.Add(parameter);
@@ -226,14 +234,14 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
 
                         if (localDumper != null)
                         {
-                            localDumper.GetLocalSymbols(method, list);
+                            localDumper.GetLocalSymbols(method.GetSymbol(), list);
                         }
 
                         break;
                     case SymbolKind.Field:
                         if (localDumper != null)
                         {
-                            localDumper.GetLocalSymbols((FieldSymbol)memberSymbol, list);
+                            localDumper.GetLocalSymbols(memberSymbol.GetSymbol<FieldSymbol>(), list);
                         }
 
                         break;
@@ -266,7 +274,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
 
         private class LocalSymbolDumper
         {
-            private CSharpCompilation _compilation;
+            private readonly CSharpCompilation _compilation;
             public LocalSymbolDumper(CSharpCompilation compilation)
             {
                 _compilation = compilation;
@@ -276,8 +284,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
             {
                 foreach (var node in symbol.DeclaringSyntaxReferences.Select(d => d.GetSyntax()))
                 {
-                    var declarator = node as VariableDeclaratorSyntax;
-                    if (declarator != null && declarator.Initializer != null)
+                    if (node is VariableDeclaratorSyntax declarator && declarator.Initializer != null)
                     {
                         var model = _compilation.GetSemanticModel(declarator.SyntaxTree);
 
@@ -295,13 +302,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
                 foreach (var node in symbol.DeclaringSyntaxReferences.Select(d => d.GetSyntax()))
                 {
                     BlockSyntax body = null;
-                    if (node is BaseMethodDeclarationSyntax)
+                    if (node is BaseMethodDeclarationSyntax baseMethod)
                     {
-                        body = (node as BaseMethodDeclarationSyntax).Body;
+                        body = baseMethod.Body;
                     }
-                    else if (node is AccessorDeclarationSyntax)
+                    else if (node is AccessorDeclarationSyntax accessor)
                     {
-                        body = (node as AccessorDeclarationSyntax).Body;
+                        body = accessor.Body;
                     }
 
                     var model = _compilation.GetSemanticModel(node.SyntaxTree);
@@ -317,15 +324,14 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
                     }
 
                     // C# specific (this|base access)
-                    var ctor = node as ConstructorDeclarationSyntax;
-                    if (ctor != null && ctor.Initializer != null)
+                    if (node is ConstructorDeclarationSyntax ctor && ctor.Initializer != null)
                     {
                         foreach (var a in ctor.Initializer.ArgumentList.Arguments)
                         {
                             var df = model.AnalyzeDataFlow(a.Expression);
 
                             // VisitLocals(arg, df);
-                            list.AddRange(df.VariablesDeclared.OfType<Symbol>());
+                            list.AddRange(df.VariablesDeclared);
 
                             GetAnonymousExprSymbols(a.Expression, model, list);
                         }
@@ -337,9 +343,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
             {
                 foreach (var v in df.VariablesDeclared)
                 {
-                    list.Add((Symbol)v);
-                    var local = v as LocalSymbol;
-                    if (local != null && (local.Type.Kind == SymbolKind.ArrayType || local.Type.Kind == SymbolKind.PointerType))
+                    list.Add(v);
+                    if (v is ILocalSymbol local && (local.Type.Kind == SymbolKind.ArrayType || local.Type.Kind == SymbolKind.PointerType))
                     {
                         list.Add(local.Type);
                     }
@@ -404,16 +409,16 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SymbolId
                     // var f = (Func<int>)(() => { return 1; }); Type is delegate
                     // method symbol
                     var sinfo = model.GetSymbolInfo(expr);
-                    list.Add((Symbol)sinfo.Symbol);
+                    list.Add(sinfo.Symbol);
                 }
                 else if (tinfo.Type != null && tinfo.Type.TypeKind != TypeKind.Delegate)
                 {
                     // bug#12625
                     // GetSymbolInfo -> .ctor (part of members)
-                    list.Add((Symbol)tinfo.Type); // NamedType with empty name
+                    list.Add(tinfo.Type); // NamedType with empty name
                     foreach (var m in tinfo.Type.GetMembers())
                     {
-                        list.Add((Symbol)m);
+                        list.Add(m);
                     }
                 }
             }

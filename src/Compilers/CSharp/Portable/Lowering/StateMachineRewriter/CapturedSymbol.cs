@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
@@ -19,7 +21,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Rewrite the replacement expression for the hoisted local so all synthesized field are accessed as members
         /// of the appropriate frame.
         /// </summary>
-        public abstract BoundExpression Replacement(CSharpSyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame);
+        public abstract BoundExpression Replacement(SyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame);
     }
 
     internal sealed class CapturedToFrameSymbolReplacement : CapturedSymbolReplacement
@@ -32,7 +34,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             this.HoistedField = hoistedField;
         }
 
-        public override BoundExpression Replacement(CSharpSyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame)
+        public override BoundExpression Replacement(SyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame)
         {
             var frame = makeFrame(this.HoistedField.ContainingType);
             var field = this.HoistedField.AsMember((NamedTypeSymbol)frame.Type);
@@ -50,7 +52,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             this.HoistedField = hoistedField;
         }
 
-        public override BoundExpression Replacement(CSharpSyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame)
+        public override BoundExpression Replacement(SyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame)
         {
             var frame = makeFrame(this.HoistedField.ContainingType);
             var field = this.HoistedField.AsMember((NamedTypeSymbol)frame.Type);
@@ -70,7 +72,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             this.HoistedFields = hoistedFields;
         }
 
-        public override BoundExpression Replacement(CSharpSyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame)
+        public override BoundExpression Replacement(SyntaxNode node, Func<NamedTypeSymbol, BoundExpression> makeFrame)
         {
             // By returning the same replacement each time, it is possible we
             // are constructing a DAG instead of a tree for the translation.

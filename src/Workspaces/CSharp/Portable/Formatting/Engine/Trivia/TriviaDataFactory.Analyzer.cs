@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
@@ -35,7 +37,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
             {
                 if (!token1.HasTrailingTrivia && !token2.HasLeadingTrivia)
                 {
-                    return default(AnalysisResult);
+                    return default;
                 }
 
                 var result = default(AnalysisResult);
@@ -124,6 +126,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
                     {
                         result.HasSkippedOrDisabledText = true;
                     }
+                    else if (trivia.Kind() == SyntaxKind.ConflictMarkerTrivia)
+                    {
+                        result.HasConflictMarker = true;
+                    }
                     else
                     {
                         Contract.ThrowIfFalse(SyntaxFacts.IsPreprocessorDirective(trivia.Kind()));
@@ -156,12 +162,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
                 Debug.Assert(trivia.Kind() == SyntaxKind.WhitespaceTrivia);
                 Debug.Assert(trivia.Width() == trivia.FullWidth());
 
-                int space = 0;
-                int tab = 0;
-                int unknownWhitespace = 0;
+                var space = 0;
+                var tab = 0;
+                var unknownWhitespace = 0;
 
                 var text = trivia.ToString();
-                for (int i = 0; i < trivia.Width(); i++)
+                for (var i = 0; i < trivia.Width(); i++)
                 {
                     if (text[i] == ' ')
                     {
@@ -201,6 +207,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
                 internal bool HasSkippedTokens { get; set; }
                 internal bool HasSkippedOrDisabledText { get; set; }
 
+                internal bool HasConflictMarker { get; set; }
                 internal bool HasComments { get; set; }
                 internal bool HasPreprocessor { get; set; }
 

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '-----------------------------------------------------------------------------------------------------------
 ' Contains hand-written Partial class extensions to certain of the syntax nodes (other that the 
@@ -70,7 +72,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax
         End Function
     End Class
 
-    Public Partial Class SingleLineLambdaExpressionSyntax
+    Partial Public Class SingleLineLambdaExpressionSyntax
         ''' <summary>
         ''' Single line subs only have a single statement.  However, when binding it is convenient to have a statement list.  For example,
         ''' dim statements are not valid in a single line lambda.  However, it is nice to be able to provide semantic info about the local.

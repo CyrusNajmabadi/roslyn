@@ -1,37 +1,44 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Internal.Log;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.ImplementAbstractClass
 {
-    internal abstract partial class AbstractImplementAbstractClassService : IImplementAbstractClassService
+    internal abstract partial class AbstractImplementAbstractClassService<TClassSyntax> :
+        IImplementAbstractClassService
+        where TClassSyntax : SyntaxNode
     {
         protected AbstractImplementAbstractClassService()
         {
         }
 
-        protected abstract bool TryInitializeState(Document document, SemanticModel model, SyntaxNode classNode, CancellationToken cancellationToken, out INamedTypeSymbol classType, out INamedTypeSymbol abstractClassType);
+        protected abstract bool TryInitializeState(Document document, SemanticModel model, TClassSyntax classNode, CancellationToken cancellationToken, out INamedTypeSymbol classType, out INamedTypeSymbol abstractClassType);
 
-        public Task<Document> ImplementAbstractClassAsync(Document document, SemanticModel model, SyntaxNode node, CancellationToken cancellationToken)
+        public async Task<Document> ImplementAbstractClassAsync(
+            Document document, SyntaxNode classNode, CancellationToken cancellationToken)
         {
             using (Logger.LogBlock(FunctionId.Refactoring_ImplementAbstractClass, cancellationToken))
             {
-                var state = State.Generate(this, document, model, node, cancellationToken);
+                var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+                var state = State.Generate(this, document, model, (TClassSyntax)classNode, cancellationToken);
                 if (state == null)
                 {
-                    return SpecializedTasks.Default<Document>();
+                    return null;
                 }
 
-                return new Editor(document, model, state).GetEditAsync(cancellationToken);
+                return await new Editor(document, model, state).GetEditAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public bool CanImplementAbstractClass(Document document, SemanticModel model, SyntaxNode node, CancellationToken cancellationToken)
+        public async Task<bool> CanImplementAbstractClassAsync(
+            Document document, SyntaxNode node, CancellationToken cancellationToken)
         {
-            return State.Generate(this, document, model, node, cancellationToken) != null;
+            var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            return State.Generate(this, document, model, (TClassSyntax)node, cancellationToken) != null;
         }
     }
 }

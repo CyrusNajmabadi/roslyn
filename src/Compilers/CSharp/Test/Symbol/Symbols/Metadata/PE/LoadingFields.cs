@@ -1,11 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
+using System.Linq;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
@@ -54,7 +55,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.Same(f1, f1.OriginalDefinition);
             Assert.Equal(Accessibility.Public, f1.DeclaredAccessibility);
             Assert.Same(vbFields, f1.ContainingSymbol);
-            Assert.Equal(0, f1.CustomModifiers.Length);
+            Assert.Equal(0, f1.TypeWithAnnotations.CustomModifiers.Length);
 
             Assert.Equal("F2", f2.Name);
             Assert.Same(((PEModuleSymbol)module2).GetCorLibType(SpecialType.System_Int32), f2.Type);
@@ -63,7 +64,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.False(f2.IsStatic);
             Assert.False(f2.IsVolatile);
             Assert.Equal(Accessibility.Protected, f2.DeclaredAccessibility);
-            Assert.Equal(0, f2.CustomModifiers.Length);
+            Assert.Equal(0, f2.TypeWithAnnotations.CustomModifiers.Length);
 
             Assert.Equal("F3", f3.Name);
             Assert.False(f3.IsConst);
@@ -71,7 +72,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.False(f3.IsStatic);
             Assert.False(f3.IsVolatile);
             Assert.Equal(Accessibility.Internal, f3.DeclaredAccessibility);
-            Assert.Equal(0, f3.CustomModifiers.Length);
+            Assert.Equal(0, f3.TypeWithAnnotations.CustomModifiers.Length);
 
             Assert.Equal("F4", f4.Name);
             Assert.False(f4.IsConst);
@@ -79,7 +80,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.False(f4.IsStatic);
             Assert.False(f4.IsVolatile);
             Assert.Equal(Accessibility.ProtectedOrInternal, f4.DeclaredAccessibility);
-            Assert.Equal(0, f4.CustomModifiers.Length);
+            Assert.Equal(0, f4.TypeWithAnnotations.CustomModifiers.Length);
 
             Assert.Equal("F5", f5.Name);
             Assert.True(f5.IsConst);
@@ -87,16 +88,16 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.True(f5.IsStatic);
             Assert.False(f5.IsVolatile);
             Assert.Equal(Accessibility.Protected, f5.DeclaredAccessibility);
-            Assert.Equal(0, f5.CustomModifiers.Length);
+            Assert.Equal(0, f5.TypeWithAnnotations.CustomModifiers.Length);
 
             Assert.Equal("F6", f6.Name);
             Assert.False(f6.IsConst);
             Assert.False(f6.IsReadOnly);
             Assert.False(f6.IsStatic);
             Assert.True(f6.IsVolatile);
-            Assert.Equal(1, f6.CustomModifiers.Length);
+            Assert.Equal(1, f6.TypeWithAnnotations.CustomModifiers.Length);
 
-            CustomModifier mod = f6.CustomModifiers[0];
+            CustomModifier mod = f6.TypeWithAnnotations.CustomModifiers[0];
 
             Assert.False(mod.IsOptional);
             Assert.Equal("System.Runtime.CompilerServices.IsVolatile", mod.Modifier.ToTestDisplayString());
@@ -104,6 +105,37 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Metadata.PE
             Assert.Equal(SymbolKind.NamedType, csFields.GetMembers("FFF").Single().Kind);
             Assert.Equal(SymbolKind.Field, csFields.GetMembers("Fff").Single().Kind);
             Assert.Equal(SymbolKind.Method, csFields.GetMembers("FfF").Single().Kind);
+        }
+
+        [Fact]
+        [WorkItem(193333, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?_a=edit&id=193333")]
+        public void EnumWithPrivateValueField()
+        {
+            var il = @"
+.class public auto ansi sealed TestEnum
+       extends [mscorlib]System.Enum
+{
+  .field private specialname rtspecialname int32 value__
+  .field public static literal valuetype TestEnum Value1 = int32(0x00000000)
+  .field public static literal valuetype TestEnum Value2 = int32(0x00000001)
+} // end of class TestEnum
+";
+
+            var text = @"
+class Program
+{
+    static void Main()
+    {
+        TestEnum val = TestEnum.Value1;
+        System.Console.WriteLine(val.ToString());
+        val =  TestEnum.Value2;
+        System.Console.WriteLine(val.ToString());
+    }
+}
+";
+            var compilation = CreateCompilationWithILAndMscorlib40(text, il, options: TestOptions.DebugExe);
+            CompileAndVerify(compilation, expectedOutput: @"Value1
+Value2");
         }
     }
 }

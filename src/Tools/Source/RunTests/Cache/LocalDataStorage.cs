@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +13,6 @@ namespace RunTests.Cache
 {
     /// <summary>
     /// Data storage that works under %LOCALAPPDATA%
-    /// TODO: need to do garbage collection on the files
     /// </summary>
     internal sealed class LocalDataStorage : IDataStorage
     {
@@ -22,6 +23,7 @@ namespace RunTests.Cache
             ErrorOutput,
             ResultsFileContent,
             ResultsFileName,
+            ElapsedSeconds,
             Content
         }
 
@@ -30,9 +32,23 @@ namespace RunTests.Cache
 
         private readonly string _storagePath;
 
+        public string Name => "local";
+
         internal LocalDataStorage(string storagePath = null)
         {
             _storagePath = storagePath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), DirectoryName);
+            CleanupStorage();
+        }
+
+        public Task<CachedTestResult?> TryGetCachedTestResult(string checksum)
+        {
+            CachedTestResult? value = null;
+            if (TryGetCachedTestResult(checksum, out var testResult))
+            {
+                value = testResult;
+            }
+
+            return Task.FromResult(value);
         }
 
         public bool TryGetCachedTestResult(string checksum, out CachedTestResult testResult)
@@ -52,25 +68,26 @@ namespace RunTests.Cache
                 var errorOutput = Read(checksum, StorageKind.ErrorOutput);
                 var resultsFileName = Read(checksum, StorageKind.ResultsFileName);
                 var resultsFileContent = Read(checksum, StorageKind.ResultsFileContent);
+                var elapsed = Read(checksum, StorageKind.ElapsedSeconds);
 
                 testResult = new CachedTestResult(
                     exitCode: int.Parse(exitCode),
                     standardOutput: standardOutput,
                     errorOutput: errorOutput,
-                    resultsFileName: resultsFileName,
-                    resultsFileContent: resultsFileContent);
+                    resultsFileContent: resultsFileContent,
+                    elapsed: TimeSpan.FromSeconds(int.Parse(elapsed)));
                 return true;
             }
             catch (Exception e)
             {
                 // Okay for exception to occur here on I/O
-                Logger.Log($"Failed to read cache {checksum} {e.Message}");
+                Logger.Log($"Failed to read cache {checksum}", e);
             }
 
             return false;
         }
 
-        public void AddCachedTestResult(ContentFile contentFile, CachedTestResult testResult)
+        public Task AddCachedTestResult(AssemblyInfo assemblyInfo, ContentFile contentFile, CachedTestResult testResult)
         {
             var checksum = contentFile.Checksum;
             var storagePath = Path.Combine(_storagePath, checksum);
@@ -78,22 +95,24 @@ namespace RunTests.Cache
             {
                 if (!FileUtil.EnsureDirectory(storagePath))
                 {
-                    return;
+                    return Task.FromResult(true);
                 }
 
                 Write(checksum, StorageKind.ExitCode, testResult.ExitCode.ToString());
                 Write(checksum, StorageKind.StandardOutput, testResult.StandardOutput);
                 Write(checksum, StorageKind.ErrorOutput, testResult.ErrorOutput);
-                Write(checksum, StorageKind.ResultsFileName, testResult.ResultsFileName);
                 Write(checksum, StorageKind.ResultsFileContent, testResult.ResultsFileContent);
+                Write(checksum, StorageKind.ElapsedSeconds, testResult.Elapsed.TotalSeconds.ToString());
                 Write(checksum, StorageKind.Content, contentFile.Content);
             }
             catch (Exception e)
             {
                 // I/O errors are expected and okay here.
-                Logger.Log($"Failed to log {checksum} {e.Message}");
+                Logger.Log($"Failed to log {checksum}", e);
                 FileUtil.DeleteDirectory(storagePath);
             }
+
+            return Task.FromResult(true);
         }
 
         private string GetStorageFolder(string checksum)
@@ -122,6 +141,13 @@ namespace RunTests.Cache
         {
             try
             {
+                // This is a spot check to avoid dumping entries into the log file if the 
+                // directory doesn't exist
+                if (!Directory.Exists(_storagePath))
+                {
+                    return;
+                }
+
                 var files = Directory.GetFiles(_storagePath);
                 if (files.Length < MaxStorageCount)
                 {
@@ -141,7 +167,7 @@ namespace RunTests.Cache
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unable to cleanup storage {ex.Message}");
+                Logger.Log("Unable to cleanup storage", ex);
             }
         }
     }

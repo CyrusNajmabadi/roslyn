@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
@@ -9,6 +11,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Symbols;
 using Microsoft.CodeAnalysis.VisualBasic;
 using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
@@ -19,6 +22,19 @@ namespace Microsoft.CodeAnalysis.UnitTests
 {
     public class MetadataReferenceTests : TestBase
     {
+        // Tests require AppDomains
+#if NET472
+        [Fact]
+        public void CreateFromAssembly_NoMetadata()
+        {
+            var dynamicAssembly = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName { Name = "A" }, System.Reflection.Emit.AssemblyBuilderAccess.Run);
+            Assert.Throws<NotSupportedException>(() => MetadataReference.CreateFromAssemblyInternal(dynamicAssembly));
+
+            var inMemoryAssembly = Assembly.Load(TestResources.General.C1);
+            Assert.Equal("", inMemoryAssembly.Location);
+            Assert.Throws<NotSupportedException>(() => MetadataReference.CreateFromAssemblyInternal(inMemoryAssembly));
+        }
+
         [Fact]
         public void CreateFrom_Errors()
         {
@@ -31,9 +47,10 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Throws<ArgumentNullException>(() => MetadataReference.CreateFromAssemblyInternal(null));
             Assert.Throws<ArgumentException>(() => MetadataReference.CreateFromAssemblyInternal(typeof(object).Assembly, new MetadataReferenceProperties(MetadataImageKind.Module)));
 
-            var dynamicAssembly = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName { Name = "Foo" }, System.Reflection.Emit.AssemblyBuilderAccess.Run);
+            var dynamicAssembly = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName { Name = "Goo" }, System.Reflection.Emit.AssemblyBuilderAccess.Run);
             Assert.Throws<NotSupportedException>(() => MetadataReference.CreateFromAssemblyInternal(dynamicAssembly));
         }
+#endif
 
         [Fact]
         public void CreateFromImage()
@@ -66,7 +83,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // check that the metadata is in memory and the file can be deleted:
             File.Delete(file.Path);
-            var metadata = (AssemblyMetadata)r.GetMetadata();
+            var metadata = (AssemblyMetadata)r.GetMetadataNoCopy();
             Assert.Equal("CommonLanguageRuntimeLibrary", metadata.GetModules()[0].Name);
         }
 
@@ -77,7 +94,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Equal(CodeAnalysisResources.InMemoryAssembly, r.Display);
 
             Assert.Equal("C, Version=1.0.0.0, Culture=neutral, PublicKeyToken=374d0c2befcd8cc9",
-                ((AssemblyMetadata)r.GetMetadata()).GetAssembly().Identity.GetDisplayName());
+                ((AssemblyMetadata)r.GetMetadataNoCopy()).GetAssembly().Identity.GetDisplayName());
         }
 
         [Fact]
@@ -97,7 +114,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // check that the metadata is in memory and the file can be deleted:
             File.Delete(file.Path);
-            var metadata = (AssemblyMetadata)r.GetMetadata();
+            var metadata = (AssemblyMetadata)r.GetMetadataNoCopy();
             Assert.Equal("CommonLanguageRuntimeLibrary", metadata.GetModules()[0].Name);
         }
 
@@ -118,7 +135,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // check that the metadata is in memory and the file can be deleted:
             File.Delete(file.Path);
-            var metadata = (ModuleMetadata)r.GetMetadata();
+            var metadata = (ModuleMetadata)r.GetMetadataNoCopy();
             Assert.Equal("ModuleCS00.netmodule", metadata.Name);
         }
 
@@ -136,17 +153,6 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             var props = new MetadataReferenceProperties(MetadataImageKind.Assembly, ImmutableArray.Create("a", "b"), embedInteropTypes: true, hasRecursiveAliases: true);
             Assert.Equal(props, MetadataReference.CreateFromAssemblyInternal(assembly, props).Properties);
-        }
-
-        [Fact]
-        public void CreateFromAssembly_NoMetadata()
-        {
-            var dynamicAssembly = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName { Name = "A" }, System.Reflection.Emit.AssemblyBuilderAccess.Run);
-            Assert.Throws<NotSupportedException>(() => MetadataReference.CreateFromAssemblyInternal(dynamicAssembly));
-
-            var inMemoryAssembly = Assembly.Load(TestResources.General.C1);
-            Assert.Equal("", inMemoryAssembly.Location);
-            Assert.Throws<NotSupportedException>(() => MetadataReference.CreateFromAssemblyInternal(inMemoryAssembly));
         }
 
         [Fact]
@@ -189,8 +195,8 @@ namespace Microsoft.CodeAnalysis.UnitTests
             var r = module.GetReference(filePath: @"c:\temp", display: "hello", documentation: doc);
             Assert.Same(doc, r.DocumentationProvider);
             Assert.Same(doc, r.DocumentationProvider);
-            Assert.NotNull(r.GetMetadata());
-            Assert.Equal(false, r.Properties.EmbedInteropTypes);
+            Assert.NotNull(r.GetMetadataNoCopy());
+            Assert.False(r.Properties.EmbedInteropTypes);
             Assert.Equal(MetadataImageKind.Module, r.Properties.Kind);
             Assert.True(r.Properties.Aliases.IsEmpty);
             Assert.Equal(@"c:\temp", r.FilePath);
@@ -228,8 +234,8 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             Assert.Same(doc, r.DocumentationProvider);
             Assert.Same(doc, r.DocumentationProvider);
-            Assert.NotNull(r.GetMetadata());
-            Assert.Equal(true, r.Properties.EmbedInteropTypes);
+            Assert.NotNull(r.GetMetadataNoCopy());
+            Assert.True(r.Properties.EmbedInteropTypes);
             Assert.Equal(MetadataImageKind.Assembly, r.Properties.Kind);
             AssertEx.Equal(new[] { "a" }, r.Properties.Aliases);
             Assert.Equal(@"c:\temp", r.FilePath);
@@ -240,7 +246,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             var r3 = r.WithAliases(ImmutableArray.Create("b", "c"));
             Assert.Same(r.DocumentationProvider, r3.DocumentationProvider);
-            Assert.Same(r.GetMetadata(), r3.GetMetadata());
+            Assert.Same(r.GetMetadataNoCopy(), r3.GetMetadataNoCopy());
             Assert.Equal(r.Properties.EmbedInteropTypes, r3.Properties.EmbedInteropTypes);
             Assert.Equal(r.Properties.Kind, r3.Properties.Kind);
             AssertEx.Equal(new[] { "b", "c" }, r3.Properties.Aliases);
@@ -248,8 +254,8 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             var r4 = r.WithEmbedInteropTypes(false);
             Assert.Same(r.DocumentationProvider, r4.DocumentationProvider);
-            Assert.Same(r.GetMetadata(), r4.GetMetadata());
-            Assert.Equal(false, r4.Properties.EmbedInteropTypes);
+            Assert.Same(r.GetMetadataNoCopy(), r4.GetMetadataNoCopy());
+            Assert.False(r4.Properties.EmbedInteropTypes);
             Assert.Equal(r.Properties.Kind, r4.Properties.Kind);
             AssertEx.Equal(r.Properties.Aliases, r4.Properties.Aliases);
             Assert.Equal(r.FilePath, r4.FilePath);
@@ -453,7 +459,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         [Fact]
         public void Equivalence()
         {
-            var comparer = CommonReferenceManager<CS.CSharpCompilation, IAssemblySymbol>.MetadataReferenceEqualityComparer.Instance;
+            var comparer = CommonReferenceManager<CS.CSharpCompilation, IAssemblySymbolInternal>.MetadataReferenceEqualityComparer.Instance;
 
             var f1 = MscorlibRef;
             var f2 = SystemCoreRef;
@@ -461,18 +467,18 @@ namespace Microsoft.CodeAnalysis.UnitTests
             var i1 = AssemblyMetadata.CreateFromImage(TestResources.NetFX.v4_0_30319.mscorlib).GetReference(display: "i1");
             var i2 = AssemblyMetadata.CreateFromImage(TestResources.NetFX.v4_0_30319.mscorlib).GetReference(display: "i2");
 
-            var m1a = new MyReference(@"c:\a\foo.dll", display: "m1a");
+            var m1a = new MyReference(@"c:\a\goo.dll", display: "m1a");
             Assert.Equal("m1a", m1a.Display);
-            var m1b = new MyReference(@"c:\b\..\a\foo.dll", display: "m1b");
+            var m1b = new MyReference(@"c:\b\..\a\goo.dll", display: "m1b");
             Assert.Equal("m1b", m1b.Display);
-            var m2 = new MyReference(@"c:\b\foo.dll", display: "m2");
+            var m2 = new MyReference(@"c:\b\goo.dll", display: "m2");
             Assert.Equal("m2", m2.Display);
             var m3 = new MyReference(null, display: "m3");
             var m4 = new MyReference(null, display: "m4");
 
-            var c1a = CS.CSharpCompilation.Create("foo").ToMetadataReference();
+            var c1a = CS.CSharpCompilation.Create("goo").ToMetadataReference();
             var c1b = c1a.Compilation.ToMetadataReference();
-            var c2 = CS.CSharpCompilation.Create("foo").ToMetadataReference();
+            var c2 = CS.CSharpCompilation.Create("goo").ToMetadataReference();
 
             var all = new MetadataReference[] { f1, f2, i1, i2, m1a, m1b, m2, c1a, c1b, c2 };
             foreach (var r in all)
@@ -498,14 +504,14 @@ namespace Microsoft.CodeAnalysis.UnitTests
         [Fact]
         public void PortableReference_Display()
         {
-            var comparer = CommonReferenceManager<CS.CSharpCompilation, IAssemblySymbol>.MetadataReferenceEqualityComparer.Instance;
+            var comparer = CommonReferenceManager<CS.CSharpCompilation, IAssemblySymbolInternal>.MetadataReferenceEqualityComparer.Instance;
 
             var f1 = MscorlibRef;
             var f2 = SystemCoreRef;
 
-            var m1a = new MyReference2(@"c:\a\foo.dll", display: "m1a");
-            Assert.Equal(@"c:\a\foo.dll", m1a.Display);
-            Assert.Equal(@"c:\a\foo.dll", m1a.FilePath);
+            var m1a = new MyReference2(@"c:\a\goo.dll", display: "m1a");
+            Assert.Equal(@"c:\a\goo.dll", m1a.Display);
+            Assert.Equal(@"c:\a\goo.dll", m1a.FilePath);
         }
 
         [Fact]
@@ -515,7 +521,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             var corlib = AssemblyMetadata.CreateFromImage(TestResources.NetFX.v4_0_30319.mscorlib).
                 GetReference(display: "corlib", documentation: docProvider);
 
-            var comp = CS.CSharpCompilation.Create("foo",
+            var comp = (Compilation)CS.CSharpCompilation.Create("goo",
                 syntaxTrees: new[] { CS.SyntaxFactory.ParseSyntaxTree("class C : System.Collections.ArrayList { }") },
                 references: new[] { corlib });
 
@@ -531,7 +537,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             var r = MetadataReference.CreateFromStream(new MemoryStream(TestResources.SymbolsTests.Metadata.InvalidPublicKey, writable: false));
             Assert.Equal(CodeAnalysisResources.InMemoryAssembly, r.Display);
 
-            Assert.Throws<BadImageFormatException>((Func<object>)((AssemblyMetadata)r.GetMetadata()).GetAssembly);
+            Assert.Throws<BadImageFormatException>((Func<object>)((AssemblyMetadata)r.GetMetadataNoCopy()).GetAssembly);
         }
     }
 }

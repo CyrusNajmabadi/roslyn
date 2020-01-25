@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections;
@@ -12,13 +14,13 @@ namespace Microsoft.CodeAnalysis
         // Public struct enumerator
         // Only implements enumerator pattern as used by foreach
         // Does not implement IEnumerator. Doing so would require the struct to implement IDisposable too.
-        [SuppressMessage("Performance", "RS0008", Justification = "Equality not actually implemented")]
+        [SuppressMessage("Performance", "CA1067", Justification = "Equality not actually implemented")]
         public struct Enumerator
         {
             private readonly SeparatedSyntaxList<TNode> _list;
             private int _index;
 
-            internal Enumerator(SeparatedSyntaxList<TNode> list)
+            internal Enumerator(in SeparatedSyntaxList<TNode> list)
             {
                 _list = list;
                 _index = -1;
@@ -65,9 +67,9 @@ namespace Microsoft.CodeAnalysis
         {
             private Enumerator _e;
 
-            internal EnumeratorImpl(SeparatedSyntaxList<TNode> list)
+            internal EnumeratorImpl(in SeparatedSyntaxList<TNode> list)
             {
-                _e = new Enumerator(list);
+                _e = new Enumerator(in list);
             }
 
             public TNode Current

@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -42,6 +44,11 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.Progression
                               SymbolDisplayParameterOptions.IncludeOptionalBrackets,
             delegateStyle: SymbolDisplayDelegateStyle.NameAndParameters,
             miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+
+        [ImportingConstructor]
+        public CSharpProgressionLanguageService()
+        {
+        }
 
         public IEnumerable<SyntaxNode> GetTopLevelNodesFromDocument(SyntaxNode root, CancellationToken cancellationToken)
         {
@@ -110,13 +117,15 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.Progression
 
         private static ITypeSymbol GetType(ISymbol symbol)
         {
-            return symbol.TypeSwitch(
-                (IEventSymbol f) => f.Type,
-                (IFieldSymbol f) => f.ContainingType.TypeKind == TypeKind.Enum ? null : f.Type,
-                (IMethodSymbol m) => IncludeReturnType(m) ? m.ReturnType : null,
-                (IPropertySymbol p) => p.Type,
-                (INamedTypeSymbol n) => n.IsDelegateType() ? n.DelegateInvokeMethod.ReturnType : null,
-                _ => null);
+            switch (symbol)
+            {
+                case IEventSymbol f: return f.Type;
+                case IFieldSymbol f: return f.ContainingType.TypeKind == TypeKind.Enum ? null : f.Type;
+                case IMethodSymbol m: return IncludeReturnType(m) ? m.ReturnType : null;
+                case IPropertySymbol p: return p.Type;
+                case INamedTypeSymbol n: return n.IsDelegateType() ? n.DelegateInvokeMethod.ReturnType : null;
+                default: return null;
+            }
         }
 
         private static bool IncludeReturnType(IMethodSymbol f)

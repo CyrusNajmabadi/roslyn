@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.Emit;
 using Roslyn.Utilities;
@@ -17,7 +20,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get
             {
-                return this.CustomModifiers.As<Cci.ICustomModifier>();
+                return this.TypeWithAnnotations.CustomModifiers.As<Cci.ICustomModifier>();
             }
         }
 
@@ -29,11 +32,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        ushort Cci.IParameterTypeInformation.CountOfCustomModifiersPrecedingByRef
+        ImmutableArray<Cci.ICustomModifier> Cci.IParameterTypeInformation.RefCustomModifiers
         {
             get
             {
-                return this.CountOfCustomModifiersPrecedingByRef;
+                return this.RefCustomModifiers.As<Cci.ICustomModifier>();
             }
         }
 
@@ -55,13 +58,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// <summary>
         /// Gets constant value to be stored in metadata Constant table.
         /// </summary>
-        Cci.IMetadataConstant Cci.IParameterDefinition.GetDefaultValue(EmitContext context)
+        MetadataConstant Cci.IParameterDefinition.GetDefaultValue(EmitContext context)
         {
             CheckDefinitionInvariant();
             return this.GetMetadataConstantValue(context);
         }
 
-        internal Cci.IMetadataConstant GetMetadataConstantValue(EmitContext context)
+        internal MetadataConstant GetMetadataConstantValue(EmitContext context)
         {
             if (!HasMetadataConstantValue)
             {

@@ -1,11 +1,13 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.ComponentModel.Composition;
+using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editor.Host;
-using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.VisualStudio.ComponentModelHost;
@@ -23,15 +25,17 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
         private static readonly Func<string, string, string> s_messageGetter = (t, m) => string.Format("{0} : {1}", t, m);
 
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public VisualStudioWaitIndicator(SVsServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
         }
 
-        public WaitIndicatorResult Wait(string title, string message, bool allowCancel, Action<IWaitContext> action)
+        public WaitIndicatorResult Wait(
+            string title, string message, bool allowCancel, bool showProgress, Action<IWaitContext> action)
         {
             using (Logger.LogBlock(FunctionId.Misc_VisualStudioWaitIndicator_Wait, s_messageGetter, title, message, CancellationToken.None))
-            using (var waitContext = StartWait(title, message, allowCancel))
+            using (var waitContext = StartWait(title, message, allowCancel, showProgress))
             {
                 try
                 {
@@ -43,22 +47,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
                 {
                     return WaitIndicatorResult.Canceled;
                 }
-                catch (AggregateException e)
+                catch (AggregateException aggregate) when (aggregate.InnerExceptions.All(e => e is OperationCanceledException))
                 {
-                    var operationCanceledException = e.InnerExceptions[0] as OperationCanceledException;
-                    if (operationCanceledException != null)
-                    {
-                        return WaitIndicatorResult.Canceled;
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    return WaitIndicatorResult.Canceled;
                 }
             }
         }
 
-        private VisualStudioWaitContext StartWait(string title, string message, bool allowCancel)
+        private VisualStudioWaitContext StartWait(
+            string title, string message, bool allowCancel, bool showProgress)
         {
             var componentModel = (IComponentModel)_serviceProvider.GetService(typeof(SComponentModel));
             var workspace = componentModel.GetService<VisualStudioWorkspace>();
@@ -70,12 +67,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
             var dialogFactory = (IVsThreadedWaitDialogFactory)_serviceProvider.GetService(typeof(SVsThreadedWaitDialogFactory));
             Contract.ThrowIfNull(dialogFactory);
 
-            return new VisualStudioWaitContext(notificationService, dialogFactory, title, message, allowCancel);
+            return new VisualStudioWaitContext(
+                notificationService, dialogFactory, title, message, allowCancel, showProgress);
         }
 
-        IWaitContext IWaitIndicator.StartWait(string title, string message, bool allowCancel)
+        IWaitContext IWaitIndicator.StartWait(
+            string title, string message, bool allowCancel, bool showProgress)
         {
-            return StartWait(title, message, allowCancel);
+            return StartWait(title, message, allowCancel, showProgress);
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -11,14 +13,14 @@ namespace Microsoft.CodeAnalysis.Formatting.Rules
 {
     internal class BaseIndentationFormattingRule : AbstractFormattingRule
     {
-        private readonly IFormattingRule _vbHelperFormattingRule;
+        private readonly AbstractFormattingRule _vbHelperFormattingRule;
         private readonly int _baseIndentation;
         private readonly SyntaxToken _token1;
         private readonly SyntaxToken _token2;
         private readonly SyntaxNode _commonNode;
         private readonly TextSpan _span;
 
-        public BaseIndentationFormattingRule(SyntaxNode root, TextSpan span, int baseIndentation, IFormattingRule vbHelperFormattingRule = null)
+        public BaseIndentationFormattingRule(SyntaxNode root, TextSpan span, int baseIndentation, AbstractFormattingRule vbHelperFormattingRule = null)
         {
             _span = span;
             SetInnermostNodeForSpan(root, ref _span, out _token1, out _token2, out _commonNode);
@@ -27,7 +29,7 @@ namespace Microsoft.CodeAnalysis.Formatting.Rules
             _vbHelperFormattingRule = vbHelperFormattingRule;
         }
 
-        public override void AddIndentBlockOperations(List<IndentBlockOperation> list, SyntaxNode node, OptionSet optionSet, NextAction<IndentBlockOperation> nextOperation)
+        public override void AddIndentBlockOperations(List<IndentBlockOperation> list, SyntaxNode node, OptionSet optionSet, in NextIndentBlockOperationAction nextOperation)
         {
             // for the common node itself, return absolute indentation
             if (_commonNode == node)
@@ -44,21 +46,21 @@ namespace Microsoft.CodeAnalysis.Formatting.Rules
             }
 
             // Add everything to the list.
-            AddNextIndentBlockOperations(list, node, optionSet, nextOperation);
+            AddNextIndentBlockOperations(list, node, optionSet, in nextOperation);
 
             // Filter out everything that encompasses our span.
             AdjustIndentBlockOperation(list);
         }
 
-        private void AddNextIndentBlockOperations(List<IndentBlockOperation> list, SyntaxNode node, OptionSet optionSet, NextAction<IndentBlockOperation> nextOperation)
+        private void AddNextIndentBlockOperations(List<IndentBlockOperation> list, SyntaxNode node, OptionSet optionSet, in NextIndentBlockOperationAction nextOperation)
         {
             if (_vbHelperFormattingRule == null)
             {
-                base.AddIndentBlockOperations(list, node, optionSet, nextOperation);
+                base.AddIndentBlockOperations(list, node, optionSet, in nextOperation);
                 return;
             }
 
-            _vbHelperFormattingRule.AddIndentBlockOperations(list, node, optionSet, nextOperation);
+            _vbHelperFormattingRule.AddIndentBlockOperations(list, node, optionSet, in nextOperation);
         }
 
         private void AdjustIndentBlockOperation(List<IndentBlockOperation> list)
@@ -122,7 +124,7 @@ namespace Microsoft.CodeAnalysis.Formatting.Rules
                 case IndentBlockOption.AbsolutePosition:
                     return FormattingOperations.CreateIndentBlockOperation(operation.StartToken, operation.EndToken, AdjustTextSpan(operation.TextSpan), operation.IndentationDeltaOrPosition, operation.Option);
                 default:
-                    throw ExceptionUtilities.Unreachable;
+                    throw ExceptionUtilities.UnexpectedValue(operation.Option);
             }
         }
 
@@ -133,7 +135,7 @@ namespace Microsoft.CodeAnalysis.Formatting.Rules
 
         private void SetInnermostNodeForSpan(SyntaxNode root, ref TextSpan span, out SyntaxToken token1, out SyntaxToken token2, out SyntaxNode commonNode)
         {
-            commonNode = default(SyntaxNode);
+            commonNode = default;
 
             GetTokens(root, span, out token1, out token2);
 
@@ -201,6 +203,17 @@ namespace Microsoft.CodeAnalysis.Formatting.Rules
                 {
                     end = tree.Length;
                 }
+            }
+
+            if (token1.Equals(token2) && end < start)
+            {
+                // This can happen if `token1.Span` is larger than `span` on each end (due to trivia) and occurs when
+                // only a single token is projected into a buffer and the projection is sandwiched between two other
+                // projections into the same backing buffer.  An example of this is during broken code scenarios when
+                // typing certain Razor `@` directives.
+                var temp = end;
+                end = start;
+                start = temp;
             }
 
             return TextSpan.FromBounds(start, end);

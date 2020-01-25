@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -36,7 +39,15 @@ namespace Microsoft.CodeAnalysis.CSharp
             // such as generating a params array, re-ordering arguments based on argsToParamsOpt map, inserting arguments for optional parameters, etc.
             ImmutableArray<LocalSymbol> temps;
             ImmutableArray<RefKind> argumentRefKindsOpt = node.ArgumentRefKindsOpt;
-            rewrittenArguments = MakeArguments(node.Syntax, rewrittenArguments, node.Constructor, node.Constructor, node.Expanded, node.ArgsToParamsOpt, ref argumentRefKindsOpt, out temps);
+            rewrittenArguments = MakeArguments(
+                node.Syntax,
+                rewrittenArguments,
+                node.Constructor,
+                node.Constructor,
+                node.Expanded,
+                node.ArgsToParamsOpt,
+                ref argumentRefKindsOpt,
+                out temps);
 
             BoundExpression rewrittenObjectCreation;
 
@@ -47,23 +58,23 @@ namespace Microsoft.CodeAnalysis.CSharp
                     throw ExceptionUtilities.UnexpectedValue(temps.Length);
                 }
 
-                rewrittenObjectCreation = node.UpdateArgumentsAndInitializer(rewrittenArguments, MakeObjectCreationInitializerForExpressionTree(node.InitializerExpressionOpt), changeTypeOpt: node.Constructor.ContainingType);
+                rewrittenObjectCreation = node.UpdateArgumentsAndInitializer(rewrittenArguments, argumentRefKindsOpt, MakeObjectCreationInitializerForExpressionTree(node.InitializerExpressionOpt), changeTypeOpt: node.Constructor.ContainingType);
 
                 if (node.Type.IsInterfaceType())
                 {
-                    Debug.Assert(rewrittenObjectCreation.Type == ((NamedTypeSymbol)node.Type).ComImportCoClass);
-                    rewrittenObjectCreation = MakeConversion(rewrittenObjectCreation, node.Type, false, false);
+                    Debug.Assert(TypeSymbol.Equals(rewrittenObjectCreation.Type, ((NamedTypeSymbol)node.Type).ComImportCoClass, TypeCompareKind.ConsiderEverything2));
+                    rewrittenObjectCreation = MakeConversionNode(rewrittenObjectCreation, node.Type, false, false);
                 }
 
                 return rewrittenObjectCreation;
             }
 
-            rewrittenObjectCreation = node.UpdateArgumentsAndInitializer(rewrittenArguments, newInitializerExpression: null, changeTypeOpt: node.Constructor.ContainingType);
+            rewrittenObjectCreation = node.UpdateArgumentsAndInitializer(rewrittenArguments, argumentRefKindsOpt, newInitializerExpression: null, changeTypeOpt: node.Constructor.ContainingType);
 
             // replace "new S()" with a default struct ctor with "default(S)"
             if (node.Constructor.IsDefaultValueTypeConstructor())
             {
-                rewrittenObjectCreation = new BoundDefaultOperator(rewrittenObjectCreation.Syntax, rewrittenObjectCreation.Type);
+                rewrittenObjectCreation = new BoundDefaultExpression(rewrittenObjectCreation.Syntax, rewrittenObjectCreation.Type);
             }
 
             if (!temps.IsDefaultOrEmpty)
@@ -78,8 +89,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (node.Type.IsInterfaceType())
             {
-                Debug.Assert(rewrittenObjectCreation.Type == ((NamedTypeSymbol)node.Type).ComImportCoClass);
-                rewrittenObjectCreation = MakeConversion(rewrittenObjectCreation, node.Type, false, false);
+                Debug.Assert(TypeSymbol.Equals(rewrittenObjectCreation.Type, ((NamedTypeSymbol)node.Type).ComImportCoClass, TypeCompareKind.ConsiderEverything2));
+                rewrittenObjectCreation = MakeConversionNode(rewrittenObjectCreation, node.Type, false, false);
             }
 
             if (node.InitializerExpressionOpt == null || node.InitializerExpressionOpt.HasErrors)
@@ -90,7 +101,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return MakeObjectCreationWithInitializer(node.Syntax, rewrittenObjectCreation, node.InitializerExpressionOpt, node.Type);
         }
 
-        private BoundExpression MakeObjectCreationInitializerForExpressionTree(BoundExpression initializerExpressionOpt)
+        private BoundObjectInitializerExpressionBase MakeObjectCreationInitializerForExpressionTree(BoundObjectInitializerExpressionBase initializerExpressionOpt)
         {
             if (initializerExpressionOpt != null && !initializerExpressionOpt.HasErrors)
             {
@@ -104,7 +115,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // Shared helper for MakeObjectCreationWithInitializer and MakeNewT
         private BoundExpression MakeObjectCreationWithInitializer(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenObjectCreation,
             BoundExpression initializerExpression,
             TypeSymbol type)
@@ -171,7 +182,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return MakeObjectCreationWithInitializer(node.Syntax, rewrittenNewT, node.InitializerExpressionOpt, rewrittenNewT.Type);
         }
 
-        private BoundExpression MakeNewT(CSharpSyntaxNode syntax, TypeParameterSymbol typeParameter)
+        private BoundExpression MakeNewT(SyntaxNode syntax, TypeParameterSymbol typeParameter)
         {
             // "new T()" is rewritten as: "Activator.CreateInstance<T>()".
 
@@ -185,7 +196,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (!this.TryGetWellKnownTypeMember(syntax, WellKnownMember.System_Activator__CreateInstance_T, out method))
             {
-                return new BoundDefaultOperator(syntax, null, type: typeParameter, hasErrors: true);
+                return new BoundDefaultExpression(syntax, type: typeParameter, hasErrors: true);
             }
 
             Debug.Assert((object)method != null);
@@ -203,6 +214,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 invokedAsExtensionMethod: false,
                 argsToParamsOpt: default(ImmutableArray<int>),
                 resultKind: LookupResultKind.Viable,
+                binderOpt: null,
                 type: typeParameter);
 
             return createInstanceCall;
@@ -220,9 +232,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             //
             // (IPiaType)System.Activator.CreateInstance(System.Type.GetTypeFromCLSID(new Guid(GUID)))
 
-            CSharpSyntaxNode oldSyntax = _factory.Syntax;
+            SyntaxNode oldSyntax = _factory.Syntax;
             _factory.Syntax = node.Syntax;
-
 
             var ctor = _factory.WellKnownMethod(WellKnownMember.System_Guid__ctor);
             BoundExpression newGuid;
@@ -233,7 +244,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                newGuid = new BoundBadExpression(node.Syntax, LookupResultKind.NotCreatable, ImmutableArray<Symbol>.Empty, ImmutableArray<BoundNode>.Empty, ErrorTypeSymbol.UnknownResultType);
+                newGuid = new BoundBadExpression(node.Syntax, LookupResultKind.NotCreatable, ImmutableArray<Symbol>.Empty, ImmutableArray<BoundExpression>.Empty, ErrorTypeSymbol.UnknownResultType);
             }
 
             var getTypeFromCLSID = _factory.WellKnownMethod(WellKnownMember.System_Runtime_InteropServices_Marshal__GetTypeFromCLSID, isOptional: true);
@@ -251,7 +262,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                callGetTypeFromCLSID = new BoundBadExpression(node.Syntax, LookupResultKind.OverloadResolutionFailure, ImmutableArray<Symbol>.Empty, ImmutableArray<BoundNode>.Empty, ErrorTypeSymbol.UnknownResultType);
+                callGetTypeFromCLSID = new BoundBadExpression(node.Syntax, LookupResultKind.OverloadResolutionFailure, ImmutableArray<Symbol>.Empty, ImmutableArray<BoundExpression>.Empty, ErrorTypeSymbol.UnknownResultType);
             }
 
             var createInstance = _factory.WellKnownMethod(WellKnownMember.System_Activator__CreateInstance);
@@ -263,7 +274,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                rewrittenObjectCreation = new BoundBadExpression(node.Syntax, LookupResultKind.OverloadResolutionFailure, ImmutableArray<Symbol>.Empty, ImmutableArray<BoundNode>.Empty, node.Type);
+                rewrittenObjectCreation = new BoundBadExpression(node.Syntax, LookupResultKind.OverloadResolutionFailure, ImmutableArray<Symbol>.Empty, ImmutableArray<BoundExpression>.Empty, node.Type);
             }
 
             _factory.Syntax = oldSyntax;

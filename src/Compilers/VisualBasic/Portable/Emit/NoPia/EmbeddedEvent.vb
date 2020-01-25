@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -12,8 +14,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             MyBase.New(underlyingEvent, adder, remover, caller)
         End Sub
 
-        Protected Overrides Function GetCustomAttributesToEmit(compilationSatte As ModuleCompilationState) As IEnumerable(Of VisualBasicAttributeData)
-            Return UnderlyingEvent.GetCustomAttributesToEmit(compilationSatte)
+        Protected Overrides Function GetCustomAttributesToEmit(moduleBuilder As PEModuleBuilder) As IEnumerable(Of VisualBasicAttributeData)
+            Return UnderlyingEvent.GetCustomAttributesToEmit(moduleBuilder.CompilationState)
         End Function
 
         Protected Overrides ReadOnly Property IsRuntimeSpecial As Boolean
@@ -28,7 +30,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             End Get
         End Property
 
-        Protected Overrides Function [GetType](moduleBuilder As PEModuleBuilder, syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag) As Cci.ITypeReference
+        Protected Overrides Function [GetType](moduleBuilder As PEModuleBuilder, syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag) As Cci.ITypeReference
             Return moduleBuilder.Translate(UnderlyingEvent.Type, syntaxNodeOpt, diagnostics)
         End Function
 
@@ -50,7 +52,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             End Get
         End Property
 
-        Protected Overrides Sub EmbedCorrespondingComEventInterfaceMethodInternal(syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag, isUsedForComAwareEventBinding As Boolean)
+        Protected Overrides Sub EmbedCorrespondingComEventInterfaceMethodInternal(syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag, isUsedForComAwareEventBinding As Boolean)
             ' If the event happens to belong to a class with a ComEventInterfaceAttribute, there will also be
             ' a paired method living on its source interface. The ComAwareEventInfo class expects to find this 
             ' method through reflection. If we embed an event, therefore, we must ensure that the associated source
@@ -63,7 +65,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
                     Dim sourceInterface As NamedTypeSymbol = Nothing
 
                     If attrData.CommonConstructorArguments.Length = 2 Then
-                        sourceInterface = TryCast(attrData.CommonConstructorArguments(0).Value, NamedTypeSymbol)
+                        sourceInterface = TryCast(attrData.CommonConstructorArguments(0).ValueInternal, NamedTypeSymbol)
                         If sourceInterface IsNot Nothing Then
                             foundMatch = EmbedMatchingInterfaceMethods(sourceInterface, syntaxNodeOpt, diagnostics)
 
@@ -94,7 +96,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit.NoPia
             Next
         End Sub
 
-        Private Function EmbedMatchingInterfaceMethods(sourceInterface As NamedTypeSymbol, syntaxNodeOpt As VisualBasicSyntaxNode, diagnostics As DiagnosticBag) As Boolean
+        Private Function EmbedMatchingInterfaceMethods(sourceInterface As NamedTypeSymbol, syntaxNodeOpt As SyntaxNode, diagnostics As DiagnosticBag) As Boolean
             Dim foundMatch = False
             For Each m In sourceInterface.GetMembers(UnderlyingEvent.MetadataName)
                 If m.Kind = SymbolKind.Method Then

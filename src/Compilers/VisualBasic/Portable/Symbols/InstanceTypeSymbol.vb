@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -28,12 +30,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property TypeArgumentsCustomModifiers As ImmutableArray(Of ImmutableArray(Of CustomModifier))
-            Get
-                ' This is always the instance type, so the type arguments do not have any modifiers.
-                Return CreateEmptyTypeArgumentsCustomModifiers()
-            End Get
-        End Property
+        Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+            ' This is always the instance type, so the type arguments do not have any modifiers.
+            Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+        End Function
 
         Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
             Get
@@ -69,10 +69,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' !!! All other code should use Construct methods.                                        !!! 
         ''' </summary>
         Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
-            Return New TypeWithModifiers(InternalSubstituteTypeParametersInNamedType(substitution))
+            Return New TypeWithModifiers(SubstituteTypeParametersInNamedType(substitution))
         End Function
 
-        Private Overloads Function InternalSubstituteTypeParametersInNamedType(substitution As TypeSubstitution) As NamedTypeSymbol
+        Private Function SubstituteTypeParametersInNamedType(substitution As TypeSubstitution) As NamedTypeSymbol
 
             If substitution IsNot Nothing Then
                 ' The substitution might target one of this type's children.

@@ -1,12 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
 using Microsoft.CodeAnalysis;
-using Roslyn.Utilities;
-using static System.Math;
+using Microsoft.CodeAnalysis.Utilities;
+using System;
 
 namespace Roslyn.Utilities
 {
@@ -25,7 +26,7 @@ namespace Roslyn.Utilities
     internal partial class BKTree
     {
         public static readonly BKTree Empty = new BKTree(
-            SpecializedCollections.EmptyArray<char>(),
+            Array.Empty<char>(),
             ImmutableArray<Node>.Empty,
             ImmutableArray<Edge>.Empty);
 
@@ -63,10 +64,10 @@ namespace Roslyn.Utilities
 
         public static BKTree Create(params string[] values)
         {
-            return Create((IEnumerable<string>)values);
+            return Create(values.Select(v => new StringSlice(v)));
         }
 
-        public static BKTree Create(IEnumerable<string> values)
+        public static BKTree Create(IEnumerable<StringSlice> values)
         {
             return new Builder(values).Create();
         }
@@ -86,9 +87,9 @@ namespace Roslyn.Utilities
                     lowerCaseCharacters[i] = CaseInsensitiveComparison.ToLower(value[i]);
                 }
 
-                threshold = threshold ?? WordSimilarityChecker.GetThreshold(value);
+                threshold ??= WordSimilarityChecker.GetThreshold(value);
                 var result = new List<string>();
-                Lookup(_nodes[0], lowerCaseCharacters, value.Length, threshold.Value, result);
+                Lookup(_nodes[0], lowerCaseCharacters, value.Length, threshold.Value, result, recursionCount: 0);
                 return result;
             }
             finally
@@ -97,15 +98,35 @@ namespace Roslyn.Utilities
             }
         }
 
-        private void Lookup(Node currentNode, char[] queryCharacters, int queryLength, int threshold, List<string> result)
+        private void Lookup(
+            Node currentNode,
+            char[] queryCharacters,
+            int queryLength,
+            int threshold,
+            List<string> result,
+            int recursionCount)
         {
+            // Don't bother recursing too deeply in the case of pathological trees.
+            // This really only happens when the actual code is strange (like
+            // 10,000 symbols all a single letter long).  In htat case, searching
+            // down this path will be fairly fruitless anyways.
+            //
+            // Note: this won't affect good searches against good data even if this
+            // pathological chain exists.  That's because the good items will still
+            // cluster near the root node in the tree, and won't be off the end of
+            // this long chain.
+            if (recursionCount > 256)
+            {
+                return;
+            }
+
             // We always want to compute the real edit distance (ignoring any thresholds).  This is
             // because we need that edit distance to appropriately determine which edges to walk 
             // in the tree.
             var characterSpan = currentNode.WordSpan;
             var editDistance = EditDistance.GetEditDistance(
-                new ArraySlice<char>(_concatenatedLowerCaseWords, characterSpan),
-                new ArraySlice<char>(queryCharacters, 0, queryLength));
+                _concatenatedLowerCaseWords.AsSpan(characterSpan.Start, characterSpan.Length),
+                queryCharacters.AsSpan(0, queryLength));
 
             if (editDistance <= threshold)
             {
@@ -124,7 +145,8 @@ namespace Roslyn.Utilities
                 if (min <= childEditDistance && childEditDistance <= max)
                 {
                     Lookup(_nodes[_edges[i].ChildNodeIndex],
-                        queryCharacters, queryLength, threshold, result);
+                        queryCharacters, queryLength, threshold, result,
+                        recursionCount + 1);
                 }
             }
         }

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -33,7 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             return (catchBlocks.IsDefaultOrEmpty && finallyBlockOpt == null)
                 ? (BoundNode)tryBlock
-                : (BoundNode)node.Update(tryBlock, catchBlocks, finallyBlockOpt, node.PreferFaultHandler);
+                : (BoundNode)node.Update(tryBlock, catchBlocks, finallyBlockOpt, node.FinallyLabelOpt, node.PreferFaultHandler);
         }
 
         /// <summary>
@@ -47,7 +49,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             switch (statement.Kind)
             {
                 case BoundKind.NoOpStatement:
-                    return true;
+                    return false;
                 case BoundKind.Block:
                     {
                         var block = (BoundBlock)statement;
@@ -79,6 +81,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return base.VisitCatchBlock(node);
             }
 
+            if (node.ExceptionFilterOpt.ConstantValue?.BooleanValue == false)
+            {
+                return null;
+            }
+
             BoundExpression rewrittenExceptionSourceOpt = (BoundExpression)this.Visit(node.ExceptionSourceOpt);
             BoundExpression rewrittenFilter = (BoundExpression)this.Visit(node.ExceptionFilterOpt);
             BoundBlock rewrittenBody = (BoundBlock)this.Visit(node.Body);
@@ -86,11 +93,16 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // EnC: We need to insert a hidden sequence point to handle function remapping in case 
             // the containing method is edited while methods invoked in the condition are being executed.
+            if (rewrittenFilter != null && !node.WasCompilerGenerated && this.Instrument)
+            {
+                rewrittenFilter = _instrumenter.InstrumentCatchClauseFilter(node, rewrittenFilter, _factory);
+            }
+
             return node.Update(
-                node.LocalOpt,
+                node.Locals,
                 rewrittenExceptionSourceOpt,
                 rewrittenExceptionTypeOpt,
-                AddConditionSequencePoint(rewrittenFilter, node),
+                rewrittenFilter,
                 rewrittenBody,
                 node.IsSynthesizedAsyncCatchAll);
         }

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Roslyn.Utilities;
 using System;
@@ -42,7 +44,7 @@ namespace Microsoft.CodeAnalysis.Emit.NoPia
                 this.UnderlyingTypeParameter = underlyingTypeParameter;
             }
 
-            protected abstract IEnumerable<Cci.ITypeReference> GetConstraints(EmitContext context);
+            protected abstract IEnumerable<Cci.TypeReferenceWithAttributes> GetConstraints(EmitContext context);
             protected abstract bool MustBeReferenceType { get; }
             protected abstract bool MustBeValueType { get; }
             protected abstract bool MustHaveDefaultConstructor { get; }
@@ -57,7 +59,7 @@ namespace Microsoft.CodeAnalysis.Emit.NoPia
                 }
             }
 
-            IEnumerable<Cci.ITypeReference> Cci.IGenericParameter.GetConstraints(EmitContext context)
+            IEnumerable<Cci.TypeReferenceWithAttributes> Cci.IGenericParameter.GetConstraints(EmitContext context)
             {
                 return GetConstraints(context);
             }
@@ -126,9 +128,12 @@ namespace Microsoft.CodeAnalysis.Emit.NoPia
                 return null;
             }
 
-            Cci.PrimitiveTypeCode Cci.ITypeReference.TypeCode(EmitContext context)
+            Cci.PrimitiveTypeCode Cci.ITypeReference.TypeCode
             {
-                return Cci.PrimitiveTypeCode.NotPrimitive;
+                get
+                {
+                    return Cci.PrimitiveTypeCode.NotPrimitive;
+                }
             }
 
             TypeDefinitionHandle Cci.ITypeReference.TypeDef

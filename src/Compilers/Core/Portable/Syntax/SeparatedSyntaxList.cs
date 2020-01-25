@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections;
@@ -10,7 +12,7 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
-    public partial struct SeparatedSyntaxList<TNode> : IEquatable<SeparatedSyntaxList<TNode>>, IReadOnlyList<TNode> where TNode : SyntaxNode
+    public readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<SeparatedSyntaxList<TNode>>, IReadOnlyList<TNode> where TNode : SyntaxNode
     {
         private readonly SyntaxNodeOrTokenList _list;
         private readonly int _count;
@@ -282,6 +284,19 @@ namespace Microsoft.CodeAnalysis
             return _list.Any();
         }
 
+        internal bool Any(Func<TNode, bool> predicate)
+        {
+            for (int i = 0; i < this.Count; i++)
+            {
+                if (predicate(this[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public SyntaxNodeOrTokenList GetWithSeparators()
         {
             return _list;
@@ -401,7 +416,7 @@ namespace Microsoft.CodeAnalysis
             return new SeparatedSyntaxList<TNode>(nodesWithSeps.InsertRange(insertionIndex, nodesToInsertWithSeparators));
         }
 
-        private static bool KeepSeparatorWithPreviousNode(SyntaxToken separator)
+        private static bool KeepSeparatorWithPreviousNode(in SyntaxToken separator)
         {
             // if the trivia after the separator contains an explicit end of line or a single line comment
             // then it should stay associated with previous node
@@ -572,6 +587,16 @@ namespace Microsoft.CodeAnalysis
             }
 
             return SpecializedCollections.EmptyEnumerator<TNode>();
+        }
+
+        public static implicit operator SeparatedSyntaxList<SyntaxNode>(SeparatedSyntaxList<TNode> nodes)
+        {
+            return new SeparatedSyntaxList<SyntaxNode>(nodes._list);
+        }
+
+        public static implicit operator SeparatedSyntaxList<TNode>(SeparatedSyntaxList<SyntaxNode> nodes)
+        {
+            return new SeparatedSyntaxList<TNode>(nodes._list);
         }
     }
 }

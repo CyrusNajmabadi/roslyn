@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections;
@@ -13,9 +15,9 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Reversed enumerable.
         /// </summary>
-        public struct Reversed : IEnumerable<SyntaxTrivia>, IEquatable<Reversed>
+        public readonly struct Reversed : IEnumerable<SyntaxTrivia>, IEquatable<Reversed>
         {
-            private SyntaxTriviaList _list;
+            private readonly SyntaxTriviaList _list;
 
             public Reversed(SyntaxTriviaList list)
             {
@@ -24,7 +26,7 @@ namespace Microsoft.CodeAnalysis
 
             public Enumerator GetEnumerator()
             {
-                return new Enumerator(ref _list);
+                return new Enumerator(in _list);
             }
 
             IEnumerator<SyntaxTrivia> IEnumerable<SyntaxTrivia>.GetEnumerator()
@@ -34,7 +36,7 @@ namespace Microsoft.CodeAnalysis
                     return SpecializedCollections.EmptyEnumerator<SyntaxTrivia>();
                 }
 
-                return new ReversedEnumeratorImpl(ref _list);
+                return new ReversedEnumeratorImpl(in _list);
             }
 
             IEnumerator
@@ -45,7 +47,7 @@ namespace Microsoft.CodeAnalysis
                     return SpecializedCollections.EmptyEnumerator<SyntaxTrivia>();
                 }
 
-                return new ReversedEnumeratorImpl(ref _list);
+                return new ReversedEnumeratorImpl(in _list);
             }
 
             public override int GetHashCode()
@@ -75,7 +77,7 @@ namespace Microsoft.CodeAnalysis
                 private GreenNode _current;
                 private int _position;
 
-                public Enumerator(ref SyntaxTriviaList list)
+                internal Enumerator(in SyntaxTriviaList list)
                     : this()
                 {
                     if (list.Any())
@@ -128,9 +130,9 @@ namespace Microsoft.CodeAnalysis
                 private Enumerator _enumerator;
 
                 // SyntaxTriviaList is a relatively big struct so is passed as ref
-                internal ReversedEnumeratorImpl(ref SyntaxTriviaList list)
+                internal ReversedEnumeratorImpl(in SyntaxTriviaList list)
                 {
-                    _enumerator = new Enumerator(ref list);
+                    _enumerator = new Enumerator(in list);
                 }
 
                 public SyntaxTrivia Current => _enumerator.Current;

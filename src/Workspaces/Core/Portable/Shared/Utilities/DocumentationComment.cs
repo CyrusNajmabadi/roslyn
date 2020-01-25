@@ -1,9 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading;
+using System.Linq;
 using System.Xml;
 using XmlNames = Roslyn.Utilities.DocumentationCommentXmlNames;
 
@@ -64,6 +66,11 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
         /// Null if the tag or cref attribute didn't exist.
         /// </summary>
         public string CompletionListCref { get; private set; }
+
+        /// <summary>
+        /// Used for <see cref="CommentBuilder.TrimEachLine"/> method, to prevent new allocation of string
+        /// </summary>
+        private static readonly string[] s_NewLineAsStringArray = new string[] { "\n" };
 
         private DocumentationComment()
         {
@@ -155,53 +162,58 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
                 builder.ParseCallback(reader);
             }
 
+            private string TrimEachLine(string text)
+            {
+                return string.Join(Environment.NewLine, text.Split(s_NewLineAsStringArray, StringSplitOptions.RemoveEmptyEntries).Select(i => i.Trim()));
+            }
+
             private void ParseCallback(XmlReader reader)
             {
                 if (reader.NodeType == XmlNodeType.Element)
                 {
-                    string localName = reader.LocalName;
+                    var localName = reader.LocalName;
                     if (XmlNames.ElementEquals(localName, XmlNames.ExampleElementName) && _comment.ExampleText == null)
                     {
-                        _comment.ExampleText = reader.ReadInnerXml().Trim(); // TODO: trim each line
+                        _comment.ExampleText = TrimEachLine(reader.ReadInnerXml());
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.SummaryElementName) && _comment.SummaryText == null)
                     {
-                        _comment.SummaryText = reader.ReadInnerXml().Trim(); // TODO: trim each line
+                        _comment.SummaryText = TrimEachLine(reader.ReadInnerXml());
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.ReturnsElementName) && _comment.ReturnsText == null)
                     {
-                        _comment.ReturnsText = reader.ReadInnerXml().Trim(); // TODO: trim each line
+                        _comment.ReturnsText = TrimEachLine(reader.ReadInnerXml());
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.RemarksElementName) && _comment.RemarksText == null)
                     {
-                        _comment.RemarksText = reader.ReadInnerXml().Trim(); // TODO: trim each line
+                        _comment.RemarksText = TrimEachLine(reader.ReadInnerXml());
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.ParameterElementName))
                     {
-                        string name = reader.GetAttribute(XmlNames.NameAttributeName);
-                        string paramText = reader.ReadInnerXml();
+                        var name = reader.GetAttribute(XmlNames.NameAttributeName);
+                        var paramText = reader.ReadInnerXml();
 
                         if (!string.IsNullOrWhiteSpace(name) && !_comment._parameterTexts.ContainsKey(name))
                         {
                             (_parameterNamesBuilder ?? (_parameterNamesBuilder = ImmutableArray.CreateBuilder<string>())).Add(name);
-                            _comment._parameterTexts.Add(name, paramText.Trim()); // TODO: trim each line
+                            _comment._parameterTexts.Add(name, TrimEachLine(paramText));
                         }
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.TypeParameterElementName))
                     {
-                        string name = reader.GetAttribute(XmlNames.NameAttributeName);
-                        string typeParamText = reader.ReadInnerXml();
+                        var name = reader.GetAttribute(XmlNames.NameAttributeName);
+                        var typeParamText = reader.ReadInnerXml();
 
                         if (!string.IsNullOrWhiteSpace(name) && !_comment._typeParameterTexts.ContainsKey(name))
                         {
                             (_typeParameterNamesBuilder ?? (_typeParameterNamesBuilder = ImmutableArray.CreateBuilder<string>())).Add(name);
-                            _comment._typeParameterTexts.Add(name, typeParamText.Trim()); // TODO: trim each line
+                            _comment._typeParameterTexts.Add(name, TrimEachLine(typeParamText));
                         }
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.ExceptionElementName))
                     {
-                        string type = reader.GetAttribute(XmlNames.CrefAttributeName);
-                        string exceptionText = reader.ReadInnerXml();
+                        var type = reader.GetAttribute(XmlNames.CrefAttributeName);
+                        var exceptionText = reader.ReadInnerXml();
 
                         if (!string.IsNullOrWhiteSpace(type))
                         {
@@ -216,7 +228,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
                     }
                     else if (XmlNames.ElementEquals(localName, XmlNames.CompletionListElementName))
                     {
-                        string cref = reader.GetAttribute(XmlNames.CrefAttributeName);
+                        var cref = reader.GetAttribute(XmlNames.CrefAttributeName);
                         if (!string.IsNullOrWhiteSpace(cref))
                         {
                             _comment.CompletionListCref = cref;
@@ -248,8 +260,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
         /// </summary>
         public string GetParameterText(string parameterName)
         {
-            string text;
-            _parameterTexts.TryGetValue(parameterName, out text);
+            _parameterTexts.TryGetValue(parameterName, out var text);
             return text;
         }
 
@@ -258,8 +269,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
         /// </summary>
         public string GetTypeParameterText(string typeParameterName)
         {
-            string text;
-            _typeParameterTexts.TryGetValue(typeParameterName, out text);
+            _typeParameterTexts.TryGetValue(typeParameterName, out var text);
             return text;
         }
 
@@ -268,8 +278,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
         /// </summary>
         public ImmutableArray<string> GetExceptionTexts(string exceptionName)
         {
-            ImmutableArray<string> texts;
-            _exceptionTexts.TryGetValue(exceptionName, out texts);
+            _exceptionTexts.TryGetValue(exceptionName, out var texts);
 
             if (texts.IsDefault)
             {

@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -9,7 +12,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
     Friend MustInherit Class MethodSymbol
         Inherits Symbol
-        Implements IMethodSymbolInternal
+        Implements IMethodSymbol, IMethodSymbolInternal
 
         ''' <summary>
         ''' Gets what kind of method this is. There are several different kinds of things in the
@@ -100,6 +103,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         ''' <summary>
+        ''' Always returns false because the 'readonly members' feature is not available in VB.
+        ''' </summary>
+        Private ReadOnly Property IMethodSymbol_IsReadOnly As Boolean Implements IMethodSymbol.IsReadOnly
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
         ''' Returns true if this method has no return type; i.e., is a Sub instead of a Function.
         ''' </summary>
         Public MustOverride ReadOnly Property IsSub As Boolean
@@ -117,6 +129,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public MustOverride ReadOnly Property IsIterator As Boolean
 
         ''' <summary>
+        ''' Source: Returns False; methods from source cannot return by reference.
+        ''' Metadata: Returns whether or not this method returns by reference.
+        ''' </summary>
+        Public MustOverride ReadOnly Property ReturnsByRef As Boolean
+
+        ''' <summary>
         ''' Gets the return type of the method. If the method is a Sub, returns
         ''' the same type symbol as is returned by Compilation.VoidType.
         ''' </summary>
@@ -128,11 +146,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public MustOverride ReadOnly Property ReturnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
 
         ''' <summary>
+        ''' Custom modifiers associated with the ref modifier, or an empty array if there are none.
+        ''' </summary>
+        Public MustOverride ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+
+        ''' <summary>
         ''' Returns the list of attributes, if any, associated with the return type.
         ''' </summary>
         Public Overridable Function GetReturnTypeAttributes() As ImmutableArray(Of VisualBasicAttributeData)
             Return ImmutableArray(Of VisualBasicAttributeData).Empty
         End Function
+
+        ''' <summary>
+        ''' Build and add synthesized return type attributes for this method symbol.
+        ''' </summary>
+        Friend Overridable Sub AddSynthesizedReturnTypeAttributes(ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
+        End Sub
 
         ''' <summary>
         ''' Optimization: in many cases, the parameter count (fast) is sufficient and we
@@ -156,7 +185,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <summary>
         ''' Should return syntax node that originated the method. 
         ''' </summary>
-        Friend MustOverride ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend MustOverride ReadOnly Property Syntax As SyntaxNode
 
         ''' <summary>
         ''' Returns true if calls to this method are omitted in the given syntax tree at the given syntax node location.
@@ -216,9 +245,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Forces binding and decoding of attributes.
         ''' NOTE: Conditional symbols on the overridden method must be inherited by the overriding method, but the native VB compiler doesn't do so. We maintain compatibility.
         ''' </remarks>
-        Friend ReadOnly Property IsConditional As Boolean
+        Public ReadOnly Property IsConditional As Boolean Implements IMethodSymbol.IsConditional
             Get
                 Return Me.GetAppliedConditionalSymbols.Any()
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' True if the method itself Is excluded from code coverage instrumentation.
+        ''' True for source methods marked with <see cref="AttributeDescription.ExcludeFromCodeCoverageAttribute"/>.
+        ''' </summary>
+        Friend Overridable ReadOnly Property IsDirectlyExcludedFromCodeCoverage As Boolean
+            Get
+                Return False
             End Get
         End Property
 
@@ -301,7 +340,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public MustOverride ReadOnly Property ExplicitInterfaceImplementations As ImmutableArray(Of MethodSymbol)
 
-#Disable Warning RS0010
+#Disable Warning CA1200 ' Avoid using cref tags with a prefix
         ''' <summary>
         ''' Returns true if this method is not implemented in IL of the assembly it is defined in.
         ''' </summary>
@@ -314,7 +353,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         '''    <see cref="T:System.Runtime.CompilerServices.MethodCodeType.Runtime"/> flags.
         ''' 4) Synthesized constructors of ComImport types
         ''' </remarks>
-#Enable Warning RS0010
+#Enable Warning CA1200 ' Avoid using cref tags with a prefix
         Public MustOverride ReadOnly Property IsExternalMethod As Boolean
 
         ''' <summary>
@@ -420,6 +459,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <returns>True if the method can be used as an entry point.</returns>
         Friend ReadOnly Property IsEntryPointCandidate As Boolean
             Get
+                If Me.ContainingType.IsEmbedded Then
+                    Return False
+                End If
+
+                If Me.IsSubmissionConstructor Then
+                    Return False
+                End If
+
+                If Me.IsImplicitlyDeclared Then
+                    Return False
+                End If
+
                 Return String.Equals(Name, WellKnownMemberNames.EntryPointMethodName, StringComparison.OrdinalIgnoreCase)
             End Get
         End Property
@@ -578,17 +629,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
 
             ' Check return type custom modifiers.
-            Dim paramsErrorInfo = DeriveUseSiteErrorInfoFromCustomModifiers(Me.ReturnTypeCustomModifiers)
+            Dim refModifiersErrorInfo = DeriveUseSiteErrorInfoFromCustomModifiers(Me.RefCustomModifiers)
 
-            If paramsErrorInfo IsNot Nothing Then
-                If paramsErrorInfo.Code = ERRID.ERR_UnsupportedMethod1 Then
-                    Return paramsErrorInfo
-                End If
-
-                If errorInfo Is Nothing Then
-                    errorInfo = paramsErrorInfo
-                End If
+            If refModifiersErrorInfo IsNot Nothing AndAlso refModifiersErrorInfo.Code = ERRID.ERR_UnsupportedMethod1 Then
+                Return refModifiersErrorInfo
             End If
+
+            Dim typeModifiersErrorInfo = DeriveUseSiteErrorInfoFromCustomModifiers(Me.ReturnTypeCustomModifiers)
+
+            If typeModifiersErrorInfo IsNot Nothing AndAlso typeModifiersErrorInfo.Code = ERRID.ERR_UnsupportedMethod1 Then
+                Return typeModifiersErrorInfo
+            End If
+
+            errorInfo = If(errorInfo, If(refModifiersErrorInfo, typeModifiersErrorInfo))
 
             ' Check parameters.
             Dim result = MergeUseSiteErrorInfo(errorInfo, DeriveUseSiteErrorInfoFromParameters(Me.Parameters))
@@ -598,9 +651,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             If result Is Nothing AndAlso Me.ContainingModule.HasUnifiedReferences Then
                 Dim unificationCheckedTypes As HashSet(Of TypeSymbol) = Nothing
                 result = If(Me.ReturnType.GetUnificationUseSiteDiagnosticRecursive(Me, unificationCheckedTypes),
+                         If(GetUnificationUseSiteDiagnosticRecursive(Me.RefCustomModifiers, Me, unificationCheckedTypes),
                          If(GetUnificationUseSiteDiagnosticRecursive(Me.ReturnTypeCustomModifiers, Me, unificationCheckedTypes),
                          If(GetUnificationUseSiteDiagnosticRecursive(Me.Parameters, Me, unificationCheckedTypes),
-                            GetUnificationUseSiteDiagnosticRecursive(Me.TypeParameters, Me, unificationCheckedTypes))))
+                            GetUnificationUseSiteDiagnosticRecursive(Me.TypeParameters, Me, unificationCheckedTypes)))))
             End If
 
             Return result
@@ -722,11 +776,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' The bound method body is typically a high-level tree - it may contain 
         ''' lambdas, foreach etc... which will be processed in CompileMethod(...)
         ''' </summary>
+        ''' <param name="compilationState">Enables synthesized methods to create <see cref="SyntheticBoundNodeFactory"/> instances.</param>
         ''' <param name="methodBodyBinder">Optionally returns a binder, OUT parameter!</param>
         ''' <remarks>
         ''' The method MAY return a binder used for binding so it can be reused later in method compiler
         ''' </remarks>
-        Friend Overridable Function GetBoundMethodBody(diagnostics As DiagnosticBag, <Out()> Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+        Friend Overridable Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As DiagnosticBag, <Out()> Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
             Throw ExceptionUtilities.Unreachable
         End Function
 
@@ -767,6 +822,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend Overridable ReadOnly Property PreserveOriginalLocals As Boolean
             Get
                 Return False
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' Is this a method of a tuple type?
+        ''' </summary>
+        Public Overridable ReadOnly Property IsTupleMethod() As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' If this is a method of a tuple type, return corresponding underlying method from the
+        ''' tuple underlying type. Otherwise, Nothing. 
+        ''' </summary>
+        Public Overridable ReadOnly Property TupleUnderlyingMethod() As MethodSymbol
+            Get
+                Return Nothing
             End Get
         End Property
 
@@ -817,6 +891,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property IMethodSymbol_ReceiverType As ITypeSymbol Implements IMethodSymbol.ReceiverType
             Get
                 Return Me.ReceiverType
+            End Get
+        End Property
+
+        Private ReadOnly Property IMethodSymbol_ReceiverNullableAnnotation As NullableAnnotation Implements IMethodSymbol.ReceiverNullableAnnotation
+            Get
+                Return NullableAnnotation.None
             End Get
         End Property
 
@@ -893,15 +973,45 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Private ReadOnly Property IMethodSymbol_ReturnsByRef As Boolean Implements IMethodSymbol.ReturnsByRef
+            Get
+                Return Me.ReturnsByRef
+            End Get
+        End Property
+
+        Private ReadOnly Property IMethodSymbol_ReturnsByReadonlyRef As Boolean Implements IMethodSymbol.ReturnsByRefReadonly
+            Get
+                Return False
+            End Get
+        End Property
+
+        Private ReadOnly Property IMethodSymbol_RefKind As RefKind Implements IMethodSymbol.RefKind
+            Get
+                Return If(Me.ReturnsByRef, RefKind.Ref, RefKind.None)
+            End Get
+        End Property
+
         Private ReadOnly Property IMethodSymbol_ReturnType As ITypeSymbol Implements IMethodSymbol.ReturnType
             Get
                 Return Me.ReturnType
             End Get
         End Property
 
+        Private ReadOnly Property IMethodSymbol_ReturnNullableAnnotation As NullableAnnotation Implements IMethodSymbol.ReturnNullableAnnotation
+            Get
+                Return NullableAnnotation.None
+            End Get
+        End Property
+
         Private ReadOnly Property IMethodSymbol_TypeArguments As ImmutableArray(Of ITypeSymbol) Implements IMethodSymbol.TypeArguments
             Get
                 Return StaticCast(Of ITypeSymbol).From(Me.TypeArguments)
+            End Get
+        End Property
+
+        Private ReadOnly Property IMethodSymbol_TypeArgumentsNullableAnnotation As ImmutableArray(Of NullableAnnotation) Implements IMethodSymbol.TypeArgumentNullableAnnotations
+            Get
+                Return Me.TypeArguments.SelectAsArray(Function(t) NullableAnnotation.None)
             End Get
         End Property
 
@@ -923,7 +1033,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private ReadOnly Property IMethodSymbol_IsAsync As Boolean Implements IMethodSymbol.IsAsync
+        Private ReadOnly Property IMethodSymbol_IsAsync As Boolean Implements IMethodSymbol.IsAsync, IMethodSymbolInternal.IsAsync
             Get
                 Return Me.IsAsync
             End Get
@@ -932,6 +1042,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property IMethodSymbol_HidesBaseMethodsByName As Boolean Implements IMethodSymbol.HidesBaseMethodsByName
             Get
                 Return True
+            End Get
+        End Property
+
+        Private ReadOnly Property IMethodSymbol_RefCustomModifiers As ImmutableArray(Of CustomModifier) Implements IMethodSymbol.RefCustomModifiers
+            Get
+                Return Me.RefCustomModifiers
             End Get
         End Property
 
@@ -945,12 +1061,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return ImmutableArrayExtensions.Cast(Of VisualBasicAttributeData, AttributeData)(Me.GetReturnTypeAttributes)
         End Function
 
-        Private Function IMethodSymbol_Construct(ParamArray arguments() As ITypeSymbol) As IMethodSymbol Implements IMethodSymbol.Construct
-            For Each arg In arguments
-                arg.EnsureVbSymbolOrNothing(Of TypeSymbol)("typeArguments")
-            Next
+        Private Function IMethodSymbol_Construct(ParamArray typeArguments() As ITypeSymbol) As IMethodSymbol Implements IMethodSymbol.Construct
+            Return Construct(ConstructTypeArguments(typeArguments))
+        End Function
 
-            Return Construct(arguments.Cast(Of TypeSymbol).ToArray())
+        Private Function IMethodSymbolInternal_Construct(ParamArray typeArguments() As ITypeSymbolInternal) As IMethodSymbolInternal Implements IMethodSymbolInternal.Construct
+            Return Construct(DirectCast(typeArguments, TypeSymbol()))
+        End Function
+
+        Private Function IMethodSymbol_Construct(typeArguments As ImmutableArray(Of ITypeSymbol), typeArgumentNullableAnnotations As ImmutableArray(Of CodeAnalysis.NullableAnnotation)) As IMethodSymbol Implements IMethodSymbol.Construct
+            Return Construct(ConstructTypeArguments(typeArguments, typeArgumentNullableAnnotations))
         End Function
 
         Private ReadOnly Property IMethodSymbol_AssociatedAnonymousDelegate As INamedTypeSymbol Implements IMethodSymbol.AssociatedAnonymousDelegate
@@ -961,6 +1081,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 #End Region
 
 #Region "IMethodSymbolInternal"
+        Private ReadOnly Property IMethodSymbolInternal_IsIterator As Boolean Implements IMethodSymbolInternal.IsIterator
+            Get
+                Return Me.IsIterator
+            End Get
+        End Property
+
         Private Function IMethodSymbolInternal_CalculateLocalSyntaxOffset(localPosition As Integer, localTree As SyntaxTree) As Integer Implements IMethodSymbolInternal.CalculateLocalSyntaxOffset
             Return CalculateLocalSyntaxOffset(localPosition, localTree)
         End Function

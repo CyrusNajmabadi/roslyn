@@ -1,8 +1,11 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.DocumentationComments;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Utilities;
 
 namespace Microsoft.CodeAnalysis.MetadataAsSource
@@ -11,20 +14,20 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
     {
         internal class DocCommentFormatter
         {
-            private static readonly int s_indentSize = 2;
-            private static readonly int s_wrapLength = 80;
+            private const int s_indentSize = 2;
+            private const int s_wrapLength = 80;
 
-            private static readonly string s_summaryHeader = FeaturesResources.Summary;
-            private static readonly string s_paramHeader = FeaturesResources.Parameters;
-            private static readonly string s_labelFormat = "{0}:";
-            private static readonly string s_typeParameterHeader = FeaturesResources.TypeParameters;
-            private static readonly string s_returnsHeader = FeaturesResources.Returns;
-            private static readonly string s_exceptionsHeader = FeaturesResources.Exceptions;
-            private static readonly string s_remarksHeader = FeaturesResources.Remarks;
+            private static readonly string s_summaryHeader = FeaturesResources.Summary_colon;
+            private static readonly string s_paramHeader = FeaturesResources.Parameters_colon;
+            private const string s_labelFormat = "{0}:";
+            private static readonly string s_typeParameterHeader = FeaturesResources.Type_parameters_colon;
+            private static readonly string s_returnsHeader = FeaturesResources.Returns_colon;
+            private static readonly string s_exceptionsHeader = FeaturesResources.Exceptions_colon;
+            private static readonly string s_remarksHeader = FeaturesResources.Remarks_colon;
 
             internal static ImmutableArray<string> Format(IDocumentationCommentFormattingService docCommentFormattingService, DocumentationComment docComment)
             {
-                var formattedCommentLinesBuilder = ImmutableArray.CreateBuilder<string>();
+                var formattedCommentLinesBuilder = ArrayBuilder<string>.GetInstance();
                 var lineBuilder = new StringBuilder();
 
                 var formattedSummaryText = docCommentFormattingService.Format(docComment.SummaryText);
@@ -40,7 +43,7 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                     formattedCommentLinesBuilder.Add(string.Empty);
                     formattedCommentLinesBuilder.Add(s_paramHeader);
 
-                    for (int i = 0; i < parameterNames.Length; i++)
+                    for (var i = 0; i < parameterNames.Length; i++)
                     {
                         if (i != 0)
                         {
@@ -67,7 +70,7 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                     formattedCommentLinesBuilder.Add(string.Empty);
                     formattedCommentLinesBuilder.Add(s_typeParameterHeader);
 
-                    for (int i = 0; i < typeParameterNames.Length; i++)
+                    for (var i = 0; i < typeParameterNames.Length; i++)
                     {
                         if (i != 0)
                         {
@@ -102,11 +105,11 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                     formattedCommentLinesBuilder.Add(string.Empty);
                     formattedCommentLinesBuilder.Add(s_exceptionsHeader);
 
-                    for (int i = 0; i < exceptionTypes.Length; i++)
+                    for (var i = 0; i < exceptionTypes.Length; i++)
                     {
                         var rawExceptionTexts = docComment.GetExceptionTexts(exceptionTypes[i]);
 
-                        for (int j = 0; j < rawExceptionTexts.Length; j++)
+                        for (var j = 0; j < rawExceptionTexts.Length; j++)
                         {
                             if (i != 0 || j != 0)
                             {
@@ -149,12 +152,12 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                     formattedCommentLinesBuilder.RemoveAt(formattedCommentLinesBuilder.Count - 1);
                 }
 
-                return formattedCommentLinesBuilder.ToImmutable();
+                return formattedCommentLinesBuilder.ToImmutableAndFree();
             }
 
             private static ImmutableArray<string> CreateWrappedTextFromRawText(string rawText)
             {
-                var lines = ImmutableArray.CreateBuilder<string>();
+                var lines = ArrayBuilder<string>.GetInstance();
 
                 // First split the string into constituent lines.
                 var split = rawText.Split(new[] { "\r\n" }, System.StringSplitOptions.None);
@@ -165,15 +168,16 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                     SplitRawLineIntoFormattedLines(item, lines);
                 }
 
-                return lines.ToImmutable();
+                return lines.ToImmutableAndFree();
             }
 
-            private static void SplitRawLineIntoFormattedLines(string line, ImmutableArray<string>.Builder lines)
+            private static void SplitRawLineIntoFormattedLines(
+                string line, ArrayBuilder<string> lines)
             {
                 var indent = new StringBuilder().Append(' ', s_indentSize * 2).ToString();
 
                 var words = line.Split(' ');
-                bool firstInLine = true;
+                var firstInLine = true;
 
                 var sb = new StringBuilder();
                 sb.Append(indent);

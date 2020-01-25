@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -20,7 +22,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
     internal class CSharpFlagsEnumGenerator : AbstractFlagsEnumGenerator
     {
         internal static readonly CSharpFlagsEnumGenerator Instance = new CSharpFlagsEnumGenerator();
-        private static readonly SyntaxGenerator s_generatorInstance = new CSharpSyntaxGenerator();
+        private static readonly SyntaxGenerator s_generatorInstance = CSharpSyntaxGenerator.Instance;
 
         private CSharpFlagsEnumGenerator()
         {
@@ -41,8 +43,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
                 return expression;
             }
 
-            var factory = new CSharpSyntaxGenerator();
-            return factory.CastExpression(enumType, expression);
+            return CSharpSyntaxGenerator.Instance.CastExpression(enumType, expression);
         }
 
         protected override SyntaxGenerator GetSyntaxGenerator()

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -8,6 +10,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
@@ -40,12 +43,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
         public Solution FinalSolution { get; private set; }
         public bool ShowCheckBoxes { get; private set; }
 
-        public PreviewEngine(string title, string helpString, string description, string topLevelItemName, Glyph topLevelGlyph, Solution newSolution, Solution oldSolution, IComponentModel componentModel, bool showCheckBoxes = true) :
-            this(title, helpString, description, topLevelItemName, topLevelGlyph, newSolution, oldSolution, componentModel, null, showCheckBoxes)
+        public PreviewEngine(IThreadingContext threadingContext, string title, string helpString, string description, string topLevelItemName, Glyph topLevelGlyph, Solution newSolution, Solution oldSolution, IComponentModel componentModel, bool showCheckBoxes = true)
+            : this(threadingContext, title, helpString, description, topLevelItemName, topLevelGlyph, newSolution, oldSolution, componentModel, null, showCheckBoxes)
         {
         }
 
         public PreviewEngine(
+            IThreadingContext threadingContext,
             string title,
             string helpString,
             string description,
@@ -56,12 +60,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             IComponentModel componentModel,
             IVsImageService2 imageService,
             bool showCheckBoxes = true)
+            : base(threadingContext)
         {
             _topLevelName = topLevelItemName;
             _topLevelGlyph = topLevelGlyph;
-            _title = title;
-            _helpString = helpString;
-            _description = description;
+            _title = title ?? throw new ArgumentNullException(nameof(title));
+            _helpString = helpString ?? throw new ArgumentNullException(nameof(helpString));
+            _description = description ?? throw new ArgumentNullException(nameof(description));
             _newSolution = newSolution.WithMergedLinkedFileChangesAsync(oldSolution, cancellationToken: CancellationToken.None).Result;
             _oldSolution = oldSolution;
             _diffSelector = componentModel.GetService<ITextDifferencingSelectorService>();
@@ -87,7 +92,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
 
         public int GetConfirmation(out string pbstrConfirmation)
         {
-            pbstrConfirmation = EditorFeaturesResources.Apply;
+            pbstrConfirmation = EditorFeaturesResources.Apply2;
             return VSConstants.S_OK;
         }
 
@@ -131,6 +136,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             allDocumentsWithChanges.AddRange(addedAdditionalDocuments);
             allDocumentsWithChanges.AddRange(removedAdditionalDocuments);
 
+            // AnalyzerConfig Documents
+            var changedAnalyzerConfigDocuments = projectChanges.SelectMany(p => p.GetChangedAnalyzerConfigDocuments());
+            var addedAnalyzerConfigDocuments = projectChanges.SelectMany(p => p.GetAddedAnalyzerConfigDocuments());
+            var removedAnalyzerConfigDocuments = projectChanges.SelectMany(p => p.GetRemovedAnalyzerConfigDocuments());
+
+            allDocumentsWithChanges.AddRange(changedAnalyzerConfigDocuments);
+            allDocumentsWithChanges.AddRange(addedAnalyzerConfigDocuments);
+            allDocumentsWithChanges.AddRange(removedAnalyzerConfigDocuments);
+
             AppendFileChanges(allDocumentsWithChanges, builder);
 
             // References (metadata/project/analyzer)
@@ -164,14 +178,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
                 var left = _oldSolution.GetTextDocument(documentId);
                 var right = _newSolution.GetTextDocument(documentId);
 
-                var leftDocument = left as Document;
-                var rightDocument = right as Document;
-
-                if (leftDocument != null)
+                if (left is Document leftDocument)
                 {
                     linkedDocumentIds.AddRange(leftDocument.GetLinkedDocumentIds());
                 }
-                else if (rightDocument != null)
+                else if (right is Document rightDocument)
                 {
                     // Added document.
                     linkedDocumentIds.AddRange(rightDocument.GetLinkedDocumentIds());
@@ -187,7 +198,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
 
         public int GetTextViewDescription(out string pbstrTextViewDescription)
         {
-            pbstrTextViewDescription = EditorFeaturesResources.PreviewCodeChanges;
+            pbstrTextViewDescription = EditorFeaturesResources.Preview_Code_Changes_colon;
             return VSConstants.S_OK;
         }
 
@@ -220,7 +231,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
         {
             if (_updater == null)
             {
-                _updater = new PreviewUpdater(EnsureTextViewIsInitialized(textView));
+                _updater = new PreviewUpdater(ThreadingContext, EnsureTextViewIsInitialized(textView));
             }
         }
 
@@ -257,17 +268,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
 
             var newText = "";
             var newTextPtr = Marshal.StringToHGlobalAuto(newText);
+            Marshal.ThrowExceptionForHR(adapter.GetBuffer(out var lines));
+            Marshal.ThrowExceptionForHR(lines.GetLastLineIndex(out var piLIne, out var piLineIndex));
+            Marshal.ThrowExceptionForHR(lines.GetLengthOfLine(piLineIndex, out var piLineLength));
 
-            IVsTextLines lines;
-            Marshal.ThrowExceptionForHR(adapter.GetBuffer(out lines));
-
-            int piLIne, piLineIndex;
-            Marshal.ThrowExceptionForHR(lines.GetLastLineIndex(out piLIne, out piLineIndex));
-
-            int piLineLength;
-            Marshal.ThrowExceptionForHR(lines.GetLengthOfLine(piLineIndex, out piLineLength));
-
-            Microsoft.VisualStudio.TextManager.Interop.TextSpan[] changes = default(Microsoft.VisualStudio.TextManager.Interop.TextSpan[]);
+            Microsoft.VisualStudio.TextManager.Interop.TextSpan[] changes = default;
 
             piLineLength = piLineLength > 0 ? piLineLength - 1 : 0;
 
@@ -283,7 +288,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             public override int GetText(out VSTREETEXTOPTIONS tto, out string ppszText)
             {
                 tto = VSTREETEXTOPTIONS.TTO_DEFAULT;
-                ppszText = ServicesVSResources.NoChanges;
+                ppszText = ServicesVSResources.No_Changes;
                 return VSConstants.S_OK;
             }
 

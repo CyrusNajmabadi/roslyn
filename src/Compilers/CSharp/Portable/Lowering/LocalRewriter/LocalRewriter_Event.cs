@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -6,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.RuntimeMembers;
 using Microsoft.CodeAnalysis.Text;
 
@@ -69,7 +72,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <remarks>
         /// TODO: use or delete isDynamic.
         /// </remarks>
-        private BoundExpression RewriteWindowsRuntimeEventAssignmentOperator(CSharpSyntaxNode syntax, EventSymbol eventSymbol, EventAssignmentKind kind, bool isDynamic, BoundExpression rewrittenReceiverOpt, BoundExpression rewrittenArgument)
+        private BoundExpression RewriteWindowsRuntimeEventAssignmentOperator(SyntaxNode syntax, EventSymbol eventSymbol, EventAssignmentKind kind, bool isDynamic, BoundExpression rewrittenReceiverOpt, BoundExpression rewrittenArgument)
         {
             BoundAssignmentOperator tempAssignment = null;
             BoundLocal boundTemp = null;
@@ -109,7 +112,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
                 else
                 {
-                    clearCall = new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, ImmutableArray.Create<BoundNode>(removeDelegate), ErrorTypeSymbol.UnknownResultType);
+                    clearCall = new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, ImmutableArray.Create<BoundExpression>(removeDelegate), ErrorTypeSymbol.UnknownResultType);
                 }
             }
 
@@ -151,7 +154,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                marshalCall = new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, StaticCast<BoundNode>.From(marshalArguments), ErrorTypeSymbol.UnknownResultType);
+                marshalCall = new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, marshalArguments, ErrorTypeSymbol.UnknownResultType);
             }
 
             // In this case, we don't need a sequence.
@@ -172,7 +175,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return new BoundSequence(syntax, tempSymbols, sideEffects.ToImmutableAndFree(), marshalCall, marshalCall.Type);
         }
 
-        private BoundExpression VisitWindowsRuntimeEventFieldAssignmentOperator(CSharpSyntaxNode syntax, BoundEventAccess left, BoundExpression right)
+        private BoundExpression VisitWindowsRuntimeEventFieldAssignmentOperator(SyntaxNode syntax, BoundEventAccess left, BoundExpression rewrittenRight)
         {
             Debug.Assert(left.IsUsableAsField);
 
@@ -181,7 +184,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             Debug.Assert(eventSymbol.IsWindowsRuntimeEvent);
 
             BoundExpression rewrittenReceiverOpt = left.ReceiverOpt == null ? null : VisitExpression(left.ReceiverOpt);
-            BoundExpression rewrittenRight = VisitExpression(right);
 
             const bool isDynamic = false;
             return RewriteWindowsRuntimeEventAssignmentOperator(
@@ -204,7 +206,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         private BoundExpression MakeEventAccess(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenReceiver,
             EventSymbol eventSymbol,
             ConstantValue constantValueOpt,
@@ -248,7 +250,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                getOrCreateCall = new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, ImmutableArray.Create<BoundNode>(fieldAccess), ErrorTypeSymbol.UnknownResultType);
+                getOrCreateCall = new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, ImmutableArray.Create<BoundExpression>(fieldAccess), ErrorTypeSymbol.UnknownResultType);
             }
 
             PropertySymbol invocationListProperty;
@@ -270,7 +272,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            return new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, ImmutableArray.Create<BoundNode>(getOrCreateCall), ErrorTypeSymbol.UnknownResultType);
+            return new BoundBadExpression(syntax, LookupResultKind.NotInvocable, ImmutableArray<Symbol>.Empty, ImmutableArray.Create(getOrCreateCall), ErrorTypeSymbol.UnknownResultType);
         }
 
         private BoundExpression RewriteNoPiaEventAssignmentOperator(BoundEventAssignmentOperator node, BoundExpression rewrittenReceiver, BoundExpression rewrittenArgument)
@@ -281,7 +283,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             BoundExpression result = null;
 
-            CSharpSyntaxNode oldSyntax = _factory.Syntax;
+            SyntaxNode oldSyntax = _factory.Syntax;
             _factory.Syntax = node.Syntax;
 
 
@@ -318,7 +320,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             return new BoundBadExpression(node.Syntax, LookupResultKind.NotCreatable, ImmutableArray.Create<Symbol>(node.Event),
-                                          ImmutableArray.Create<BoundNode>(rewrittenReceiver, rewrittenArgument), ErrorTypeSymbol.UnknownResultType);
+                                          ImmutableArray.Create(rewrittenReceiver, rewrittenArgument), ErrorTypeSymbol.UnknownResultType);
         }
     }
 }

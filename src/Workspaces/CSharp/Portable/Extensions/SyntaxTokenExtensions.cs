@@ -1,49 +1,23 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
+using SyntaxNodeOrTokenExtensions = Microsoft.CodeAnalysis.Shared.Extensions.SyntaxNodeOrTokenExtensions;
 
 namespace Microsoft.CodeAnalysis.CSharp.Extensions
 {
-    internal static class SyntaxTokenExtensions
+    internal static partial class SyntaxTokenExtensions
     {
-        public static bool IsKindOrHasMatchingText(this SyntaxToken token, SyntaxKind kind)
-        {
-            return token.Kind() == kind || token.HasMatchingText(kind);
-        }
-
-        public static bool HasMatchingText(this SyntaxToken token, SyntaxKind kind)
-        {
-            return token.ToString() == SyntaxFacts.GetText(kind);
-        }
-
-        public static bool IsKind(this SyntaxToken token, SyntaxKind kind1, SyntaxKind kind2)
-        {
-            return token.Kind() == kind1
-                || token.Kind() == kind2;
-        }
-
-        public static bool IsKind(this SyntaxToken token, SyntaxKind kind1, SyntaxKind kind2, SyntaxKind kind3)
-        {
-            return token.Kind() == kind1
-                || token.Kind() == kind2
-                || token.Kind() == kind3;
-        }
-
-        public static bool IsKind(this SyntaxToken token, params SyntaxKind[] kinds)
-        {
-            return kinds.Contains(token.Kind());
-        }
-
         public static bool IsLiteral(this SyntaxToken token)
         {
             switch (token.Kind())
@@ -74,17 +48,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
 
         private static bool IsWord(SyntaxToken token)
         {
-            return new CSharpSyntaxFactsService().IsWord(token);
+            return CSharpSyntaxFactsService.Instance.IsWord(token);
         }
 
         public static SyntaxToken GetNextNonZeroWidthTokenOrEndOfFile(this SyntaxToken token)
         {
             return token.GetNextTokenOrEndOfFile();
-        }
-
-        public static SyntaxToken With(this SyntaxToken token, SyntaxTriviaList leading, SyntaxTriviaList trailing)
-        {
-            return token.WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
         }
 
         /// <summary>
@@ -104,91 +73,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         }
 
         public static bool SpansPreprocessorDirective(this IEnumerable<SyntaxToken> tokens)
-        {
-            // we want to check all leading trivia of all tokens (except the 
-            // first one), and all trailing trivia of all tokens (except the
-            // last one).
-
-            var first = true;
-            var previousToken = default(SyntaxToken);
-
-            foreach (var token in tokens)
-            {
-                if (first)
-                {
-                    first = false;
-                }
-                else
-                {
-                    // check the leading trivia of this token, and the trailing trivia
-                    // of the previous token.
-                    if (SpansPreprocessorDirective(token.LeadingTrivia) ||
-                        SpansPreprocessorDirective(previousToken.TrailingTrivia))
-                    {
-                        return true;
-                    }
-                }
-
-                previousToken = token;
-            }
-
-            return false;
-        }
-
-        private static bool SpansPreprocessorDirective(SyntaxTriviaList list)
-        {
-            return list.Any(t => t.GetStructure() is DirectiveTriviaSyntax);
-        }
-
-        public static SyntaxToken WithoutTrivia(
-            this SyntaxToken token,
-            params SyntaxTrivia[] trivia)
-        {
-            if (!token.LeadingTrivia.Any() && !token.TrailingTrivia.Any())
-            {
-                return token;
-            }
-
-            return token.With(new SyntaxTriviaList(), new SyntaxTriviaList());
-        }
-
-        public static SyntaxToken WithPrependedLeadingTrivia(
-            this SyntaxToken token,
-            params SyntaxTrivia[] trivia)
-        {
-            if (trivia.Length == 0)
-            {
-                return token;
-            }
-
-            return token.WithPrependedLeadingTrivia((IEnumerable<SyntaxTrivia>)trivia);
-        }
-
-        public static SyntaxToken WithPrependedLeadingTrivia(
-            this SyntaxToken token,
-            SyntaxTriviaList trivia)
-        {
-            if (trivia.Count == 0)
-            {
-                return token;
-            }
-
-            return token.WithLeadingTrivia(trivia.Concat(token.LeadingTrivia));
-        }
-
-        public static SyntaxToken WithPrependedLeadingTrivia(
-            this SyntaxToken token,
-            IEnumerable<SyntaxTrivia> trivia)
-        {
-            return token.WithPrependedLeadingTrivia(trivia.ToSyntaxTriviaList());
-        }
-
-        public static SyntaxToken WithAppendedTrailingTrivia(
-            this SyntaxToken token,
-            IEnumerable<SyntaxTrivia> trivia)
-        {
-            return token.WithTrailingTrivia(token.TrailingTrivia.Concat(trivia));
-        }
+            => CSharpSyntaxFactsService.Instance.SpansPreprocessorDirective(tokens);
 
         /// <summary>
         /// Retrieves all trivia after this token, including it's trailing trivia and
@@ -241,7 +126,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             var token = genericIdentifier.GetNextToken(includeSkipped: true);
             Contract.ThrowIfFalse(token.Kind() == SyntaxKind.LessThanToken);
 
-            int stack = 0;
+            var stack = 0;
 
             do
             {
@@ -344,15 +229,43 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             }
         }
 
-        public static bool IsOpenBraceOrCommaOfObjectInitializer(this SyntaxToken token)
+        /// <summary>
+        /// Returns true if this token is something that looks like a C# keyword. This includes 
+        /// actual keywords, contextual keywords, and even 'var' and 'dynamic'
+        /// </summary>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public static bool CouldBeKeyword(this SyntaxToken token)
         {
-            return (token.IsKind(SyntaxKind.OpenBraceToken) || token.IsKind(SyntaxKind.CommaToken)) &&
-                token.Parent.IsKind(SyntaxKind.ObjectInitializerExpression);
+            if (token.IsKeyword())
+            {
+                return true;
+            }
+
+            if (token.Kind() == SyntaxKind.IdentifierToken)
+            {
+                var simpleNameText = token.ValueText;
+                return simpleNameText == "var" ||
+                       simpleNameText == "dynamic" ||
+                       SyntaxFacts.GetContextualKeywordKind(simpleNameText) != SyntaxKind.None;
+            }
+
+            return false;
         }
 
-        public static bool IsOpenBraceOfAccessorList(this SyntaxToken token)
-        {
-            return token.IsKind(SyntaxKind.OpenBraceToken) && token.Parent.IsKind(SyntaxKind.AccessorList);
-        }
+        public static SyntaxToken WithCommentsFrom(
+            this SyntaxToken token,
+            IEnumerable<SyntaxTrivia> leadingTrivia,
+            IEnumerable<SyntaxTrivia> trailingTrivia,
+            params SyntaxNodeOrToken[] trailingNodesOrTokens)
+            => token
+                .WithPrependedLeadingTrivia(leadingTrivia)
+                .WithTrailingTrivia((
+                    token.TrailingTrivia.Concat(SyntaxNodeOrTokenExtensions.GetTrivia(trailingNodesOrTokens).Concat(trailingTrivia))).FilterComments(addElasticMarker: false));
+
+        public static SyntaxToken KeepCommentsAndAddElasticMarkers(this SyntaxToken token)
+            => token
+                    .WithTrailingTrivia(token.TrailingTrivia.FilterComments(addElasticMarker: true))
+                    .WithLeadingTrivia(token.LeadingTrivia.FilterComments(addElasticMarker: true));
     }
 }

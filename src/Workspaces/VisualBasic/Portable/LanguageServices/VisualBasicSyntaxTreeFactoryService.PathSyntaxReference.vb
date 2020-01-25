@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Threading
@@ -66,7 +68,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                             node = trivia.Token.Parent
                             Continue While
                         ElseIf node IsNot root Then
-                            Throw New InvalidOperationException(VBWorkspaceResources.NodeDoesNotDescendFromRoot)
+                            Throw New InvalidOperationException(VBWorkspaceResources.Node_does_not_descend_from_root)
                         End If
                     End While
 
@@ -85,7 +87,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         index = index + 1
                     Next
 
-                    Throw New InvalidOperationException(VBWorkspaceResources.NodeNotInParentsChildList)
+                    Throw New InvalidOperationException(VBWorkspaceResources.Node_not_in_parent_s_child_list)
                 End Function
 
                 Private Function GetTriviaIndex(trivia As SyntaxTrivia) As Integer
@@ -107,7 +109,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         index = index + 1
                     Next
 
-                    Throw New InvalidOperationException(VBWorkspaceResources.TriviaIsNotAssociatedWithToken)
+                    Throw New InvalidOperationException(VBWorkspaceResources.Trivia_is_not_associated_with_token)
                 End Function
 
                 Private Function GetTrivia(token As SyntaxToken, triviaIndex As Integer) As SyntaxTrivia

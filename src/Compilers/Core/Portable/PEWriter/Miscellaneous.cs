@@ -1,12 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using Roslyn.Utilities;
 using EmitContext = Microsoft.CodeAnalysis.Emit.EmitContext;
 
@@ -20,7 +23,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// True if the given enumerable is not null and contains at least one element.
         /// </summary>
-        public static bool EnumerableIsNotEmpty<T>(IEnumerable<T>/*?*/ enumerable)
+        public static bool EnumerableIsNotEmpty<T>([NotNullWhen(returnValue: true)] IEnumerable<T>? enumerable)
         {
             if (enumerable == null)
             {
@@ -45,7 +48,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// True if the given enumerable is null or contains no elements
         /// </summary>
-        public static bool EnumerableIsEmpty<T>(IEnumerable<T>/*?*/ enumerable)
+        public static bool EnumerableIsEmpty<T>([NotNullWhen(returnValue: false)] IEnumerable<T>? enumerable)
         {
             return !EnumerableIsNotEmpty<T>(enumerable);
         }
@@ -53,7 +56,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// Returns the number of elements in the given enumerable. A null enumerable is allowed and results in 0.
         /// </summary>
-        public static uint EnumerableCount<T>(IEnumerable<T>/*?*/ enumerable)
+        public static uint EnumerableCount<T>(IEnumerable<T>? enumerable)
         {
             // ^ ensures result >= 0;
             if (enumerable == null)
@@ -166,7 +169,7 @@ namespace Microsoft.Cci
         /// (The element type of a safe array is VARIANT. The "sub type" specifies the value of all of the tag fields (vt) of the element values. )
         /// -1 if it should be omitted from the marshal blob.
         /// </summary>
-        System.Runtime.InteropServices.VarEnum SafeArrayElementSubtype
+        VarEnum SafeArrayElementSubtype
         {
             get;
         }
@@ -187,7 +190,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// The name of the entity.
         /// </summary>
-        string Name { get; }
+        string? Name { get; }
     }
 
     /// <summary>
@@ -215,43 +218,6 @@ namespace Microsoft.Cci
     }
 
     /// <summary>
-    /// This enum is used internally by BCL. It includes flags that are not in the metadata spec.
-    /// </summary>
-    [Flags]
-    internal enum PInvokeAttributes : ushort
-    {
-        NoMangle = 0x0001,
-
-        CharSetMask = 0x0006,
-        CharSetNotSpec = 0x0000,
-        CharSetAnsi = 0x0002,
-        CharSetUnicode = 0x0004,
-        CharSetAuto = 0x0006,
-
-
-        BestFitUseAssem = 0x0000,
-        BestFitEnabled = 0x0010,
-        BestFitDisabled = 0x0020,
-        BestFitMask = 0x0030,
-
-        ThrowOnUnmappableCharUseAssem = 0x0000,
-        ThrowOnUnmappableCharEnabled = 0x1000,
-        ThrowOnUnmappableCharDisabled = 0x2000,
-        ThrowOnUnmappableCharMask = 0x3000,
-
-        SupportsLastError = 0x0040,
-
-        CallConvMask = 0x0700,
-        CallConvWinapi = 0x0100,
-        CallConvCdecl = 0x0200,
-        CallConvStdcall = 0x0300,
-        CallConvThiscall = 0x0400,
-        CallConvFastcall = 0x0500,
-
-        MaxValue = 0xFFFF,
-    }
-
-    /// <summary>
     /// Information that describes how a method from the underlying Platform is to be invoked.
     /// </summary>
     internal interface IPlatformInvokeInformation
@@ -259,25 +225,25 @@ namespace Microsoft.Cci
         /// <summary>
         /// Module providing the method/field.
         /// </summary>
-        string ModuleName { get; }
+        string? ModuleName { get; }
 
         /// <summary>
         /// Name of the method providing the implementation.
         /// </summary>
-        string EntryPointName { get; }
+        string? EntryPointName { get; }
 
         /// <summary>
         /// Flags that determine marshalling behavior.
         /// </summary>
-        PInvokeAttributes Flags { get; }
+        MethodImportAttributes Flags { get; }
     }
 
     internal class ResourceSection
     {
         internal ResourceSection(byte[] sectionBytes, uint[] relocations)
         {
-            Debug.Assert(sectionBytes != null);
-            Debug.Assert(relocations != null);
+            RoslynDebug.Assert(sectionBytes != null);
+            RoslynDebug.Assert(relocations != null);
 
             SectionBytes = sectionBytes;
             Relocations = relocations;

@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -15,7 +18,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend MustInherit Class ParameterSymbol
         Inherits Symbol
-        Implements IParameterSymbol
+        Implements IParameterSymbol, IParameterSymbolInternal
 
         ''' <summary>
         ''' Get the original definition of this symbol. If this symbol is derived from another
@@ -90,7 +93,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend ReadOnly Property IsMarshalAsObject As Boolean
             Get
                 Select Case Me.MarshallingType
-                    Case UnmanagedType.Interface, UnmanagedType.IUnknown, UnmanagedType.IDispatch
+                    Case UnmanagedType.Interface, UnmanagedType.IUnknown, Cci.Constants.UnmanagedType_IDispatch
                         Return True
                 End Select
 
@@ -104,9 +107,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public MustOverride ReadOnly Property Type As TypeSymbol
 
         ''' <summary>
-        ''' The list of custom modifiers, if any, associated with the parameter.
+        ''' The list of custom modifiers, if any, associated with the parameter type.
         ''' </summary>
         Public MustOverride ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
+
+        ''' <summary>
+        ''' Custom modifiers associated with the ref modifier, or an empty array if there are none.
+        ''' </summary>
+        Public MustOverride ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
 
         ''' <summary>
         ''' Gets the ordinal order of this parameter. The first type parameter has ordinal zero.
@@ -258,14 +266,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend MustOverride ReadOnly Property IsCallerFilePath As Boolean
 
-        ''' <summary>
-        ''' The CLI spec says that custom modifiers must precede the ByRef type code in the encoding of a parameter.
-        ''' Unfortunately, the managed C++ compiler emits them in the reverse order.  In order to avoid breaking
-        ''' interop scenarios, we need to support such signatures. 
-        ''' Should be 0 for non-ref parameters.
-        ''' </summary>
-        Friend MustOverride ReadOnly Property CountOfCustomModifiersPrecedingByRef As UShort
-
         Protected Overrides ReadOnly Property HighestPriorityUseSiteError As Integer
             Get
                 Return ERRID.ERR_UnsupportedType1
@@ -281,6 +281,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 #Region "IParameterSymbol"
 
+        Private ReadOnly Property IParameterSymbol_IsDiscard As Boolean Implements IParameterSymbol.IsDiscard
+            Get
+                Return False
+            End Get
+        End Property
+
         Private ReadOnly Property IParameterSymbol_RefKind As RefKind Implements IParameterSymbol.RefKind
             Get
                 ' TODO: Should we check if it has the <Out> attribute and return 'RefKind.Out' in
@@ -295,6 +301,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Private ReadOnly Property IParameterSymbol_NullableAnnotation As NullableAnnotation Implements IParameterSymbol.NullableAnnotation
+            Get
+                Return NullableAnnotation.None
+            End Get
+        End Property
+
         Private ReadOnly Property IParameterSymbol_IsOptional As Boolean Implements IParameterSymbol.IsOptional
             Get
                 Return Me.IsOptional
@@ -304,6 +316,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property IParameterSymbol_IsThis As Boolean Implements IParameterSymbol.IsThis
             Get
                 Return Me.IsMe
+            End Get
+        End Property
+
+        Private ReadOnly Property IParameterSymbol_RefCustomModifiers As ImmutableArray(Of CustomModifier) Implements IParameterSymbol.RefCustomModifiers
+            Get
+                Return Me.RefCustomModifiers
             End Get
         End Property
 

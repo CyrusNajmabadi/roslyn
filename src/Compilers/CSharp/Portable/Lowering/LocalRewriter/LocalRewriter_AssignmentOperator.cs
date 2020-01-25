@@ -1,5 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -31,13 +34,19 @@ namespace Microsoft.CodeAnalysis.CSharp
                     loweredLeft = VisitIndexerAccess((BoundIndexerAccess)left, isLeftOfAssignment: true);
                     break;
 
+                case BoundKind.IndexOrRangePatternIndexerAccess:
+                    loweredLeft = VisitIndexOrRangePatternIndexerAccess(
+                        (BoundIndexOrRangePatternIndexerAccess)left,
+                        isLeftOfAssignment: true);
+                    break;
+
                 case BoundKind.EventAccess:
                     {
                         BoundEventAccess eventAccess = (BoundEventAccess)left;
                         if (eventAccess.EventSymbol.IsWindowsRuntimeEvent)
                         {
-                            Debug.Assert(node.RefKind == RefKind.None);
-                            return VisitWindowsRuntimeEventFieldAssignmentOperator(node.Syntax, eventAccess, node.Right);
+                            Debug.Assert(!node.IsRef);
+                            return VisitWindowsRuntimeEventFieldAssignmentOperator(node.Syntax, eventAccess, loweredRight);
                         }
                         goto default;
                     }
@@ -71,14 +80,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                     break;
             }
 
-            return MakeStaticAssignmentOperator(node.Syntax, loweredLeft, loweredRight, node.Type, used);
+            return MakeStaticAssignmentOperator(node.Syntax, loweredLeft, loweredRight, node.IsRef, node.Type, used);
         }
 
         /// <summary>
         /// Generates a lowered form of the assignment operator for the given left and right sub-expressions.
         /// Left and right sub-expressions must be in lowered form.
         /// </summary>
-        private BoundExpression MakeAssignmentOperator(CSharpSyntaxNode syntax, BoundExpression rewrittenLeft, BoundExpression rewrittenRight, TypeSymbol type,
+        private BoundExpression MakeAssignmentOperator(SyntaxNode syntax, BoundExpression rewrittenLeft, BoundExpression rewrittenRight, TypeSymbol type,
             bool used, bool isChecked, bool isCompoundAssignment)
         {
             switch (rewrittenLeft.Kind)
@@ -103,8 +112,28 @@ namespace Microsoft.CodeAnalysis.CSharp
                         isCompoundAssignment,
                         isChecked).ToExpression();
 
+                case BoundKind.EventAccess:
+                    var eventAccess = (BoundEventAccess)rewrittenLeft;
+                    Debug.Assert(eventAccess.IsUsableAsField);
+                    if (eventAccess.EventSymbol.IsWindowsRuntimeEvent)
+                    {
+                        const bool isDynamic = false;
+                        return RewriteWindowsRuntimeEventAssignmentOperator(eventAccess.Syntax,
+                                                                            eventAccess.EventSymbol,
+                                                                            EventAssignmentKind.Assignment,
+                                                                            isDynamic,
+                                                                            eventAccess.ReceiverOpt,
+                                                                            rewrittenRight);
+                    }
+
+                    // Only Windows Runtime field-like events can come through here:
+                    // - Assignment operation is not supported for custom (non-field like) events.
+                    // - Access to regular field-like events is expected to be lowered to at least a field access
+                    //   when we reach here.
+                    throw ExceptionUtilities.Unreachable;
+
                 default:
-                    return MakeStaticAssignmentOperator(syntax, rewrittenLeft, rewrittenRight, type, used);
+                    return MakeStaticAssignmentOperator(syntax, rewrittenLeft, rewrittenRight, isRef: false, type: type, used: used);
             }
         }
 
@@ -135,7 +164,13 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Generates a lowered form of the assignment operator for the given left and right sub-expressions.
         /// Left and right sub-expressions must be in lowered form.
         /// </summary>
-        private BoundExpression MakeStaticAssignmentOperator(CSharpSyntaxNode syntax, BoundExpression rewrittenLeft, BoundExpression rewrittenRight, TypeSymbol type, bool used)
+        private BoundExpression MakeStaticAssignmentOperator(
+            SyntaxNode syntax,
+            BoundExpression rewrittenLeft,
+            BoundExpression rewrittenRight,
+            bool isRef,
+            TypeSymbol type,
+            bool used)
         {
             switch (rewrittenLeft.Kind)
             {
@@ -145,6 +180,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 case BoundKind.PropertyAccess:
                     {
+                        Debug.Assert(!isRef);
                         BoundPropertyAccess propertyAccess = (BoundPropertyAccess)rewrittenLeft;
                         BoundExpression rewrittenReceiver = propertyAccess.ReceiverOpt;
                         PropertySymbol property = propertyAccess.PropertySymbol;
@@ -164,6 +200,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 case BoundKind.IndexerAccess:
                     {
+                        Debug.Assert(!isRef);
                         BoundIndexerAccess indexerAccess = (BoundIndexerAccess)rewrittenLeft;
                         BoundExpression rewrittenReceiver = indexerAccess.ReceiverOpt;
                         ImmutableArray<BoundExpression> rewrittenArguments = indexerAccess.Arguments;
@@ -182,8 +219,57 @@ namespace Microsoft.CodeAnalysis.CSharp
                             used);
                     }
 
+                case BoundKind.Local:
+                    {
+                        Debug.Assert(!isRef || ((BoundLocal)rewrittenLeft).LocalSymbol.RefKind != RefKind.None);
+                        return new BoundAssignmentOperator(
+                            syntax,
+                            rewrittenLeft,
+                            rewrittenRight,
+                            type,
+                            isRef: isRef);
+                    }
+
+                case BoundKind.Parameter:
+                    {
+                        Debug.Assert(!isRef || rewrittenLeft.GetRefKind() != RefKind.None);
+                        return new BoundAssignmentOperator(
+                            syntax,
+                            rewrittenLeft,
+                            rewrittenRight,
+                            isRef,
+                            type);
+                    }
+
+                case BoundKind.DiscardExpression:
+                    {
+                        return rewrittenRight;
+                    }
+
+                case BoundKind.Sequence:
+                    // An Index or Range pattern-based indexer produces a sequence with a nested
+                    // BoundIndexerAccess. We need to lower the final expression and produce an
+                    // update sequence
+                    var sequence = (BoundSequence)rewrittenLeft;
+                    if (sequence.Value.Kind == BoundKind.IndexerAccess)
+                    {
+                        return sequence.Update(
+                            sequence.Locals,
+                            sequence.SideEffects,
+                            MakeStaticAssignmentOperator(
+                                syntax,
+                                sequence.Value,
+                                rewrittenRight,
+                                isRef,
+                                type,
+                                used),
+                            type);
+                    }
+                    goto default;
+
                 default:
                     {
+                        Debug.Assert(!isRef);
                         return new BoundAssignmentOperator(
                             syntax,
                             rewrittenLeft,
@@ -194,7 +280,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         private BoundExpression MakePropertyAssignment(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenReceiver,
             PropertySymbol property,
             ImmutableArray<BoundExpression> rewrittenArguments,
@@ -222,7 +308,17 @@ namespace Microsoft.CodeAnalysis.CSharp
             // We have already lowered each argument, but we may need some additional rewriting for the arguments,
             // such as generating a params array, re-ordering arguments based on argsToParamsOpt map, inserting arguments for optional parameters, etc.
             ImmutableArray<LocalSymbol> argTemps;
-            rewrittenArguments = MakeArguments(syntax, rewrittenArguments, property, setMethod, expanded, argsToParamsOpt, ref argumentRefKindsOpt, out argTemps, enableCallerInfo: ThreeState.True);
+            rewrittenArguments = MakeArguments(
+                syntax,
+                rewrittenArguments,
+                property,
+                setMethod,
+                expanded,
+                argsToParamsOpt,
+                ref argumentRefKindsOpt,
+                out argTemps,
+                invokedAsExtensionMethod: false,
+                enableCallerInfo: ThreeState.True);
 
             if (used)
             {

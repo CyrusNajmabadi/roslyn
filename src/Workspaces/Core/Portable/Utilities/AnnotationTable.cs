@@ -1,6 +1,7 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -47,8 +48,7 @@ namespace Roslyn.Utilities
 
         private SyntaxAnnotation GetOrCreateRealAnnotation(TAnnotation annotation)
         {
-            SyntaxAnnotation realAnnotation;
-            if (!_realAnnotationMap.TryGetValue(annotation, out realAnnotation))
+            if (!_realAnnotationMap.TryGetValue(annotation, out var realAnnotation))
             {
                 var id = Interlocked.Increment(ref _globalId);
                 var idString = id.ToString();
@@ -75,8 +75,7 @@ namespace Roslyn.Utilities
 
         private SyntaxAnnotation GetRealAnnotation(TAnnotation annotation)
         {
-            SyntaxAnnotation realAnnotation;
-            _realAnnotationMap.TryGetValue(annotation, out realAnnotation);
+            _realAnnotationMap.TryGetValue(annotation, out var realAnnotation);
             return realAnnotation;
         }
 
@@ -124,8 +123,7 @@ namespace Roslyn.Utilities
         {
             foreach (var ra in realAnnotations)
             {
-                TAnnotation annotation;
-                if (_annotationMap.TryGetValue(ra.Data, out annotation))
+                if (_annotationMap.TryGetValue(ra.Data, out var annotation))
                 {
                     yield return annotation;
                 }

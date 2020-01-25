@@ -1,9 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.IntelliSense.CompletionSetSources
@@ -14,9 +13,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.IntelliSense.Completion
 
         private void VerifyWorker(string markup, bool validLocation, CSharpParseOptions options = null)
         {
-            string code;
-            int position;
-            MarkupTestFile.GetPosition(markup, out code, out position);
+            MarkupTestFile.GetPosition(markup, out var code, out int position);
 
             VerifyAtPosition(code, position, validLocation, options: options);
             VerifyInFrontOfComment(code, position, validLocation, options: options);
@@ -139,6 +136,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.IntelliSense.Completion
     " + text +
 @"  }
 }";
+        }
+
+        protected string AddInsideClass(string text)
+        {
+            return
+@"class C
+{
+    " + text +
+@"}";
         }
     }
 }

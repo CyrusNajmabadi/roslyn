@@ -1,9 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -18,20 +18,11 @@ namespace Microsoft.CodeAnalysis
             _oldProject = oldProject;
         }
 
-        public ProjectId ProjectId
-        {
-            get { return _newProject.Id; }
-        }
+        public ProjectId ProjectId => _newProject.Id;
 
-        public Project OldProject
-        {
-            get { return _oldProject; }
-        }
+        public Project OldProject => _oldProject;
 
-        public Project NewProject
-        {
-            get { return _newProject; }
-        }
+        public Project NewProject => _newProject;
 
         public IEnumerable<ProjectReference> GetAddedProjectReferences()
         {
@@ -127,16 +118,53 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
+        public IEnumerable<DocumentId> GetAddedAnalyzerConfigDocuments()
+        {
+            foreach (var doc in _newProject.AnalyzerConfigDocuments)
+            {
+                if (!_oldProject.ContainsAnalyzerConfigDocument(doc.Id))
+                {
+                    yield return doc.Id;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get Documents with any changes, including textual and non-textual changes
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<DocumentId> GetChangedDocuments()
         {
-            // if the document states are different then there is a change.
+            return GetChangedDocuments(false);
+        }
+
+        /// <summary>
+        /// Get Changed Documents:
+        /// When onlyGetDocumentsWithTextChanges is true, only get documents with text changes;
+        /// otherwise get documents with any changes i.e. DocumentState changes:
+        /// <see cref="DocumentState.ParseOptions"/>, <see cref="DocumentState.SourceCodeKind"/>, <see cref="TextDocumentState.FilePath"/>
+        /// </summary>
+        /// <param name="onlyGetDocumentsWithTextChanges"></param>
+        /// <returns></returns>
+        public IEnumerable<DocumentId> GetChangedDocuments(bool onlyGetDocumentsWithTextChanges)
+        {
             foreach (var id in _newProject.DocumentIds)
             {
                 var newState = _newProject.GetDocumentState(id);
                 var oldState = _oldProject.GetDocumentState(id);
-                if (oldState != null && newState != oldState)
+
+                if (oldState != null)
                 {
-                    yield return id;
+                    if (onlyGetDocumentsWithTextChanges)
+                    {
+                        if (newState.HasTextChanged(oldState))
+                            yield return id;
+                    }
+                    else
+                    {
+                        if (newState != oldState)
+                            yield return id;
+                    }
                 }
             }
         }
@@ -151,6 +179,20 @@ namespace Microsoft.CodeAnalysis
                 if (oldState != null && newState != oldState)
                 {
                     yield return id;
+                }
+            }
+        }
+
+        public IEnumerable<DocumentId> GetChangedAnalyzerConfigDocuments()
+        {
+            // if the document states are different then there is a change.
+            foreach (var doc in _newProject.AnalyzerConfigDocuments)
+            {
+                var newState = _newProject.GetAnalyzerConfigDocumentState(doc.Id);
+                var oldState = _oldProject.GetAnalyzerConfigDocumentState(doc.Id);
+                if (oldState != null && newState != oldState)
+                {
+                    yield return doc.Id;
                 }
             }
         }
@@ -173,6 +215,17 @@ namespace Microsoft.CodeAnalysis
                 if (!_newProject.ContainsAdditionalDocument(id))
                 {
                     yield return id;
+                }
+            }
+        }
+
+        public IEnumerable<DocumentId> GetRemovedAnalyzerConfigDocuments()
+        {
+            foreach (var doc in _oldProject.AnalyzerConfigDocuments)
+            {
+                if (!_newProject.ContainsAnalyzerConfigDocument(doc.Id))
+                {
+                    yield return doc.Id;
                 }
             }
         }

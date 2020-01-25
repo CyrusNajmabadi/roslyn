@@ -1,15 +1,14 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Reflection
 Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.UnitTests
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
     Public Class SpeculativeSemanticModelTests
-        Inherits SpeculativeSemanticModelTestsBase
-
         <Fact>
         Public Sub SyntaxTreeCreateAcceptsAnySyntaxNode()
             Dim node As VisualBasicSyntaxNode = SyntaxFactory.ImportsStatement(SyntaxFactory.SingletonSeparatedList(Of ImportsClauseSyntax)(SyntaxFactory.SimpleImportsClause(SyntaxFactory.IdentifierName("Blah"))))
@@ -81,28 +80,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
         End Sub
 
         Private Sub CheckTree(tree As SyntaxTree)
-#If False Then ' https://github.com/dotnet/roslyn/issues/4453
-            CheckAllMembers(
-                tree,
-                New Dictionary(Of Type, Func(Of Object)) From
-                {
-                    {GetType(SyntaxTree), Function() tree},
-                    {GetType(VisualBasicSyntaxTree), Function() tree},
-                    {GetType(TextSpan), Function() TextSpan.FromBounds(0, 0)},
-                    {GetType(SourceText), Function() New StringText("Module Module1 _ End Module")},
-                    {GetType(SyntaxNodeOrToken), Function() New SyntaxNodeOrToken(tree.GetRoot())},
-                    {GetType(SyntaxNodeOrToken), Function() New SyntaxNodeOrToken(tree.GetRoot())}
-                },
-                New Dictionary(Of MemberInfo, Type) From
-                {
-                    {GetType(VisualBasicSyntaxTree).GetMethod("GetCompilationUnitRoot"), GetType(InvalidCastException)},
-                    {GetType(VisualBasicSyntaxTree).GetMethod("GetDiagnostics", {GetType(VisualBasicSyntaxNode)}), GetType(ArgumentNullException)},
-                    {GetType(VisualBasicSyntaxTree).GetMethod("GetDiagnostics", {GetType(SyntaxToken)}), GetType(InvalidOperationException)},
-                    {GetType(VisualBasicSyntaxTree).GetMethod("GetDiagnostics", {GetType(SyntaxTrivia)}), GetType(InvalidOperationException)},
-                    {GetType(VisualBasicSyntaxTree).GetMethod("GetDiagnostics", {GetType(SyntaxNode)}), GetType(ArgumentNullException)},
-                    {GetType(VisualBasicSyntaxTree).GetMethod("GetDiagnostics", {GetType(SyntaxToken)}), GetType(InvalidOperationException)}
-                })
-#End If
+            Assert.Throws(Of InvalidCastException)(
+                Sub()
+                    Dim _ignored = DirectCast(DirectCast(tree.GetCompilationUnitRoot(), [Object]), VisualBasicSyntaxTree)
+                End Sub)
+
+            Assert.Throws(Of ArgumentNullException)(
+                Sub()
+                    tree.GetDiagnostics(DirectCast(Nothing, VisualBasicSyntaxNode))
+                End Sub)
+
+            Assert.Throws(Of InvalidOperationException)(
+                Sub()
+                    Dim token As SyntaxToken = Nothing
+                    tree.GetDiagnostics(token)
+                End Sub)
+
+            Assert.Throws(Of ArgumentNullException)(
+                Sub()
+                    tree.GetDiagnostics(DirectCast(Nothing, SyntaxNode))
+                End Sub)
+
+            Assert.Throws(Of InvalidOperationException)(
+                Sub()
+                    Dim trivia As SyntaxTrivia = Nothing
+                    tree.GetDiagnostics(trivia)
+                End Sub)
         End Sub
     End Class
 End Namespace

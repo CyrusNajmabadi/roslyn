@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -15,7 +18,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend MustInherit Class FieldSymbol
         Inherits Symbol
-        Implements IFieldSymbol
+        Implements IFieldSymbol, IFieldSymbolInternal
 
         ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ' Changes to the public interface of this class should remain synchronized with the C# version.
@@ -326,10 +329,72 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        ''' <summary>
+        ''' Is this a field of a tuple type?
+        ''' </summary>
+        Public Overridable ReadOnly Property IsTupleField() As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' Returns True when field symbol is not mapped directly to a field in the underlying tuple struct.
+        ''' </summary>
+        Public Overridable ReadOnly Property IsVirtualTupleField As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' Returns true if this is a field representing a Default element like Item1, Item2...
+        ''' </summary>
+        Public Overridable ReadOnly Property IsDefaultTupleElement As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' If this is a field of a tuple type, return corresponding underlying field from the
+        ''' tuple underlying type. Otherwise, Nothing. In case of a malformed underlying type
+        ''' the corresponding underlying field might be missing, return Nothing in this case too.
+        ''' </summary>
+        Public Overridable ReadOnly Property TupleUnderlyingField() As FieldSymbol
+            Get
+                Return Nothing
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' If this field represents a tuple element, returns a corresponding default element field.
+        ''' Otherwise returns Nothing
+        ''' </summary>
+        Public Overridable ReadOnly Property CorrespondingTupleField As FieldSymbol
+            Get
+                Return Nothing
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' If this is a field representing a tuple element,
+        ''' returns the index of the element (zero-based).
+        ''' Otherwise returns -1
+        ''' </summary>
+        Public Overridable ReadOnly Property TupleElementIndex As Integer
+            Get
+                Return -1
+            End Get
+        End Property
+
         Friend Function AsMember(newOwner As NamedTypeSymbol) As FieldSymbol
             Debug.Assert(Me Is Me.OriginalDefinition)
             Debug.Assert(newOwner.OriginalDefinition Is Me.ContainingSymbol.OriginalDefinition)
-            Return If(newOwner = Me.ContainingSymbol, Me, DirectCast(DirectCast(newOwner, SubstitutedNamedType).GetMemberForDefinition(Me), FieldSymbol))
+            Return If(TypeSymbol.Equals(newOwner, Me.ContainingType, TypeCompareKind.ConsiderEverything),
+                Me,
+                DirectCast(DirectCast(newOwner, SubstitutedNamedType).GetMemberForDefinition(Me), FieldSymbol))
         End Function
 
 #Region "IFieldSymbol"
@@ -346,7 +411,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private ReadOnly Property IFieldSymbol_IsVolatile As Boolean Implements IFieldSymbol.IsVolatile
+        Private ReadOnly Property IFieldSymbol_IsVolatile As Boolean Implements IFieldSymbol.IsVolatile, IFieldSymbolInternal.IsVolatile
+            Get
+                Return False
+            End Get
+        End Property
+
+        Private ReadOnly Property IFieldSymbol_IsFixedSizeBuffer As Boolean Implements IFieldSymbol.IsFixedSizeBuffer
             Get
                 Return False
             End Get
@@ -355,6 +426,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property IFieldSymbol_Type As ITypeSymbol Implements IFieldSymbol.Type
             Get
                 Return Me.Type
+            End Get
+        End Property
+
+        Private ReadOnly Property IFieldSymbol_NullableAnnotation As NullableAnnotation Implements IFieldSymbol.NullableAnnotation
+            Get
+                Return NullableAnnotation.None
             End Get
         End Property
 
@@ -379,6 +456,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property IFieldSymbol_OriginalDefinition As IFieldSymbol Implements IFieldSymbol.OriginalDefinition
             Get
                 Return Me.OriginalDefinition
+            End Get
+        End Property
+
+        Private ReadOnly Property IFieldSymbol_CorrespondingTupleField As IFieldSymbol Implements IFieldSymbol.CorrespondingTupleField
+            Get
+                Return Me.CorrespondingTupleField
             End Get
         End Property
 

@@ -1,16 +1,21 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
@@ -32,12 +37,12 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             return new EncapsulateFieldResult(c => EncapsulateFieldResultAsync(document, span, useDefaultBehavior, c));
         }
 
-        public async Task<IEnumerable<EncapsulateFieldCodeAction>> GetEncapsulateFieldCodeActionsAsync(Document document, TextSpan span, CancellationToken cancellationToken)
+        public async Task<ImmutableArray<EncapsulateFieldCodeAction>> GetEncapsulateFieldCodeActionsAsync(Document document, TextSpan span, CancellationToken cancellationToken)
         {
             var fields = (await GetFieldsAsync(document, span, cancellationToken).ConfigureAwait(false)).ToImmutableArrayOrEmpty();
             if (fields.Length == 0)
             {
-                return SpecializedCollections.EmptyEnumerable<EncapsulateFieldCodeAction>();
+                return ImmutableArray<EncapsulateFieldCodeAction>.Empty;
             }
 
             if (fields.Length == 1)
@@ -48,25 +53,26 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             else
             {
                 // there are multiple fields.
-                var current = SpecializedCollections.EmptyEnumerable<EncapsulateFieldCodeAction>();
+                var current = ArrayBuilder<EncapsulateFieldCodeAction>.GetInstance();
 
                 if (span.IsEmpty)
                 {
                     // if there is no selection, get action for each field + all of them.
                     for (var i = 0; i < fields.Length; i++)
                     {
-                        current = current.Concat(EncapsulateOneField(document, span, fields[i], i));
+                        current.AddRange(EncapsulateOneField(document, span, fields[i], i));
                     }
                 }
 
-                return current.Concat(EncapsulateAllFields(document, span));
+                current.AddRange(EncapsulateAllFields(document, span));
+                return current.ToImmutableAndFree();
             }
         }
 
         private IEnumerable<EncapsulateFieldCodeAction> EncapsulateAllFields(Document document, TextSpan span)
         {
-            var action1Text = FeaturesResources.EncapsulateFieldsUsages;
-            var action2Text = FeaturesResources.EncapsulateFields;
+            var action1Text = FeaturesResources.Encapsulate_fields_and_use_property;
+            var action2Text = FeaturesResources.Encapsulate_fields_but_still_use_field;
 
             return new[]
             {
@@ -75,22 +81,20 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             };
         }
 
-        private IEnumerable<EncapsulateFieldCodeAction> EncapsulateOneField(Document document, TextSpan span, IFieldSymbol field, int index)
+        private ImmutableArray<EncapsulateFieldCodeAction> EncapsulateOneField(Document document, TextSpan span, IFieldSymbol field, int index)
         {
-            var action1Text = string.Format(FeaturesResources.EncapsulateFieldUsages, field.Name);
-            var action2Text = string.Format(FeaturesResources.EncapsulateField, field.Name);
+            var action1Text = string.Format(FeaturesResources.Encapsulate_field_colon_0_and_use_property, field.Name);
+            var action2Text = string.Format(FeaturesResources.Encapsulate_field_colon_0_but_still_use_field, field.Name);
 
-            return new[]
-            {
+            return ImmutableArray.Create(
                 new EncapsulateFieldCodeAction(new EncapsulateFieldResult(c => SingleEncapsulateFieldResultAsync(document, span, index, true, c)), action1Text),
-                new EncapsulateFieldCodeAction(new EncapsulateFieldResult(c => SingleEncapsulateFieldResultAsync(document, span, index, false, c)), action2Text)
-            };
+                new EncapsulateFieldCodeAction(new EncapsulateFieldResult(c => SingleEncapsulateFieldResultAsync(document, span, index, false, c)), action2Text));
         }
 
         private async Task<Result> SingleEncapsulateFieldResultAsync(Document document, TextSpan span, int index, bool updateReferences, CancellationToken cancellationToken)
         {
             var fields = (await GetFieldsAsync(document, span, cancellationToken).ConfigureAwait(false)).ToImmutableArrayOrEmpty();
-            Contract.Requires(fields.Length > index);
+            Debug.Assert(fields.Length > index);
 
             var field = fields[index];
             var result = await EncapsulateFieldAsync(field, document, updateReferences, cancellationToken).ConfigureAwait(false);
@@ -108,7 +112,7 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             var failedFieldSymbols = new List<IFieldSymbol>();
 
             var fields = await GetFieldsAsync(document, span, cancellationToken).ConfigureAwait(false);
-            Contract.Requires(fields.Any());
+            Debug.Assert(fields.Any());
 
             // For now, build up the multiple field case by encapsulating one at a time.
             Result result = null;
@@ -116,10 +120,9 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             {
                 var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
                 var compilation = semanticModel.Compilation;
-                var currentField = field.GetSymbolKey().Resolve(compilation, cancellationToken: cancellationToken).Symbol as IFieldSymbol;
 
                 // We couldn't resolve this field. skip it
-                if (currentField == null)
+                if (!(field.GetSymbolKey().Resolve(compilation, cancellationToken: cancellationToken).Symbol is IFieldSymbol currentField))
                 {
                     failedFieldSymbols.Add(field);
                     continue;
@@ -181,15 +184,13 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             var compilation = semanticModel.Compilation;
             field = field.GetSymbolKey().Resolve(compilation, cancellationToken: cancellationToken).Symbol as IFieldSymbol;
 
-            var solutionNeedingProperty = solution;
-
             // We couldn't resolve field after annotating its declaration. Bail
             if (field == null)
             {
                 return null;
             }
 
-            solutionNeedingProperty = await UpdateReferencesAsync(
+            var solutionNeedingProperty = await UpdateReferencesAsync(
                 updateReferences, solution, document, field, finalFieldName, generatedPropertyName, cancellationToken).ConfigureAwait(false);
             document = solutionNeedingProperty.GetDocument(document.Id);
 
@@ -216,10 +217,17 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             var newDeclaration = newRoot.GetAnnotatedNodes<SyntaxNode>(declarationAnnotation).First();
             field = semanticModel.GetDeclaredSymbol(newDeclaration, cancellationToken) as IFieldSymbol;
 
-            var generatedProperty = GenerateProperty(generatedPropertyName, finalFieldName, originalField.DeclaredAccessibility, originalField, field.ContainingType, new SyntaxAnnotation(), document, cancellationToken);
+            var generatedProperty = GenerateProperty(
+                generatedPropertyName,
+                finalFieldName,
+                originalField.DeclaredAccessibility,
+                originalField,
+                field.ContainingType,
+                new SyntaxAnnotation(),
+                document);
 
-            var codeGenerationService = document.GetLanguageService<ICodeGenerationService>();
-            var solutionWithProperty = await AddPropertyAsync(document, document.Project.Solution, field, generatedProperty, cancellationToken).ConfigureAwait(false);
+            var solutionWithProperty = await AddPropertyAsync(
+                document, document.Project.Solution, field, generatedProperty, cancellationToken).ConfigureAwait(false);
 
             return new Result(solutionWithProperty, originalField.ToDisplayString(), originalField.GetGlyph());
         }
@@ -232,14 +240,18 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                 return solution;
             }
 
+            var projectId = document.Project.Id;
             if (field.IsReadOnly)
             {
                 // Inside the constructor we want to rename references the field to the final field name.
                 var constructorSyntaxes = GetConstructorNodes(field.ContainingType).ToSet();
                 if (finalFieldName != field.Name && constructorSyntaxes.Count > 0)
                 {
-                    solution = await Renamer.RenameSymbolAsync(solution, field, finalFieldName, solution.Workspace.Options,
-                        location => constructorSyntaxes.Any(c => c.Span.IntersectsWith(location.SourceSpan)), cancellationToken: cancellationToken).ConfigureAwait(false);
+                    solution = await Renamer.RenameSymbolAsync(solution,
+                        SymbolAndProjectId.Create(field, projectId),
+                        finalFieldName, solution.Options,
+                        location => constructorSyntaxes.Any(c => c.Span.IntersectsWith(location.SourceSpan)),
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
                     document = solution.GetDocument(document.Id);
 
                     var compilation = await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
@@ -248,13 +260,18 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                 }
 
                 // Outside the constructor we want to rename references to the field to final property name.
-                return await Renamer.RenameSymbolAsync(solution, field, generatedPropertyName, solution.Workspace.Options,
-                    location => !constructorSyntaxes.Any(c => c.Span.IntersectsWith(location.SourceSpan)), cancellationToken: cancellationToken).ConfigureAwait(false);
+                return await Renamer.RenameSymbolAsync(solution,
+                    SymbolAndProjectId.Create(field, projectId),
+                    generatedPropertyName, solution.Options,
+                    location => !constructorSyntaxes.Any(c => c.Span.IntersectsWith(location.SourceSpan)),
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 // Just rename everything.
-                return await Renamer.RenameSymbolAsync(solution, field, generatedPropertyName, solution.Workspace.Options, cancellationToken).ConfigureAwait(false);
+                return await Renamer.RenameSymbolAsync(
+                    solution, SymbolAndProjectId.Create(field, projectId),
+                    generatedPropertyName, solution.Options, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -265,7 +282,9 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             var codeGenerationService = document.GetLanguageService<ICodeGenerationService>();
 
             var fieldDeclaration = field.DeclaringSyntaxReferences.First();
-            var options = new CodeGenerationOptions(contextLocation: fieldDeclaration.SyntaxTree.GetLocation(fieldDeclaration.Span));
+            var options = new CodeGenerationOptions(
+                contextLocation: fieldDeclaration.SyntaxTree.GetLocation(fieldDeclaration.Span),
+                parseOptions: fieldDeclaration.SyntaxTree.Options);
 
             var destination = field.ContainingType;
             var updatedDocument = await codeGenerationService.AddPropertyAsync(destinationSolution, destination, property, options, cancellationToken)
@@ -277,18 +296,25 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             return updatedDocument.Project.Solution;
         }
 
-        protected IPropertySymbol GenerateProperty(string propertyName, string fieldName, Accessibility accessibility, IFieldSymbol field, INamedTypeSymbol containingSymbol, SyntaxAnnotation annotation, Document document, CancellationToken cancellationToken)
+        protected IPropertySymbol GenerateProperty(
+            string propertyName, string fieldName,
+            Accessibility accessibility,
+            IFieldSymbol field,
+            INamedTypeSymbol containingSymbol,
+            SyntaxAnnotation annotation,
+            Document document)
         {
             var factory = document.GetLanguageService<SyntaxGenerator>();
 
             var propertySymbol = annotation.AddAnnotationToSymbol(CodeGenerationSymbolFactory.CreatePropertySymbol(containingType: containingSymbol,
-                attributes: SpecializedCollections.EmptyList<AttributeData>(),
+                attributes: ImmutableArray<AttributeData>.Empty,
                 accessibility: ComputeAccessibility(accessibility, field.Type),
                 modifiers: new DeclarationModifiers(isStatic: field.IsStatic, isReadOnly: field.IsReadOnly, isUnsafe: field.IsUnsafe()),
-                type: field.Type,
-                explicitInterfaceSymbol: null,
+                type: field.GetSymbolType(),
+                refKind: RefKind.None,
+                explicitInterfaceImplementations: default,
                 name: propertyName,
-                parameters: SpecializedCollections.EmptyList<IParameterSymbol>(),
+                parameters: ImmutableArray<IParameterSymbol>.Empty,
                 getMethod: CreateGet(fieldName, field, factory),
                 setMethod: field.IsReadOnly || field.IsConst ? null : CreateSet(fieldName, field, factory)));
 
@@ -324,19 +350,27 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                     assigned.WithAdditionalAnnotations(Simplifier.Annotation),
                 factory.IdentifierName("value")));
 
-            return CodeGenerationSymbolFactory.CreateAccessorSymbol(SpecializedCollections.EmptyList<AttributeData>(),
+            return CodeGenerationSymbolFactory.CreateAccessorSymbol(
+                ImmutableArray<AttributeData>.Empty,
                 Accessibility.NotApplicable,
-                new[] { body }.ToList());
+                ImmutableArray.Create(body));
         }
 
         protected IMethodSymbol CreateGet(string originalFieldName, IFieldSymbol field, SyntaxGenerator factory)
         {
-            var body = factory.ReturnStatement(
-                factory.IdentifierName(originalFieldName));
+            var value = !field.IsStatic
+                ? factory.MemberAccessExpression(
+                    factory.ThisExpression(),
+                    factory.IdentifierName(originalFieldName))
+                : factory.IdentifierName(originalFieldName);
 
-            return CodeGenerationSymbolFactory.CreateAccessorSymbol(SpecializedCollections.EmptyList<AttributeData>(),
+            var body = factory.ReturnStatement(
+                value.WithAdditionalAnnotations(Simplifier.Annotation));
+
+            return CodeGenerationSymbolFactory.CreateAccessorSymbol(
+                ImmutableArray<AttributeData>.Empty,
                 Accessibility.NotApplicable,
-                new[] { body }.ToList());
+                ImmutableArray.Create(body));
         }
 
         private static readonly char[] s_underscoreCharArray = new[] { '_' };
@@ -360,9 +394,11 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
 
             // Make the first character upper case using the "en-US" culture.  See discussion at
             // https://github.com/dotnet/roslyn/issues/5524.
-            var firstCharacter = CompletionRules.EnUSCultureInfo.TextInfo.ToUpper(baseName[0]);
+            var firstCharacter = EnUSCultureInfo.TextInfo.ToUpper(baseName[0]);
             return firstCharacter.ToString() + baseName.Substring(1);
         }
+
+        private static readonly CultureInfo EnUSCultureInfo = new CultureInfo("en-US");
 
         protected abstract Task<SyntaxNode> RewriteFieldNameAndAccessibility(string originalFieldName, bool makePrivate, Document document, SyntaxAnnotation declarationAnnotation, CancellationToken cancellationToken);
         protected abstract Task<IEnumerable<IFieldSymbol>> GetFieldsAsync(Document document, TextSpan span, CancellationToken cancellationToken);
@@ -371,21 +407,21 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
         {
             public Result(Solution solutionWithProperty, string name, Glyph glyph)
             {
-                this.Solution = solutionWithProperty;
-                this.Name = name;
-                this.Glyph = glyph;
+                Solution = solutionWithProperty;
+                Name = name;
+                Glyph = glyph;
             }
 
-            public Result(Solution solutionWithProperty, string name, Glyph glyph, List<IFieldSymbol> failedFieldSymbols) :
-                this(solutionWithProperty, name, glyph)
+            public Result(Solution solutionWithProperty, string name, Glyph glyph, List<IFieldSymbol> failedFieldSymbols)
+                : this(solutionWithProperty, name, glyph)
             {
-                this.FailedFields = failedFieldSymbols.ToImmutableArrayOrEmpty();
+                FailedFields = failedFieldSymbols.ToImmutableArrayOrEmpty();
             }
 
-            public Result(Solution originalSolution, params IFieldSymbol[] fields) :
-                this(originalSolution, string.Empty, Glyph.Error)
+            public Result(Solution originalSolution, params IFieldSymbol[] fields)
+                : this(originalSolution, string.Empty, Glyph.Error)
             {
-                this.FailedFields = fields.ToImmutableArrayOrEmpty();
+                FailedFields = fields.ToImmutableArrayOrEmpty();
             }
 
             public Solution Solution { get; }

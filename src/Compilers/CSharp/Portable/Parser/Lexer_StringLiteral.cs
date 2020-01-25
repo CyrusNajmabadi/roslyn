@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -222,8 +225,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         {
             // We have a string of the form
             //                $" ... "
-            // or, if isVerbatim is true, of the form
+            // or, if isVerbatim is true, of possible forms
             //                $@" ... "
+            //                @$" ... "
             // Where the contents contains zero or more sequences
             //                { STUFF }
             // where these curly braces delimit STUFF in expression "holes".
@@ -316,12 +320,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
             internal void ScanInterpolatedStringLiteralTop(ArrayBuilder<Interpolation> interpolations, ref TokenInfo info, out bool closeQuoteMissing)
             {
-                Debug.Assert(lexer.TextWindow.PeekChar() == '$');
-                lexer.TextWindow.AdvanceChar(); // $
                 if (isVerbatim)
                 {
-                    Debug.Assert(lexer.TextWindow.PeekChar() == '@');
-                    lexer.TextWindow.AdvanceChar(); // @
+                    Debug.Assert(
+                        (lexer.TextWindow.PeekChar() == '@' && lexer.TextWindow.PeekChar(1) == '$') ||
+                        (lexer.TextWindow.PeekChar() == '$' && lexer.TextWindow.PeekChar(1) == '@'));
+
+                    // @$ or $@
+                    lexer.TextWindow.AdvanceChar();
+                    lexer.TextWindow.AdvanceChar();
+                }
+                else
+                {
+                    Debug.Assert(lexer.TextWindow.PeekChar() == '$');
+                    lexer.TextWindow.AdvanceChar(); // $
                 }
 
                 Debug.Assert(lexer.TextWindow.PeekChar() == '"');
@@ -579,7 +591,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                         case '"':
                         case '\'':
                             // handle string or character literal inside an expression hole.
-                            ScanInterpolatedStringLiteralNestedString(ch);
+                            ScanInterpolatedStringLiteralNestedString();
                             continue;
                         case '@':
                             if (lexer.TextWindow.PeekChar(1) == '"')
@@ -666,7 +678,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 }
             }
 
-            private void ScanInterpolatedStringLiteralNestedString(char quote)
+            private void ScanInterpolatedStringLiteralNestedString()
             {
                 var discarded = default(TokenInfo);
                 lexer.ScanStringLiteral(ref discarded, true);

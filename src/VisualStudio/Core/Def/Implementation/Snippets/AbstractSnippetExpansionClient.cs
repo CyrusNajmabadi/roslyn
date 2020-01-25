@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,14 +11,13 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Notification;
-using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Shared.Options;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
 using Microsoft.VisualStudio.Editor;
@@ -27,6 +28,7 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.TextManager.Interop;
 using MSXML;
+using Roslyn.Utilities;
 using VsTextSpan = Microsoft.VisualStudio.TextManager.Interop.TextSpan;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
@@ -44,7 +46,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
 
         internal IVsExpansionSession ExpansionSession;
 
-        public AbstractSnippetExpansionClient(Guid languageServiceGuid, ITextView textView, ITextBuffer subjectBuffer, IVsEditorAdaptersFactoryService editorAdaptersFactoryService)
+        public AbstractSnippetExpansionClient(IThreadingContext threadingContext, Guid languageServiceGuid, ITextView textView, ITextBuffer subjectBuffer, IVsEditorAdaptersFactoryService editorAdaptersFactoryService)
+            : base(threadingContext)
         {
             this.LanguageServiceGuid = languageServiceGuid;
             this.TextView = textView;
@@ -54,13 +57,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
 
         public abstract int GetExpansionFunction(IXMLDOMNode xmlFunctionNode, string bstrFieldName, out IVsExpansionFunction pFunc);
         protected abstract ITrackingSpan InsertEmptyCommentAndGetEndPositionTrackingSpan();
-        internal abstract Document AddImports(Document document, XElement snippetNode, bool placeSystemNamespaceFirst, CancellationToken cancellationToken);
+        internal abstract Document AddImports(Document document, int position, XElement snippetNode, bool placeSystemNamespaceFirst, CancellationToken cancellationToken);
 
         public int FormatSpan(IVsTextLines pBuffer, VsTextSpan[] tsInSurfaceBuffer)
         {
             // Formatting a snippet isn't cancellable.
             var cancellationToken = CancellationToken.None;
-
             // At this point, the $selection$ token has been replaced with the selected text and
             // declarations have been replaced with their default text. We need to format the 
             // inserted snippet text while carefully handling $end$ position (where the caret goes
@@ -84,9 +86,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
             //     {
             //         $end$
             //     }
-
-            SnapshotSpan snippetSpan;
-            if (!TryGetSubjectBufferSpan(tsInSurfaceBuffer[0], out snippetSpan))
+            if (!TryGetSubjectBufferSpan(tsInSurfaceBuffer[0], out var snippetSpan))
             {
                 return VSConstants.S_OK;
             }
@@ -105,6 +105,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
             var endPositionTrackingSpan = isFullSnippetFormat ? InsertEmptyCommentAndGetEndPositionTrackingSpan() : null;
 
             var formattingSpan = CommonFormattingHelpers.GetFormattingSpan(SubjectBuffer.CurrentSnapshot, snippetTrackingSpan.GetSpan(SubjectBuffer.CurrentSnapshot));
+
             SubjectBuffer.CurrentSnapshot.FormatAndApplyToBuffer(formattingSpan, CancellationToken.None);
 
             if (isFullSnippetFormat)
@@ -115,7 +116,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 // specified in the snippet xml. In OnBeforeInsertion we have no guarantee that the
                 // snippet xml will be available, and changing the buffer during OnAfterInsertion can
                 // cause the underlying tracking spans to get out of sync.
-                AddReferencesAndImports(ExpansionSession, cancellationToken);
+                var currentStartPosition = snippetTrackingSpan.GetStartPoint(SubjectBuffer.CurrentSnapshot).Position;
+                AddReferencesAndImports(
+                    ExpansionSession, currentStartPosition, cancellationToken);
 
                 SetNewEndPosition(endPositionTrackingSpan);
             }
@@ -132,23 +135,21 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
 
             if (endTrackingSpan != null)
             {
-                SnapshotSpan endSpanInSurfaceBuffer;
                 if (!TryGetSpanOnHigherBuffer(
                     endTrackingSpan.GetSpan(SubjectBuffer.CurrentSnapshot),
                     TextView.TextBuffer,
-                    out endSpanInSurfaceBuffer))
+                    out var endSpanInSurfaceBuffer))
                 {
                     return;
                 }
 
-                int endLine, endColumn;
-                TextView.TextSnapshot.GetLineAndColumn(endSpanInSurfaceBuffer.Start.Position, out endLine, out endColumn);
+                TextView.TextSnapshot.GetLineAndCharacter(endSpanInSurfaceBuffer.Start.Position, out var endLine, out var endChar);
                 ExpansionSession.SetEndSpan(new VsTextSpan
                 {
                     iStartLine = endLine,
-                    iStartIndex = endColumn,
+                    iStartIndex = endChar,
                     iEndLine = endLine,
-                    iEndIndex = endColumn
+                    iEndIndex = endChar
                 });
             }
         }
@@ -174,9 +175,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                     var document = this.SubjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges();
                     if (document != null)
                     {
-                        var optionService = document.Project.Solution.Workspace.Services.GetService<IOptionService>();
-                        var tabSize = optionService.GetOption(FormattingOptions.TabSize, document.Project.Language);
-                        indentDepth = lineText.GetColumnFromLineOffset(lineText.Length, tabSize);
+                        var documentOptions = document.GetOptionsAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                        indentDepth = lineText.GetColumnFromLineOffset(lineText.Length, documentOptions.GetOption(FormattingOptions.TabSize));
                     }
                     else
                     {
@@ -196,8 +196,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
         /// </summary>
         private static bool SetEndPositionIfNoneSpecified(IVsExpansionSession pSession)
         {
-            XElement snippetNode;
-            if (!TryGetSnippetNode(pSession, out snippetNode))
+            if (!TryGetSnippetNode(pSession, out var snippetNode))
             {
                 return false;
             }
@@ -246,9 +245,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 // released before leaving this method. Otherwise, a second invocation of the same
                 // snippet may cause an AccessViolationException.
                 var session = (IVsExpansionSessionInternal)pSession;
-
-                IntPtr pNode;
-                if (session.GetSnippetNode(null, out pNode) != VSConstants.S_OK)
+                if (session.GetSnippetNode(null, out var pNode) != VSConstants.S_OK)
                 {
                     return false;
                 }
@@ -272,15 +269,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
             // empty line and indented, then we have already removed the white space on that line
             // and the navigation location will be at column 0 on a blank line. We must now
             // position the caret in virtual space.
-
-            int lineLength;
-            pBuffer.GetLengthOfLine(ts[0].iStartLine, out lineLength);
-
-            string endLineText;
-            pBuffer.GetLineText(ts[0].iStartLine, 0, ts[0].iStartLine, lineLength, out endLineText);
-
-            int endLinePosition;
-            pBuffer.GetPositionOfLine(ts[0].iStartLine, out endLinePosition);
+            pBuffer.GetLengthOfLine(ts[0].iStartLine, out var lineLength);
+            pBuffer.GetLineText(ts[0].iStartLine, 0, ts[0].iStartLine, lineLength, out var endLineText);
+            pBuffer.GetPositionOfLine(ts[0].iStartLine, out var endLinePosition);
 
             PositionCaretForEditingInternal(endLineText, endLinePosition);
 
@@ -374,33 +365,25 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 return false;
             }
 
-            int startLine = 0;
-            int startIndex = 0;
-            int endLine = 0;
-            int endIndex = 0;
-
             // The expansion itself needs to be created in the data buffer, so map everything up
             var startPointInSubjectBuffer = SubjectBuffer.CurrentSnapshot.GetPoint(startPositionInSubjectBuffer);
             var endPointInSubjectBuffer = SubjectBuffer.CurrentSnapshot.GetPoint(endPositionInSubjectBuffer);
-
-            SnapshotSpan dataBufferSpan;
             if (!TryGetSpanOnHigherBuffer(
                 SubjectBuffer.CurrentSnapshot.GetSpan(startPositionInSubjectBuffer, endPositionInSubjectBuffer - startPositionInSubjectBuffer),
                 textViewModel.DataBuffer,
-                out dataBufferSpan))
+                out var dataBufferSpan))
             {
                 return false;
             }
 
             var buffer = EditorAdaptersFactoryService.GetBufferAdapter(textViewModel.DataBuffer);
-            var expansion = buffer as IVsExpansion;
-            if (buffer == null || expansion == null)
+            if (buffer == null || !(buffer is IVsExpansion expansion))
             {
                 return false;
             }
 
-            buffer.GetLineIndexOfPosition(dataBufferSpan.Start.Position, out startLine, out startIndex);
-            buffer.GetLineIndexOfPosition(dataBufferSpan.End.Position, out endLine, out endIndex);
+            buffer.GetLineIndexOfPosition(dataBufferSpan.Start.Position, out var startLine, out var startIndex);
+            buffer.GetLineIndexOfPosition(dataBufferSpan.End.Position, out var endLine, out var endIndex);
 
             var textSpan = new VsTextSpan
             {
@@ -472,7 +455,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 textSpan.iEndLine = textSpan.iStartLine;
                 textSpan.iEndIndex = textSpan.iStartIndex;
 
-                IVsExpansion expansion = EditorAdaptersFactoryService.GetBufferAdapter(textViewModel.DataBuffer) as IVsExpansion;
+                var expansion = EditorAdaptersFactoryService.GetBufferAdapter(textViewModel.DataBuffer) as IVsExpansion;
                 earlyEndExpansionHappened = false;
                 hr = expansion.InsertNamedExpansion(pszTitle, pszPath, textSpan, this, LanguageServiceGuid, fShowDisambiguationUI: 0, pSession: out ExpansionSession);
 
@@ -498,23 +481,21 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
         {
             var vsTextView = EditorAdaptersFactoryService.GetViewAdapter(TextView);
             vsTextView.GetCaretPos(out caretLine, out caretColumn);
-
-            IVsTextLines textLines;
-            vsTextView.GetBuffer(out textLines);
-
+            vsTextView.GetBuffer(out var textLines);
             // Handle virtual space (e.g, see Dev10 778675)
-            int lineLength;
-            textLines.GetLengthOfLine(caretLine, out lineLength);
+            textLines.GetLengthOfLine(caretLine, out var lineLength);
             if (caretColumn > lineLength)
             {
                 caretColumn = lineLength;
             }
         }
 
-        private void AddReferencesAndImports(IVsExpansionSession pSession, CancellationToken cancellationToken)
+        private void AddReferencesAndImports(
+            IVsExpansionSession pSession,
+            int position,
+            CancellationToken cancellationToken)
         {
-            XElement snippetNode;
-            if (!TryGetSnippetNode(pSession, out snippetNode))
+            if (!TryGetSnippetNode(pSession, out var snippetNode))
             {
                 return;
             }
@@ -525,9 +506,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 return;
             }
 
-            var optionService = documentWithImports.Project.Solution.Workspace.Services.GetService<IOptionService>();
-            var placeSystemNamespaceFirst = optionService.GetOption(OrganizerOptions.PlaceSystemNamespaceFirst, documentWithImports.Project.Language);
-            documentWithImports = AddImports(documentWithImports, snippetNode, placeSystemNamespaceFirst, cancellationToken);
+            var documentOptions = documentWithImports.GetOptionsAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var placeSystemNamespaceFirst = documentOptions.GetOption(GenerationOptions.PlaceSystemNamespaceFirst);
+
+            documentWithImports = AddImports(documentWithImports, position, snippetNode, placeSystemNamespaceFirst, cancellationToken);
             AddReferences(documentWithImports.Project, snippetNode);
         }
 
@@ -545,7 +527,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
 
             var assemblyXmlName = XName.Get("Assembly", snippetNode.Name.NamespaceName);
             var failedReferenceAdditions = new List<string>();
-            var visualStudioWorkspace = workspace as VisualStudioWorkspaceImpl;
 
             foreach (var reference in referencesNode.Elements(XName.Get("Reference", snippetNode.Name.NamespaceName)))
             {
@@ -559,7 +540,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                     continue;
                 }
 
-                if (visualStudioWorkspace == null ||
+                if (!(workspace is VisualStudioWorkspaceImpl visualStudioWorkspace) ||
                     !visualStudioWorkspace.TryAddReferenceToProject(projectId, assemblyName))
                 {
                     failedReferenceAdditions.Add(assemblyName);
@@ -570,7 +551,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
             {
                 var notificationService = workspace.Services.GetService<INotificationService>();
                 notificationService.SendNotification(
-                    string.Format(ServicesVSResources.ReferencesNotFound, Environment.NewLine)
+                    string.Format(ServicesVSResources.The_following_references_were_not_found_0_Please_locate_and_add_them_manually, Environment.NewLine)
                     + Environment.NewLine + Environment.NewLine
                     + string.Join(Environment.NewLine, failedReferenceAdditions),
                     severity: NotificationSeverity.Warning);
@@ -579,20 +560,18 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
 
         protected static bool TryAddImportsToContainedDocument(Document document, IEnumerable<string> memberImportsNamespaces)
         {
-            var vsWorkspace = document.Project.Solution.Workspace as VisualStudioWorkspaceImpl;
-            if (vsWorkspace == null)
+            if (!(document.Project.Solution.Workspace is VisualStudioWorkspaceImpl vsWorkspace))
             {
                 return false;
             }
 
-            var containedDocument = vsWorkspace.GetHostDocument(document.Id) as ContainedDocument;
+            var containedDocument = vsWorkspace.TryGetContainedDocument(document.Id);
             if (containedDocument == null)
             {
                 return false;
             }
 
-            var containedLanguageHost = containedDocument.ContainedLanguage.ContainedLanguageHost as IVsContainedLanguageHostInternal;
-            if (containedLanguageHost != null)
+            if (containedDocument.ContainedLanguageHost is IVsContainedLanguageHostInternal containedLanguageHost)
             {
                 foreach (var importClause in memberImportsNamespaces)
                 {
@@ -637,7 +616,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 return true;
             }
 
-            subjectBufferSpan = default(SnapshotSpan);
+            subjectBufferSpan = default;
             return false;
         }
 
@@ -652,7 +631,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Snippets
                 return true;
             }
 
-            span = default(SnapshotSpan);
+            span = default;
             return false;
         }
     }

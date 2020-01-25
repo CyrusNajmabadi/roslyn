@@ -1,6 +1,9 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -31,7 +34,16 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Recommendations
         {
             await VerifyKeywordAsync(@"class C
 {
-    $$ public void foo() { }
+    $$ public void goo() { }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestInsideInterface()
+        {
+            await VerifyKeywordAsync(@"interface C
+{
+    $$
 }");
         }
 
@@ -54,9 +66,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Recommendations
         {
             await VerifyKeywordAsync(@"class C
 {
-    void foo()
+    void goo()
     {
-        foo($$
+        goo($$
     }
 }");
         }
@@ -66,7 +78,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Recommendations
         {
             await VerifyAbsenceAsync(@"class C
 {
-    void foo($$)
+    void goo($$)
     {
     }
 }");
@@ -103,7 +115,7 @@ class Program
         public async Task TestNotInNamespace()
         {
             await VerifyAbsenceAsync(@"
-namespace Foo
+namespace Goo
 {
     $$
 }");
@@ -114,7 +126,7 @@ namespace Foo
         public async Task TestNotAfterPartialInNamespace()
         {
             await VerifyAbsenceAsync(@"
-namespace Foo
+namespace Goo
 {
     partial $$
 }");
@@ -125,9 +137,123 @@ namespace Foo
         public async Task TestNotAfterPartialInClass()
         {
             await VerifyAbsenceAsync(@"
-class Foo
+class Goo
 {
     partial $$
+}");
+        }
+
+        [Fact]
+        [WorkItem(8616, "https://github.com/dotnet/roslyn/issues/8616")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        public async Task TestLocalFunction()
+        {
+            await VerifyKeywordAsync(@"
+class Goo
+{
+    public void M()
+    {
+        $$
+    }
+}");
+        }
+
+        [Fact]
+        [WorkItem(14525, "https://github.com/dotnet/roslyn/issues/14525")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        [Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestLocalFunction2()
+        {
+            await VerifyKeywordAsync(@"
+class Goo
+{
+    public void M()
+    {
+        unsafe $$
+    }
+}");
+        }
+
+        [Fact]
+        [WorkItem(14525, "https://github.com/dotnet/roslyn/issues/14525")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        [Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestLocalFunction3()
+        {
+            await VerifyKeywordAsync(@"
+class Goo
+{
+    public void M()
+    {
+        unsafe $$ void L() { }
+    }
+}");
+        }
+
+        [Fact]
+        [WorkItem(8616, "https://github.com/dotnet/roslyn/issues/8616")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        [Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestLocalFunction4()
+        {
+            await VerifyKeywordAsync(@"
+class Goo
+{
+    public void M()
+    {
+        $$ void L() { }
+    }
+}");
+        }
+
+        [Fact]
+        [WorkItem(8616, "https://github.com/dotnet/roslyn/issues/8616")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        [Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestLocalFunction5()
+        {
+            await VerifyKeywordAsync(@"
+class Goo
+{
+    public void M(Action<int> a)
+    {
+        M(async () =>
+        {
+            $$
+        });
+    }
+}");
+        }
+
+        [Fact]
+        [WorkItem(8616, "https://github.com/dotnet/roslyn/issues/8616")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        [Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestLocalFunction6()
+        {
+            await VerifyAbsenceAsync(@"
+class Goo
+{
+    public void M()
+    {
+        int $$
+    }
+}");
+        }
+
+        [Fact]
+        [WorkItem(8616, "https://github.com/dotnet/roslyn/issues/8616")]
+        [Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.LocalFunctions)]
+        [Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
+        public async Task TestLocalFunction7()
+        {
+            await VerifyAbsenceAsync(@"
+class Goo
+{
+    public void M()
+    {
+        static $$
+    }
 }");
         }
     }

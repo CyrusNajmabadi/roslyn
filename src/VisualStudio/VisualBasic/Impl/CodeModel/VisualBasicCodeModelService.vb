@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Text
 Imports System.Threading
@@ -18,6 +20,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Extensions
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
+Imports Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Interop
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel.Extenders
 Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel.MethodXml
@@ -35,8 +38,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 provider,
                 editorOptionsFactoryService,
                 refactorNotifyServices,
-                New LineAdjustmentFormattingRule(),
-                New EndRegionFormattingRule())
+                LineAdjustmentFormattingRule.Instance,
+                EndRegionFormattingRule.Instance)
 
             Me._commitBufferManagerFactory = commitBufferManagerFactory
         End Sub
@@ -383,6 +386,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 Return GetAttributeNodes(DirectCast(node, FieldDeclarationSyntax).AttributeLists)
             ElseIf TypeOf node Is ParameterSyntax Then
                 Return GetAttributeNodes(DirectCast(node, ParameterSyntax).AttributeLists)
+            ElseIf TypeOf node Is EnumMemberDeclarationSyntax Then
+                Return GetAttributeNodes(DirectCast(node, EnumMemberDeclarationSyntax).AttributeLists)
             ElseIf TypeOf node Is ModifiedIdentifierSyntax OrElse
                    TypeOf node Is VariableDeclaratorSyntax Then
                 Return GetAttributeNodes(node.Parent)
@@ -940,11 +945,17 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 Throw New ArgumentNullException(NameOf(node))
             End If
 
+            ' In all cases, the resulting syntax for the new name has elastic trivia attached,
+            ' whether via this call to SyntaxFactory.Identifier or via explicitly added elastic
+            ' markers.
             Dim identifier As SyntaxToken = SyntaxFactory.Identifier(name)
 
             Select Case node.Kind
                 Case SyntaxKind.Attribute
-                    Return DirectCast(node, AttributeSyntax).WithName(SyntaxFactory.ParseTypeName(name))
+                    Return DirectCast(node, AttributeSyntax).WithName(
+                        SyntaxFactory.ParseTypeName(name) _
+                            .WithLeadingTrivia(SyntaxFactory.TriviaList(SyntaxFactory.ElasticMarker)) _
+                            .WithTrailingTrivia(SyntaxFactory.TriviaList(SyntaxFactory.ElasticMarker)))
                 Case SyntaxKind.ClassStatement
                     Return DirectCast(node, ClassStatementSyntax).WithIdentifier(identifier)
                 Case SyntaxKind.InterfaceStatement
@@ -959,7 +970,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                      SyntaxKind.DelegateSubStatement
                     Return DirectCast(node, DelegateStatementSyntax).WithIdentifier(identifier)
                 Case SyntaxKind.NamespaceStatement
-                    Return DirectCast(node, NamespaceStatementSyntax).WithName(SyntaxFactory.ParseName(name))
+                    Return DirectCast(node, NamespaceStatementSyntax).WithName(
+                        SyntaxFactory.ParseName(name) _
+                            .WithLeadingTrivia(SyntaxFactory.TriviaList(SyntaxFactory.ElasticMarker)) _
+                            .WithTrailingTrivia(SyntaxFactory.TriviaList(SyntaxFactory.ElasticMarker)))
                 Case SyntaxKind.SubStatement,
                      SyntaxKind.FunctionStatement,
                      SyntaxKind.SubNewStatement
@@ -1045,6 +1059,14 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                             semanticModel.GetDeclaredSymbol(node))
 
             Return GetExternalSymbolFullName(symbol)
+        End Function
+
+        Public Overrides Function IsExpressionBodiedProperty(node As SyntaxNode) As Boolean
+            Return False
+        End Function
+
+        Public Overrides Function TryGetAutoPropertyExpressionBody(parentNode As SyntaxNode, ByRef accessorNode As SyntaxNode) As Boolean
+            Return False
         End Function
 
         Public Overrides Function IsAccessorNode(node As SyntaxNode) As Boolean
@@ -1378,6 +1400,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
             Return symbol.DeclaredAccessibility = Accessibility.Public OrElse
                    symbol.DeclaredAccessibility = Accessibility.Protected OrElse
                    symbol.DeclaredAccessibility = Accessibility.ProtectedOrFriend OrElse
+                   symbol.DeclaredAccessibility = Accessibility.ProtectedAndFriend OrElse
                    symbol.DeclaredAccessibility = Accessibility.Friend
         End Function
 
@@ -1411,6 +1434,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                     access = access Or EnvDTE.vsCMAccess.vsCMAccessProject
                 Case Accessibility.ProtectedOrInternal, Accessibility.ProtectedOrFriend
                     access = access Or EnvDTE.vsCMAccess.vsCMAccessProjectOrProtected
+                Case Accessibility.ProtectedAndInternal, Accessibility.ProtectedAndFriend
+                    ' there is no appropriate mapping for private protected in EnvDTE.vsCMAccess
+                    ' See https://github.com/dotnet/roslyn/issues/22406
+                    access = access Or EnvDTE.vsCMAccess.vsCMAccessProject
                 Case Accessibility.Public
                     access = access Or EnvDTE.vsCMAccess.vsCMAccessPublic
                 Case Else
@@ -2000,7 +2027,11 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 newModifierList.Add(SyntaxFactory.Token(SyntaxKind.OptionalKeyword))
             End If
 
-            If (kind And EnvDTE80.vsCMParameterKind.vsCMParameterKindRef) <> 0 Then
+
+            If (kind And EnvDTE80.vsCMParameterKind.vsCMParameterKindIn) <> 0 AndAlso parameter.Modifiers.Any(SyntaxKind.ByValKeyword) Then
+                ' Ensure that we keep ByVal if it was already present.
+                newModifierList.Add(SyntaxFactory.Token(SyntaxKind.ByValKeyword))
+            ElseIf (kind And EnvDTE80.vsCMParameterKind.vsCMParameterKindRef) <> 0 Then
                 newModifierList.Add(SyntaxFactory.Token(SyntaxKind.ByRefKeyword))
             End If
 
@@ -2025,6 +2056,27 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
             End Select
 
             Return False
+        End Function
+
+        Public Overrides Function UpdateParameterKind(parameterKind As EnvDTE80.vsCMParameterKind, passingMode As PARAMETER_PASSING_MODE) As EnvDTE80.vsCMParameterKind
+            Dim updatedParameterKind = parameterKind
+
+            Select Case passingMode
+                Case PARAMETER_PASSING_MODE.cmParameterTypeIn
+                    updatedParameterKind = updatedParameterKind Or EnvDTE80.vsCMParameterKind.vsCMParameterKindIn
+                    updatedParameterKind = updatedParameterKind And Not EnvDTE80.vsCMParameterKind.vsCMParameterKindRef
+                    updatedParameterKind = updatedParameterKind And Not EnvDTE80.vsCMParameterKind.vsCMParameterKindOut
+
+                Case PARAMETER_PASSING_MODE.cmParameterTypeInOut
+                    updatedParameterKind = updatedParameterKind And Not EnvDTE80.vsCMParameterKind.vsCMParameterKindIn
+                    updatedParameterKind = updatedParameterKind Or EnvDTE80.vsCMParameterKind.vsCMParameterKindRef
+                    updatedParameterKind = updatedParameterKind And Not EnvDTE80.vsCMParameterKind.vsCMParameterKindOut
+
+                Case PARAMETER_PASSING_MODE.cmParameterTypeOut
+                    Throw Exceptions.ThrowEInvalidArg()
+            End Select
+
+            Return updatedParameterKind
         End Function
 
         Public Overrides Function ValidateFunctionKind(containerNode As SyntaxNode, kind As EnvDTE.vsCMFunction, name As String) As EnvDTE.vsCMFunction
@@ -2153,7 +2205,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 If trivia.Kind = SyntaxKind.CommentTrivia Then
                     firstCommentFound = True
                     commentList.Add(trivia)
-                ElseIf Not firstCommentFound AndAlso trivia.IsWhitespace() Then
+                ElseIf Not firstCommentFound AndAlso trivia.IsWhitespaceOrEndOfLine() Then
                     Continue For
                 ElseIf firstCommentFound AndAlso trivia.Kind = SyntaxKind.EndOfLineTrivia AndAlso nextTrivia.Kind = SyntaxKind.CommentTrivia Then
                     Continue For

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -22,13 +24,11 @@ namespace Microsoft.CodeAnalysis.Formatting
             private readonly TokenStream _tokenStream;
             private readonly ChainedFormattingRules _formattingRules;
             private readonly SyntaxNode _rootNode;
-            private readonly SyntaxToken _lastToken;
 
             public InitialContextFinder(
                 TokenStream tokenStream,
                 ChainedFormattingRules formattingRules,
-                SyntaxNode rootNode,
-                SyntaxToken lastToken)
+                SyntaxNode rootNode)
             {
                 Contract.ThrowIfNull(tokenStream);
                 Contract.ThrowIfNull(formattingRules);
@@ -37,10 +37,9 @@ namespace Microsoft.CodeAnalysis.Formatting
                 _tokenStream = tokenStream;
                 _formattingRules = formattingRules;
                 _rootNode = rootNode;
-                _lastToken = lastToken;
             }
 
-            public ValueTuple<List<IndentBlockOperation>, List<SuppressOperation>> Do(SyntaxToken startToken, SyntaxToken endToken)
+            public (List<IndentBlockOperation> indentOperations, List<SuppressOperation> suppressOperations) Do(SyntaxToken startToken, SyntaxToken endToken)
             {
                 // we are formatting part of document, try to find initial context that formatting will be based on such as
                 // initial indentation and etc.
@@ -60,7 +59,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                                      o.TextSpan.Contains(endToken.SpanStart)));
                     }
 
-                    return ValueTuple.Create(initialIndentationOperations, initialSuppressOperations);
+                    return (initialIndentationOperations, initialSuppressOperations);
                 }
             }
 
@@ -79,7 +78,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                     node.DescendantNodesAndSelf(n => n != previous && n.Span.IntersectsWith(span) && !span.Contains(n.Span))
                         .Do(n =>
                             {
-                                _formattingRules.AddIndentBlockOperations(list, n, _lastToken);
+                                _formattingRules.AddIndentBlockOperations(list, n);
                                 foreach (var element in list)
                                 {
                                     if (element != null)
@@ -154,19 +153,19 @@ namespace Microsoft.CodeAnalysis.Formatting
                 // operation has found
                 var list = new List<SuppressOperation>();
 
-                Predicate<SuppressOperation> predicate = o =>
+                bool predicate(SuppressOperation o)
                 {
                     if (o == null)
                     {
                         return true;
                     }
 
-                    if (o.ContainsElasticTrivia(_tokenStream) && !o.Option.IsOn(SuppressOption.IgnoreElastic))
+                    if (!o.TextSpan.Contains(startPosition))
                     {
                         return true;
                     }
 
-                    if (!o.TextSpan.Contains(startPosition))
+                    if (o.ContainsElasticTrivia(_tokenStream) && !o.Option.IsOn(SuppressOption.IgnoreElasticWrapping))
                     {
                         return true;
                     }
@@ -177,12 +176,12 @@ namespace Microsoft.CodeAnalysis.Formatting
                     }
 
                     return false;
-                };
+                }
 
                 var currentIndentationNode = startNode;
                 while (currentIndentationNode != null)
                 {
-                    _formattingRules.AddSuppressOperations(list, currentIndentationNode, _lastToken);
+                    _formattingRules.AddSuppressOperations(list, currentIndentationNode);
 
                     list.RemoveAll(predicate);
                     if (list.Count > 0)

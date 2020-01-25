@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
 using Roslyn.Utilities;
@@ -11,9 +13,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
     /// <summary>
     /// Represents a compiler generated field of given type and name.
     /// </summary>
-    internal class SynthesizedFieldSymbol : SynthesizedFieldSymbolBase
+    internal sealed class SynthesizedFieldSymbol : SynthesizedFieldSymbolBase
     {
-        private readonly TypeSymbol _type;
+        private readonly TypeWithAnnotations _type;
 
         public SynthesizedFieldSymbol(
             NamedTypeSymbol containingType,
@@ -25,10 +27,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             : base(containingType, name, isPublic, isReadOnly, isStatic)
         {
             Debug.Assert((object)type != null);
-            _type = type;
+            _type = TypeWithAnnotations.Create(type);
         }
 
-        internal override TypeSymbol GetFieldType(ConsList<FieldSymbol> fieldsBeingBound)
+        internal override bool SuppressDynamicAttribute
+        {
+            get { return true; }
+        }
+
+        internal override TypeWithAnnotations GetFieldType(ConsList<FieldSymbol> fieldsBeingBound)
         {
             return _type;
         }

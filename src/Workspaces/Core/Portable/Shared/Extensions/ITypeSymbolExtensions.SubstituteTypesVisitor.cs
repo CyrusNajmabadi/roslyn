@@ -1,11 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Shared.Extensions
 {
@@ -34,8 +33,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
             private ITypeSymbol VisitType(ITypeSymbol symbol)
             {
-                TType2 converted;
-                if (symbol is TType1 && _map.TryGetValue((TType1)symbol, out converted))
+                if (symbol is TType1 && _map.TryGetValue((TType1)symbol, out var converted))
                 {
                     return converted;
                 }
@@ -45,7 +43,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
             public override ITypeSymbol VisitDynamicType(IDynamicTypeSymbol symbol)
             {
-                return symbol;
+                return VisitType(symbol);
             }
 
             public override ITypeSymbol VisitTypeParameter(ITypeParameterSymbol symbol)
@@ -55,6 +53,12 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
             public override ITypeSymbol VisitNamedType(INamedTypeSymbol symbol)
             {
+                var mapped = VisitType(symbol);
+                if (!Equals(mapped, symbol))
+                {
+                    return mapped;
+                }
+
                 if (symbol.IsAnonymousType)
                 {
                     return symbol;
@@ -73,22 +77,28 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
                     : symbol.ContainingType.Accept(this);
 
                 // If our containing type changed, then find us again in the new containing type.
-                if (updatedContainingType != symbol.ContainingType)
+                if (!Equals(updatedContainingType, symbol.ContainingType))
                 {
                     symbol = updatedContainingType.GetTypeMembers(symbol.Name, symbol.Arity).First(m => m.TypeKind == symbol.TypeKind);
                 }
 
-                var substitutedArguments = symbol.TypeArguments.Select(t => t.Accept(this)).ToArray();
+                var substitutedArguments = symbol.TypeArguments.Select(t => t.Accept(this));
                 if (symbol.TypeArguments.SequenceEqual(substitutedArguments))
                 {
                     return symbol;
                 }
 
-                return _typeGenerator.Construct(symbol.OriginalDefinition, substitutedArguments);
+                return _typeGenerator.Construct(symbol.OriginalDefinition, substitutedArguments.ToArray()).WithNullableAnnotation(symbol.NullableAnnotation);
             }
 
             public override ITypeSymbol VisitArrayType(IArrayTypeSymbol symbol)
             {
+                var mapped = VisitType(symbol);
+                if (!Equals(mapped, symbol))
+                {
+                    return mapped;
+                }
+
                 var elementType = symbol.ElementType.Accept(this);
                 if (elementType != null && elementType.Equals(symbol.ElementType))
                 {
@@ -100,6 +110,12 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
             public override ITypeSymbol VisitPointerType(IPointerTypeSymbol symbol)
             {
+                var mapped = VisitType(symbol);
+                if (!Equals(mapped, symbol))
+                {
+                    return mapped;
+                }
+
                 var pointedAtType = symbol.PointedAtType.Accept(this);
                 if (pointedAtType != null && pointedAtType.Equals(symbol.PointedAtType))
                 {

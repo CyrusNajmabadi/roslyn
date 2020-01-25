@@ -1,17 +1,18 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Module TypeSymbolExtensions
 
         <Extension()>
         Public Function IsNullableType(this As TypeSymbol) As Boolean
-            Dim original = TryCast(this.OriginalDefinition, TypeSymbol)
-
-            Return original IsNot Nothing AndAlso original.SpecialType = SpecialType.System_Nullable_T
+            Return this.OriginalDefinition.SpecialType = SpecialType.System_Nullable_T
         End Function
 
         <Extension()>
@@ -40,16 +41,75 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Function GetEnumUnderlyingType(type As TypeSymbol) As TypeSymbol
             Debug.Assert(type IsNot Nothing)
 
-            If type.IsEnumType() Then
-                Return DirectCast(type, NamedTypeSymbol).EnumUnderlyingType
-            End If
-
-            Return Nothing
+            Return TryCast(type, NamedTypeSymbol)?.EnumUnderlyingType
         End Function
 
         <Extension()>
         Public Function GetEnumUnderlyingTypeOrSelf(type As TypeSymbol) As TypeSymbol
             Return If(GetEnumUnderlyingType(type), type)
+        End Function
+
+        <Extension()>
+        Public Function GetTupleUnderlyingType(type As TypeSymbol) As TypeSymbol
+            Debug.Assert(type IsNot Nothing)
+
+            Return TryCast(type, NamedTypeSymbol)?.TupleUnderlyingType
+        End Function
+
+        <Extension()>
+        Public Function GetTupleUnderlyingTypeOrSelf(type As TypeSymbol) As TypeSymbol
+            Return If(GetTupleUnderlyingType(type), type)
+        End Function
+
+        <Extension()>
+        Public Function TryGetElementTypesIfTupleOrCompatible(type As TypeSymbol, <Out> ByRef elementTypes As ImmutableArray(Of TypeSymbol)) As Boolean
+            If type.IsTupleType Then
+                elementTypes = DirectCast(type, TupleTypeSymbol).TupleElementTypes
+                Return True
+            End If
+
+            ' The following codepath should be very uncommon since it would be rare
+            ' to see a tuple underlying type not represented as a tuple.
+            ' It still might happen since tuple underlying types are creatable via public APIs 
+            ' and it is also possible that they would be passed in.
+
+            ' PERF: if allocations here become nuisance, consider caching the results
+            '       in the type symbols that can actually be tuple compatible
+            Dim cardinality As Integer
+            If Not type.IsTupleCompatible(cardinality) Then
+                ' source not a tuple or compatible
+                elementTypes = Nothing
+                Return False
+            End If
+
+            Dim elementTypesBuilder = ArrayBuilder(Of TypeSymbol).GetInstance(cardinality)
+            TupleTypeSymbol.AddElementTypes(DirectCast(type, NamedTypeSymbol), elementTypesBuilder)
+
+            Debug.Assert(elementTypesBuilder.Count = cardinality)
+
+            elementTypes = elementTypesBuilder.ToImmutableAndFree()
+            Return True
+        End Function
+
+        <Extension()>
+        Public Function GetElementTypesOfTupleOrCompatible(Type As TypeSymbol) As ImmutableArray(Of TypeSymbol)
+            If Type.IsTupleType Then
+                Return DirectCast(Type, TupleTypeSymbol).TupleElementTypes
+            End If
+
+            ' The following codepath should be very uncommon since it would be rare
+            ' to see a tuple underlying type not represented as a tuple.
+            ' It still might happen since tuple underlying types are creatable via public APIs 
+            ' and it is also possible that they would be passed in.
+
+            Debug.Assert(Type.IsTupleCompatible())
+
+            ' PERF: if allocations here become nuisance, consider caching the results
+            '       in the type symbols that can actually be tuple compatible
+            Dim elementTypesBuilder = ArrayBuilder(Of TypeSymbol).GetInstance()
+            TupleTypeSymbol.AddElementTypes(DirectCast(Type, NamedTypeSymbol), elementTypesBuilder)
+
+            Return elementTypesBuilder.ToImmutableAndFree()
         End Function
 
         <Extension()>
@@ -124,7 +184,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' library. It should be acceptable just to check the name of the type to avoid adding
             ' this type into WellKnownTypes and passing compilation into this method.
             ' Note, the comparison should be case-sensitive, similar to metadata resolution.
-            Const [namespace] As String = "System"
+            Const [namespace] As String = MetadataHelpers.SystemString
             Const name As String = "DBNull"
 
             If type.SpecialType = SpecialType.None AndAlso
@@ -174,10 +234,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         <Extension()>
-        Friend Function IsSameTypeIgnoringCustomModifiers(t1 As TypeSymbol, t2 As TypeSymbol) As Boolean
+        Friend Function IsSameTypeIgnoringAll(t1 As TypeSymbol, t2 As TypeSymbol) As Boolean
+            Return IsSameType(t1, t2, TypeCompareKind.AllIgnoreOptionsForVB)
+        End Function
+
+        ''' <summary>
+        ''' Compares types ignoring some differences.
+        ''' </summary>
+        <Extension()>
+        Friend Function IsSameType(t1 As TypeSymbol, t2 As TypeSymbol, compareKind As TypeCompareKind) As Boolean
+            Debug.Assert((compareKind And Not (TypeCompareKind.IgnoreCustomModifiersAndArraySizesAndLowerBounds Or TypeCompareKind.IgnoreTupleNames)) = 0)
 
             If t1 Is t2 Then
                 Return True
+            ElseIf t1 Is Nothing OrElse t2 Is Nothing Then
+                Return False
+            End If
+
+            If compareKind = TypeCompareKind.ConsiderEverything Then
+                Return t1.Equals(t2)
             End If
 
             Dim kind = t1.Kind
@@ -191,24 +266,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim array1 = DirectCast(t1, ArrayTypeSymbol)
                 Dim array2 = DirectCast(t2, ArrayTypeSymbol)
 
-                Return array1.HasSameShapeAs(array2) AndAlso
-                       array1.ElementType.IsSameTypeIgnoringCustomModifiers(array2.ElementType)
-
+                Return array1.IsSameType(array2, compareKind)
             ElseIf t1.IsAnonymousType AndAlso t2.IsAnonymousType Then
-                Return AnonymousTypeManager.EqualsIgnoringCustomModifiers(t1, t2)
+                Return AnonymousTypeManager.IsSameType(t1, t2, compareKind)
 
             ElseIf kind = SymbolKind.NamedType OrElse kind = SymbolKind.ErrorType Then
+                If t1.IsTupleType OrElse t2.IsTupleType Then
+                    If t1.GetTupleUnderlyingTypeOrSelf().IsSameType(t2.GetTupleUnderlyingTypeOrSelf(), compareKind) Then
+                        If (compareKind And TypeCompareKind.IgnoreTupleNames) = 0 Then
+                            If Not t1.IsTupleType OrElse Not t2.IsTupleType OrElse Not HasSameTupleNames(t1, t2) Then
+                                Return False
+                            End If
+                        End If
+                        Return True
+                    Else
+                        Return False
+                    End If
+                End If
+
                 Dim t1IsDefinition = t1.IsDefinition
                 Dim t2IsDefinition = t2.IsDefinition
 
-                If (t1IsDefinition <> t2IsDefinition) AndAlso
-                   Not (DirectCast(t1, NamedTypeSymbol).HasTypeArgumentsCustomModifiers OrElse DirectCast(t2, NamedTypeSymbol).HasTypeArgumentsCustomModifiers) Then
-                    Return False
-                End If
-
                 If Not (t1IsDefinition AndAlso t2IsDefinition) Then ' This is a generic instantiation case
 
-                    If t1.OriginalDefinition <> t2.OriginalDefinition Then
+                    If Not t1.OriginalDefinition.Equals(t2.OriginalDefinition) Then
                         Return False ' different definition
                     End If
 
@@ -217,14 +298,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Dim container2 As NamedTypeSymbol = DirectCast(t2, NamedTypeSymbol)
 
                     Do
-                        Dim args1 As ImmutableArray(Of TypeSymbol) = container1.TypeArgumentsNoUseSiteDiagnostics
-                        Dim args2 As ImmutableArray(Of TypeSymbol) = container2.TypeArgumentsNoUseSiteDiagnostics
 
-                        For i As Integer = 0 To args1.Length - 1 Step 1
-                            If Not args1(i).IsSameTypeIgnoringCustomModifiers(args2(i)) Then
+                        If Not (container1 Is container1.ConstructedFrom AndAlso container2 Is container2.ConstructedFrom) Then
+                            ' No need to compare type arguments on those containers when they didn't add type arguments (that would cause cycles)
+
+                            If (compareKind And Global.Microsoft.CodeAnalysis.TypeCompareKind.IgnoreCustomModifiersAndArraySizesAndLowerBounds) = 0 AndAlso
+                                Not HasSameTypeArgumentCustomModifiers(container1, container2) Then
+
                                 Return False
                             End If
-                        Next
+
+                            Dim args1 As ImmutableArray(Of TypeSymbol) = container1.TypeArgumentsNoUseSiteDiagnostics
+                            Dim args2 As ImmutableArray(Of TypeSymbol) = container2.TypeArgumentsNoUseSiteDiagnostics
+
+                            For i As Integer = 0 To args1.Length - 1 Step 1
+                                If Not args1(i).IsSameType(args2(i), compareKind) Then
+                                    Return False
+                                End If
+                            Next
+                        End If
 
                         container1 = container1.ContainingType
                         container2 = container2.ContainingType
@@ -233,13 +325,73 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                            container1 Is container2 Then ' Shortcut
                             Exit Do
                         End If
+
                     Loop
 
                     Return True
                 End If
+            ElseIf kind = SymbolKind.TypeParameter Then
+                If Not t1.OriginalDefinition.Equals(t2.OriginalDefinition) Then
+                    Return False ' different definition
+                End If
+
+                Return t1.ContainingType.IsSameType(t2.ContainingType, compareKind)
             End If
 
-            Return (t1 = t2)
+            Return t1.Equals(t2)
+        End Function
+
+        Private Function HasSameTypeArgumentCustomModifiers(type1 As NamedTypeSymbol, type2 As NamedTypeSymbol) As Boolean
+            Dim hasMods1 = type1.HasTypeArgumentsCustomModifiers()
+            Dim hasMods2 = type2.HasTypeArgumentsCustomModifiers()
+
+            If Not hasMods1 AndAlso Not hasMods2 Then
+                ' Neither has modifiers
+                Return True
+            End If
+
+            If Not hasMods1 OrElse Not hasMods2 Then
+                ' Only one has modifiers
+                Return False
+            End If
+
+            ' Both have modifiers, let's compare them
+            For i As Integer = 0 To type1.Arity - 1
+                If Not type1.GetTypeArgumentCustomModifiers(i).AreSameCustomModifiers(type2.GetTypeArgumentCustomModifiers(i)) Then
+                    Return False
+                End If
+            Next
+
+            Return True
+        End Function
+
+        <Extension()>
+        Friend Function AreSameCustomModifiers([mod] As ImmutableArray(Of CustomModifier), otherMod As ImmutableArray(Of CustomModifier)) As Boolean
+            Dim count As Integer = [mod].Length
+
+            If (count <> otherMod.Length) Then
+                Return False
+            End If
+
+            Return [mod].SequenceEqual(otherMod)
+        End Function
+
+        Private Function HasSameTupleNames(t1 As TypeSymbol, t2 As TypeSymbol) As Boolean
+            Debug.Assert(t1.IsTupleType And t2.IsTupleType)
+
+            Dim t1Names = t1.TupleElementNames
+            Dim t2Names = t2.TupleElementNames
+
+            If t1Names.IsDefault AndAlso t2Names.IsDefault Then
+                Return True
+            End If
+
+            If t1Names.IsDefault OrElse t2Names.IsDefault Then
+                Return False
+            End If
+            Debug.Assert(t1Names.Length = t2Names.Length)
+
+            Return t1Names.SequenceEqual(t2Names, AddressOf IdentifierComparison.Equals)
         End Function
 
         <Extension()>
@@ -494,7 +646,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         <Extension()>
         Public Function IsSameOrNestedWithin(inner As NamedTypeSymbol, outer As NamedTypeSymbol) As Boolean
             Do
-                If inner = outer Then
+                If TypeSymbol.Equals(inner, outer, TypeCompareKind.ConsiderEverything) Then
                     Return True
                 End If
 
@@ -505,12 +657,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         <Extension()>
-        Public Function ImplementsInterface(subType As TypeSymbol, superInterface As TypeSymbol, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As Boolean
+        Public Function ImplementsInterface(subType As TypeSymbol, superInterface As TypeSymbol, comparer As EqualityComparer(Of TypeSymbol), <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As Boolean
+            If comparer Is Nothing Then
+                comparer = EqualityComparer(Of TypeSymbol).Default
+            End If
 
             For Each [interface] In subType.AllInterfacesWithDefinitionUseSiteDiagnostics(useSiteDiagnostics)
 
                 If [interface].IsInterface AndAlso
-                   [interface] = superInterface Then
+                   comparer.Equals([interface], superInterface) Then
 
                     Return True
                 End If
@@ -572,7 +727,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     current.OriginalDefinition.AddUseSiteDiagnostics(useSiteDiagnostics)
                 End If
 
-                If current = superType Then
+                If current.IsSameTypeIgnoringAll(superType) Then
                     Return True
                 End If
 
@@ -586,7 +741,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Function IsOrDerivedFrom(derivedType As NamedTypeSymbol, baseType As TypeSymbol, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As Boolean
             Dim current = derivedType
             While current IsNot Nothing
-                If current.IsSameTypeIgnoringCustomModifiers(baseType) Then
+                If current.IsSameTypeIgnoringAll(baseType) Then
                     Return True
                 End If
 
@@ -654,7 +809,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             ' first find all implementations of IEnumerable(Of T)
             If Binder.IsOrInheritsFromOrImplementsInterface(type, genericIEnumerable, useSiteDiagnostics, matchingInterfaces) Then
-                If Not matchingInterfaces.IsEmpty Then
+                If matchingInterfaces.Count > 0 Then
 
                     ' now check if the type argument is compatible with the given type
                     For Each matchingInterface In matchingInterfaces
@@ -685,7 +840,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         <Extension()>
         Public Function IsBaseTypeOrInterfaceOf(superType As TypeSymbol, subType As TypeSymbol, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As Boolean
             If superType.IsInterfaceType() Then
-                Return subType.ImplementsInterface(superType, useSiteDiagnostics)
+                Return subType.ImplementsInterface(superType, EqualsIgnoringComparer.InstanceCLRSignatureCompare, useSiteDiagnostics)
             Else
                 Return superType.IsBaseTypeOf(subType, useSiteDiagnostics)
             End If
@@ -760,6 +915,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly s_isTypeParameterFunc As Func(Of TypeSymbol, Object, Boolean) = Function(type, arg) (type.TypeKind = TypeKind.TypeParameter)
 
         ''' <summary>
+        ''' Return true if the type contains any tuples.
+        ''' </summary>
+        <Extension()>
+        Friend Function ContainsTuple(type As TypeSymbol) As Boolean
+            Return type.VisitType(s_isTupleTypeFunc, Nothing) IsNot Nothing
+        End Function
+
+        Private ReadOnly s_isTupleTypeFunc As Func(Of TypeSymbol, Object, Boolean) = Function(type, arg) type.IsTupleType
+
+        ''' <summary>
+        ''' Return true if the type contains any tuples with element names.
+        ''' </summary>
+        <Extension()>
+        Friend Function ContainsTupleNames(type As TypeSymbol) As Boolean
+            Return type.VisitType(s_hasTupleNamesFunc, Nothing) IsNot Nothing
+        End Function
+
+        Private ReadOnly s_hasTupleNamesFunc As Func(Of TypeSymbol, Object, Boolean) = Function(type, arg) Not type.TupleElementNames.IsDefault
+
+        ''' <summary>
         ''' Visit the given type and, in the case of compound types, visit all "sub type"
         ''' (such as A in A(), or { A(Of T), T, U } in A(Of T).B(Of U)) invoking 'predicate'
         ''' with the type and 'arg' at each sub type. If the predicate returns true for any type,
@@ -767,45 +942,77 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' completes without the predicate returning true for any type, this method returns null.
         ''' </summary>
         <Extension()>
-        Friend Function VisitType(Of T)(this As TypeSymbol, predicate As Func(Of TypeSymbol, T, Boolean), arg As T) As TypeSymbol
+        Friend Function VisitType(Of T)(type As TypeSymbol, predicate As Func(Of TypeSymbol, T, Boolean), arg As T) As TypeSymbol
+            ' In order to handle extremely "deep" types like "Integer()()()()()()()()()...()"
+            ' we implement manual tail recursion rather than doing the natural recursion.
 
-            Select Case this.Kind
-                Case SymbolKind.TypeParameter
-                    If predicate(this, arg) Then
-                        Return this
-                    End If
+            Dim current As TypeSymbol = type
 
-                Case SymbolKind.ArrayType
-                    If predicate(this, arg) Then
-                        Return this
-                    End If
+            Do
+                ' Visit containing types from outer-most to inner-most.
+                Select Case current.TypeKind
 
-                    Return DirectCast(this, ArrayTypeSymbol).ElementType.VisitType(predicate, arg)
+                    Case TypeKind.Class,
+                         TypeKind.Struct,
+                         TypeKind.Interface,
+                         TypeKind.Enum,
+                         TypeKind.Delegate
 
-                Case SymbolKind.NamedType, SymbolKind.ErrorType
-                    Dim typeToCheck = DirectCast(this, NamedTypeSymbol)
+                        Dim containingType = current.ContainingType
+                        If containingType IsNot Nothing Then
+                            Dim result = containingType.VisitType(predicate, arg)
 
-                    Do
-                        If predicate(typeToCheck, arg) Then
-                            Return typeToCheck
+                            If result IsNot Nothing Then
+                                Return result
+                            End If
                         End If
 
-                        For Each typeArg In typeToCheck.TypeArgumentsNoUseSiteDiagnostics
-                            Dim result = typeArg.VisitType(predicate, arg)
+                    Case TypeKind.Submission
+                        Debug.Assert(current.ContainingType Is Nothing)
+                End Select
+
+                If predicate(current, arg) Then
+                    Return current
+                End If
+
+                Select Case current.TypeKind
+
+                    Case TypeKind.Dynamic,
+                         TypeKind.TypeParameter,
+                         TypeKind.Submission,
+                         TypeKind.Enum,
+                         TypeKind.Module
+
+                        Return Nothing
+
+                    Case TypeKind.Class,
+                         TypeKind.Struct,
+                         TypeKind.Interface,
+                         TypeKind.Delegate,
+                         TypeKind.Error
+
+                        If current.IsTupleType Then
+                            ' turn tuple type elements into parameters
+                            current = current.TupleUnderlyingType
+                        End If
+
+                        For Each nestedType In DirectCast(current, NamedTypeSymbol).TypeArgumentsNoUseSiteDiagnostics
+                            Dim result = nestedType.VisitType(predicate, arg)
                             If result IsNot Nothing Then
                                 Return result
                             End If
                         Next
 
-                        typeToCheck = typeToCheck.ContainingType
-                    Loop While typeToCheck IsNot Nothing
+                        Return Nothing
 
-                Case Else
-                    Throw ExceptionUtilities.UnexpectedValue(this.Kind)
+                    Case TypeKind.Array
+                        current = DirectCast(current, ArrayTypeSymbol).ElementType
+                        Continue Do
 
-            End Select
-
-            Return Nothing
+                    Case Else
+                        Throw ExceptionUtilities.UnexpectedValue(current.TypeKind)
+                End Select
+            Loop
         End Function
 
         ''' <summary>
@@ -835,7 +1042,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
 
             Return type.GetEnumUnderlyingTypeOrSelf.SpecialType.IsValidTypeForAttributeArgument() OrElse
-                type = compilation.GetWellKnownType(WellKnownType.System_Type) ' don't call the version with diagnostics
+                TypeSymbol.Equals(type, compilation.GetWellKnownType(WellKnownType.System_Type), TypeCompareKind.ConsiderEverything) ' don't call the version with diagnostics
         End Function
 
         <Extension()>
@@ -979,7 +1186,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim namedType = DirectCast(type, NamedTypeSymbol)
 
                 ' Note that if the compilation doesn't have the Expression(Of T) well-known type, then the below test just fails correctly.
-                If namedType.Arity = 1 AndAlso namedType.OriginalDefinition = compilation.GetWellKnownType(WellKnownType.System_Linq_Expressions_Expression_T) Then
+                If namedType.Arity = 1 AndAlso TypeSymbol.Equals(namedType.OriginalDefinition, compilation.GetWellKnownType(WellKnownType.System_Linq_Expressions_Expression_T), TypeCompareKind.ConsiderEverything) Then
                     Dim typeArgument = namedType.TypeArgumentsNoUseSiteDiagnostics(0)
                     If typeArgument.TypeKind = TypeKind.Delegate Then
                         Return DirectCast(typeArgument, NamedTypeSymbol)
@@ -1125,19 +1332,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         <Extension>
         Public Function GetAllTypeArgumentsWithModifiers(type As NamedTypeSymbol) As ImmutableArray(Of TypeWithModifiers)
-            Dim typeArguments = type.TypeArgumentsNoUseSiteDiagnostics
-            Dim typeArgumentsCustomModifiers = type.TypeArgumentsCustomModifiers
+            Dim builder = ArrayBuilder(Of TypeWithModifiers).GetInstance()
 
-            While True
+            Do
+                Dim typeArguments = type.TypeArgumentsNoUseSiteDiagnostics
+
+                For i As Integer = typeArguments.Length - 1 To 0 Step -1
+                    builder.Add(New TypeWithModifiers(typeArguments(i), type.GetTypeArgumentCustomModifiers(i)))
+                Next
+
                 type = type.ContainingType
-                If type Is Nothing Then
-                    Exit While
-                End If
-                typeArguments = type.TypeArgumentsNoUseSiteDiagnostics.Concat(typeArguments)
-                typeArgumentsCustomModifiers = type.TypeArgumentsCustomModifiers.Concat(typeArgumentsCustomModifiers)
-            End While
+            Loop While type IsNot Nothing
 
-            Return ImmutableArray.CreateRange(typeArguments.Zip(typeArgumentsCustomModifiers, Function(a, m) New TypeWithModifiers(a, m)))
+            builder.ReverseContents()
+            Return builder.ToImmutableAndFree()
         End Function
 
         ''' <summary>
@@ -1195,6 +1403,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return (name.Length = length) AndAlso (String.Compare(name, 0, namespaceName, offset, length, comparison) = 0)
         End Function
 
+        <Extension>
+        Friend Function GetTypeRefWithAttributes(type As TypeSymbol, declaringCompilation As VisualBasicCompilation, typeRef As Cci.ITypeReference) As Cci.TypeReferenceWithAttributes
+            If type.ContainsTupleNames() Then
+                Dim attr = declaringCompilation.SynthesizeTupleNamesAttribute(type)
+                If attr IsNot Nothing Then
+                    Return New Cci.TypeReferenceWithAttributes(
+                        typeRef,
+                        ImmutableArray.Create(Of Cci.ICustomAttribute)(attr))
+                End If
+            End If
+
+            Return New Cci.TypeReferenceWithAttributes(typeRef)
+        End Function
     End Module
 
 End Namespace

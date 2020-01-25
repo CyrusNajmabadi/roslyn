@@ -1,9 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Formatting
@@ -17,9 +19,9 @@ namespace Microsoft.CodeAnalysis.Formatting
     /// this object is supposed to be live very short but created a lot of time. that is why it is struct. 
     /// (same reason why SyntaxToken is struct - to reduce heap allocation)
     /// </summary>
-    internal struct TokenData : IEqualityComparer<TokenData>, IEquatable<TokenData>, IComparable<TokenData>, IComparer<TokenData>
+    internal readonly struct TokenData : IEqualityComparer<TokenData>, IEquatable<TokenData>, IComparable<TokenData>, IComparer<TokenData>
     {
-        public TokenData(TokenStream tokenStream, int indexInStream, SyntaxToken token) : this()
+        public TokenData(TokenStream tokenStream, int indexInStream, SyntaxToken token)
         {
             Contract.ThrowIfNull(tokenStream);
             Contract.ThrowIfFalse((indexInStream == -1) || (0 <= indexInStream && indexInStream < tokenStream.TokenCount));
@@ -60,12 +62,8 @@ namespace Microsoft.CodeAnalysis.Formatting
 
         public override bool Equals(object obj)
         {
-            if (obj is TokenData)
-            {
-                return this.Equals((TokenData)obj);
-            }
-
-            return false;
+            return obj is TokenData data &&
+                   this.Equals(data);
         }
 
         public bool Equals(TokenData other)
@@ -111,7 +109,7 @@ namespace Microsoft.CodeAnalysis.Formatting
 
             // this is expansive check. but there is no other way to check.
             var commonRoot = this.Token.GetCommonRoot(other.Token);
-            Contract.Requires(commonRoot != null);
+            Debug.Assert(commonRoot != null);
 
             var tokens = commonRoot.DescendantTokens();
 

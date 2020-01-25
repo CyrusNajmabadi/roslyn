@@ -1,7 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -26,13 +30,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         public static MergedNamespaceDeclaration Create(SingleNamespaceDeclaration declaration)
         {
             return new MergedNamespaceDeclaration(ImmutableArray.Create(declaration));
-        }
-
-        public static MergedNamespaceDeclaration Create(
-            MergedNamespaceDeclaration mergedDeclaration,
-            SingleNamespaceDeclaration declaration)
-        {
-            return new MergedNamespaceDeclaration(mergedDeclaration._declarations.Add(declaration));
         }
 
         public override DeclarationKind Kind
@@ -148,7 +145,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
                 else
                 {
-                    var namespaceGroups = namespaces.ToDictionary(n => n.Name);
+                    var namespaceGroups = namespaces.ToDictionary(n => n.Name, StringOrdinalComparer.Instance);
                     namespaces.Free();
 
                     foreach (var namespaceGroup in namespaceGroups.Values)

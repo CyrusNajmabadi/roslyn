@@ -1,12 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.Common;
+using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Roslyn.Utilities;
 
@@ -24,10 +28,14 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         private readonly SimpleTaskQueue _eventQueue;
 
         private readonly object _gate;
-        private readonly Dictionary<IDiagnosticUpdateSource, Dictionary<object, Data>> _map;
+        private readonly Dictionary<IDiagnosticUpdateSource, Dictionary<Workspace, Dictionary<object, Data>>> _map;
+
+        private readonly EventListenerTracker<IDiagnosticService> _eventListenerTracker;
 
         [ImportingConstructor]
-        public DiagnosticService([ImportMany] IEnumerable<Lazy<IAsynchronousOperationListener, FeatureMetadata>> asyncListeners) : this()
+        public DiagnosticService(
+            IAsynchronousOperationListenerProvider listenerProvider,
+            [ImportMany]IEnumerable<Lazy<IEventListener, EventListenerMetadata>> eventListeners) : this()
         {
             // queue to serialize events.
             _eventMap = new EventMap();
@@ -36,10 +44,12 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             // queue itself can handle huge number of events but we are seeing OOM due to captured data in pending events.
             _eventQueue = new SimpleTaskQueue(s_eventScheduler);
 
-            _listener = new AggregateAsynchronousOperationListener(asyncListeners, FeatureAttribute.DiagnosticService);
+            _listener = listenerProvider.GetListener(FeatureAttribute.DiagnosticService);
 
             _gate = new object();
-            _map = new Dictionary<IDiagnosticUpdateSource, Dictionary<object, Data>>();
+            _map = new Dictionary<IDiagnosticUpdateSource, Dictionary<Workspace, Dictionary<object, Data>>>();
+
+            _eventListenerTracker = new EventListenerTracker<IDiagnosticService>(eventListeners, WellKnownEventListeners.DiagnosticService);
         }
 
         public event EventHandler<DiagnosticsUpdatedArgs> DiagnosticsUpdated
@@ -55,58 +65,140 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             }
         }
 
-        private void RaiseDiagnosticsUpdated(object sender, DiagnosticsUpdatedArgs args)
+        private void RaiseDiagnosticsUpdated(IDiagnosticUpdateSource source, DiagnosticsUpdatedArgs args)
+        {
+            _eventListenerTracker.EnsureEventListener(args.Workspace, this);
+
+            var ev = _eventMap.GetEventHandlers<EventHandler<DiagnosticsUpdatedArgs>>(DiagnosticsUpdatedEventName);
+
+            var eventToken = _listener.BeginAsyncOperation(DiagnosticsUpdatedEventName);
+            _eventQueue.ScheduleTask(() =>
+            {
+                if (!UpdateDataMap(source, args))
+                {
+                    // there is no change, nothing to raise events for.
+                    return;
+                }
+
+                ev.RaiseEvent(handler => handler(source, args));
+            }).CompletesAsyncOperation(eventToken);
+        }
+
+        private void RaiseDiagnosticsCleared(IDiagnosticUpdateSource source)
         {
             var ev = _eventMap.GetEventHandlers<EventHandler<DiagnosticsUpdatedArgs>>(DiagnosticsUpdatedEventName);
-            if (ev.HasHandlers)
+
+            var eventToken = _listener.BeginAsyncOperation(DiagnosticsUpdatedEventName);
+            _eventQueue.ScheduleTask(() =>
             {
-                var eventToken = _listener.BeginAsyncOperation(DiagnosticsUpdatedEventName);
-                _eventQueue.ScheduleTask(() =>
+                using var pooledObject = SharedPools.Default<List<DiagnosticsUpdatedArgs>>().GetPooledObject();
+
+                var removed = pooledObject.Object;
+                if (!ClearDiagnosticsReportedBySource(source, removed))
                 {
-                    UpdateDataMap(sender, args);
-                    ev.RaiseEvent(handler => handler(sender, args));
-                }).CompletesAsyncOperation(eventToken);
+                    // there is no change, nothing to raise events for.
+                    return;
+                }
+
+                // don't create event listener if it haven't created yet. if there is a diagnostic to remove
+                // listener should have already created since all events are done in the serialized queue
+                foreach (var args in removed)
+                {
+                    ev.RaiseEvent(handler => handler(source, args));
+                }
+            }).CompletesAsyncOperation(eventToken);
+        }
+
+        private bool UpdateDataMap(IDiagnosticUpdateSource source, DiagnosticsUpdatedArgs args)
+        {
+            // we expect source who uses this ability to have small number of diagnostics.
+            lock (_gate)
+            {
+                Debug.Assert(_updateSources.Contains(source));
+
+                // check cheap early bail out
+                if (args.Diagnostics.Length == 0 && !_map.ContainsKey(source))
+                {
+                    // no new diagnostic, and we don't have update source for it.
+                    return false;
+                }
+
+                // 2 different workspaces (ex, PreviewWorkspaces) can return same Args.Id, we need to
+                // distinguish them. so we separate diagnostics per workspace map.
+                var workspaceMap = _map.GetOrAdd(source, _ => new Dictionary<Workspace, Dictionary<object, Data>>());
+
+                if (args.Diagnostics.Length == 0 && !workspaceMap.ContainsKey(args.Workspace))
+                {
+                    // no new diagnostic, and we don't have workspace for it.
+                    return false;
+                }
+
+                var diagnosticDataMap = workspaceMap.GetOrAdd(args.Workspace, _ => new Dictionary<object, Data>());
+
+                diagnosticDataMap.Remove(args.Id);
+                if (diagnosticDataMap.Count == 0 && args.Diagnostics.Length == 0)
+                {
+                    workspaceMap.Remove(args.Workspace);
+
+                    if (workspaceMap.Count == 0)
+                    {
+                        _map.Remove(source);
+                    }
+
+                    return true;
+                }
+
+                if (args.Diagnostics.Length > 0)
+                {
+                    // save data only if there is a diagnostic
+                    var data = source.SupportGetDiagnostics ? new Data(args) : new Data(args, args.Diagnostics);
+                    diagnosticDataMap.Add(args.Id, data);
+                }
+
+                return true;
             }
         }
 
-        private void UpdateDataMap(object sender, DiagnosticsUpdatedArgs args)
+        private bool ClearDiagnosticsReportedBySource(IDiagnosticUpdateSource source, List<DiagnosticsUpdatedArgs> removed)
         {
-            var updateSource = sender as IDiagnosticUpdateSource;
-            if (updateSource == null)
-            {
-                return;
-            }
-
-            Contract.Requires(_updateSources.Contains(updateSource));
-
-            // we expect someone who uses this ability to small.
+            // we expect source who uses this ability to have small number of diagnostics.
             lock (_gate)
             {
-                // check cheap early bail out
-                if (args.Diagnostics.Length == 0 && !_map.ContainsKey(updateSource))
+                Debug.Assert(_updateSources.Contains(source));
+
+                // 2 different workspaces (ex, PreviewWorkspaces) can return same Args.Id, we need to
+                // distinguish them. so we separate diagnostics per workspace map.
+                if (!_map.TryGetValue(source, out var workspaceMap))
                 {
-                    // no new diagnostic, and we don't have update source for it.
-                    return;
+                    return false;
                 }
 
-                var list = _map.GetOrAdd(updateSource, _ => new Dictionary<object, Data>());
-                var data = updateSource.SupportGetDiagnostics ? new Data(args) : new Data(args, args.Diagnostics);
-
-                list.Remove(data.Id);
-                if (list.Count == 0 && args.Diagnostics.Length == 0)
+                foreach (var (workspace, map) in workspaceMap)
                 {
-                    _map.Remove(updateSource);
-                    return;
+                    foreach (var (id, data) in map)
+                    {
+                        removed.Add(DiagnosticsUpdatedArgs.DiagnosticsRemoved(id, data.Workspace, solution: null, data.ProjectId, data.DocumentId));
+                    }
                 }
 
-                list.Add(args.Id, data);
+                // all diagnostics from the source is cleared
+                _map.Remove(source);
+                return true;
             }
         }
 
         private void OnDiagnosticsUpdated(object sender, DiagnosticsUpdatedArgs e)
         {
             AssertIfNull(e.Diagnostics);
-            RaiseDiagnosticsUpdated(sender, e);
+
+            // all events are serialized by async event handler
+            RaiseDiagnosticsUpdated((IDiagnosticUpdateSource)sender, e);
+        }
+
+        private void OnCleared(object sender, EventArgs e)
+        {
+            // all events are serialized by async event handler
+            RaiseDiagnosticsCleared((IDiagnosticUpdateSource)sender);
         }
 
         public IEnumerable<DiagnosticData> GetDiagnostics(
@@ -138,16 +230,15 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 }
                 else
                 {
-                    using (var pool = SharedPools.Default<List<Data>>().GetPooledObject())
-                    {
-                        AppendMatchingData(source, workspace, projectId, documentId, id, pool.Object);
-                        Contract.Requires(pool.Object.Count == 0 || pool.Object.Count == 1);
+                    using var pool = SharedPools.Default<List<Data>>().GetPooledObject();
 
-                        if (pool.Object.Count == 1)
-                        {
-                            var diagnostics = pool.Object[0].Diagnostics;
-                            return !includeSuppressedDiagnostics ? FilterSuppressedDiagnostics(diagnostics) : diagnostics;
-                        }
+                    AppendMatchingData(source, workspace, projectId, documentId, id, pool.Object);
+                    Debug.Assert(pool.Object.Count == 0 || pool.Object.Count == 1);
+
+                    if (pool.Object.Count == 1)
+                    {
+                        var diagnostics = pool.Object[0].Diagnostics;
+                        return !includeSuppressedDiagnostics ? FilterSuppressedDiagnostics(diagnostics) : diagnostics;
                     }
                 }
             }
@@ -155,9 +246,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             return SpecializedCollections.EmptyEnumerable<DiagnosticData>();
         }
 
-        private static IEnumerable<DiagnosticData> FilterSuppressedDiagnostics(IEnumerable<DiagnosticData> diagnostics)
+        private static IEnumerable<DiagnosticData> FilterSuppressedDiagnostics(ImmutableArray<DiagnosticData> diagnostics)
         {
-            if (diagnostics != null)
+            if (!diagnostics.IsDefault)
             {
                 foreach (var diagnostic in diagnostics)
                 {
@@ -186,19 +277,18 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 }
                 else
                 {
-                    using (var list = SharedPools.Default<List<Data>>().GetPooledObject())
-                    {
-                        AppendMatchingData(source, workspace, projectId, documentId, null, list.Object);
+                    using var list = SharedPools.Default<List<Data>>().GetPooledObject();
 
-                        foreach (var data in list.Object)
+                    AppendMatchingData(source, workspace, projectId, documentId, null, list.Object);
+
+                    foreach (var data in list.Object)
+                    {
+                        foreach (var diagnostic in data.Diagnostics)
                         {
-                            foreach (var diagnostic in data.Diagnostics)
+                            AssertIfNull(diagnostic);
+                            if (includeSuppressedDiagnostics || !diagnostic.IsSuppressed)
                             {
-                                AssertIfNull(diagnostic);
-                                if (includeSuppressedDiagnostics || !diagnostic.IsSuppressed)
-                                {
-                                    yield return diagnostic;
-                                }
+                                yield return diagnostic;
                             }
                         }
                     }
@@ -206,20 +296,20 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             }
         }
 
-        public IEnumerable<UpdatedEventArgs> GetDiagnosticsUpdatedEventArgs(Workspace workspace, ProjectId projectId, DocumentId documentId, CancellationToken cancellationToken)
+        public IEnumerable<UpdatedEventArgs> GetDiagnosticsUpdatedEventArgs(
+            Workspace workspace, ProjectId projectId, DocumentId documentId, CancellationToken cancellationToken)
         {
             foreach (var source in _updateSources)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                using (var list = SharedPools.Default<List<Data>>().GetPooledObject())
-                {
-                    AppendMatchingData(source, workspace, projectId, documentId, null, list.Object);
+                using var list = SharedPools.Default<List<Data>>().GetPooledObject();
 
-                    foreach (var data in list.Object)
-                    {
-                        yield return new UpdatedEventArgs(data.Id, data.Workspace, data.ProjectId, data.DocumentId);
-                    }
+                AppendMatchingData(source, workspace, projectId, documentId, null, list.Object);
+
+                foreach (var data in list.Object)
+                {
+                    yield return new UpdatedEventArgs(data.Id, data.Workspace, data.ProjectId, data.DocumentId);
                 }
             }
         }
@@ -227,18 +317,19 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         private void AppendMatchingData(
             IDiagnosticUpdateSource source, Workspace workspace, ProjectId projectId, DocumentId documentId, object id, List<Data> list)
         {
+            Contract.ThrowIfNull(workspace);
+
             lock (_gate)
             {
-                Dictionary<object, Data> current;
-                if (!_map.TryGetValue(source, out current))
+                if (!_map.TryGetValue(source, out var workspaceMap) ||
+                    !workspaceMap.TryGetValue(workspace, out var current))
                 {
                     return;
                 }
 
                 if (id != null)
                 {
-                    Data data;
-                    if (current.TryGetValue(id, out data))
+                    if (current.TryGetValue(id, out var data))
                     {
                         list.Add(data);
                     }
@@ -248,9 +339,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
                 foreach (var data in current.Values)
                 {
-                    if (TryAddData(documentId, data, d => d.DocumentId, list) ||
-                        TryAddData(projectId, data, d => d.ProjectId, list) ||
-                        TryAddData(workspace, data, d => d.Workspace, list))
+                    if (TryAddData(workspace, documentId, data, d => d.DocumentId, list) ||
+                        TryAddData(workspace, projectId, data, d => d.ProjectId, list) ||
+                        TryAddData(workspace, workspace, data, d => d.Workspace, list))
                     {
                         continue;
                     }
@@ -258,9 +349,15 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             }
         }
 
-        private bool TryAddData<T>(T key, Data data, Func<Data, T> keyGetter, List<Data> result) where T : class
+        private bool TryAddData<T>(Workspace workspace, T key, Data data, Func<Data, T> keyGetter, List<Data> result) where T : class
         {
             if (key == null)
+            {
+                return false;
+            }
+
+            // make sure data is from same workspace. project/documentId can be shared between 2 different workspace
+            if (workspace != data.Workspace)
             {
                 return false;
             }
@@ -283,15 +380,15 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         }
 
         [Conditional("DEBUG")]
-        private void AssertIfNull(DiagnosticData diagnostic)
+        private void AssertIfNull<T>(T obj) where T : class
         {
-            if (diagnostic == null)
+            if (obj == null)
             {
-                Contract.Requires(false, "who returns invalid data?");
+                Debug.Assert(false, "who returns invalid data?");
             }
         }
 
-        private struct Data : IEquatable<Data>
+        private readonly struct Data
         {
             public readonly Workspace Workspace;
             public readonly ProjectId ProjectId;
@@ -299,39 +396,18 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             public readonly object Id;
             public readonly ImmutableArray<DiagnosticData> Diagnostics;
 
-            public Data(UpdatedEventArgs args) :
-                this(args, ImmutableArray<DiagnosticData>.Empty)
+            public Data(UpdatedEventArgs args)
+                : this(args, ImmutableArray<DiagnosticData>.Empty)
             {
             }
 
             public Data(UpdatedEventArgs args, ImmutableArray<DiagnosticData> diagnostics)
             {
-                this.Workspace = args.Workspace;
-                this.ProjectId = args.ProjectId;
-                this.DocumentId = args.DocumentId;
-                this.Id = args.Id;
-                this.Diagnostics = diagnostics;
-            }
-
-            public bool Equals(Data other)
-            {
-                return this.Workspace == other.Workspace &&
-                       this.ProjectId == other.ProjectId &&
-                       this.DocumentId == other.DocumentId &&
-                       this.Id == other.Id;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return (obj is Data) && Equals((Data)obj);
-            }
-
-            public override int GetHashCode()
-            {
-                return Hash.Combine(Workspace,
-                       Hash.Combine(ProjectId,
-                       Hash.Combine(DocumentId,
-                       Hash.Combine(Id, 1))));
+                Workspace = args.Workspace;
+                ProjectId = args.ProjectId;
+                DocumentId = args.DocumentId;
+                Id = args.Id;
+                Diagnostics = diagnostics;
             }
         }
     }

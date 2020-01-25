@@ -1,8 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Formatting
@@ -11,8 +12,8 @@ namespace Microsoft.CodeAnalysis.Formatting
     {
         private class Node : TreeData
         {
-            public Node(SyntaxNode root) :
-                base(root)
+            public Node(SyntaxNode root)
+                : base(root)
             {
                 Contract.ThrowIfFalse(root.GetFirstToken(includeZeroWidth: true).RawKind != 0);
             }
@@ -44,7 +45,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                     currentToken = currentToken.GetPreviousToken(includeZeroWidth: true);
                 }
 
-                return default(SyntaxToken);
+                return default;
             }
 
             public override string GetTextBetween(SyntaxToken token1, SyntaxToken token2)

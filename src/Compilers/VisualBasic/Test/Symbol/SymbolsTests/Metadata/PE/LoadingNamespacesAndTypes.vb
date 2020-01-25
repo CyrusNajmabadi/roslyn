@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.IO
@@ -11,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata.PE
     Public Class LoadingNamespacesAndTypes
         Inherits BasicTestBase
 
-        <Fact(Skip:="873386")>
+        <Fact>
         Public Sub Test1()
             Dim assembly = LoadFromBytes(TestResources.NetFX.v4_0_21006.mscorlib)
             Dim dumpXML As XElement = LoadChildNamespace1(assembly.Modules(0).GlobalNamespace)
@@ -24,7 +26,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata.PE
             Assert.Equal(dumpXML.ToString(), baseLine.ToString())
         End Sub
 
-        <Fact(Skip:="873386")>
+        <Fact>
         Public Sub Test2()
             Dim assembly = LoadFromBytes(TestResources.NetFX.v4_0_21006.mscorlib)
             Dim dumpXML As XElement = LoadChildNamespace2(assembly.Modules(0).GlobalNamespace)

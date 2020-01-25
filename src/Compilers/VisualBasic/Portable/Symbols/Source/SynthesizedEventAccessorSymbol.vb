@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Reflection
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.RuntimeMembers
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -105,7 +108,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
             Dim compilation = Me.DeclaringCompilation
             Return ConstructFieldLikeEventAccessorBody(Me.m_propertyOrEvent, Me.MethodKind = MethodKind.EventAdd, compilation, diagnostics)
         End Function
@@ -201,8 +204,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim getOrCreateCall = New BoundCall(
                 syntax:=syntax,
                 method:=getOrCreateMethod,
-                methodGroup:=Nothing,
-                receiver:=Nothing,
+                methodGroupOpt:=Nothing,
+                receiverOpt:=Nothing,
                 arguments:=ImmutableArray.Create(Of BoundExpression)(fieldAccess),
                 constantValueOpt:=Nothing,
                 type:=getOrCreateMethod.ReturnType).MakeCompilerGenerated()
@@ -220,8 +223,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim processHandlerCall = New BoundCall(
                 syntax:=syntax,
                 method:=processHandlerMethod,
-                methodGroup:=Nothing,
-                receiver:=getOrCreateCall,
+                methodGroupOpt:=Nothing,
+                receiverOpt:=getOrCreateCall,
                 arguments:=ImmutableArray.Create(Of BoundExpression)(parameterAccess),
                 constantValueOpt:=Nothing,
                 type:=processHandlerMethod.ReturnType).MakeCompilerGenerated()

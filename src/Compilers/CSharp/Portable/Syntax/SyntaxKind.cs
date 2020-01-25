@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -38,6 +40,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         QuestionToken = 8219,
         HashToken = 8220,
         SlashToken = 8221,
+        DotDotToken = 8222,
 
         // additional xml tokens
         SlashGreaterThanToken = 8232, // xml empty element end
@@ -74,6 +77,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         MinusEqualsToken = 8281,
         CaretEqualsToken = 8282,
         PercentEqualsToken = 8283,
+        QuestionQuestionEqualsToken = 8284,
 
         // Keywords
         BoolKeyword = 8304,
@@ -192,7 +196,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         AsyncKeyword = 8435,
         AwaitKeyword = 8436,
         WhenKeyword = 8437,
+        /// when adding a contextual keyword following functions must be adapted:
+        /// <see cref="SyntaxFacts.GetContextualKeywordKinds"/>
+        /// <see cref="SyntaxFacts.IsContextualKeyword(SyntaxKind)"/>
 
+        // keywords with an enum value less than ElifKeyword are considered i.a. contextual keywords
         // additional preprocessor keywords
         ElifKeyword = 8467,
         EndIfKeyword = 8468,
@@ -209,13 +217,23 @@ namespace Microsoft.CodeAnalysis.CSharp
         DisableKeyword = 8479,
         RestoreKeyword = 8480,
         ReferenceKeyword = 8481,
-        LoadKeyword = 8485,
 
         InterpolatedStringStartToken = 8482,            // $"
         InterpolatedStringEndToken = 8483,              // "
-        InterpolatedVerbatimStringStartToken = 8484,    // $@"
+        InterpolatedVerbatimStringStartToken = 8484,    // $@" or @$"
+
+        // additional preprocessor keywords (continued)
+        LoadKeyword = 8485,
+        NullableKeyword = 8486,
+        EnableKeyword = 8487,
+
+        // targets for #nullable directive
+        WarningsKeyword = 8488,
+        AnnotationsKeyword = 8489,
 
         // Other
+        VarKeyword = 8490,
+        UnderscoreToken = 8491,
         OmittedTypeArgumentToken = 8492,
         OmittedArraySizeExpressionToken = 8493,
         EndOfDirectiveToken = 8494,
@@ -262,6 +280,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         ReferenceDirectiveTrivia = 8561,
         BadDirectiveTrivia = 8562,
         SkippedTokensTrivia = 8563,
+        ConflictMarkerTrivia = 8564,
 
         // xml nodes (for xml doc comment structure)
         XmlElement = 8574,
@@ -328,6 +347,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         OmittedArraySizeExpression = 8654,
         InterpolatedStringExpression = 8655,
         ImplicitElementAccess = 8656,
+        IsPatternExpression = 8657,
+        RangeExpression = 8658,
 
         // binary expressions
         AddExpression = 8668,
@@ -371,6 +392,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         OrAssignmentExpression = 8722,
         LeftShiftAssignmentExpression = 8723,
         RightShiftAssignmentExpression = 8724,
+        CoalesceAssignmentExpression = 8725,
 
         // unary expressions
         UnaryPlusExpression = 8730,
@@ -384,6 +406,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         PostIncrementExpression = 8738,
         PostDecrementExpression = 8739,
         AwaitExpression = 8740,
+        IndexExpression = 8741,
 
         // primary expression
         ThisExpression = 8746,
@@ -395,6 +418,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         TrueLiteralExpression = 8752,
         FalseLiteralExpression = 8753,
         NullLiteralExpression = 8754,
+        DefaultLiteralExpression = 8755,
 
         // primary function expressions
         TypeOfExpression = 8760,
@@ -468,6 +492,9 @@ namespace Microsoft.CodeAnalysis.CSharp
         CatchFilterClause = 8828,
         FinallyClause = 8829,
 
+        // statements that didn't fit above
+        LocalFunctionStatement = 8830,
+
         // declarations
         CompilationUnit = 8840,
         GlobalStatement = 8841,
@@ -532,5 +559,42 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         ShebangDirectiveTrivia = 8922,
         LoadDirectiveTrivia = 8923,
+        // Changes after C# 6
+
+        // tuples
+        TupleType = 8924,
+        TupleElement = 8925,
+        TupleExpression = 8926,
+        SingleVariableDesignation = 8927,
+        ParenthesizedVariableDesignation = 8928,
+        ForEachVariableStatement = 8929,
+
+        // patterns (for pattern-matching)
+        DeclarationPattern = 9000,
+        ConstantPattern = 9002,
+        CasePatternSwitchLabel = 9009,
+        WhenClause = 9013,
+        DiscardDesignation = 9014,
+
+        // added along with recursive patterns
+        RecursivePattern = 9020,
+        PropertyPatternClause = 9021,
+        Subpattern = 9022,
+        PositionalPatternClause = 9023,
+        DiscardPattern = 9024,
+        SwitchExpression = 9025,
+        SwitchExpressionArm = 9026,
+        VarPattern = 9027,
+
+        // Kinds between 9000 and 9039 are "reserved" for pattern matching.
+        // Please start with 9040 if you add more kinds below.
+
+        DeclarationExpression = 9040,
+        RefExpression = 9050,
+        RefType = 9051,
+        ThrowExpression = 9052,
+        ImplicitStackAllocArrayCreationExpression = 9053,
+        SuppressNullableWarningExpression = 9054,
+        NullableDirectiveTrivia = 9055,
     }
 }

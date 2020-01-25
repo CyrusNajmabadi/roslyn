@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.CodeGeneration
 Imports Microsoft.CodeAnalysis.CodeGeneration.CodeGenerationHelpers
@@ -48,7 +50,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                       statements:=GenerateStatements(constructor),
                       endSubStatement:=SyntaxFactory.EndSubStatement()))
 
-            Return AddAnnotationsTo(constructor, AddCleanupAnnotationsTo(
+            Return AddAnnotationsTo(constructor, AddFormatterAndCodeGeneratorAnnotationsTo(
                 ConditionallyAddDocumentationCommentTo(declaration, constructor, options)))
         End Function
 
@@ -58,22 +60,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
         End Function
 
         Private Function GenerateStatements(constructor As IMethodSymbol) As SyntaxList(Of StatementSyntax)
-            If CodeGenerationConstructorInfo.GetStatements(constructor) Is Nothing AndAlso
-               CodeGenerationConstructorInfo.GetBaseConstructorArgumentsOpt(constructor) Is Nothing AndAlso
-               CodeGenerationConstructorInfo.GetThisConstructorArgumentsOpt(constructor) Is Nothing Then
+            If CodeGenerationConstructorInfo.GetStatements(constructor).IsDefault AndAlso
+               CodeGenerationConstructorInfo.GetBaseConstructorArgumentsOpt(constructor).IsDefault AndAlso
+               CodeGenerationConstructorInfo.GetThisConstructorArgumentsOpt(constructor).IsDefault Then
                 Return Nothing
             End If
 
             Dim statements = New List(Of StatementSyntax)
-            If CodeGenerationConstructorInfo.GetBaseConstructorArgumentsOpt(constructor) IsNot Nothing Then
+            If Not CodeGenerationConstructorInfo.GetBaseConstructorArgumentsOpt(constructor).IsDefault Then
                 statements.Add(CreateBaseConstructorCall(constructor))
             End If
 
-            If CodeGenerationConstructorInfo.GetThisConstructorArgumentsOpt(constructor) IsNot Nothing Then
+            If Not CodeGenerationConstructorInfo.GetThisConstructorArgumentsOpt(constructor).IsDefault Then
                 statements.Add(CreateThisConstructorCall(CodeGenerationConstructorInfo.GetThisConstructorArgumentsOpt(constructor)))
             End If
 
-            If CodeGenerationConstructorInfo.GetStatements(constructor) IsNot Nothing Then
+            If Not CodeGenerationConstructorInfo.GetStatements(constructor).IsDefault Then
                 statements.AddRange(StatementGenerator.GenerateStatements(
                     CodeGenerationConstructorInfo.GetStatements(constructor)))
             End If

@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.ComponentModel.Composition;
 using Microsoft.Internal.VisualStudio.PlatformUI;
@@ -10,10 +12,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
     [Export(typeof(IAttachedCollectionSourceProvider))]
     [Name("AnalyzerItemsProvider")]
     [Order]
-    internal class AnalyzerItemProvider : AttachedCollectionSourceProvider<AnalyzersFolderItem>
+    internal sealed class AnalyzerItemProvider : AttachedCollectionSourceProvider<AnalyzersFolderItem>
     {
         [Import(typeof(AnalyzersCommandHandler))]
-        private IAnalyzersCommandHandler _commandHandler = null;
+        private readonly IAnalyzersCommandHandler _commandHandler = null;
+
+        [ImportingConstructor]
+        public AnalyzerItemProvider()
+        {
+        }
 
         protected override IAttachedCollectionSource CreateCollectionSource(AnalyzersFolderItem analyzersFolder, string relationshipName)
         {

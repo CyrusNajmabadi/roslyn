@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Symbols;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -16,12 +19,12 @@ namespace Microsoft.CodeAnalysis
         private int _marshalArrayElementType;      // safe array: VarEnum; array: UnmanagedType
         private int _marshalArrayElementCount;     // number of elements in an array, length of a string, or Unspecified
         private int _marshalParameterIndex;        // index of parameter that specifies array size (short) or IID (int), or Unspecified
-        private object _marshalTypeNameOrSymbol;   // custom marshaller: string or ITypeSymbol; safe array: element type symbol
+        private object _marshalTypeNameOrSymbol;   // custom marshaller: string or ITypeSymbolInternal; safe array: element type symbol
         private string _marshalCookie;
 
         internal const int Invalid = -1;
         private const UnmanagedType InvalidUnmanagedType = (UnmanagedType)Invalid;
-        private const VarEnum InvalidVariantType = (VarEnum)Invalid;
+        private const Cci.VarEnum InvalidVariantType = (Cci.VarEnum)Invalid;
         internal const int MaxMarshalInteger = 0x1fffffff;
 
         #region Initialization
@@ -66,11 +69,11 @@ namespace Microsoft.CodeAnalysis
             _marshalArrayElementCount = elementCount ?? Invalid;
         }
 
-        internal void SetMarshalAsSafeArray(VarEnum? elementType, ITypeSymbol elementTypeSymbol)
+        internal void SetMarshalAsSafeArray(Cci.VarEnum? elementType, ITypeSymbolInternal elementTypeSymbol)
         {
             Debug.Assert(elementType == null || elementType >= 0 && (int)elementType <= MaxMarshalInteger);
 
-            _marshalType = UnmanagedType.SafeArray;
+            _marshalType = Cci.Constants.UnmanagedType_SafeArray;
             _marshalArrayElementType = (int)(elementType ?? InvalidVariantType);
             _marshalTypeNameOrSymbol = elementTypeSymbol;
         }
@@ -103,7 +106,7 @@ namespace Microsoft.CodeAnalysis
                 Debug.Assert(
                     _marshalType == UnmanagedType.Interface ||
                     _marshalType == UnmanagedType.IUnknown ||
-                    _marshalType == UnmanagedType.IDispatch);
+                    _marshalType == Cci.Constants.UnmanagedType_IDispatch);
 
                 return _marshalParameterIndex;
             }
@@ -112,7 +115,7 @@ namespace Microsoft.CodeAnalysis
         object Cci.IMarshallingInformation.GetCustomMarshaller(EmitContext context)
         {
             Debug.Assert(_marshalType == Cci.Constants.UnmanagedType_CustomMarshaler);
-            var typeSymbol = _marshalTypeNameOrSymbol as ITypeSymbol;
+            var typeSymbol = _marshalTypeNameOrSymbol as ITypeSymbolInternal;
             if (typeSymbol != null)
             {
                 return ((CommonPEModuleBuilder)context.Module).Translate(typeSymbol, context.SyntaxNodeOpt, context.Diagnostics);
@@ -137,7 +140,7 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                Debug.Assert(_marshalType == UnmanagedType.ByValTStr || _marshalType == UnmanagedType.LPArray || _marshalType == UnmanagedType.SafeArray || _marshalType == UnmanagedType.ByValArray);
+                Debug.Assert(_marshalType == UnmanagedType.ByValTStr || _marshalType == UnmanagedType.LPArray || _marshalType == Cci.Constants.UnmanagedType_SafeArray || _marshalType == UnmanagedType.ByValArray);
                 return _marshalArrayElementCount;
             }
         }
@@ -160,25 +163,25 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        VarEnum Cci.IMarshallingInformation.SafeArrayElementSubtype
+        Cci.VarEnum Cci.IMarshallingInformation.SafeArrayElementSubtype
         {
             get
             {
-                Debug.Assert(_marshalType == UnmanagedType.SafeArray);
-                return (VarEnum)_marshalArrayElementType;
+                Debug.Assert(_marshalType == Cci.Constants.UnmanagedType_SafeArray);
+                return (Cci.VarEnum)_marshalArrayElementType;
             }
         }
 
         Cci.ITypeReference Cci.IMarshallingInformation.GetSafeArrayElementUserDefinedSubtype(EmitContext context)
         {
-            Debug.Assert(_marshalType == UnmanagedType.SafeArray);
+            Debug.Assert(_marshalType == Cci.Constants.UnmanagedType_SafeArray);
 
             if (_marshalTypeNameOrSymbol == null)
             {
                 return null;
             }
 
-            return ((CommonPEModuleBuilder)context.Module).Translate((ITypeSymbol)_marshalTypeNameOrSymbol, context.SyntaxNodeOpt, context.Diagnostics);
+            return ((CommonPEModuleBuilder)context.Module).Translate((ITypeSymbolInternal)_marshalTypeNameOrSymbol, context.SyntaxNodeOpt, context.Diagnostics);
         }
 
         /// <summary>
@@ -187,9 +190,9 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         internal MarshalPseudoCustomAttributeData WithTranslatedTypes<TTypeSymbol, TArg>(
             Func<TTypeSymbol, TArg, TTypeSymbol> translator, TArg arg)
-            where TTypeSymbol : ITypeSymbol
+            where TTypeSymbol : ITypeSymbolInternal
         {
-            if (_marshalType != UnmanagedType.SafeArray || _marshalTypeNameOrSymbol == null)
+            if (_marshalType != Cci.Constants.UnmanagedType_SafeArray || _marshalTypeNameOrSymbol == null)
             {
                 return this;
             }
@@ -201,14 +204,14 @@ namespace Microsoft.CodeAnalysis
             }
 
             var result = new MarshalPseudoCustomAttributeData();
-            result.SetMarshalAsSafeArray((VarEnum)_marshalArrayElementType, translatedType);
+            result.SetMarshalAsSafeArray((Cci.VarEnum)_marshalArrayElementType, translatedType);
             return result;
         }
 
         // testing only
-        internal ITypeSymbol TryGetSafeArrayElementUserDefinedSubtype()
+        internal ITypeSymbolInternal TryGetSafeArrayElementUserDefinedSubtype()
         {
-            return _marshalTypeNameOrSymbol as ITypeSymbol;
+            return _marshalTypeNameOrSymbol as ITypeSymbolInternal;
         }
     }
 }

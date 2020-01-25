@@ -1,9 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Threading;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Utilities;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Formatting
@@ -20,8 +21,8 @@ namespace Microsoft.CodeAnalysis.Formatting
 
             private readonly bool _treatAsElastic;
 
-            public AbstractComplexTrivia(OptionSet optionSet, TreeData treeInfo, SyntaxToken token1, SyntaxToken token2) :
-                base(optionSet, token1.Language)
+            public AbstractComplexTrivia(OptionSet optionSet, TreeData treeInfo, SyntaxToken token1, SyntaxToken token2)
+                : base(optionSet, token1.Language)
             {
                 Contract.ThrowIfNull(treeInfo);
 
@@ -32,10 +33,7 @@ namespace Microsoft.CodeAnalysis.Formatting
 
                 this.TreeInfo = treeInfo;
                 this.OriginalString = this.TreeInfo.GetTextBetween(token1, token2);
-
-                int lineBreaks;
-                int spaces;
-                ExtractLineAndSpace(this.OriginalString, out lineBreaks, out spaces);
+                ExtractLineAndSpace(this.OriginalString, out var lineBreaks, out var spaces);
 
                 this.LineBreaks = lineBreaks;
                 this.Spaces = spaces;
@@ -147,10 +145,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                 // okay, we need to do expansive calculation to find out actual space between two tokens
                 var trivia = Format(context, formattingRules, this.LineBreaks, indentation, cancellationToken);
                 var triviaString = CreateString(trivia, cancellationToken);
-
-                int lineBreaks;
-                int spaces;
-                ExtractLineAndSpace(triviaString, out lineBreaks, out spaces);
+                ExtractLineAndSpace(triviaString, out var lineBreaks, out var spaces);
 
                 return CreateComplexTrivia(lineBreaks, spaces, indentation);
             }

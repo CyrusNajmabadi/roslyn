@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -24,7 +26,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
         End Sub
 
         Public Overrides Function DefaultVisit(symbol As ISymbol) As ExpressionSyntax
-            Return symbol.Accept(New TypeSyntaxGeneratorVisitor(_addGlobal))
+            Return symbol.Accept(TypeSyntaxGeneratorVisitor.Create(_addGlobal))
         End Function
 
         Private Function AddInformationTo(Of TExpressionSyntax As ExpressionSyntax)(expression As TExpressionSyntax, symbol As ISymbol) As TExpressionSyntax
@@ -34,7 +36,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
         End Function
 
         Public Overrides Function VisitNamedType(symbol As INamedTypeSymbol) As ExpressionSyntax
-            Dim typeSyntax = New TypeSyntaxGeneratorVisitor(_addGlobal).CreateSimpleTypeSyntax(symbol)
+            Dim typeSyntax = TypeSyntaxGeneratorVisitor.Create(_addGlobal).CreateSimpleTypeSyntax(symbol)
             If Not (TypeOf typeSyntax Is SimpleNameSyntax) Then
                 Return typeSyntax
             End If

@@ -1,6 +1,9 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -10,11 +13,30 @@ using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.DesignerAttribute
 {
-    internal abstract partial class AbstractDesignerAttributeIncrementalAnalyzer : IIncrementalAnalyzer
+    internal partial class DesignerAttributeIncrementalAnalyzer : IIncrementalAnalyzer
     {
         private class DesignerAttributeState : AbstractDocumentAnalyzerState<Data>
         {
-            private const string FormatVersion = "1";
+            private const string FormatVersion = "2";
+
+            /// <summary>
+            /// remember last time what we reported
+            /// </summary>
+            private readonly ConcurrentDictionary<DocumentId, string> _lastReported = new ConcurrentDictionary<DocumentId, string>(concurrencyLevel: 2, capacity: 10);
+
+            public bool Update(DocumentId id, string designerAttributeArgument)
+            {
+                if (_lastReported.TryGetValue(id, out var lastReported) &&
+                    lastReported == designerAttributeArgument)
+                {
+                    // nothing is actually updated
+                    return false;
+                }
+
+                // value updated
+                _lastReported[id] = designerAttributeArgument;
+                return true;
+            }
 
             protected override string StateName
             {
@@ -24,18 +46,20 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.DesignerAttribu
                 }
             }
 
+            protected override int GetCount(Data data)
+            {
+                return 1;
+            }
+
             protected override Data TryGetExistingData(Stream stream, Document value, CancellationToken cancellationToken)
             {
-                try
-                {
-                    using (var reader = new ObjectReader(stream))
-                    {
-                        var format = reader.ReadString();
-                        if (!string.Equals(format, FormatVersion))
-                        {
-                            return null;
-                        }
+                using var reader = ObjectReader.TryGetReader(stream, leaveOpen: true, cancellationToken);
 
+                if (reader != null)
+                {
+                    var format = reader.ReadString();
+                    if (string.Equals(format, FormatVersion, StringComparison.InvariantCulture))
+                    {
                         var textVersion = VersionStamp.ReadFrom(reader);
                         var dataVersion = VersionStamp.ReadFrom(reader);
                         var designerAttributeArgument = reader.ReadString();
@@ -43,21 +67,25 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.DesignerAttribu
                         return new Data(textVersion, dataVersion, designerAttributeArgument);
                     }
                 }
-                catch (Exception)
-                {
-                    return null;
-                }
+
+                return null;
             }
 
             protected override void WriteTo(Stream stream, Data data, CancellationToken cancellationToken)
             {
-                using (var writer = new ObjectWriter(stream, cancellationToken: cancellationToken))
-                {
-                    writer.WriteString(FormatVersion);
-                    data.TextVersion.WriteTo(writer);
-                    data.SemanticVersion.WriteTo(writer);
-                    writer.WriteString(data.DesignerAttributeArgument);
-                }
+                using var writer = new ObjectWriter(stream, leaveOpen: true, cancellationToken);
+                writer.WriteString(FormatVersion);
+                data.TextVersion.WriteTo(writer);
+                data.SemanticVersion.WriteTo(writer);
+                writer.WriteString(data.DesignerAttributeArgument);
+            }
+
+            public override bool Remove(DocumentId id)
+            {
+                // forget what I have reported
+                _lastReported.TryRemove(id, out _);
+
+                return base.Remove(id);
             }
         }
     }

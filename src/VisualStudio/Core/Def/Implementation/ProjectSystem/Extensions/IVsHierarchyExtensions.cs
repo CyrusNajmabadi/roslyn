@@ -1,6 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.Shell.Interop;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
@@ -9,11 +13,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
     {
         public static bool TryGetItemProperty<T>(this IVsHierarchy hierarchy, uint itemId, int propertyId, out T value)
         {
-            object property;
-            if (ErrorHandler.Failed(hierarchy.GetProperty(itemId, propertyId, out property)) ||
+            if (ErrorHandler.Failed(hierarchy.GetProperty(itemId, propertyId, out var property)) ||
                 !(property is T))
             {
-                value = default(T);
+                value = default;
                 return false;
             }
 
@@ -76,6 +79,31 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
         public static bool TryGetTypeGuid(this IVsHierarchy hierarchy, out Guid typeGuid)
         {
             return hierarchy.TryGetGuidProperty(__VSHPROPID.VSHPROPID_TypeGuid, out typeGuid);
+        }
+
+        public static bool TryGetTargetFrameworkMoniker(this IVsHierarchy hierarchy, uint itemId, out string targetFrameworkMoniker)
+        {
+            return hierarchy.TryGetItemProperty(itemId, (int)__VSHPROPID4.VSHPROPID_TargetFrameworkMoniker, out targetFrameworkMoniker);
+        }
+
+        public static uint TryGetItemId(this IVsHierarchy hierarchy, string moniker)
+        {
+            if (ErrorHandler.Succeeded(hierarchy.ParseCanonicalName(moniker, out var itemid)))
+            {
+                return itemid;
+            }
+
+            return VSConstants.VSITEMID_NIL;
+        }
+
+        public static string TryGetProjectFilePath(this IVsHierarchy hierarchy)
+        {
+            if (ErrorHandler.Succeeded(((IVsProject3)hierarchy).GetMkDocument((uint)VSConstants.VSITEMID.Root, out var projectFilePath)) && !string.IsNullOrEmpty(projectFilePath))
+            {
+                return projectFilePath;
+            }
+
+            return null;
         }
     }
 }

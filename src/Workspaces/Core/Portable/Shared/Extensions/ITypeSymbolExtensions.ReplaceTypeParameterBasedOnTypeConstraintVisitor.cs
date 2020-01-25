@@ -1,14 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Shared.Extensions
@@ -101,10 +101,10 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
                             var derivedImplementedTypesOfEachConstraintType = symbol.ConstraintTypes.Select(ct =>
                             {
                                 var derivedAndImplementedTypes = new List<INamedTypeSymbol>();
-                                return SymbolFinder.FindDerivedClassesAsync((INamedTypeSymbol)ct, _solution, immutableProjects, _cancellationToken).WaitAndGetResult(_cancellationToken)
-                                       .Concat(DependentTypeFinder.FindImplementingTypesAsync((INamedTypeSymbol)ct, _solution, immutableProjects, _cancellationToken).WaitAndGetResult(_cancellationToken))
-                                       .ToList();
-                            });
+                                var derivedClasses = SymbolFinder.FindDerivedClassesAsync((INamedTypeSymbol)ct, _solution, immutableProjects, _cancellationToken).WaitAndGetResult(_cancellationToken);
+                                var implementedTypes = DependentTypeFinder.FindTransitivelyImplementingStructuresAndClassesAsync((INamedTypeSymbol)ct, _solution, immutableProjects, _cancellationToken).WaitAndGetResult(_cancellationToken);
+                                return derivedClasses.Concat(implementedTypes.Select(s => s.Symbol)).ToList();
+                            }).ToList();
 
                             var intersectingTypes = derivedImplementedTypesOfEachConstraintType.Aggregate((x, y) => x.Intersect(y).ToList());
 

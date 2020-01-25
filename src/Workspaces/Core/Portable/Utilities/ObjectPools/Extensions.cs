@@ -1,9 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
+using Microsoft.CodeAnalysis.PooledObjects;
 
-namespace Roslyn.Utilities
+namespace Microsoft.CodeAnalysis
 {
     internal static class SharedPoolExtensions
     {
@@ -12,6 +16,11 @@ namespace Roslyn.Utilities
         public static PooledObject<StringBuilder> GetPooledObject(this ObjectPool<StringBuilder> pool)
         {
             return PooledObject<StringBuilder>.Create(pool);
+        }
+
+        public static PooledObject<Stopwatch> GetPooledObject(this ObjectPool<Stopwatch> pool)
+        {
+            return PooledObject<Stopwatch>.Create(pool);
         }
 
         public static PooledObject<Stack<TItem>> GetPooledObject<TItem>(this ObjectPool<Stack<TItem>> pool)
@@ -39,6 +48,13 @@ namespace Roslyn.Utilities
             return PooledObject<List<TItem>>.Create(pool);
         }
 
+        public static PooledObject<List<TItem>> GetPooledObject<TItem>(this ObjectPool<List<TItem>> pool, out List<TItem> list)
+        {
+            var pooledObject = PooledObject<List<TItem>>.Create(pool);
+            list = pooledObject.Object;
+            return pooledObject;
+        }
+
         public static PooledObject<T> GetPooledObject<T>(this ObjectPool<T> pool) where T : class
         {
             return new PooledObject<T>(pool, p => p.Allocate(), (p, o) => p.Free(o));
@@ -50,6 +66,14 @@ namespace Roslyn.Utilities
             sb.Clear();
 
             return sb;
+        }
+
+        public static Stopwatch AllocateAndClear(this ObjectPool<Stopwatch> pool)
+        {
+            var watch = pool.Allocate();
+            watch.Reset();
+
+            return watch;
         }
 
         public static Stack<T> AllocateAndClear<T>(this ObjectPool<Stack<T>> pool)
@@ -107,6 +131,17 @@ namespace Roslyn.Utilities
             }
 
             pool.Free(sb);
+        }
+
+        public static void ClearAndFree(this ObjectPool<Stopwatch> pool, Stopwatch watch)
+        {
+            if (watch == null)
+            {
+                return;
+            }
+
+            watch.Reset();
+            pool.Free(watch);
         }
 
         public static void ClearAndFree<T>(this ObjectPool<HashSet<T>> pool, HashSet<T> set)

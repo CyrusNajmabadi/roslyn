@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Composition;
@@ -19,14 +21,18 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
     [ExportLanguageService(typeof(IImplementInterfaceService), LanguageNames.CSharp), Shared]
     internal class CSharpImplementInterfaceService : AbstractImplementInterfaceService
     {
+        [ImportingConstructor]
+        public CSharpImplementInterfaceService()
+        {
+        }
+
         protected override bool TryInitializeState(
             Document document, SemanticModel model, SyntaxNode node, CancellationToken cancellationToken,
             out SyntaxNode classOrStructDecl, out INamedTypeSymbol classOrStructType, out IEnumerable<INamedTypeSymbol> interfaceTypes)
         {
             if (!cancellationToken.IsCancellationRequested)
             {
-                var interfaceNode = node as TypeSyntax;
-                if (interfaceNode != null && interfaceNode.Parent is BaseTypeSyntax &&
+                if (node is TypeSyntax interfaceNode && interfaceNode.Parent is BaseTypeSyntax &&
                     interfaceNode.Parent.IsParentKind(SyntaxKind.BaseList) &&
                     ((BaseTypeSyntax)interfaceNode.Parent).Type == interfaceNode)
                 {
@@ -36,10 +42,9 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
                         var interfaceSymbolInfo = model.GetSymbolInfo(interfaceNode, cancellationToken);
                         if (interfaceSymbolInfo.CandidateReason != CandidateReason.WrongArity)
                         {
-                            var interfaceType = interfaceSymbolInfo.GetAnySymbol() as INamedTypeSymbol;
                             cancellationToken.ThrowIfCancellationRequested();
 
-                            if (interfaceType != null && interfaceType.TypeKind == TypeKind.Interface)
+                            if (interfaceSymbolInfo.GetAnySymbol() is INamedTypeSymbol interfaceType && interfaceType.TypeKind == TypeKind.Interface)
                             {
                                 classOrStructDecl = interfaceNode.Parent.Parent.Parent as TypeDeclarationSyntax;
                                 classOrStructType = model.GetDeclaredSymbol(classOrStructDecl, cancellationToken) as INamedTypeSymbol;
@@ -58,21 +63,9 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
             return false;
         }
 
-        protected override bool CanImplementImplicitly
-        {
-            get
-            {
-                return true;
-            }
-        }
+        protected override bool CanImplementImplicitly => true;
 
-        protected override bool HasHiddenExplicitImplementation
-        {
-            get
-            {
-                return true;
-            }
-        }
+        protected override bool HasHiddenExplicitImplementation => true;
 
         private static ClassDeclarationSyntax GetClassDeclarationAt(SyntaxNode root, int position)
         {
@@ -102,7 +95,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
             // localize the comments individually.
             var code = $@"
     #region IDisposable Support
-    private bool disposedValue = false; // {FeaturesResources.ToDetectRedundantCalls}
+    private bool disposedValue = false; // {FeaturesResources.To_detect_redundant_calls}
 
     {(symbol.IsSealed ? "" : "protected virtual ")}void Dispose(bool disposing)
     {{
@@ -110,28 +103,29 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
         {{
             if (disposing)
             {{
-                // {FeaturesResources.DisposeManagedStateTodo}
+                // {FeaturesResources.TODO_colon_dispose_managed_state_managed_objects}
             }}
 
-            // {CSharpFeaturesResources.FreeUnmanagedResourcesTodo}
-            // {FeaturesResources.SetLargeFieldsToNullTodo}
+            // {CSharpFeaturesResources.TODO_colon_free_unmanaged_resources_unmanaged_objects_and_override_a_finalizer_below}
+            // {FeaturesResources.TODO_colon_set_large_fields_to_null}
 
             disposedValue = true;
         }}
     }}
 
-    // {CSharpFeaturesResources.OverrideAFinalizerTodo}
-    // ~{classDecl.Identifier.Value}() {{
-    //   // {CSharpFeaturesResources.DoNotChangeThisCodeUseDispose}
+    // {CSharpFeaturesResources.TODO_colon_override_a_finalizer_only_if_Dispose_bool_disposing_above_has_code_to_free_unmanaged_resources}
+    // ~{classDecl.Identifier.Value}()
+    // {{
+    //   // {CSharpFeaturesResources.Do_not_change_this_code_Put_cleanup_code_in_Dispose_bool_disposing_above}
     //   Dispose(false);
     // }}
 
-    // {CSharpFeaturesResources.ThisCodeAddedToCorrectlyImplementDisposable}
+    // {CSharpFeaturesResources.This_code_added_to_correctly_implement_the_disposable_pattern}
     {(explicitly ? "void System.IDisposable." : "public void ")}Dispose()
     {{
-        // {CSharpFeaturesResources.DoNotChangeThisCodeUseDispose}
+        // {CSharpFeaturesResources.Do_not_change_this_code_Put_cleanup_code_in_Dispose_bool_disposing_above}
         Dispose(true);
-        // {CSharpFeaturesResources.UncommentTheFollowingIfFinalizerOverriddenTodo}
+        // {CSharpFeaturesResources.TODO_colon_uncomment_the_following_line_if_the_finalizer_is_overridden_above}
         // GC.SuppressFinalize(this);
     }}
     #endregion
@@ -146,7 +140,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
             decls[decls.Length - 1] = decls[decls.Length - 1].WithAppendedTrailingTrivia(
                 SyntaxFactory.TriviaList(
                     SyntaxFactory.Trivia(SyntaxFactory.EndRegionDirectiveTrivia(true)),
-                    SyntaxFactory.CarriageReturnLineFeed));
+                    SyntaxFactory.ElasticCarriageReturnLineFeed));
 
             // Ensure that open and close brace tokens are generated in case they are missing.
             var newNode = classDecl.EnsureOpenAndCloseBraceTokens().AddMembers(decls);

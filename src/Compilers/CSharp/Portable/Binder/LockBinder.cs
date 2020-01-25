@@ -1,10 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Diagnostics;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -31,7 +34,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Allow method groups during binding and then rule them out when we check that the expression has
             // a reference type.
             ExpressionSyntax exprSyntax = TargetExpressionSyntax;
-            BoundExpression expr = BindTargetExpression(diagnostics);
+            BoundExpression expr = BindTargetExpression(diagnostics, originalBinder);
             TypeSymbol exprType = expr.Type;
 
             bool hasErrors = false;

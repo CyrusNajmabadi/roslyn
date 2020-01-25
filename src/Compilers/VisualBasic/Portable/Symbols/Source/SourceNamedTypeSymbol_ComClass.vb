@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -38,20 +41,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim args As ImmutableArray(Of TypedConstant) = attrData.CommonConstructorArguments
 
                 If args.Length > 0 Then
-                    Dim strVal As String = If(args(0).Kind <> TypedConstantKind.Array, TryCast(args(0).Value, String), Nothing)
+                    Dim strVal As String = If(args(0).Kind <> TypedConstantKind.Array, TryCast(args(0).ValueInternal, String), Nothing)
 
                     If Not String.IsNullOrEmpty(strVal) Then
                         Me.ClassId = strVal
                     End If
 
                     If args.Length > 1 Then
-                        strVal = If(args(1).Kind <> TypedConstantKind.Array, TryCast(args(1).Value, String), Nothing)
+                        strVal = If(args(1).Kind <> TypedConstantKind.Array, TryCast(args(1).ValueInternal, String), Nothing)
                         If Not String.IsNullOrEmpty(strVal) Then
                             Me.InterfaceId = strVal
                         End If
 
                         If args.Length > 2 Then
-                            strVal = If(args(2).Kind <> TypedConstantKind.Array, TryCast(args(2).Value, String), Nothing)
+                            strVal = If(args(2).Kind <> TypedConstantKind.Array, TryCast(args(2).ValueInternal, String), Nothing)
                             If Not String.IsNullOrEmpty(strVal) Then
                                 Me.EventId = strVal
                             End If
@@ -308,7 +311,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 If comVisible > -1 Then
                     Dim typedValue As TypedConstant = attrData(comVisible).CommonConstructorArguments(0)
-                    Dim value As Object = If(typedValue.Kind <> TypedConstantKind.Array, typedValue.Value, Nothing)
+                    Dim value As Object = If(typedValue.Kind <> TypedConstantKind.Array, typedValue.ValueInternal, Nothing)
 
                     If value Is Nothing OrElse (TypeOf value Is Boolean AndAlso Not DirectCast(value, Boolean)) Then
                         Return False
@@ -483,7 +486,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 If dispIdIndex > -1 Then
                     Dim typedValue As TypedConstant = attrData(dispIdIndex).CommonConstructorArguments(0)
-                    Dim value As Object = If(typedValue.Kind <> TypedConstantKind.Array, typedValue.Value, Nothing)
+                    Dim value As Object = If(typedValue.Kind <> TypedConstantKind.Array, typedValue.ValueInternal, Nothing)
 
                     If value IsNot Nothing AndAlso TypeOf value Is Integer Then
                         Dim dispId = DirectCast(value, Integer)
@@ -783,7 +786,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Return SpecializedCollections.EmptyEnumerable(Of FieldSymbol)()
                 End Function
 
-                Friend Overrides ReadOnly Property HasEmbeddedAttribute As Boolean
+                Friend Overrides ReadOnly Property HasCodeAnalysisEmbeddedAttribute As Boolean
+                    Get
+                        Throw ExceptionUtilities.Unreachable
+                    End Get
+                End Property
+
+                Friend Overrides ReadOnly Property HasVisualBasicEmbeddedAttribute As Boolean
                     Get
                         Throw ExceptionUtilities.Unreachable
                     End Get
@@ -867,11 +876,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Return ImmutableArray(Of NamedTypeSymbol).Empty
                 End Function
 
-                Friend Overrides Function MakeDeclaredBase(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As NamedTypeSymbol
+                Friend Overrides Function MakeDeclaredBase(basesBeingResolved As BasesBeingResolved, diagnostics As DiagnosticBag) As NamedTypeSymbol
                     Return Nothing
                 End Function
 
-                Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+                Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As BasesBeingResolved, diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
                     Return ImmutableArray(Of NamedTypeSymbol).Empty
                 End Function
 
@@ -905,7 +914,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
-                Friend Overrides ReadOnly Property IsSerializable As Boolean
+                Public Overrides ReadOnly Property IsSerializable As Boolean
                     Get
                         Return False
                     End Get
@@ -929,11 +938,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
-                Friend NotOverridable Overrides ReadOnly Property TypeArgumentsCustomModifiers As ImmutableArray(Of ImmutableArray(Of CustomModifier))
-                    Get
-                        Return ImmutableArray(Of ImmutableArray(Of CustomModifier)).Empty
-                    End Get
-                End Property
+                Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+                    Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+                End Function
 
                 Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
                     Get
@@ -988,7 +995,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             ImmutableArray.Create(
                                 New TypedConstant(_comClass.GetSpecialType(SpecialType.System_Int16),
                                                         TypedConstantKind.Primitive,
-                                                        CShort(ComInterfaceType.InterfaceIsIDispatch)))))
+                                                        CShort(Cci.Constants.ComInterfaceType_InterfaceIsIDispatch)))))
                     End If
 
                     AddSynthesizedAttribute(attributes, compilation.TrySynthesizeAttribute(
@@ -1008,6 +1015,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 Friend Overrides Function GetUnificationUseSiteDiagnosticRecursive(owner As Symbol, ByRef checkedTypes As HashSet(Of TypeSymbol)) As DiagnosticInfo
                     Return Nothing
+                End Function
+
+                Friend NotOverridable Overrides Function GetSynthesizedWithEventsOverrides() As IEnumerable(Of PropertySymbol)
+                    Return SpecializedCollections.EmptyEnumerable(Of PropertySymbol)()
                 End Function
             End Class
 
@@ -1244,6 +1255,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
+                Public Overrides ReadOnly Property ReturnsByRef As Boolean
+                    Get
+                        Return ClonedFrom.ReturnsByRef
+                    End Get
+                End Property
+
                 Public Overrides ReadOnly Property ReturnType As TypeSymbol
                     Get
                         Return ClonedFrom.ReturnType
@@ -1256,7 +1273,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
-                Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+                Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+                    Get
+                        Return ClonedFrom.RefCustomModifiers
+                    End Get
+                End Property
+
+                Friend Overrides ReadOnly Property Syntax As SyntaxNode
                     Get
                         Throw ExceptionUtilities.Unreachable
                     End Get
@@ -1398,6 +1421,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
+                Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+                    Get
+                        Return _clonedFrom.RefCustomModifiers
+                    End Get
+                End Property
+
                 Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
                     Get
                         Throw ExceptionUtilities.Unreachable
@@ -1529,12 +1558,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         End If
 
                         Return _clonedFrom.IsCallerFilePath
-                    End Get
-                End Property
-
-                Friend Overrides ReadOnly Property CountOfCustomModifiersPrecedingByRef As UShort
-                    Get
-                        Return _clonedFrom.CountOfCustomModifiersPrecedingByRef
                     End Get
                 End Property
 
@@ -1770,6 +1793,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Get
                 End Property
 
+                Public Overrides ReadOnly Property ReturnsByRef As Boolean
+                    Get
+                        Return _clonedFrom.ReturnsByRef
+                    End Get
+                End Property
+
                 Public Overrides ReadOnly Property Type As TypeSymbol
                     Get
                         Return _clonedFrom.Type
@@ -1785,6 +1814,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Public Overrides ReadOnly Property TypeCustomModifiers As ImmutableArray(Of CustomModifier)
                     Get
                         Return _clonedFrom.TypeCustomModifiers
+                    End Get
+                End Property
+
+                Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+                    Get
+                        Return _clonedFrom.RefCustomModifiers
                     End Get
                 End Property
 

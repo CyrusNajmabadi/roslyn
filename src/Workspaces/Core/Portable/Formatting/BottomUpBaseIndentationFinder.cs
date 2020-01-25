@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -19,14 +21,12 @@ namespace Microsoft.CodeAnalysis.Formatting
         private readonly ChainedFormattingRules _formattingRules;
         private readonly int _tabSize;
         private readonly int _indentationSize;
-        private readonly SyntaxToken _lastToken;
 
         public BottomUpBaseIndentationFinder(
             ChainedFormattingRules formattingRules,
             int tabSize,
             int indentationSize,
-            TokenStream tokenStream,
-            SyntaxToken lastToken)
+            TokenStream tokenStream)
         {
             Contract.ThrowIfNull(formattingRules);
 
@@ -34,7 +34,6 @@ namespace Microsoft.CodeAnalysis.Formatting
             _tabSize = tabSize;
             _indentationSize = indentationSize;
             _tokenStream = tokenStream;
-            _lastToken = lastToken;
         }
 
         public int? FromIndentBlockOperations(
@@ -114,7 +113,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             var list = GetParentIndentBlockOperations(token);
 
             // remove one that is smaller than current one
-            for (int i = list.Count - 1; i >= 0; i--)
+            for (var i = list.Count - 1; i >= 0; i--)
             {
                 if (CommonFormattingHelpers.IndentBlockOperationComparer(startingOperation, list[i]) < 0)
                 {
@@ -139,8 +138,8 @@ namespace Microsoft.CodeAnalysis.Formatting
             CancellationToken cancellationToken)
         {
             var tuple = GetIndentationRuleOfCurrentPosition(root, token, list, position);
-            var indentationLevel = tuple.Item1;
-            var operation = tuple.Item2;
+            var indentationLevel = tuple.indentation;
+            var operation = tuple.operation;
 
             if (operation == null)
             {
@@ -177,7 +176,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             throw ExceptionUtilities.Unreachable;
         }
 
-        private ValueTuple<int, IndentBlockOperation> GetIndentationRuleOfCurrentPosition(
+        private (int indentation, IndentBlockOperation operation) GetIndentationRuleOfCurrentPosition(
             SyntaxNode root, SyntaxToken token, List<IndentBlockOperation> list, int position)
         {
             var indentationLevel = 0;
@@ -186,24 +185,24 @@ namespace Microsoft.CodeAnalysis.Formatting
             {
                 if (operation.Option.IsOn(IndentBlockOption.AbsolutePosition))
                 {
-                    return ValueTuple.Create(operation.IndentationDeltaOrPosition + _indentationSize * indentationLevel, operation);
+                    return (operation.IndentationDeltaOrPosition + _indentationSize * indentationLevel, operation);
                 }
 
                 if (operation.Option == IndentBlockOption.RelativeToFirstTokenOnBaseTokenLine)
                 {
-                    return ValueTuple.Create(indentationLevel, operation);
+                    return (indentationLevel, operation);
                 }
 
                 if (operation.IsRelativeIndentation)
                 {
-                    return ValueTuple.Create(indentationLevel, operation);
+                    return (indentationLevel, operation);
                 }
 
                 // move up to its containing operation
                 indentationLevel += operation.IndentationDeltaOrPosition;
             }
 
-            return new ValueTuple<int, IndentBlockOperation>(indentationLevel, null);
+            return (indentationLevel, null);
         }
 
         private List<IndentBlockOperation> GetParentIndentBlockOperations(SyntaxToken token)
@@ -212,7 +211,7 @@ namespace Microsoft.CodeAnalysis.Formatting
 
             // gather all indent operations 
             var list = new List<IndentBlockOperation>();
-            allNodes.Do(n => _formattingRules.AddIndentBlockOperations(list, n, _lastToken));
+            allNodes.Do(n => _formattingRules.AddIndentBlockOperations(list, n));
 
             // sort them in right order
             list.RemoveAll(CommonFormattingHelpers.IsNull);
@@ -250,7 +249,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             while (currentNode != null)
             {
                 list.Clear();
-                _formattingRules.AddAlignTokensOperations(list, currentNode, _lastToken);
+                _formattingRules.AddAlignTokensOperations(list, currentNode);
 
                 if (list.Count == 0)
                 {
@@ -268,7 +267,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                 currentNode = currentNode.Parent;
             }
 
-            return default(SyntaxToken);
+            return default;
         }
 
         private IndentBlockOperation GetIndentationDataFor(SyntaxNode root, SyntaxToken token, int position)
@@ -281,7 +280,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             var currentNode = startNode;
             while (currentNode != null)
             {
-                _formattingRules.AddIndentBlockOperations(list, currentNode, _lastToken);
+                _formattingRules.AddIndentBlockOperations(list, currentNode);
 
                 if (list.Any(o => o != null && o.TextSpan.Contains(position)))
                 {
@@ -310,7 +309,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             var map = new HashSet<TextSpan>();
 
             // iterate backward
-            for (int i = list.Count - 1; i >= 0; i--)
+            for (var i = list.Count - 1; i >= 0; i--)
             {
                 var operation = list[i];
                 if (map.Contains(operation.TextSpan))

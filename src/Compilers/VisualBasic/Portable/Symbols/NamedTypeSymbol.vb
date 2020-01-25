@@ -1,11 +1,15 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
@@ -17,7 +21,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend MustInherit Class NamedTypeSymbol
         Inherits TypeSymbol
-        Implements INamedTypeSymbol
+        Implements INamedTypeSymbol, INamedTypeSymbolInternal
 
         ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ' Changes to the public interface of this class should remain synchronized with the C# version.
@@ -38,38 +42,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public MustOverride ReadOnly Property TypeParameters As ImmutableArray(Of TypeParameterSymbol)
 
         ''' <summary>
-        ''' Returns the type arguments that have been substituted for the type parameters. 
-        ''' If nothing has been substituted for a give type parameters,
-        ''' then the type parameter itself is consider the type argument.
+        ''' Returns custom modifiers for the type argument that has been substituted for the type parameter. 
+        ''' The modifiers correspond to the type argument at the same ordinal within the <see cref="TypeArgumentsNoUseSiteDiagnostics"/>
+        ''' array.
         ''' </summary>
-        Public ReadOnly Property TypeArguments As ImmutableArray(Of TypeSymbol)
-            Get
-                Return TypeArgumentsNoUseSiteDiagnostics
-            End Get
-        End Property
+        Public MustOverride Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
 
-        ''' <summary>
-        ''' Returns custom modifiers for the type arguments that have been substituted for the type parameters. 
-        ''' </summary>
-        Friend MustOverride ReadOnly Property TypeArgumentsCustomModifiers As ImmutableArray(Of ImmutableArray(Of CustomModifier))
-
-        Friend Function CreateEmptyTypeArgumentsCustomModifiers() As ImmutableArray(Of ImmutableArray(Of CustomModifier))
-            Dim arity = Me.Arity
-
-            If arity > 0 Then
-                Return CreateEmptyTypeArgumentsCustomModifiers(arity)
-            Else
-                Return ImmutableArray(Of ImmutableArray(Of CustomModifier)).Empty
+        Friend Function GetEmptyTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+            If ordinal < 0 OrElse ordinal >= Me.Arity Then
+                Throw New IndexOutOfRangeException()
             End If
-        End Function
 
-        Friend Shared Function CreateEmptyTypeArgumentsCustomModifiers(arity As Integer) As ImmutableArray(Of ImmutableArray(Of CustomModifier))
-            Debug.Assert(arity > 0)
-            Return ArrayBuilder(Of ImmutableArray(Of CustomModifier)).GetInstance(arity, ImmutableArray(Of CustomModifier).Empty).ToImmutableAndFree()
+            Return ImmutableArray(Of CustomModifier).Empty
         End Function
 
         Friend MustOverride ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
 
+        ''' <summary>
+        ''' Returns the type arguments that have been substituted for the type parameters. 
+        ''' If nothing has been substituted for a give type parameters,
+        ''' then the type parameter itself is consider the type argument.
+        ''' </summary>
         Friend MustOverride ReadOnly Property TypeArgumentsNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
 
         Friend Function TypeArgumentsWithDefinitionUseSiteDiagnostics(<[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ImmutableArray(Of TypeSymbol)
@@ -171,6 +164,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         ''' <summary>
+        ''' True if the type itself Is excluded from code coverage instrumentation.
+        ''' True for source types marked with <see cref="AttributeDescription.ExcludeFromCodeCoverageAttribute"/>.
+        ''' </summary>
+        Friend Overridable ReadOnly Property IsDirectlyExcludedFromCodeCoverage As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
         ''' Should the name returned by Name property be mangled with [`arity] suffix in order to get metadata name.
         ''' Must return False for a type with Arity == 0.
         ''' </summary>
@@ -187,7 +190,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <summary>
         '''  True if this type is considered serializable (metadata flag Serializable is set).
         ''' </summary>
-        Friend MustOverride ReadOnly Property IsSerializable As Boolean
+        Public MustOverride ReadOnly Property IsSerializable As Boolean Implements INamedTypeSymbol.IsSerializable
 
         ''' <summary>
         ''' Type layout information (ClassLayout metadata and layout kind flags).
@@ -266,9 +269,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public MustOverride ReadOnly Property MightContainExtensionMethods As Boolean Implements INamedTypeSymbol.MightContainExtensionMethods
 
         ''' <summary>
+        ''' Returns True if the type is marked by 'Microsoft.CodeAnalysis.Embedded' attribute. 
+        ''' </summary>
+        Friend MustOverride ReadOnly Property HasCodeAnalysisEmbeddedAttribute As Boolean
+
+        ''' <summary>
         ''' Returns True if the type is marked by 'Microsoft.VisualBasic.Embedded' attribute. 
         ''' </summary>
-        Friend MustOverride ReadOnly Property HasEmbeddedAttribute As Boolean
+        Friend MustOverride ReadOnly Property HasVisualBasicEmbeddedAttribute As Boolean
 
         ''' <summary>
         ''' A Named type is an extensible interface if both the following are true:
@@ -711,7 +719,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' basesBeingResolved are passed if there are any types already have their bases resolved
         ''' so that the derived implementation could avoid infinite recursion
         ''' </summary>
-        Friend MustOverride Function MakeDeclaredBase(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As NamedTypeSymbol
+        Friend MustOverride Function MakeDeclaredBase(basesBeingResolved As BasesBeingResolved, diagnostics As DiagnosticBag) As NamedTypeSymbol
 
         ''' <summary>
         ''' NamedTypeSymbol calls derived implementations of this method when declared interfaces
@@ -720,7 +728,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' basesBeingResolved are passed if there are any types already have their bases resolved
         ''' so that the derived implementation could avoid infinite recursion
         ''' </summary>
-        Friend MustOverride Function MakeDeclaredInterfaces(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend MustOverride Function MakeDeclaredInterfaces(basesBeingResolved As BasesBeingResolved, diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
 
         ''' <summary>
         ''' Base type as "declared".
@@ -729,7 +737,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' If DeclaredBase must be accessed while other DeclaredBases are being resolved, 
         ''' the bases that are being resolved must be specified here to prevent potential infinite recursion.
         ''' </summary>
-        Friend Overridable Function GetDeclaredBase(basesBeingResolved As ConsList(Of Symbol)) As NamedTypeSymbol
+        Friend Overridable Function GetDeclaredBase(basesBeingResolved As BasesBeingResolved) As NamedTypeSymbol
             If _lazyDeclaredBase Is ErrorTypeSymbol.UnknownResultType Then
                 Dim diagnostics = DiagnosticBag.GetInstance()
                 AtomicStoreReferenceAndDiagnostics(_lazyDeclaredBase, MakeDeclaredBase(basesBeingResolved, diagnostics), diagnostics, ErrorTypeSymbol.UnknownResultType)
@@ -781,7 +789,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' If DeclaredInterfaces must be accessed while other DeclaredInterfaces are being resolved, 
         ''' the bases that are being resolved must be specified here to prevent potential infinite recursion.
         ''' </summary>
-        Friend Overridable Function GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved As ConsList(Of Symbol)) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Overridable Function GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved As BasesBeingResolved) As ImmutableArray(Of NamedTypeSymbol)
             If _lazyDeclaredInterfaces.IsDefault Then
                 Dim diagnostics = DiagnosticBag.GetInstance()
                 AtomicStoreArrayAndDiagnostics(_lazyDeclaredInterfaces, MakeDeclaredInterfaces(basesBeingResolved, diagnostics), diagnostics)
@@ -791,7 +799,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return _lazyDeclaredInterfaces
         End Function
 
-        Friend Function GetDeclaredInterfacesWithDefinitionUseSiteDiagnostics(basesBeingResolved As ConsList(Of Symbol), <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Function GetDeclaredInterfacesWithDefinitionUseSiteDiagnostics(basesBeingResolved As BasesBeingResolved, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ImmutableArray(Of NamedTypeSymbol)
             Dim result = GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved)
 
             For Each iface In result
@@ -801,9 +809,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return result
         End Function
 
-        Friend Function GetDirectBaseInterfacesNoUseSiteDiagnostics(basesBeingResolved As ConsList(Of Symbol)) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Function GetDirectBaseInterfacesNoUseSiteDiagnostics(basesBeingResolved As BasesBeingResolved) As ImmutableArray(Of NamedTypeSymbol)
             If Me.TypeKind = TypeKind.Interface Then
-                If basesBeingResolved Is Nothing Then
+                If basesBeingResolved.InheritsBeingResolvedOpt Is Nothing Then
                     Return Me.InterfacesNoUseSiteDiagnostics
                 Else
                     Return GetDeclaredBaseInterfacesSafe(basesBeingResolved)
@@ -813,13 +821,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Function
 
-        Friend Overridable Function GetDeclaredBaseInterfacesSafe(basesBeingResolved As ConsList(Of Symbol)) As ImmutableArray(Of NamedTypeSymbol)
-            Debug.Assert(basesBeingResolved.Any)
-            If basesBeingResolved.Contains(Me) Then
+        Friend Overridable Function GetDeclaredBaseInterfacesSafe(basesBeingResolved As BasesBeingResolved) As ImmutableArray(Of NamedTypeSymbol)
+            Debug.Assert(Me.IsInterface)
+            Debug.Assert(basesBeingResolved.InheritsBeingResolvedOpt.Any)
+            If basesBeingResolved.InheritsBeingResolvedOpt.Contains(Me) Then
                 Return Nothing
             End If
 
-            Return GetDeclaredInterfacesNoUseSiteDiagnostics(If(basesBeingResolved, ConsList(Of Symbol).Empty).Prepend(Me))
+            Return GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved.PrependInheritsBeingResolved(Me))
         End Function
 
         ''' <summary>
@@ -1016,8 +1025,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             If Me.HasTypeArgumentsCustomModifiers Then
                 Dim modifiersErrorInfo As DiagnosticInfo = Nothing
 
-                For Each modifiers In Me.TypeArgumentsCustomModifiers
-                    modifiersErrorInfo = MergeUseSiteErrorInfo(modifiersErrorInfo, DeriveUseSiteErrorInfoFromCustomModifiers(modifiers))
+                For i As Integer = 0 To Me.Arity - 1
+                    modifiersErrorInfo = MergeUseSiteErrorInfo(modifiersErrorInfo, DeriveUseSiteErrorInfoFromCustomModifiers(Me.GetTypeArgumentCustomModifiers(i)))
                 Next
 
                 Return MergeUseSiteErrorInfo(argsErrorInfo, modifiersErrorInfo)
@@ -1028,7 +1037,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         ''' <summary>
         ''' True if this is a reference to an <em>unbound</em> generic type.  These occur only
-        ''' within a <code>GetType</code> expression.  A generic type is considered <em>unbound</em>
+        ''' within a <c>GetType</c> expression.  A generic type is considered <em>unbound</em>
         ''' if all of the type argument lists in its fully qualified name are empty.
         ''' Note that the type arguments of an unbound generic type will be returned as error
         ''' types because they do not really have type arguments.  An unbound generic type
@@ -1080,6 +1089,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <returns>True if this Is an interface type.</returns>
         Friend MustOverride ReadOnly Property IsInterface As Boolean
 
+        ''' <summary>
+        ''' Get synthesized WithEvents overrides that aren't returned by <see cref="GetMembers"/>
+        ''' </summary>
+        Friend MustOverride Function GetSynthesizedWithEventsOverrides() As IEnumerable(Of PropertySymbol)
+
 #Region "INamedTypeSymbol"
 
         Private ReadOnly Property INamedTypeSymbol_Arity As Integer Implements INamedTypeSymbol.Arity
@@ -1106,6 +1120,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Private ReadOnly Property INamedTypeSymbolInternal_EnumUnderlyingType As INamedTypeSymbolInternal Implements INamedTypeSymbolInternal.EnumUnderlyingType
+            Get
+                Return Me.EnumUnderlyingType
+            End Get
+        End Property
+
         Private ReadOnly Property INamedTypeSymbol_MemberNames As IEnumerable(Of String) Implements INamedTypeSymbol.MemberNames
             Get
                 Return Me.MemberNames
@@ -1124,9 +1144,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Private Function INamedTypeSymbol_GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier) Implements INamedTypeSymbol.GetTypeArgumentCustomModifiers
+            Return GetTypeArgumentCustomModifiers(ordinal)
+        End Function
+
         Private ReadOnly Property INamedTypeSymbol_TypeArguments As ImmutableArray(Of ITypeSymbol) Implements INamedTypeSymbol.TypeArguments
             Get
                 Return StaticCast(Of ITypeSymbol).From(Me.TypeArgumentsNoUseSiteDiagnostics)
+            End Get
+        End Property
+
+        Private ReadOnly Property TypeArgumentNullableAnnotations As ImmutableArray(Of NullableAnnotation) Implements INamedTypeSymbol.TypeArgumentNullableAnnotations
+            Get
+                Return Me.TypeArgumentsNoUseSiteDiagnostics.SelectAsArray(Function(t) NullableAnnotation.None)
             End Get
         End Property
 
@@ -1149,12 +1179,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private Function INamedTypeSymbol_Construct(ParamArray arguments() As ITypeSymbol) As INamedTypeSymbol Implements INamedTypeSymbol.Construct
-            For Each arg In arguments
-                arg.EnsureVbSymbolOrNothing(Of TypeSymbol)("typeArguments")
-            Next
+        Private Function INamedTypeSymbol_Construct(ParamArray typeArguments() As ITypeSymbol) As INamedTypeSymbol Implements INamedTypeSymbol.Construct
+            Return Construct(ConstructTypeArguments(typeArguments))
+        End Function
 
-            Return Construct(arguments.Cast(Of TypeSymbol).ToArray())
+        Private Function INamedTypeSymbol_Construct(typeArguments As ImmutableArray(Of ITypeSymbol), typeArgumentNullableAnnotations As ImmutableArray(Of CodeAnalysis.NullableAnnotation)) As INamedTypeSymbol Implements INamedTypeSymbol.Construct
+            Return Construct(ConstructTypeArguments(typeArguments, typeArgumentNullableAnnotations))
         End Function
 
         Private Function INamedTypeSymbol_ConstructUnboundGenericType() As INamedTypeSymbol Implements INamedTypeSymbol.ConstructUnboundGenericType
@@ -1185,6 +1215,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Private ReadOnly Property INamedTypeSymbol_IsComImport As Boolean Implements INamedTypeSymbol.IsComImport
+            Get
+                Return IsComImport
+            End Get
+        End Property
+
 #End Region
 
 #Region "ISymbol"
@@ -1198,6 +1234,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Protected Overrides ReadOnly Property ISymbol_IsSealed As Boolean
             Get
                 Return Me.IsNotInheritable
+            End Get
+        End Property
+
+        Private ReadOnly Property INamedTypeSymbol_TupleElements As ImmutableArray(Of IFieldSymbol) Implements INamedTypeSymbol.TupleElements
+            Get
+                Return StaticCast(Of IFieldSymbol).From(TupleElements)
+            End Get
+        End Property
+
+        Private ReadOnly Property INamedTypeSymbol_TupleUnderlyingType As INamedTypeSymbol Implements INamedTypeSymbol.TupleUnderlyingType
+            Get
+                Return TupleUnderlyingType
             End Get
         End Property
 
@@ -1218,6 +1266,67 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
 #End Region
+
+        ''' <summary>
+        ''' Verify if the given type can be used to back a tuple type 
+        ''' and return cardinality of that tuple type in <paramref name="tupleCardinality"/>. 
+        ''' </summary>
+        ''' <param name="tupleCardinality">If method returns true, contains cardinality of the compatible tuple type.</param>
+        ''' <returns></returns>
+        Public NotOverridable Overrides Function IsTupleCompatible(<Out> ByRef tupleCardinality As Integer) As Boolean
+            If IsTupleType Then
+                tupleCardinality = 0
+                Return False
+            End If
+
+            ' Should this be optimized for perf (caching for VT<0> to VT<7>, etc.)?
+            If Not IsUnboundGenericType AndAlso
+                (ContainingSymbol?.Kind = SymbolKind.Namespace).GetValueOrDefault() AndAlso
+                (ContainingNamespace.ContainingNamespace?.IsGlobalNamespace).GetValueOrDefault() AndAlso
+                Name = TupleTypeSymbol.TupleTypeName AndAlso
+                ContainingNamespace.Name = MetadataHelpers.SystemString Then
+
+                Dim arity = Me.Arity
+
+                If arity > 0 AndAlso arity < TupleTypeSymbol.RestPosition Then
+                    tupleCardinality = arity
+                    Return True
+                ElseIf arity = TupleTypeSymbol.RestPosition AndAlso Not IsDefinition Then
+                    ' Skip through "Rest" extensions
+                    Dim typeToCheck As TypeSymbol = Me
+                    Dim levelsOfNesting As Integer = 0
+
+                    Do
+                        levelsOfNesting += 1
+                        typeToCheck = DirectCast(typeToCheck, NamedTypeSymbol).TypeArgumentsNoUseSiteDiagnostics(TupleTypeSymbol.RestPosition - 1)
+                    Loop While TypeSymbol.Equals(typeToCheck.OriginalDefinition, Me.OriginalDefinition, TypeCompareKind.ConsiderEverything) AndAlso Not typeToCheck.IsDefinition
+
+                    If typeToCheck.IsTupleType Then
+                        Dim underlying = typeToCheck.TupleUnderlyingType
+                        If underlying.Arity = TupleTypeSymbol.RestPosition AndAlso Not TypeSymbol.Equals(underlying.OriginalDefinition, Me.OriginalDefinition, TypeCompareKind.ConsiderEverything) Then
+                            tupleCardinality = 0
+                            Return False
+                        End If
+
+                        tupleCardinality = (TupleTypeSymbol.RestPosition - 1) * levelsOfNesting + typeToCheck.TupleElementTypes.Length
+                        Return True
+                    End If
+
+                    arity = If(TryCast(typeToCheck, NamedTypeSymbol)?.Arity, 0)
+
+                    If arity > 0 AndAlso
+                        arity < TupleTypeSymbol.RestPosition AndAlso
+                        typeToCheck.IsTupleCompatible(tupleCardinality) Then
+                        Debug.Assert(tupleCardinality < TupleTypeSymbol.RestPosition)
+                        tupleCardinality += (TupleTypeSymbol.RestPosition - 1) * levelsOfNesting
+                        Return True
+                    End If
+                End If
+            End If
+
+            tupleCardinality = 0
+            Return False
+        End Function
 
     End Class
 End Namespace

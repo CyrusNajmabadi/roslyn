@@ -1,57 +1,69 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis.Editor.Commands;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.SignatureHelp;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Text.Editor.Commanding;
+using Microsoft.VisualStudio.Text.Editor.Commanding.Commands;
 using Microsoft.VisualStudio.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHelp
 {
     internal partial class Controller :
         AbstractController<Controller.Session, Model, ISignatureHelpPresenterSession, ISignatureHelpSession>,
-        ICommandHandler<TypeCharCommandArgs>,
-        ICommandHandler<InvokeSignatureHelpCommandArgs>
+        IChainedCommandHandler<TypeCharCommandArgs>,
+        IChainedCommandHandler<InvokeSignatureHelpCommandArgs>
     {
         private static readonly object s_controllerPropertyKey = new object();
 
         private readonly IList<Lazy<ISignatureHelpProvider, OrderableLanguageMetadata>> _allProviders;
-        private IList<ISignatureHelpProvider> _providers;
+        private ImmutableArray<ISignatureHelpProvider> _providers;
         private IContentType _lastSeenContentType;
 
+        public string DisplayName => EditorFeaturesResources.Signature_Help;
+
         public Controller(
+            IThreadingContext threadingContext,
             ITextView textView,
             ITextBuffer subjectBuffer,
             IIntelliSensePresenter<ISignatureHelpPresenterSession, ISignatureHelpSession> presenter,
             IAsynchronousOperationListener asyncListener,
             IDocumentProvider documentProvider,
             IList<Lazy<ISignatureHelpProvider, OrderableLanguageMetadata>> allProviders)
-            : base(textView, subjectBuffer, presenter, asyncListener, documentProvider, "SignatureHelp")
+            : base(threadingContext, textView, subjectBuffer, presenter, asyncListener, documentProvider, "SignatureHelp")
         {
             _allProviders = allProviders;
         }
 
         // For testing purposes.
         internal Controller(
+            IThreadingContext threadingContext,
             ITextView textView,
             ITextBuffer subjectBuffer,
             IIntelliSensePresenter<ISignatureHelpPresenterSession, ISignatureHelpSession> presenter,
             IAsynchronousOperationListener asyncListener,
             IDocumentProvider documentProvider,
             IList<ISignatureHelpProvider> providers)
-            : base(textView, subjectBuffer, presenter, asyncListener, documentProvider, "SignatureHelp")
+            : base(threadingContext, textView, subjectBuffer, presenter, asyncListener, documentProvider, "SignatureHelp")
         {
-            _providers = providers;
+            _providers = providers.ToImmutableArray();
         }
 
         internal static Controller GetInstance(
-            CommandArgs args,
+            IThreadingContext threadingContext,
+            EditorCommandArgs args,
             IIntelliSensePresenter<ISignatureHelpPresenterSession, ISignatureHelpSession> presenter,
             IAsynchronousOperationListener asyncListener,
             IList<Lazy<ISignatureHelpProvider, OrderableLanguageMetadata>> allProviders)
@@ -59,10 +71,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             var textView = args.TextView;
             var subjectBuffer = args.SubjectBuffer;
             return textView.GetOrCreatePerSubjectBufferProperty(subjectBuffer, s_controllerPropertyKey,
-                (v, b) => new Controller(v, b,
+                (v, b) => new Controller(threadingContext, v, b,
                     presenter,
                     asyncListener,
-                    new DocumentProvider(),
+                    new DocumentProvider(threadingContext),
                     allProviders));
         }
 
@@ -97,7 +109,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             }
         }
 
-        private void StartSession(IList<ISignatureHelpProvider> providers, SignatureHelpTriggerInfo triggerInfo)
+        private void StartSession(
+            ImmutableArray<ISignatureHelpProvider> providers, SignatureHelpTriggerInfo triggerInfo)
         {
             AssertIsForeground();
             VerifySessionIsInactive();
@@ -106,7 +119,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
             this.sessionOpt.ComputeModel(providers, triggerInfo);
         }
 
-        private IList<ISignatureHelpProvider> GetProviders()
+        private ImmutableArray<ISignatureHelpProvider> GetProviders()
         {
             this.AssertIsForeground();
 
@@ -119,7 +132,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.SignatureHel
                 var document = snapshot.GetOpenDocumentInCurrentContextWithChanges();
                 if (document != null)
                 {
-                    _providers = document.Project.LanguageServices.WorkspaceServices.SelectMatchingExtensionValues(_allProviders, this.SubjectBuffer.ContentType);
+                    _providers = document.Project.LanguageServices.WorkspaceServices.SelectMatchingExtensionValues(
+                        _allProviders, this.SubjectBuffer.ContentType).ToImmutableArray();
                     _lastSeenContentType = currentContentType;
                 }
             }

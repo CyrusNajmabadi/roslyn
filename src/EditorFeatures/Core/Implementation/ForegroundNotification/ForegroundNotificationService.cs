@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -7,10 +9,11 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Roslyn.Utilities;
-using Microsoft.CodeAnalysis.ErrorReporting;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
 {
@@ -29,70 +32,95 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
         private int _lastProcessedTimeInMS;
 
         [ImportingConstructor]
-        public ForegroundNotificationService()
+        public ForegroundNotificationService(IThreadingContext threadingContext)
+            : base(threadingContext)
         {
             _workQueue = new PriorityQueue();
             _lastProcessedTimeInMS = Environment.TickCount;
 
-            Contract.ThrowIfFalse(IsValid());
-            Debug.Assert(IsForeground());
-            Task.Factory.SafeStartNewFromAsync(ProcessAsync, CancellationToken.None, TaskScheduler.Default);
-        }
-
-        public void RegisterNotification(Action action, IAsyncToken asyncToken, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            RegisterNotification(action, DefaultTimeSliceInMS, asyncToken, cancellationToken);
-        }
-
-        public void RegisterNotification(Func<bool> action, IAsyncToken asyncToken, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            RegisterNotification(action, DefaultTimeSliceInMS, asyncToken, cancellationToken);
-        }
-
-        public void RegisterNotification(Action action, int delay, IAsyncToken asyncToken, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            Contract.Requires(delay >= 0);
-
-            var current = Environment.TickCount;
-
-            _workQueue.Enqueue(new PendingWork(current + delay, action, asyncToken, cancellationToken));
-        }
-
-        public void RegisterNotification(Func<bool> action, int delay, IAsyncToken asyncToken, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            Contract.Requires(delay >= 0);
-
-            var current = Environment.TickCount;
-
-            _workQueue.Enqueue(new PendingWork(current + delay, action, asyncToken, cancellationToken));
-        }
-
-        public bool IsEmpty_TestOnly
-        {
-            get
+            // Only start the background processing task if foreground work is allowed
+            if (threadingContext.HasMainThread)
             {
-                return _workQueue.IsEmpty;
+                Task.Factory.SafeStartNewFromAsync(ProcessAsync, CancellationToken.None, TaskScheduler.Default);
             }
         }
 
+        public void RegisterNotification(Action action, IAsyncToken asyncToken, CancellationToken cancellationToken = default)
+        {
+            RegisterNotification(action, DefaultTimeSliceInMS, asyncToken, cancellationToken);
+        }
+
+        public void RegisterNotification(Func<bool> action, IAsyncToken asyncToken, CancellationToken cancellationToken = default)
+        {
+            RegisterNotification(action, DefaultTimeSliceInMS, asyncToken, cancellationToken);
+        }
+
+        public void RegisterNotification(Action action, int delay, IAsyncToken asyncToken, CancellationToken cancellationToken = default)
+        {
+            Debug.Assert(delay >= 0);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                asyncToken?.Dispose();
+                return;
+            }
+
+            // Assert we have some kind of foreground thread
+            Contract.ThrowIfFalse(ThreadingContext.HasMainThread);
+
+            var current = Environment.TickCount;
+
+            _workQueue.Enqueue(new PendingWork(current + delay, action, asyncToken, cancellationToken));
+        }
+
+        public void RegisterNotification(Func<bool> action, int delay, IAsyncToken asyncToken, CancellationToken cancellationToken = default)
+        {
+            Debug.Assert(delay >= 0);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                asyncToken?.Dispose();
+                return;
+            }
+
+            // Assert we have some kind of foreground thread
+            Contract.ThrowIfFalse(ThreadingContext.HasMainThread);
+
+            var current = Environment.TickCount;
+
+            _workQueue.Enqueue(new PendingWork(current + delay, action, asyncToken, cancellationToken));
+        }
+
+        internal void ReleaseCancelledItems() => _workQueue.ReleaseCancelledItems();
+
+        public bool IsEmpty_TestOnly => _workQueue.IsEmpty;
+
         private async Task ProcessAsync()
         {
-            try
+            var isFirst = true;
+            while (true)
             {
-                AssertIsBackground();
-
-                while (true)
+                try
                 {
+                    if (isFirst)
+                    {
+                        AssertIsBackground();
+                        isFirst = false;
+                    }
+
                     // wait until it is time to run next item
                     await WaitForPendingWorkAsync().ConfigureAwait(continueOnCapturedContext: false);
 
                     // run them in UI thread
-                    await InvokeBelowInputPriority(NotifyOnForeground).ConfigureAwait(continueOnCapturedContext: false);
+                    await InvokeBelowInputPriorityAsync(NotifyOnForeground).ConfigureAwait(continueOnCapturedContext: false);
                 }
-            }
-            catch (Exception ex) when (FatalError.ReportWithoutCrash(ex))
-            {
-                System.Diagnostics.Debug.Assert(false, ex.Message);
+                catch (Exception ex) when (FatalError.ReportWithoutCrash(ex))
+                {
+                    // This is an error condition but we must continue to drain the work queue.  If we
+                    // do not then IAsyncToken values will remain uncomplete and the unit test code
+                    // will deadlock waiting for the values to complete.
+                    Debug.Assert(false, ex.Message);
+                }
             }
         }
 
@@ -111,9 +139,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
             {
                 var processedCount = 0;
                 var startProcessingTime = Environment.TickCount;
-
-                PendingWork pendingWork;
-                while (_workQueue.TryGetWorkItem(startProcessingTime, out pendingWork))
+                while (_workQueue.TryGetWorkItem(startProcessingTime, out var pendingWork))
                 {
                     var done = true;
 
@@ -139,6 +165,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
                         {
                             // eat up cancellation
                         }
+                        catch (Exception ex) when (FatalError.ReportWithoutCrash(ex))
+                        {
+                            // The PendingWork callbacks should never throw.  In the case they do we
+                            // must ensure the IAsyncToken implementation is completed.  If it is not
+                            // then the unit test code will end up in a deadlock doing an 'await' 
+                            // on the token instance.
+                            Debug.Assert(false, ex.Message);
+                            done = true;
+                        }
                     }
 
                     if (done)
@@ -163,26 +198,29 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
 
         private async Task WaitForPendingWorkAsync()
         {
-            await _workQueue.WaitForItemsAsync().ConfigureAwait(false);
             while (true)
             {
-                var current = Environment.TickCount;
-                var nextItem = _workQueue.PeekNextItemTime();
+                await _workQueue.WaitForItemsAsync().ConfigureAwait(false);
+                if (!_workQueue.TryPeekNextItemTime(out var nextItem))
+                {
+                    // Need to go back and wait for an item
+                    continue;
+                }
 
                 // The next item is ready to run
-                if (nextItem - current <= 0)
+                if (nextItem - Environment.TickCount <= 0)
                 {
                     break;
                 }
 
                 // wait some and re-check since there could be another one inserted before the first one while we were waiting.
-                await Task.Delay(MinimumDelayBetweenProcessing).ConfigureAwait(continueOnCapturedContext: false);
+                await Task.Delay(MinimumDelayBetweenProcessing).ConfigureAwait(false);
             }
 
             // Throttle how often we run by waiting MinimumDelayBetweenProcessing since the last time we processed notifications
             if (Environment.TickCount - _lastProcessedTimeInMS < MinimumDelayBetweenProcessing)
             {
-                await Task.Delay(MinimumDelayBetweenProcessing).ConfigureAwait(continueOnCapturedContext: false);
+                await Task.Delay(MinimumDelayBetweenProcessing).ConfigureAwait(false);
             }
         }
 
@@ -223,7 +261,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
         {
             // use pool to share linked list nodes rather than re-create them every time
             private static readonly ObjectPool<LinkedListNode<PendingWork>> s_pool =
-                new ObjectPool<LinkedListNode<PendingWork>>(() => new LinkedListNode<PendingWork>(default(PendingWork)), 100);
+                new ObjectPool<LinkedListNode<PendingWork>>(() => new LinkedListNode<PendingWork>(default), 100);
 
             private readonly object _gate = new object();
             private readonly LinkedList<PendingWork> _list = new LinkedList<PendingWork>();
@@ -311,18 +349,24 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
                 return;
             }
 
-            public int PeekNextItemTime()
+            public bool TryPeekNextItemTime(out int minimumRunPoint)
             {
                 lock (_gate)
                 {
-                    Contract.Requires(_list.Count > 0);
-                    return _list.First.Value.MinimumRunPointInMS;
+                    if (_list.Count == 0)
+                    {
+                        minimumRunPoint = 0;
+                        return false;
+                    }
+
+                    minimumRunPoint = _list.First.Value.MinimumRunPointInMS;
+                    return true;
                 }
             }
 
             public bool TryGetWorkItem(int currentTime, out PendingWork pendingWork)
             {
-                pendingWork = default(PendingWork);
+                pendingWork = default;
 
                 lock (_gate)
                 {
@@ -349,10 +393,35 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
                 _list.RemoveFirst();
 
                 // reset the value and put it back to pool
-                entry.Value = default(PendingWork);
+                entry.Value = default;
                 s_pool.Free(entry);
 
                 return work;
+            }
+
+            internal void ReleaseCancelledItems()
+            {
+                var removedItems = new LinkedList<PendingWork>();
+
+                lock (_gate)
+                {
+                    for (LinkedListNode<PendingWork> current = _list.First, next = current?.Next;
+                        current != null;
+                        current = next, next = current?.Next)
+                    {
+                        if (current.Value.CancellationToken.IsCancellationRequested)
+                        {
+                            _list.Remove(current);
+                            removedItems.AddLast(current);
+                        }
+                    }
+                }
+
+                // Dispose of the async tokens outside the lock
+                foreach (var pendingWork in removedItems)
+                {
+                    pendingWork.AsyncToken?.Dispose();
+                }
             }
         }
     }

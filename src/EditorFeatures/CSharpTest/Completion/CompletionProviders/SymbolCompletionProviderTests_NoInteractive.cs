@@ -1,10 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
 using Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionProviders;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
+using Microsoft.VisualStudio.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -16,14 +23,22 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionSe
         {
         }
 
-        internal override CompletionListProvider CreateCompletionProvider()
+        internal override CompletionProvider CreateCompletionProvider()
         {
             return new SymbolCompletionProvider();
         }
 
-        protected override Task VerifyWorkerAsync(string code, int position, string expectedItemOrNull, string expectedDescriptionOrNull, SourceCodeKind sourceCodeKind, bool usePreviousCharAsTrigger, bool checkForAbsence, bool experimental, int? glyph)
+        private protected override Task VerifyWorkerAsync(
+            string code, int position, string expectedItemOrNull, string expectedDescriptionOrNull,
+            SourceCodeKind sourceCodeKind, bool usePreviousCharAsTrigger, bool checkForAbsence,
+            int? glyph, int? matchPriority, bool? hasSuggestionItem, string displayTextSuffix,
+            string inlineDescription, List<CompletionFilter> matchingFilters)
         {
-            return base.VerifyWorkerAsync(code, position, expectedItemOrNull, expectedDescriptionOrNull, SourceCodeKind.Regular, usePreviousCharAsTrigger, checkForAbsence, experimental, glyph);
+            return base.VerifyWorkerAsync(code, position,
+                expectedItemOrNull, expectedDescriptionOrNull,
+                SourceCodeKind.Regular, usePreviousCharAsTrigger, checkForAbsence,
+                glyph, matchPriority, hasSuggestionItem, displayTextSuffix,
+                inlineDescription, matchingFilters);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
@@ -33,19 +48,20 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionSe
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public async Task IsTextualTriggerCharacterTest()
+        public void IsTextualTriggerCharacterTest()
         {
-            await TestCommonIsTextualTriggerCharacterAsync();
+            TestCommonIsTextualTriggerCharacter();
 
-            await VerifyTextualTriggerCharacterAsync("Abc $$X", shouldTriggerWithTriggerOnLettersEnabled: true, shouldTriggerWithTriggerOnLettersDisabled: false);
-            await VerifyTextualTriggerCharacterAsync("Abc$$ ", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
+            VerifyTextualTriggerCharacter("Abc $$X", shouldTriggerWithTriggerOnLettersEnabled: true, shouldTriggerWithTriggerOnLettersDisabled: false);
+            VerifyTextualTriggerCharacter("Abc$$ ", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
         public async Task SendEnterThroughToEditorTest()
         {
-            await VerifySendEnterThroughToEnterAsync("class C { void M() { System.Console.$$", "Beep", sendThroughEnterEnabled: false, expected: false);
-            await VerifySendEnterThroughToEnterAsync("class C { void M() { System.Console.$$", "Beep", sendThroughEnterEnabled: true, expected: true);
+            await VerifySendEnterThroughToEnterAsync("class C { void M() { System.Console.$$", "Beep", sendThroughEnterOption: EnterKeyRule.Never, expected: false);
+            await VerifySendEnterThroughToEnterAsync("class C { void M() { System.Console.$$", "Beep", sendThroughEnterOption: EnterKeyRule.AfterFullyTypedWord, expected: true);
+            await VerifySendEnterThroughToEnterAsync("class C { void M() { System.Console.$$", "Beep", sendThroughEnterOption: EnterKeyRule.Always, expected: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
@@ -312,6 +328,39 @@ class C { void M() { B.$$ } }
 ";
             await VerifyItemExistsAsync(code, "X");
             await VerifyItemExistsAsync(code, "Y");
+        }
+
+        [WorkItem(209299, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=209299")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task TestDescriptionWhenDocumentLengthChanges()
+        {
+            var code = @"using System;
+
+class C 
+{
+    string Property
+    {
+        get 
+        {
+            Console.$$";//, @"Beep"
+
+            using var workspace = TestWorkspace.CreateCSharp(code);
+            var testDocument = workspace.Documents.Single();
+            var position = testDocument.CursorPosition.Value;
+
+            var document = workspace.CurrentSolution.GetDocument(testDocument.Id);
+            var service = CompletionService.GetService(document);
+            var completions = await service.GetCompletionsAsync(document, position);
+
+            var item = completions.Items.First(i => i.DisplayText == "Beep");
+            var edit = testDocument.GetTextBuffer().CreateEdit();
+            edit.Delete(Span.FromBounds(position - 10, position));
+            edit.Apply();
+
+            var currentDocument = workspace.CurrentSolution.GetDocument(testDocument.Id);
+
+            Assert.NotEqual(currentDocument, document);
+            var description = service.GetDescriptionAsync(document, item);
         }
     }
 }

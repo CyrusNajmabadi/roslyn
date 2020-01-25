@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Notification
@@ -20,9 +23,11 @@ namespace Microsoft.CodeAnalysis.Notification
         private readonly SimpleTaskQueue _eventQueue = new SimpleTaskQueue(TaskScheduler.Default);
         private readonly EventMap _eventMap = new EventMap();
 
-        public GlobalOperationNotificationService()
+        private readonly IAsynchronousOperationListener _listener;
+
+        public GlobalOperationNotificationService(IAsynchronousOperationListener listener)
         {
-            // left  blank
+            _listener = listener;
         }
 
         public override GlobalOperationRegistration Start(string operation)
@@ -52,13 +57,14 @@ namespace Microsoft.CodeAnalysis.Notification
             var ev = _eventMap.GetEventHandlers<EventHandler>(GlobalOperationStartedEventName);
             if (ev.HasHandlers)
             {
+                var asyncToken = _listener.BeginAsyncOperation("GlobalOperationStarted");
                 return _eventQueue.ScheduleTask(() =>
                 {
                     ev.RaiseEvent(handler => handler(this, EventArgs.Empty));
-                });
+                }).CompletesAsyncOperation(asyncToken);
             }
 
-            return SpecializedTasks.EmptyTask;
+            return Task.CompletedTask;
         }
 
         protected virtual Task RaiseGlobalOperationStopped(IReadOnlyList<string> operations, bool cancelled)
@@ -66,15 +72,16 @@ namespace Microsoft.CodeAnalysis.Notification
             var ev = _eventMap.GetEventHandlers<EventHandler<GlobalOperationEventArgs>>(GlobalOperationStoppedEventName);
             if (ev.HasHandlers)
             {
+                var asyncToken = _listener.BeginAsyncOperation("GlobalOperationStopped");
                 var args = new GlobalOperationEventArgs(operations, cancelled);
 
                 return _eventQueue.ScheduleTask(() =>
                 {
                     ev.RaiseEvent(handler => handler(this, args));
-                });
+                }).CompletesAsyncOperation(asyncToken);
             }
 
-            return SpecializedTasks.EmptyTask;
+            return Task.CompletedTask;
         }
 
         public override event EventHandler Started

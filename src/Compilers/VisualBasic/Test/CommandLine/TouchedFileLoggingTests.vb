@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
 Imports System.IO
@@ -169,13 +171,11 @@ End Class
 
                 Dim outWriter = New StringWriter()
                 Dim cmd = New VisualBasicCompilerServer(
-                    DesktopCompilerServerHost.SharedAssemblyReferenceProvider,
+                    CompilerServerHost.SharedAssemblyReferenceProvider,
                     {"/nologo",
                      "/touchedfiles:" + touchedBase,
                      source1},
-                    Nothing,
-                    _baseDirectory,
-                    RuntimeEnvironment.GetRuntimeDirectory(),
+                    New BuildPaths(Nothing, _baseDirectory, RuntimeEnvironment.GetRuntimeDirectory(), Path.GetTempPath()),
                     s_libDirectory,
                     New TestAnalyzerAssemblyLoader())
                 Dim expectedReads As List(Of String) = Nothing

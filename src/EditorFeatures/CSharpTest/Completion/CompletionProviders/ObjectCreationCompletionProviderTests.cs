@@ -1,9 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -15,7 +18,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionPr
         {
         }
 
-        internal override CompletionListProvider CreateCompletionProvider()
+        internal override CompletionProvider CreateCompletionProvider()
         {
             return new ObjectCreationCompletionProvider();
         }
@@ -26,9 +29,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionPr
             var markup = @"
 class MyGeneric<T> { }
 
-void foo()
+void goo()
 {
-   MyGeneric<string> foo = new $$
+   MyGeneric<string> goo = new $$
 }";
 
             await VerifyItemExistsAsync(markup, "MyGeneric<string>");
@@ -42,11 +45,11 @@ class C
 {
     void M()
     {
-        var x = new[] { new { Foo = ""asdf"", Bar = 1 }, new $$
+        var x = new[] { new { Goo = ""asdf"", Bar = 1 }, new $$
     }
 }";
 
-            await VerifyItemIsAbsentAsync(markup, "<anonymous type: string Foo, int Bar>");
+            await VerifyItemIsAbsentAsync(markup, "<anonymous type: string Goo, int Bar>");
         }
 
         [WorkItem(854497, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/854497")]
@@ -121,13 +124,13 @@ class Program
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public async Task IsTextualTriggerCharacterTest()
+        public void IsTextualTriggerCharacterTest()
         {
-            await VerifyTextualTriggerCharacterAsync("Abc$$ ", shouldTriggerWithTriggerOnLettersEnabled: true, shouldTriggerWithTriggerOnLettersDisabled: true);
-            await VerifyTextualTriggerCharacterAsync("Abc $$X", shouldTriggerWithTriggerOnLettersEnabled: true, shouldTriggerWithTriggerOnLettersDisabled: false);
-            await VerifyTextualTriggerCharacterAsync("Abc $$@", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
-            await VerifyTextualTriggerCharacterAsync("Abc$$@", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
-            await VerifyTextualTriggerCharacterAsync("Abc$$.", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
+            VerifyTextualTriggerCharacter("Abc$$ ", shouldTriggerWithTriggerOnLettersEnabled: true, shouldTriggerWithTriggerOnLettersDisabled: true);
+            VerifyTextualTriggerCharacter("Abc $$X", shouldTriggerWithTriggerOnLettersEnabled: true, shouldTriggerWithTriggerOnLettersDisabled: false);
+            VerifyTextualTriggerCharacter("Abc $$@", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
+            VerifyTextualTriggerCharacter("Abc$$@", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
+            VerifyTextualTriggerCharacter("Abc$$.", shouldTriggerWithTriggerOnLettersEnabled: false, shouldTriggerWithTriggerOnLettersDisabled: false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
@@ -143,8 +146,9 @@ class Program
     }
 }";
 
-            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterEnabled: false, expected: false);
-            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterEnabled: true, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterOption: EnterKeyRule.Never, expected: false);
+            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterOption: EnterKeyRule.AfterFullyTypedWord, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterOption: EnterKeyRule.Always, expected: true);
         }
 
         [WorkItem(828196, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/828196")]
@@ -217,14 +221,14 @@ class Program
             var markup = @"
 class Location {}
 enum EAB { A, B }
-class Foo
+class Goo
 {
     Location Loc {get; set;}
     EAB E {get; set;}
 
     void stuff()
     {
-        var x = new Foo
+        var x = new Goo
             {
                 Loc = new $$
                 E = EAB.A
@@ -435,6 +439,247 @@ class C
 }
 ";
             await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [WorkItem(15804, "https://github.com/dotnet/roslyn/issues/15804")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task BeforeAttributeParsedAsImplicitArray()
+        {
+            var markup =
+@"class Program
+{
+    Program p = new $$ 
+
+    [STAThread]
+    static void Main() { }
+}
+";
+            await VerifyItemExistsAsync(markup, "Program");
+        }
+
+        [WorkItem(14084, "https://github.com/dotnet/roslyn/issues/14084")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InMethodCallBeforeAssignment1()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            object o;
+            string s;
+
+            Test(new $$
+            o = s;
+        }
+        static void Test(TimeSpan t, TimeSpan t2) { }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "TimeSpan");
+        }
+
+        [WorkItem(14084, "https://github.com/dotnet/roslyn/issues/14084")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InMethodCallBeforeAssignment2()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            object o;
+            string s;
+
+            Test(new TimeSpan(), new $$
+            o = s;
+        }
+        static void Test(TimeSpan t, TimeSpan t2) { }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "TimeSpan");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument1()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        public static List<Bar> Bar { get; set; }
+
+        static void Main(string[] args)
+        {
+            Bar = new $$
+        }
+    }
+
+    class Bar
+    {
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<Bar>");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument2()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        public static List<Bar> Bar { get; set; } = new $$
+    }
+
+    class Bar
+    {
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<Bar>");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument3()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        public static List<Bar> Bar { get; set; } => new $$
+    }
+
+    class Bar
+    {
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<Bar>");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument4()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static C<A> B { get; set; }
+        static C<B> A { get; set; }
+
+        static void Main(string[] args)
+        {
+            B = new $$
+        }
+    }
+    class A { }
+    class B { }
+    class C<T> { }
+}
+";
+            await VerifyItemExistsAsync(markup, "C<A>");
+        }
+
+        [WorkItem(21674, "https://github.com/dotnet/roslyn/issues/21674")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task PropertyWithSameNameAsOtherType()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static A B { get; set; }
+        static B A { get; set; }
+
+        static void Main()
+        {
+            B = new $$
+        }
+    }
+    class A { }
+    class B { }
+}
+";
+            await VerifyItemExistsAsync(markup, "A");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task NullableTypeCreation()
+        {
+            var markup =
+@"#nullable enable
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        void M()
+        {
+            object? o;
+            o = new $$
+        }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task NullableTypeCreation_AssignedNull()
+        {
+            var markup =
+@"#nullable enable
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        void M()
+        {
+            object? o = null;
+            o = new $$
+        }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task NullableTypeCreation_NestedNull()
+        {
+            var markup =
+@"#nullable enable
+
+using System.Collections.Generic;
+
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        void M()
+        {
+            List<object?> l;
+            l = new $$
+        }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<object?>");
         }
     }
 }

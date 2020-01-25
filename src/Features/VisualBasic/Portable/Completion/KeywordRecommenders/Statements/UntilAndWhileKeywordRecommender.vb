@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -24,11 +26,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Stat
              TypeOf targetToken.Parent Is LoopStatementSyntax AndAlso
              targetToken.Parent.Parent.IsKind(SyntaxKind.SimpleDoLoopBlock, SyntaxKind.DoLoopWhileBlock, SyntaxKind.DoLoopUntilBlock)) Then
                 Return {New RecommendedKeyword("Until", If(targetToken.Kind = SyntaxKind.LoopKeyword,
-                                                                        VBFeaturesResources.LoopUntilKeywordToolTip,
-                                                                        VBFeaturesResources.DoUntilKeywordToolTip)),
+                                                                        VBFeaturesResources.Repeats_a_block_of_statements_until_a_Boolean_condition_becomes_true_Do_Loop_Until_condition,
+                                                                        VBFeaturesResources.Repeats_a_block_of_statements_until_a_Boolean_condition_becomes_true_Do_Until_condition_Loop)),
                         New RecommendedKeyword("While", If(targetToken.Kind = SyntaxKind.LoopKeyword,
-                                                                        VBFeaturesResources.LoopWhileKeywordToolTip,
-                                                                        VBFeaturesResources.DoWhileKeywordToolTip))}
+                                                                        VBFeaturesResources.Repeats_a_block_of_statements_while_a_Boolean_condition_is_true_Do_Loop_While_condition,
+                                                                        VBFeaturesResources.Repeats_a_block_of_statements_while_a_Boolean_condition_is_true_Do_While_condition_Loop))}
             Else
                 Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()
             End If

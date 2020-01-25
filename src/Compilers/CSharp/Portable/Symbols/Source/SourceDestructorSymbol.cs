@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -7,15 +9,16 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
-    internal sealed class SourceDestructorSymbol : SourceMethodSymbol
+    internal sealed class SourceDestructorSymbol : SourceMemberMethodSymbol
     {
-        private TypeSymbol _lazyReturnType;
+        private TypeWithAnnotations _lazyReturnType;
+        private readonly bool _isExpressionBodied;
 
         internal SourceDestructorSymbol(
             SourceMemberContainerTypeSymbol containingType,
             DestructorDeclarationSyntax syntax,
             DiagnosticBag diagnostics) :
-            base(containingType, syntax.GetReference(), syntax.Body?.GetReference(), syntax.Identifier.GetLocation())
+            base(containingType, syntax.GetReference(), syntax.Identifier.GetLocation())
         {
             const MethodKind methodKind = MethodKind.Destructor;
             Location location = this.Locations[0];
@@ -24,8 +27,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             var declarationModifiers = MakeModifiers(syntax.Modifiers, location, diagnostics, out modifierErrors);
             this.MakeFlags(methodKind, declarationModifiers, returnsVoid: true, isExtensionMethod: false);
 
-            var bodyOpt = syntax.Body;
-            if (bodyOpt != null)
+            if (syntax.Identifier.ValueText != containingType.Name)
+            {
+                diagnostics.Add(ErrorCode.ERR_BadDestructorName, syntax.Identifier.GetLocation());
+            }
+
+            bool hasBlockBody = syntax.Body != null;
+            _isExpressionBodied = !hasBlockBody && syntax.ExpressionBody != null;
+
+            if (hasBlockBody || _isExpressionBodied)
             {
                 if (IsExtern)
                 {
@@ -33,7 +43,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
             }
 
-            if (!modifierErrors && bodySyntaxReferenceOpt == null && !IsExtern)
+            if (!modifierErrors && !hasBlockBody && !_isExpressionBodied && !IsExtern)
             {
                 diagnostics.Add(ErrorCode.ERR_ConcreteMissingBody, location, this);
             }
@@ -48,13 +58,16 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 diagnostics.Add(ErrorCode.ERR_OnlyClassesCanContainDestructors, location, this);
             }
+
+            CheckForBlockAndExpressionBody(
+                syntax.Body, syntax.ExpressionBody, syntax, diagnostics);
         }
 
         protected override void MethodChecks(DiagnosticBag diagnostics)
         {
             var syntax = GetSyntax();
-            var bodyBinder = this.DeclaringCompilation.GetBinder(syntaxReferenceOpt);
-            _lazyReturnType = bodyBinder.GetSpecialType(SpecialType.System_Void, diagnostics, syntax);
+            var bodyBinder = this.DeclaringCompilation.GetBinderFactory(syntaxReferenceOpt.SyntaxTree).GetBinder(syntax, syntax, this);
+            _lazyReturnType = TypeWithAnnotations.Create(bodyBinder.GetSpecialType(SpecialType.System_Void, diagnostics, syntax));
         }
 
         internal DestructorDeclarationSyntax GetSyntax()
@@ -83,7 +96,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return ImmutableArray<TypeParameterSymbol>.Empty; }
         }
 
-        public override TypeSymbol ReturnType
+        public override ImmutableArray<TypeParameterConstraintClause> GetTypeParameterConstraintClauses()
+            => ImmutableArray<TypeParameterConstraintClause>.Empty;
+
+        public override RefKind RefKind
+        {
+            get { return RefKind.None; }
+        }
+
+        public override TypeWithAnnotations ReturnTypeWithAnnotations
         {
             get
             {
@@ -112,7 +133,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         internal override bool IsExpressionBodied
         {
-            get { return false; }
+            get
+            {
+                return _isExpressionBodied;
+            }
         }
 
         internal override OneOrMany<SyntaxList<AttributeListSyntax>> GetAttributeDeclarations()

@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -18,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
             ' If we have modifiers which exclude it, then definitely not
             Dim modifiers = context.ModifierCollectionFacts
             If Not modifiers.CouldApplyToOneOf(PossibleDeclarationTypes.Accessor) Then
-                Return Enumerable.Empty(Of RecommendedKeyword)()
+                Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()
             End If
 
             Dim targetToken = context.TargetToken
@@ -62,11 +64,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
             Dim recommendations As New List(Of RecommendedKeyword)()
 
             If getAllowed Then
-                recommendations.Add(New RecommendedKeyword("Get", VBFeaturesResources.GetPropertyKeywordToolTip))
+                recommendations.Add(New RecommendedKeyword("Get", VBFeaturesResources.Declares_a_Get_property_procedure_that_is_used_to_return_the_current_value_of_a_property))
             End If
 
             If setAllowed Then
-                recommendations.Add(New RecommendedKeyword("Set", VBFeaturesResources.SetPropertyKeywordToolTip))
+                recommendations.Add(New RecommendedKeyword("Set", VBFeaturesResources.Declares_a_Set_property_procedure_that_is_used_to_assign_a_value_to_a_property))
             End If
 
             Return recommendations

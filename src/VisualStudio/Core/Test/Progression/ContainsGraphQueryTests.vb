@@ -1,15 +1,19 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.GraphModel
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.Progression
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
+    <[UseExportProvider]>
     Public Class ContainsGraphQueryTests
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
         Public Async Function TypesContainedInCSharpDocument() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -51,7 +55,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
         Public Async Function TypesContainedInCSharpDocumentInsideNamespace() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -96,7 +100,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
         Public Async Function TypesContainedInVisualBasicDocument() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="Visual Basic" CommonReferences="true" FilePath="Z:\Project.vbproj">
                             <Document FilePath="Z:\Project.vb">
@@ -150,7 +154,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
         Public Async Function MembersContainedInCSharpScriptDocument() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.csx" Kind="Script">
@@ -192,7 +196,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
         Public Async Function MembersContainedInClass() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -226,7 +230,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
         <WorkItem(543892, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543892")>
         Public Async Function NestedTypesContainedInClass() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -257,7 +261,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(545018, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545018")>
         Public Async Function EnumMembersInEnum() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -288,7 +292,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(610147, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/610147")>
         Public Async Function NothingInBrokenCode() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -317,7 +321,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(610147, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/610147")>
         Public Async Function NothingInBrokenCode2() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -346,7 +350,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(608653, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/608653")>
         Public Async Function NothingInBrokenCode3() As Task
-            Using testState = Await ProgressionTestState.CreateAsync(
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="Visual Basic" CommonReferences="true" FilePath="Z:\Project.vbproj">
                             <Document FilePath="Z:\Project.vb">

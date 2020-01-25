@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Diagnostics
@@ -11,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend Class Analyzer
 
         ''' <summary>
-        ''' Analyses method body for error conditions such as definite assignments, unreachable code etc...
+        ''' Analyzes method body for error conditions such as definite assignments, unreachable code etc...
         ''' 
         ''' This analysis is done when doing the full compile or when responding to GetCompileDiagnostics.
         ''' This method assume that the trees are already bound and will not do any rewriting/lowering

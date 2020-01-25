@@ -1,15 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Host
-Imports Microsoft.CodeAnalysis.LanguageServices
 Imports Microsoft.CodeAnalysis.Rename
 Imports Microsoft.CodeAnalysis.Rename.ConflictEngine
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.VisualStudio.Text
 Imports Xunit.Sdk
 Imports Microsoft.CodeAnalysis.Options
+Imports Xunit.Abstractions
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
     ''' <summary>
@@ -30,13 +30,6 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
         ''' </summary>
         Private ReadOnly _unassertedRelatedLocations As HashSet(Of RelatedLocation)
 
-        ''' <summary>
-        ''' The list of text replacements that haven't been asserted about yet. Items are removed
-        ''' from here when they are asserted, so the set should be empty once we're done.
-        ''' </summary>
-        ''' <remarks></remarks>
-        Private ReadOnly _unassertedTextChanges As HashSet(Of Location)
-
         Private ReadOnly _renameTo As String
 
         Private _failedAssert As Boolean
@@ -54,8 +47,9 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
             _renameTo = renameTo
         End Sub
 
-        Public Shared Function Create(workspaceXml As XElement, renameTo As String, Optional changedOptionSet As Dictionary(Of OptionKey, Object) = Nothing) As RenameEngineResult
+        Public Shared Function Create(helper As ITestOutputHelper, workspaceXml As XElement, renameTo As String, Optional changedOptionSet As Dictionary(Of OptionKey, Object) = Nothing) As RenameEngineResult
             Dim workspace = TestWorkspace.CreateWorkspace(workspaceXml)
+            workspace.SetTestLogger(AddressOf helper.WriteLine)
 
             Dim engineResult As RenameEngineResult = Nothing
             Try
@@ -68,8 +62,8 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
 
                 Dim document = workspace.CurrentSolution.GetDocument(cursorDocument.Id)
 
-                Dim symbol = RenameLocations.ReferenceProcessing.GetRenamableSymbolAsync(document, cursorPosition, CancellationToken.None).Result
-
+                Dim symbolAndProjectId = RenameLocations.ReferenceProcessing.GetRenamableSymbolAsync(document, cursorPosition, CancellationToken.None).Result
+                Dim symbol = symbolAndProjectId.Symbol
                 If symbol Is Nothing Then
                     AssertEx.Fail("The symbol touching the $$ could not be found.")
                 End If
@@ -82,7 +76,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
                     Next
                 End If
 
-                Dim locations = RenameLocations.FindAsync(symbol, workspace.CurrentSolution, optionSet, CancellationToken.None).Result
+                Dim locations = RenameLocations.FindAsync(symbolAndProjectId, workspace.CurrentSolution, optionSet, CancellationToken.None).Result
                 Dim originalName = symbol.Name.Split("."c).Last()
 
                 Dim result = ConflictResolver.ResolveConflictsAsync(locations, originalName, renameTo, optionSet, hasConflict:=Nothing, cancellationToken:=CancellationToken.None).Result
@@ -177,7 +171,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
         Private Sub AssertLocationReplacedWith(location As Location, replacementText As String, Optional isRenameWithinStringOrComment As Boolean = False)
             Try
                 Dim documentId = ConflictResolution.OldSolution.GetDocumentId(location.SourceTree)
-                Dim newLocation = ConflictResolution.GetResolutionTextSpan(location.SourceSpan, documentId)
+                Dim newLocation = ConflictResolution.GetTestAccessor().GetResolutionTextSpan(location.SourceSpan, documentId)
 
                 Dim newTree = ConflictResolution.NewSolution.GetDocument(documentId).GetSyntaxTreeAsync().Result
                 Dim newToken = newTree.GetRoot.FindToken(newLocation.Start, findInsideTrivia:=True)
@@ -221,15 +215,22 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
         Private Sub Dispose() Implements IDisposable.Dispose
             ' Make sure we're cleaned up. Don't want the test harness crashing...
             GC.SuppressFinalize(Me)
-            _workspace.Dispose()
 
             ' If we failed some other assert, we know we're going to have things left
             ' over. So let's just suppress these so we don't lose the root cause
             If Not _failedAssert Then
                 If _unassertedRelatedLocations.Count > 0 Then
-                    AssertEx.Fail("There were additional related locations than were unasserted.")
+                    AssertEx.Fail(
+                        "There were additional related locations that were unasserted:" + Environment.NewLine _
+                        + String.Join(Environment.NewLine,
+                            From location In _unassertedRelatedLocations
+                            Let document = _workspace.CurrentSolution.GetDocument(location.DocumentId)
+                            Let spanText = document.GetTextSynchronously(CancellationToken.None).ToString(location.ConflictCheckSpan)
+                            Select $"{spanText} @{document.Name}[{location.ConflictCheckSpan.Start}..{location.ConflictCheckSpan.End})"))
                 End If
             End If
+
+            _workspace.Dispose()
         End Sub
 
         Protected Overrides Sub Finalize()

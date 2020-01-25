@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 #if DEBUG
@@ -85,8 +87,10 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
 #endif
 
         protected AbstractAsynchronousTaggerProvider(
+            IThreadingContext threadingContext,
             IAsynchronousOperationListener asyncListener,
             IForegroundNotificationService notificationService)
+            : base(threadingContext)
         {
             _asyncListener = asyncListener;
             _notificationService = notificationService;
@@ -96,34 +100,22 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
 #endif
         }
 
-        private TagSource CreateTagSource(ITextView textViewOpt, ITextBuffer subjectBuffer)
+        internal IAccurateTagger<T> CreateTaggerWorker<T>(ITextView textViewOpt, ITextBuffer subjectBuffer) where T : ITag
         {
-            return new TagSource(textViewOpt, subjectBuffer, this, _asyncListener, _notificationService);
-        }
-
-        internal IAccurateTagger<T> GetOrCreateTagger<T>(ITextView textViewOpt, ITextBuffer subjectBuffer) where T : ITag
-        {
-            if (!subjectBuffer.GetOption(EditorComponentOnOffOptions.Tagger))
+            if (!subjectBuffer.GetFeatureOnOffOption(EditorComponentOnOffOptions.Tagger))
             {
                 return null;
             }
 
             var tagSource = GetOrCreateTagSource(textViewOpt, subjectBuffer);
-            return tagSource == null
-                ? null
-                : new Tagger(_asyncListener, _notificationService, tagSource, subjectBuffer) as IAccurateTagger<T>;
+            return new Tagger(ThreadingContext, _asyncListener, _notificationService, tagSource, subjectBuffer) as IAccurateTagger<T>;
         }
 
         private TagSource GetOrCreateTagSource(ITextView textViewOpt, ITextBuffer subjectBuffer)
         {
-            TagSource tagSource;
-            if (!this.TryRetrieveTagSource(textViewOpt, subjectBuffer, out tagSource))
+            if (!this.TryRetrieveTagSource(textViewOpt, subjectBuffer, out var tagSource))
             {
-                tagSource = this.CreateTagSource(textViewOpt, subjectBuffer);
-                if (tagSource == null)
-                {
-                    return null;
-                }
+                tagSource = new TagSource(textViewOpt, subjectBuffer, this, _asyncListener, _notificationService);
 
                 this.StoreTagSource(textViewOpt, subjectBuffer, tagSource);
                 tagSource.Disposed += (s, e) => this.RemoveTagSource(textViewOpt, subjectBuffer);
@@ -186,7 +178,7 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
         protected virtual IEnumerable<SnapshotSpan> GetSpansToTag(ITextView textViewOpt, ITextBuffer subjectBuffer)
         {
             // For a standard tagger, the spans to tag is the span of the entire snapshot.
-            return new[] { subjectBuffer.CurrentSnapshot.GetFullSpan() };
+            return SpecializedCollections.SingletonEnumerable(subjectBuffer.CurrentSnapshot.GetFullSpan());
         }
 
         /// <summary>
@@ -202,13 +194,31 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
 
         /// <summary>
         /// Produce tags for the given context.
+        /// Keep in sync with <see cref="ProduceTagsSynchronously(TaggerContext{TTag})"/>
         /// </summary>
         protected virtual async Task ProduceTagsAsync(TaggerContext<TTag> context)
         {
             foreach (var spanToTag in context.SpansToTag)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
-                await ProduceTagsAsync(context, spanToTag, GetCaretPosition(context.CaretPosition, spanToTag.SnapshotSpan)).ConfigureAwait(false);
+                await ProduceTagsAsync(
+                    context, spanToTag,
+                    GetCaretPosition(context.CaretPosition, spanToTag.SnapshotSpan)).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Produce tags for the given context.
+        /// Keep in sync with <see cref="ProduceTagsAsync(TaggerContext{TTag})"/>
+        /// </summary>
+        protected void ProduceTagsSynchronously(TaggerContext<TTag> context)
+        {
+            foreach (var spanToTag in context.SpansToTag)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                ProduceTagsSynchronously(
+                    context, spanToTag,
+                    GetCaretPosition(context.CaretPosition, spanToTag.SnapshotSpan));
             }
         }
 
@@ -220,7 +230,22 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
 
         protected virtual Task ProduceTagsAsync(TaggerContext<TTag> context, DocumentSnapshotSpan spanToTag, int? caretPosition)
         {
-            return SpecializedTasks.EmptyTask;
+            return Task.CompletedTask;
+        }
+
+        protected virtual void ProduceTagsSynchronously(TaggerContext<TTag> context, DocumentSnapshotSpan spanToTag, int? caretPosition)
+        {
+            // By default we implement the sync version of this by blocking on the async version.
+            //
+            // The benefit of this is that all taggers can implicitly be used as IAccurateTaggers
+            // without any code changes.
+            // 
+            // However, the drawback is that it means the UI thread might be blocked waiting for 
+            // tasks to be scheduled and run on the threadpool. 
+            //
+            // Taggers that need to be called accurately should override this method to produce
+            // results quickly if possible.
+            ProduceTagsAsync(context, spanToTag, caretPosition).Wait(context.CancellationToken);
         }
 
         private struct DiffResult
@@ -228,8 +253,8 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
             public NormalizedSnapshotSpanCollection Added { get; }
             public NormalizedSnapshotSpanCollection Removed { get; }
 
-            public DiffResult(List<SnapshotSpan> added, List<SnapshotSpan> removed) :
-                this(added?.Count == 0 ? null : (IEnumerable<SnapshotSpan>)added, removed?.Count == 0 ? null : (IEnumerable<SnapshotSpan>)removed)
+            public DiffResult(List<SnapshotSpan> added, List<SnapshotSpan> removed)
+                : this(added?.Count == 0 ? null : (IEnumerable<SnapshotSpan>)added, removed?.Count == 0 ? null : (IEnumerable<SnapshotSpan>)removed)
             {
             }
 

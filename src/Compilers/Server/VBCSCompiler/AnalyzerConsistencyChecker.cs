@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -13,7 +15,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer
 {
     internal static class AnalyzerConsistencyChecker
     {
-        private static readonly ImmutableArray<string> s_defaultIgnorableReferenceNames = ImmutableArray.Create("mscorlib", "System", "Microsoft.CodeAnalysis");
+        private static readonly ImmutableArray<string> s_defaultIgnorableReferenceNames = ImmutableArray.Create("mscorlib", "System", "Microsoft.CodeAnalysis", "netstandard");
 
         public static bool Check(string baseDirectory, IEnumerable<CommandLineAnalyzerReference> analyzerReferences, IAnalyzerAssemblyLoader loader, IEnumerable<string> ignorableReferenceNames = null)
         {
@@ -72,12 +74,14 @@ namespace Microsoft.CodeAnalysis.CompilerServer
                 }
             }
 
-            // Second, load all of the assemblies upfront.
+            // Register analyzers and their dependencies upfront, 
+            // so that assembly references can be resolved:
             foreach (var resolvedPath in resolvedPaths)
             {
                 loader.AddDependencyLocation(resolvedPath);
             }
 
+            // Load all analyzer assemblies:
             var loadedAssemblies = new List<Assembly>();
             foreach (var resolvedPath in resolvedPaths)
             {

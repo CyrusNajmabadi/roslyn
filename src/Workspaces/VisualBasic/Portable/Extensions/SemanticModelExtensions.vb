@@ -1,9 +1,14 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.CompilerServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Diagnostics.Analyzers.NamingStyles
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
@@ -79,17 +84,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
 
         <Extension()>
         Public Function GenerateNameForArgument(semanticModel As SemanticModel,
-                                                argument As ArgumentSyntax) As String
-            Dim result = GenerateNameForArgumentWorker(semanticModel, argument)
+                                                argument As ArgumentSyntax,
+                                                cancellationToken As CancellationToken) As String
+            Dim result = GenerateNameForArgumentWorker(semanticModel, argument, cancellationToken)
             Return If(String.IsNullOrWhiteSpace(result), s_defaultParameterName, result)
         End Function
 
         Private Function GenerateNameForArgumentWorker(semanticModel As SemanticModel,
-                                                       argument As ArgumentSyntax) As String
+                                                       argument As ArgumentSyntax,
+                                                       cancellationToken As CancellationToken) As String
             If argument.IsNamed Then
                 Return DirectCast(argument, SimpleArgumentSyntax).NameColonEquals.Name.Identifier.ValueText
             ElseIf Not argument.IsOmitted Then
-                Return semanticModel.GenerateNameForExpression(argument.GetExpression())
+                Return semanticModel.GenerateNameForExpression(
+                    argument.GetExpression(), capitalize:=False, cancellationToken:=cancellationToken)
             Else
                 Return s_defaultParameterName
             End If
@@ -102,7 +110,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
         <Extension()>
         Public Function GenerateNameForExpression(semanticModel As SemanticModel,
                                                   expression As ExpressionSyntax,
-                                                  Optional capitalize As Boolean = False) As String
+                                                  capitalize As Boolean,
+                                                  cancellationToken As CancellationToken) As String
             ' Try to find a usable name node that we can use to name the
             ' parameter.  If we have an expression that has a name as part of it
             ' then we try to use that part.
@@ -121,70 +130,130 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
                 End If
             End While
 
+            ' there was nothing in the expression to signify a name.  If we're in an argument
+            ' location, then try to choose a name based on the argument name.
+            Dim argumentName = TryGenerateNameForArgumentExpression(
+                semanticModel, expression, cancellationToken)
+            If argumentName IsNot Nothing Then
+                Return If(capitalize, argumentName.ToPascalCase(), argumentName.ToCamelCase())
+            End If
+
             ' Otherwise, figure out the type of the expression and generate a name from that
             ' instead.
-            Dim info = semanticModel.GetTypeInfo(expression)
+            Dim info = semanticModel.GetTypeInfo(expression, cancellationToken)
 
             ' If we can't determine the type, then fallback to some placeholders.
             Dim [type] = info.Type
             Return [type].CreateParameterName(capitalize)
         End Function
 
+        Private Function TryGenerateNameForArgumentExpression(semanticModel As SemanticModel, expression As ExpressionSyntax, cancellationToken As CancellationToken) As String
+            Dim topExpression = expression.WalkUpParentheses()
+            If TypeOf topExpression.Parent Is ArgumentSyntax Then
+                Dim argument = DirectCast(topExpression.Parent, ArgumentSyntax)
+                Dim simpleArgument = TryCast(argument, SimpleArgumentSyntax)
+
+                If simpleArgument?.NameColonEquals IsNot Nothing Then
+                    Return simpleArgument.NameColonEquals.Name.Identifier.ValueText
+                End If
+
+                Dim argumentList = TryCast(argument.Parent, ArgumentListSyntax)
+                If argumentList IsNot Nothing Then
+                    Dim index = argumentList.Arguments.IndexOf(argument)
+                    Dim member = TryCast(semanticModel.GetSymbolInfo(argumentList.Parent, cancellationToken).Symbol, IMethodSymbol)
+                    If member IsNot Nothing AndAlso index < member.Parameters.Length Then
+                        Dim parameter = member.Parameters(index)
+                        If parameter.Type.TypeKind <> TypeKind.TypeParameter Then
+                            Return parameter.Name
+                        End If
+                    End If
+                End If
+            End If
+
+            Return Nothing
+        End Function
+
         <Extension()>
         Public Function GenerateParameterNames(semanticModel As SemanticModel,
                                                arguments As ArgumentListSyntax,
-                                               Optional reservedNames As IEnumerable(Of String) = Nothing) As IList(Of String)
+                                               reservedNames As IEnumerable(Of String),
+                                               cancellationToken As CancellationToken) As ImmutableArray(Of ParameterName)
             If arguments Is Nothing Then
-                Return SpecializedCollections.EmptyList(Of String)()
+                Return ImmutableArray(Of ParameterName).Empty
             End If
 
-            Return GenerateParameterNames(semanticModel, arguments.Arguments.ToList(), reservedNames)
+            Return GenerateParameterNames(
+                semanticModel, arguments.Arguments.ToList(),
+                reservedNames, cancellationToken)
         End Function
 
         <Extension()>
         Public Function GenerateParameterNames(semanticModel As SemanticModel,
                                                arguments As IList(Of ArgumentSyntax),
-                                               Optional reservedNames As IEnumerable(Of String) = Nothing) As IList(Of String)
+                                               reservedNames As IEnumerable(Of String),
+                                               cancellationToken As CancellationToken) As ImmutableArray(Of ParameterName)
             reservedNames = If(reservedNames, SpecializedCollections.EmptyEnumerable(Of String))
             Return semanticModel.GenerateParameterNames(
                 arguments,
-                Function(s) Not reservedNames.Any(Function(n) CaseInsensitiveComparison.Equals(s, n)))
+                Function(s) Not reservedNames.Any(Function(n) CaseInsensitiveComparison.Equals(s, n)),
+                cancellationToken)
         End Function
 
         <Extension()>
         Public Function GenerateParameterNames(semanticModel As SemanticModel,
                                                arguments As IList(Of ArgumentSyntax),
-                                               canUse As Func(Of String, Boolean)) As IList(Of String)
+                                               reservedNames As IEnumerable(Of String),
+                                               parameterNamingRule As NamingRule,
+                                               cancellationToken As CancellationToken) As ImmutableArray(Of ParameterName)
+            reservedNames = If(reservedNames, SpecializedCollections.EmptyEnumerable(Of String))
+            Return semanticModel.GenerateParameterNames(
+                arguments,
+                Function(s) Not reservedNames.Any(Function(n) CaseInsensitiveComparison.Equals(s, n)),
+                parameterNamingRule,
+                cancellationToken)
+        End Function
+
+        <Extension()>
+        Public Function GenerateParameterNames(semanticModel As SemanticModel,
+                                               arguments As IList(Of ArgumentSyntax),
+                                               canUse As Func(Of String, Boolean),
+                                               cancellationToken As CancellationToken) As ImmutableArray(Of ParameterName)
             If arguments.Count = 0 Then
-                Return SpecializedCollections.EmptyList(Of String)()
+                Return ImmutableArray(Of ParameterName).Empty
             End If
 
             ' We can't change the names of named parameters.  Any other names we're flexible on.
             Dim isFixed = Aggregate arg In arguments
                           Select arg = TryCast(arg, SimpleArgumentSyntax)
                           Select arg IsNot Nothing AndAlso arg.NameColonEquals IsNot Nothing
-                          Into ToList()
+                          Into ToImmutableArray()
 
-            Dim parameterNames = arguments.Select(Function(a) semanticModel.GenerateNameForArgument(a)).ToList()
-            Return NameGenerator.EnsureUniqueness(parameterNames, isFixed, canUse)
+            Dim parameterNames = arguments.Select(Function(a) semanticModel.GenerateNameForArgument(a, cancellationToken)).ToImmutableArray()
+            Return NameGenerator.EnsureUniqueness(parameterNames, isFixed, canUse).
+                                 Select(Function(name, index) New ParameterName(name, isFixed(index))).
+                                 ToImmutableArray()
         End Function
 
-        Private Function SetEquals(array1 As ImmutableArray(Of ISymbol), array2 As ImmutableArray(Of ISymbol)) As Boolean
-            ' Do some quick up front checks so we won't have to allocate memory below.
-            If array1.Length = 0 AndAlso array2.Length = 0 Then
-                Return True
+        <Extension()>
+        Public Function GenerateParameterNames(semanticModel As SemanticModel,
+                                               arguments As IList(Of ArgumentSyntax),
+                                               canUse As Func(Of String, Boolean),
+                                               parameterNamingRule As NamingRule,
+                                               cancellationToken As CancellationToken) As ImmutableArray(Of ParameterName)
+            If arguments.Count = 0 Then
+                Return ImmutableArray(Of ParameterName).Empty
             End If
 
-            If array1.Length = 0 OrElse array2.Length = 0 Then
-                Return False
-            End If
+            ' We can't change the names of named parameters.  Any other names we're flexible on.
+            Dim isFixed = Aggregate arg In arguments
+                          Select arg = TryCast(arg, SimpleArgumentSyntax)
+                          Select arg IsNot Nothing AndAlso arg.NameColonEquals IsNot Nothing
+                          Into ToImmutableArray()
 
-            If array1.Length = 1 AndAlso array2.Length = 1 Then
-                Return array1(0).Equals(array2(0))
-            End If
-
-            Dim [set] = New HashSet(Of ISymbol)(array1)
-            Return [set].SetEquals(array2)
+            Dim parameterNames = arguments.Select(Function(a) semanticModel.GenerateNameForArgument(a, cancellationToken)).ToImmutableArray()
+            Return NameGenerator.EnsureUniqueness(parameterNames, isFixed, canUse).
+                                 Select(Function(name, index) New ParameterName(name, isFixed(index), parameterNamingRule)).
+                                 ToImmutableArray()
         End Function
 
         <Extension()>

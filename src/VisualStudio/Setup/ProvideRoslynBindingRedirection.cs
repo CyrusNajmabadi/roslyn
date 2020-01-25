@@ -1,8 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using Microsoft.VisualStudio.Shell;
 using System.IO;
+using Microsoft.VisualStudio.Shell;
 
 namespace Roslyn.VisualStudio.Setup
 {
@@ -19,30 +21,19 @@ namespace Roslyn.VisualStudio.Setup
         {
             // ProvideBindingRedirectionAttribute is sealed, so we can't inherit from it to provide defaults.
             // Instead, we'll do more of an aggregation pattern here.
+            // Note that PublicKeyToken, NewVersion and OldVersionUpperBound are read from the actual assembly version of the dll.
             _redirectionAttribute = new ProvideBindingRedirectionAttribute
             {
                 AssemblyName = Path.GetFileNameWithoutExtension(fileName),
-                PublicKeyToken = "31BF3856AD364E35",
-                OldVersionLowerBound = "0.7.0.0",
-                OldVersionUpperBound = "1.3.0.0",
+                OldVersionLowerBound = "0.0.0.0",
                 CodeBase = fileName,
             };
         }
 
-        public override void Register(RegistrationContext context)
-        {
+        public override void Register(RegistrationContext context) =>
             _redirectionAttribute.Register(context);
 
-            // Opt into overriding the devenv.exe.config binding redirect
-            using (var key = context.CreateKey(@"RuntimeConfiguration\dependentAssembly\bindingRedirection\" + _redirectionAttribute.Guid.ToString("B").ToUpperInvariant()))
-            {
-                key.SetValue("isPkgDefOverrideEnabled", true);
-            }
-        }
-
-        public override void Unregister(RegistrationContext context)
-        {
+        public override void Unregister(RegistrationContext context) =>
             _redirectionAttribute.Unregister(context);
-        }
     }
 }

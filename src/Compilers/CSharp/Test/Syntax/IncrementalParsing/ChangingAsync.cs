@@ -1,10 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.Text;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
@@ -13,7 +12,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
     public class ChangingAsync
     {
         [Fact]
-        public void RemoveAsync()
+        public void AddAsync()
         {
             string oldText =
 @"class Test
@@ -34,7 +33,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         }
 
         [Fact]
-        public void AddAsync()
+        public void RemoveAsync()
         {
             string oldText =
 @"class Test

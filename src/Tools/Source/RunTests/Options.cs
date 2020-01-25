@@ -1,29 +1,102 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
 namespace RunTests
 {
+    internal enum Display
+    {
+        None,
+        All,
+        Succeeded,
+        Failed,
+    }
+
     internal class Options
     {
+        /// <summary>
+        /// Use HTML output files.
+        /// </summary>
         public bool UseHtml { get; set; }
 
+        /// <summary>
+        /// Use the 64 bit test runner.
+        /// </summary>
         public bool Test64 { get; set; }
 
+        /// <summary>
+        /// Target framework used to run the tests, e.g. "net472".
+        /// This is currently only used to name the test result files.
+        /// </summary>
+        public string TargetFrameworkMoniker { get; set; }
+
+        /// <summary>
+        /// Use the open integration test runner.
+        /// </summary>
+        public bool TestVsi { get; set; }
+
+        /// <summary>
+        /// Allow the caching of test results.
+        /// </summary>
         public bool UseCachedResults { get; set; }
 
+        /// <summary>
+        /// Display the results files.
+        /// </summary>
+        public Display Display { get; set; }
+
+        /// <summary>
+        /// Trait string to pass to xunit.
+        /// </summary>
         public string Trait { get; set; }
 
+        /// <summary>
+        /// The no-trait string to pass to xunit.
+        /// </summary>
         public string NoTrait { get; set; }
 
+        /// <summary>
+        /// Set of assemblies to test.
+        /// </summary>
         public List<string> Assemblies { get; set; }
 
-        public List<string> MissingAssemblies { get; set; }
+        /// <summary>
+        /// Time after which the runner should kill the xunit process and exit with a failure.
+        /// </summary>
+        public TimeSpan? Timeout { get; set; }
+
+        /// <summary>
+        /// Whether or not to use proc dump to monitor running processes for failures.
+        /// </summary>
+        public bool UseProcDump { get; set; }
+
+        /// <summary>
+        /// The directory which contains procdump.exe. 
+        /// </summary>
+        public string ProcDumpDirectory { get; set; }
 
         public string XunitPath { get; set; }
+
+        /// <summary>
+        /// Directory to hold all of the xml files created as test results.
+        /// </summary>
+        public string TestResultXmlOutputDirectory { get; set; }
+
+        /// <summary>
+        /// Directory to hold dump files and other log files created while running tests.
+        /// </summary>
+        public string LogFilesOutputDirectory { get; set; }
+
+        /// <summary>
+        /// Directory to hold secondary dump files created while running tests.
+        /// </summary>
+        public string LogFilesSecondaryOutputDirectory { get; set; }
 
         internal static Options Parse(string[] args)
         {
@@ -32,36 +105,113 @@ namespace RunTests
                 return null;
             }
 
-            var opt = new Options { XunitPath = args[0], UseHtml = true, UseCachedResults = true };
-            int index = 1;
+            var comparer = StringComparer.OrdinalIgnoreCase;
+            bool isOption(string argument, string optionName, out string value)
+            {
+                Debug.Assert(!string.IsNullOrEmpty(optionName) && optionName[0] == '-');
+                if (argument.StartsWith(optionName + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    value = argument.Substring(optionName.Length + 1);
+                    return !string.IsNullOrEmpty(value);
+                }
 
-            var comp = StringComparer.OrdinalIgnoreCase;
+                value = null;
+                return false;
+            }
+
+            var opt = new Options { XunitPath = args[0], UseHtml = true, UseCachedResults = true, TestResultXmlOutputDirectory = Path.Combine(Directory.GetCurrentDirectory(), "TestResults") };
+            var index = 1;
+            var allGood = true;
             while (index < args.Length)
             {
                 var current = args[index];
-                if (comp.Equals(current, "-test64"))
+                if (comparer.Equals(current, "-test64"))
                 {
                     opt.Test64 = true;
                     index++;
                 }
-                else if (comp.Equals(current, "-xml"))
+                else if (comparer.Equals(current, "-testVsi"))
+                {
+                    opt.TestVsi = true;
+                    opt.UseCachedResults = false;
+                    index++;
+                }
+                else if (comparer.Equals(current, "-xml"))
                 {
                     opt.UseHtml = false;
                     index++;
                 }
-                else if (comp.Equals(current, "-nocache"))
+                else if (comparer.Equals(current, "-nocache"))
                 {
                     opt.UseCachedResults = false;
                     index++;
                 }
-                else if (current.Length > 7 && current.StartsWith("-trait:", StringComparison.OrdinalIgnoreCase))
+                else if (isOption(current, "-tfm", out string targetFrameworkMoniker))
                 {
-                    opt.Trait = current.Substring(7);
+                    opt.TargetFrameworkMoniker = targetFrameworkMoniker;
                     index++;
                 }
-                else if (current.Length > 9 && current.StartsWith("-notrait:", StringComparison.OrdinalIgnoreCase))
+                else if (isOption(current, "-out", out string value))
                 {
-                    opt.NoTrait = current.Substring(9);
+                    opt.TestResultXmlOutputDirectory = value;
+                    index++;
+                }
+                else if (isOption(current, "-logs", out string logsPath))
+                {
+                    opt.LogFilesOutputDirectory = logsPath;
+                    index++;
+                }
+                else if (isOption(current, "-secondaryLogs", out string secondaryLogsPath))
+                {
+                    opt.LogFilesSecondaryOutputDirectory = secondaryLogsPath;
+                    index++;
+                }
+                else if (isOption(current, "-display", out value))
+                {
+                    if (Enum.TryParse(value, ignoreCase: true, result: out Display display))
+                    {
+                        opt.Display = display;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{value} is not a valid option for display");
+                        allGood = false;
+                    }
+
+                    index++;
+                }
+                else if (isOption(current, "-trait", out value))
+                {
+                    opt.Trait = value;
+                    index++;
+                }
+                else if (isOption(current, "-notrait", out value))
+                {
+                    opt.NoTrait = value;
+                    index++;
+                }
+                else if (isOption(current, "-timeout", out value))
+                {
+                    if (int.TryParse(value, out var minutes))
+                    {
+                        opt.Timeout = TimeSpan.FromMinutes(minutes);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{value} is not a valid minute value for timeout");
+                        allGood = false;
+                    }
+
+                    index++;
+                }
+                else if (isOption(current, "-procdumpPath", out value))
+                {
+                    opt.ProcDumpDirectory = value;
+                    index++;
+                }
+                else if (comparer.Equals(current, "-useprocdump"))
+                {
+                    opt.UseProcDump = false;
                     index++;
                 }
                 else
@@ -88,27 +238,23 @@ namespace RunTests
                 return null;
             }
 
-            opt.Assemblies = new List<string>();
-            opt.MissingAssemblies = new List<string>();
-            var assemblyArgs = args.Skip(index).ToArray();
-
-            if (!assemblyArgs.Any())
+            if (opt.UseProcDump && string.IsNullOrEmpty(opt.ProcDumpDirectory))
             {
-                Console.WriteLine("No test assemblies specified.");
+                Console.WriteLine($"The option 'useprocdump' was specified but 'procdumppath' was not provided");
                 return null;
             }
 
-            foreach (var assemblyPath in assemblyArgs)
+            // If we weren't passed both -logs and -out but just -out, use the same value for -logs too.
+            if (opt.LogFilesOutputDirectory == null)
             {
-                if (File.Exists(assemblyPath))
-                {
-                    opt.Assemblies.Add(assemblyPath);
-                    continue;
-                }
-                opt.MissingAssemblies.Add(assemblyPath);
+                opt.LogFilesOutputDirectory = opt.TestResultXmlOutputDirectory;
             }
 
-            return opt;
+            // If we weren't passed both -secondaryLogs and -logs but just -logs (or -out), use the same value for -secondaryLogs too.
+            opt.LogFilesSecondaryOutputDirectory ??= opt.LogFilesOutputDirectory;
+
+            opt.Assemblies = args.Skip(index).ToList();
+            return allGood ? opt : null;
         }
 
         public static void PrintUsage()

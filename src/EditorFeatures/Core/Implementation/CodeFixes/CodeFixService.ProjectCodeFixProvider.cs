@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +8,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CodeFixes
 {
@@ -32,26 +35,23 @@ namespace Microsoft.CodeAnalysis.CodeFixes
             private ImmutableArray<CodeFixProvider> CreateFixers(string language)
             {
                 // check whether the analyzer reference knows how to return fixers directly.
-                var codeFixProviderFactory = _reference as ICodeFixProviderFactory;
-                if (codeFixProviderFactory != null)
+                if (_reference is ICodeFixProviderFactory codeFixProviderFactory)
                 {
                     return codeFixProviderFactory.GetFixers();
                 }
 
                 // otherwise, see whether we can pick it up from reference itself
-                var analyzerFileReference = _reference as AnalyzerFileReference;
-                if (analyzerFileReference == null)
+                if (!(_reference is AnalyzerFileReference analyzerFileReference))
                 {
                     return ImmutableArray<CodeFixProvider>.Empty;
                 }
 
-                IEnumerable<TypeInfo> typeInfos = null;
-                ImmutableArray<CodeFixProvider>.Builder builder = null;
+                using var builderDisposer = ArrayBuilder<CodeFixProvider>.GetInstance(out var builder);
 
                 try
                 {
-                    Assembly analyzerAssembly = analyzerFileReference.GetAssembly();
-                    typeInfos = analyzerAssembly.DefinedTypes;
+                    var analyzerAssembly = analyzerFileReference.GetAssembly();
+                    var typeInfos = analyzerAssembly.DefinedTypes;
 
                     foreach (var typeInfo in typeInfos)
                     {
@@ -66,7 +66,6 @@ namespace Microsoft.CodeAnalysis.CodeFixes
                                         attribute.Languages.Length == 0 ||
                                         attribute.Languages.Contains(language))
                                     {
-                                        builder = builder ?? ImmutableArray.CreateBuilder<CodeFixProvider>();
                                         builder.Add((CodeFixProvider)Activator.CreateInstance(typeInfo.AsType()));
                                     }
                                 }
@@ -83,7 +82,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
                     // NOTE: We could report "unable to load analyzer" exception here but it should have been already reported by DiagnosticService.
                 }
 
-                return builder != null ? builder.ToImmutable() : ImmutableArray<CodeFixProvider>.Empty;
+                return builder.ToImmutable();
             }
         }
     }

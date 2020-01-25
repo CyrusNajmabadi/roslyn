@@ -1,11 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable enable
+
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -17,7 +21,6 @@ namespace Microsoft.CodeAnalysis.CSharp
     internal partial class Binder
     {
         internal CSharpCompilation Compilation { get; }
-        private readonly Binder _next;
 
         internal readonly BinderFlags Flags;
 
@@ -26,27 +29,29 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// </summary>
         internal Binder(CSharpCompilation compilation)
         {
-            Debug.Assert(compilation != null);
+            RoslynDebug.Assert(compilation != null);
+            RoslynDebug.Assert(this is BuckStopsHereBinder);
             this.Flags = compilation.Options.TopLevelBinderFlags;
             this.Compilation = compilation;
         }
 
-        internal Binder(Binder next)
+        internal Binder(Binder next, Conversions? conversions = null)
         {
-            Debug.Assert(next != null);
-            _next = next;
+            RoslynDebug.Assert(next != null);
+            Next = next;
             this.Flags = next.Flags;
             this.Compilation = next.Compilation;
+            _lazyConversions = conversions;
         }
 
         protected Binder(Binder next, BinderFlags flags)
         {
-            Debug.Assert(next != null);
+            RoslynDebug.Assert(next != null);
             // Mutually exclusive.
-            Debug.Assert(!flags.Includes(BinderFlags.UncheckedRegion | BinderFlags.CheckedRegion));
+            RoslynDebug.Assert(!flags.Includes(BinderFlags.UncheckedRegion | BinderFlags.CheckedRegion));
             // Implied.
-            Debug.Assert(!flags.Includes(BinderFlags.InNestedFinallyBlock) || flags.Includes(BinderFlags.InFinallyBlock | BinderFlags.InCatchBlock));
-            _next = next;
+            RoslynDebug.Assert(!flags.Includes(BinderFlags.InNestedFinallyBlock) || flags.Includes(BinderFlags.InFinallyBlock | BinderFlags.InCatchBlock));
+            Next = next;
             this.Flags = flags;
             this.Compilation = next.Compilation;
         }
@@ -69,18 +74,14 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         // Return the nearest enclosing node being bound as a nameof(...) argument, if any, or null if none.
-        protected virtual SyntaxNode EnclosingNameofArgument => null;
+        protected virtual SyntaxNode? EnclosingNameofArgument => null;
+
+        private bool IsInsideNameof => this.EnclosingNameofArgument != null;
 
         /// <summary>
         /// Get the next binder in which to look up a name, if not found by this binder.
         /// </summary>
-        internal protected Binder Next
-        {
-            get
-            {
-                return _next;
-            }
-        }
+        internal protected Binder? Next { get; }
 
         /// <summary>
         /// <see cref="OverflowChecks.Enabled"/> if we are in an explicitly checked context (within checked block or expression).
@@ -97,7 +98,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 // For Roslyn we decided to change the spec and always flow the context in.
                 // So we don't stop at lambda binder.
 
-                Debug.Assert(!this.Flags.Includes(BinderFlags.UncheckedRegion | BinderFlags.CheckedRegion));
+                RoslynDebug.Assert(!this.Flags.Includes(BinderFlags.UncheckedRegion | BinderFlags.CheckedRegion));
 
                 return this.Flags.Includes(BinderFlags.CheckedRegion)
                     ? OverflowChecks.Enabled
@@ -145,30 +146,122 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         /// <summary>
-        /// Some nodes have special binder's for their contents (like Block's)
+        /// Some nodes have special binders for their contents (like Blocks)
         /// </summary>
-        internal virtual Binder GetBinder(CSharpSyntaxNode node)
+        internal virtual Binder? GetBinder(SyntaxNode node)
         {
+            RoslynDebug.Assert(Next is object);
             return this.Next.GetBinder(node);
         }
 
         /// <summary>
-        /// Get locals declared immediately in scope represented by the node.
+        /// Get locals declared immediately in scope designated by the node.
         /// </summary>
-        internal virtual ImmutableArray<LocalSymbol> GetDeclaredLocalsForScope(CSharpSyntaxNode node)
+        internal virtual ImmutableArray<LocalSymbol> GetDeclaredLocalsForScope(SyntaxNode scopeDesignator)
         {
-            return this.Next.GetDeclaredLocalsForScope(node);
+            RoslynDebug.Assert(Next is object);
+            return this.Next.GetDeclaredLocalsForScope(scopeDesignator);
         }
+
+        /// <summary>
+        /// Get local functions declared immediately in scope designated by the node.
+        /// </summary>
+        internal virtual ImmutableArray<LocalFunctionSymbol> GetDeclaredLocalFunctionsForScope(CSharpSyntaxNode scopeDesignator)
+        {
+            RoslynDebug.Assert(Next is object);
+            return this.Next.GetDeclaredLocalFunctionsForScope(scopeDesignator);
+        }
+
+        /// <summary>
+        /// If this binder owns a scope for locals, return syntax node that is used
+        /// as the scope designator. Otherwise, null.
+        /// </summary>
+        internal virtual SyntaxNode? ScopeDesignator
+        {
+            get
+            {
+                return null;
+            }
+        }
+
+        internal virtual bool IsLocalFunctionsScopeBinder
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        internal virtual bool IsLabelsScopeBinder
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// True if this is the top-level binder for a local function or lambda
+        /// (including implicit lambdas from query expressions).
+        /// </summary>
+        internal virtual bool IsNestedFunctionBinder => false;
 
         /// <summary>
         /// The member containing the binding context.  Note that for the purposes of the compiler,
         /// a lambda expression is considered a "member" of its enclosing method, field, or lambda.
         /// </summary>
-        internal virtual Symbol ContainingMemberOrLambda
+        internal virtual Symbol? ContainingMemberOrLambda
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return Next.ContainingMemberOrLambda;
+            }
+        }
+
+        /// <summary>
+        /// Are we in a context where un-annotated types should be interpreted as non-null?
+        /// </summary>
+        internal bool AreNullableAnnotationsEnabled(SyntaxTree syntaxTree, int position)
+        {
+            Syntax.NullableContextState context = ((CSharpSyntaxTree)syntaxTree).GetNullableContextState(position);
+
+            return context.AnnotationsState switch
+            {
+                Syntax.NullableContextState.State.Enabled => true,
+                Syntax.NullableContextState.State.Disabled => false,
+                Syntax.NullableContextState.State.ExplicitlyRestored => GetGlobalAnnotationState(),
+                Syntax.NullableContextState.State.Unknown => AreNullableAnnotationsGloballyEnabled(),
+                _ => throw ExceptionUtilities.UnexpectedValue(context.AnnotationsState)
+            };
+        }
+
+        internal bool AreNullableAnnotationsEnabled(SyntaxToken token)
+        {
+            RoslynDebug.Assert(token.SyntaxTree is object);
+            return AreNullableAnnotationsEnabled(token.SyntaxTree, token.SpanStart);
+        }
+
+        internal virtual bool AreNullableAnnotationsGloballyEnabled()
+        {
+            RoslynDebug.Assert(Next is object);
+            return Next.AreNullableAnnotationsGloballyEnabled();
+        }
+
+        protected bool GetGlobalAnnotationState()
+        {
+            switch (Compilation.Options.NullableContextOptions)
+            {
+                case NullableContextOptions.Enable:
+                case NullableContextOptions.Annotations:
+                    return true;
+
+                case NullableContextOptions.Disable:
+                case NullableContextOptions.Warnings:
+                    return false;
+
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(Compilation.Options.NullableContextOptions);
             }
         }
 
@@ -183,6 +276,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return Next.IsInMethodBody;
             }
         }
@@ -197,6 +291,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return Next.IsDirectlyInIterator;
             }
         }
@@ -212,6 +307,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return Next.IsIndirectlyInIterator;
             }
         }
@@ -221,10 +317,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// returns the <see cref="GeneratedLabelSymbol"/> that a break statement would branch to.
         /// Returns null otherwise.
         /// </summary>
-        internal virtual GeneratedLabelSymbol BreakLabel
+        internal virtual GeneratedLabelSymbol? BreakLabel
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return Next.BreakLabel;
             }
         }
@@ -234,10 +331,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// returns the <see cref="GeneratedLabelSymbol"/> that a continue statement would branch to.
         /// Returns null otherwise.
         /// </summary>
-        internal virtual GeneratedLabelSymbol ContinueLabel
+        internal virtual GeneratedLabelSymbol? ContinueLabel
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return Next.ContinueLabel;
             }
         }
@@ -245,53 +343,69 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <summary>
         /// Get the element type of this iterator.
         /// </summary>
-        /// <param name="node">Node to report diagnostics, if any, such as "yield statement cannot be used
-        /// inside a lambda expression"</param>
-        /// <param name="diagnostics">Where to place any diagnostics</param>
         /// <returns>Element type of the current iterator, or an error type.</returns>
-        internal virtual TypeSymbol GetIteratorElementType(YieldStatementSyntax node, DiagnosticBag diagnostics)
+        internal virtual TypeWithAnnotations GetIteratorElementType()
         {
-            return Next.GetIteratorElementType(node, diagnostics);
+            RoslynDebug.Assert(Next is object);
+            return Next.GetIteratorElementType();
         }
 
-        public virtual ConsList<LocalSymbol> ImplicitlyTypedLocalsBeingBound
+        /// <summary>
+        /// The imports for all containing namespace declarations (innermost-to-outermost, including global),
+        /// or null if there are none.
+        /// </summary>
+        internal virtual ImportChain? ImportChain
         {
             get
             {
-                return _next.ImplicitlyTypedLocalsBeingBound;
+                RoslynDebug.Assert(Next is object);
+                return Next.ImportChain;
             }
         }
 
         /// <summary>
-        /// The Imports for all containing namespace declarations (innermost-to-outermost, including global).
+        /// Get <see cref="QuickAttributeChecker"/> that can be used to quickly
+        /// check for certain attribute applications in context of this binder.
         /// </summary>
-        internal virtual ImportChain ImportChain
+        internal virtual QuickAttributeChecker QuickAttributeChecker
         {
             get
             {
-                return _next.ImportChain;
+                RoslynDebug.Assert(Next is object);
+                return Next.QuickAttributeChecker;
             }
         }
 
-        internal virtual Imports GetImports(ConsList<Symbol> basesBeingResolved)
+        internal virtual Imports GetImports(ConsList<TypeSymbol> basesBeingResolved)
         {
-            return _next.GetImports(basesBeingResolved);
+            RoslynDebug.Assert(Next is object);
+            return Next.GetImports(basesBeingResolved);
+        }
+
+        protected virtual bool InExecutableBinder
+        {
+            get
+            {
+                RoslynDebug.Assert(Next is object);
+                return Next.InExecutableBinder;
+            }
         }
 
         /// <summary>
         /// The type containing the binding context
         /// </summary>
-        internal NamedTypeSymbol ContainingType
+        internal NamedTypeSymbol? ContainingType
         {
             get
             {
                 var member = this.ContainingMemberOrLambda;
-                Debug.Assert((object)member == null || member.Kind != SymbolKind.ErrorType);
-                return (object)member == null
-                    ? null
-                    : member.Kind == SymbolKind.NamedType
-                        ? (NamedTypeSymbol)member
-                        : member.ContainingType;
+                RoslynDebug.Assert(member is null || member.Kind != SymbolKind.ErrorType);
+                return member switch
+                {
+                    null => null,
+                    NamedTypeSymbol namedType => namedType,
+                    _ => member.ContainingType
+                };
             }
         }
 
@@ -304,7 +418,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             get
             {
                 var containingMember = this.ContainingMemberOrLambda;
-                switch (containingMember.Kind)
+                switch (containingMember?.Kind)
                 {
                     case SymbolKind.Method:
                         // global statements
@@ -324,6 +438,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return this.Next.ConstantFieldsInProgress;
             }
         }
@@ -332,27 +447,30 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return this.Next.FieldsBeingBound;
             }
         }
 
-        internal virtual LocalSymbol LocalInProgress
+        internal virtual LocalSymbol? LocalInProgress
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return this.Next.LocalInProgress;
             }
         }
 
-        internal virtual BoundExpression ConditionalReceiverExpression
+        internal virtual BoundExpression? ConditionalReceiverExpression
         {
             get
             {
+                RoslynDebug.Assert(Next is object);
                 return this.Next.ConditionalReceiverExpression;
             }
         }
 
-        private Conversions _lazyConversions;
+        private Conversions? _lazyConversions;
         internal Conversions Conversions
         {
             get
@@ -366,7 +484,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private OverloadResolution _lazyOverloadResolution;
+        private OverloadResolution? _lazyOverloadResolution;
         internal OverloadResolution OverloadResolution
         {
             get
@@ -380,7 +498,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal static void Error(DiagnosticBag diagnostics, DiagnosticInfo info, CSharpSyntaxNode syntax)
+        internal static void Error(DiagnosticBag diagnostics, DiagnosticInfo info, SyntaxNode syntax)
         {
             diagnostics.Add(new CSDiagnostic(info, syntax.Location));
         }
@@ -412,12 +530,16 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal static void Error(DiagnosticBag diagnostics, ErrorCode code, SyntaxNodeOrToken syntax)
         {
-            Error(diagnostics, code, syntax.GetLocation());
+            var location = syntax.GetLocation();
+            RoslynDebug.Assert(location is object);
+            Error(diagnostics, code, location);
         }
 
         internal static void Error(DiagnosticBag diagnostics, ErrorCode code, SyntaxNodeOrToken syntax, params object[] args)
         {
-            Error(diagnostics, code, syntax.GetLocation(), args);
+            var location = syntax.GetLocation();
+            RoslynDebug.Assert(location is object);
+            Error(diagnostics, code, location, args);
         }
 
         internal static void Error(DiagnosticBag diagnostics, ErrorCode code, Location location)
@@ -451,7 +573,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal void ReportDiagnosticsIfObsolete(DiagnosticBag diagnostics, Conversion conversion, SyntaxNodeOrToken node, bool hasBaseReceiver)
         {
-            if (conversion.IsValid && (object)conversion.Method != null)
+            if (conversion.IsValid && conversion.Method is object)
             {
                 ReportDiagnosticsIfObsolete(diagnostics, conversion.Method, node, hasBaseReceiver);
             }
@@ -462,13 +584,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             Symbol symbol,
             SyntaxNodeOrToken node,
             bool hasBaseReceiver,
-            Symbol containingMember,
-            NamedTypeSymbol containingType,
+            Symbol? containingMember,
+            NamedTypeSymbol? containingType,
             BinderFlags location)
         {
-            Debug.Assert((object)symbol != null);
+            RoslynDebug.Assert(symbol is object);
 
-            Debug.Assert(symbol.Kind == SymbolKind.NamedType ||
+            RoslynDebug.Assert(symbol.Kind == SymbolKind.NamedType ||
                          symbol.Kind == SymbolKind.Field ||
                          symbol.Kind == SymbolKind.Method ||
                          symbol.Kind == SymbolKind.Event ||
@@ -500,7 +622,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 leastOverriddenSymbol.GetAttributes();
             }
 
-            ThreeState reportedOnOverridden = ReportDiagnosticsIfObsoleteInternal(diagnostics, leastOverriddenSymbol, node, containingMember, location);
+            var diagnosticKind = ReportDiagnosticsIfObsoleteInternal(diagnostics, leastOverriddenSymbol, node, containingMember, location);
 
             // CONSIDER: In place of hasBaseReceiver, dev11 also accepts cases where symbol.ContainingType is a "simple type" (e.g. int)
             // or a special by-ref type (e.g. ArgumentHandle).  These cases are probably more important for other checks performed by
@@ -510,114 +632,46 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // If the overridden member was not definitely obsolete and this is a (non-virtual) base member
             // access, then check the overriding symbol as well.
-            if (reportedOnOverridden != ThreeState.True && checkOverridingSymbol)
+            switch (diagnosticKind)
             {
-                Debug.Assert(reportedOnOverridden != ThreeState.Unknown, "We forced attribute binding above.");
-
-                ReportDiagnosticsIfObsoleteInternal(diagnostics, symbol, node, containingMember, location);
+                case ObsoleteDiagnosticKind.NotObsolete:
+                case ObsoleteDiagnosticKind.Lazy:
+                    if (checkOverridingSymbol)
+                    {
+                        RoslynDebug.Assert(diagnosticKind != ObsoleteDiagnosticKind.Lazy, "We forced attribute binding above.");
+                        ReportDiagnosticsIfObsoleteInternal(diagnostics, symbol, node, containingMember, location);
+                    }
+                    break;
             }
         }
 
-        /// <returns>
-        /// True if the symbol is definitely obsolete.
-        /// False if the symbol is definitely not obsolete.
-        /// Unknown if the symbol may be obsolete.
-        /// 
-        /// NOTE: The return value reflects obsolete-ness, not whether or not the diagnostic was reported.
-        /// </returns>
-        private static ThreeState ReportDiagnosticsIfObsoleteInternal(DiagnosticBag diagnostics, Symbol symbol, SyntaxNodeOrToken node, Symbol containingMember, BinderFlags location)
+        internal static ObsoleteDiagnosticKind ReportDiagnosticsIfObsoleteInternal(DiagnosticBag diagnostics, Symbol symbol, SyntaxNodeOrToken node, Symbol? containingMember, BinderFlags location)
         {
-            Debug.Assert(diagnostics != null);
+            RoslynDebug.Assert(diagnostics != null);
 
-            if (symbol.ObsoleteState == ThreeState.False)
+            var kind = ObsoleteAttributeHelpers.GetObsoleteDiagnosticKind(symbol, containingMember);
+
+            DiagnosticInfo? info = null;
+            switch (kind)
             {
-                return ThreeState.False;
+                case ObsoleteDiagnosticKind.Diagnostic:
+                    info = ObsoleteAttributeHelpers.CreateObsoleteDiagnostic(symbol, location);
+                    break;
+                case ObsoleteDiagnosticKind.Lazy:
+                case ObsoleteDiagnosticKind.LazyPotentiallySuppressed:
+                    info = new LazyObsoleteDiagnosticInfo(symbol, containingMember, location);
+                    break;
             }
 
-            var data = symbol.ObsoleteAttributeData;
-            if (data == null)
+            if (info != null)
             {
-                // Obsolete attribute has errors.
-                return ThreeState.False;
+                diagnostics.Add(info, node.GetLocation());
             }
 
-            // If we haven't cracked attributes on the symbol at all or we haven't
-            // cracked attribute arguments enough to be able to report diagnostics for
-            // ObsoleteAttribute, store the symbol so that we can report diagnostics at a 
-            // later stage.
-            if (symbol.ObsoleteState == ThreeState.Unknown)
-            {
-                diagnostics.Add(new LazyObsoleteDiagnosticInfo(symbol, containingMember, location), node.GetLocation());
-                return ThreeState.Unknown;
-            }
-
-            // After this point, always return True.
-
-            var inObsoleteContext = ObsoleteAttributeHelpers.GetObsoleteContextState(containingMember);
-
-            // If we are in a context that is already obsolete, there is no point reporting
-            // more obsolete diagnostics.
-            if (inObsoleteContext == ThreeState.True)
-            {
-                return ThreeState.True;
-            }
-            // If the context is unknown, then store the symbol so that we can do this check at a
-            // later stage
-            else if (inObsoleteContext == ThreeState.Unknown)
-            {
-                diagnostics.Add(new LazyObsoleteDiagnosticInfo(symbol, containingMember, location), node.GetLocation());
-                return ThreeState.True;
-            }
-
-            // We have all the information we need to report diagnostics right now. So do it.
-            var diagInfo = ObsoleteAttributeHelpers.CreateObsoleteDiagnostic(symbol, location);
-            if (diagInfo != null)
-            {
-                diagnostics.Add(diagInfo, node.GetLocation());
-                return ThreeState.True;
-            }
-
-            return ThreeState.True;
+            return kind;
         }
 
-        internal void ResolveOverloads<TMember>(
-            ImmutableArray<TMember> members,
-            ImmutableArray<TypeSymbol> typeArguments,
-            ImmutableArray<ArgumentSyntax> arguments,
-            OverloadResolutionResult<TMember> result,
-            ref HashSet<DiagnosticInfo> useSiteDiagnostics,
-            bool allowRefOmittedArguments)
-            where TMember : Symbol
-        {
-            var methodsBuilder = ArrayBuilder<TMember>.GetInstance(members.Length);
-            methodsBuilder.AddRange(members);
-
-            var typeArgumentsBuilder = ArrayBuilder<TypeSymbol>.GetInstance(typeArguments.Length);
-            typeArgumentsBuilder.AddRange(typeArguments);
-
-            var analyzedArguments = AnalyzedArguments.GetInstance();
-            var unusedDiagnostics = DiagnosticBag.GetInstance();
-            foreach (var argumentSyntax in arguments)
-            {
-                BindArgumentAndName(analyzedArguments, unusedDiagnostics, false, argumentSyntax, allowArglist: false);
-            }
-
-            OverloadResolution.MethodOrPropertyOverloadResolution(
-                methodsBuilder,
-                typeArgumentsBuilder,
-                analyzedArguments,
-                result,
-                isMethodGroupConversion: false,
-                allowRefOmittedArguments: allowRefOmittedArguments,
-                useSiteDiagnostics: ref useSiteDiagnostics);
-
-            methodsBuilder.Free();
-            typeArgumentsBuilder.Free();
-            analyzedArguments.Free();
-            unusedDiagnostics.Free();
-        }
-
-        internal bool IsSymbolAccessibleConditional(
+        internal static bool IsSymbolAccessibleConditional(
             Symbol symbol,
             AssemblySymbol within,
             ref HashSet<DiagnosticInfo> useSiteDiagnostics)
@@ -629,7 +683,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Symbol symbol,
             NamedTypeSymbol within,
             ref HashSet<DiagnosticInfo> useSiteDiagnostics,
-            TypeSymbol throughTypeOpt = null)
+            TypeSymbol? throughTypeOpt = null)
         {
             return this.Flags.Includes(BinderFlags.IgnoreAccessibility) || AccessCheck.IsSymbolAccessible(symbol, within, ref useSiteDiagnostics, throughTypeOpt);
         }
@@ -640,7 +694,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             TypeSymbol throughTypeOpt,
             out bool failedThroughTypeCheck,
             ref HashSet<DiagnosticInfo> useSiteDiagnostics,
-            ConsList<Symbol> basesBeingResolved = null)
+            ConsList<TypeSymbol>? basesBeingResolved = null)
         {
             if (this.Flags.Includes(BinderFlags.IgnoreAccessibility))
             {
@@ -652,70 +706,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         /// <summary>
-        /// Expression lvalue and rvalue requirements.
-        /// </summary>
-        internal enum BindValueKind : byte
-        {
-            /// <summary>
-            /// Expression is the RHS of an assignment operation.
-            /// </summary>
-            /// <remarks>
-            /// The following are rvalues: values, variables, null literals, properties
-            /// and indexers with getters, events. The following are not rvalues:
-            /// namespaces, types, method groups, anonymous functions.
-            /// </remarks>
-            RValue,
-
-            /// <summary>
-            /// Expression is the RHS of an assignment operation
-            /// and may be a method group.
-            /// </summary>
-            RValueOrMethodGroup,
-
-            /// <summary>
-            /// Expression is the LHS of a simple assignment operation.
-            /// </summary>
-            Assignment,
-
-            /// <summary>
-            /// Expression is the operand of an increment
-            /// or decrement operation.
-            /// </summary>
-            IncrementDecrement,
-
-            /// <summary>
-            /// Expression is the LHS of a compound assignment
-            /// operation (such as +=).
-            /// </summary>
-            CompoundAssignment,
-
-            /// <summary>
-            /// Expression is an out parameter.
-            /// </summary>
-            OutParameter,
-
-            /// <summary>
-            /// Expression is the operand of an address-of operation (&amp;).
-            /// </summary>
-            AddressOf,
-
-            /// <summary>
-            /// Expression is the receiver of a fixed buffer field access
-            /// </summary>
-            FixedReceiver,
-        }
-
-        /// <summary>
         /// Report diagnostics that should be reported when using a synthesized attribute. 
         /// </summary>
         internal static void ReportUseSiteDiagnosticForSynthesizedAttribute(
             CSharpCompilation compilation,
             WellKnownMember attributeMember,
             DiagnosticBag diagnostics,
-            Location location = null,
-            CSharpSyntaxNode syntax = null)
+            Location? location = null,
+            CSharpSyntaxNode? syntax = null)
         {
-            Debug.Assert((location != null) ^ (syntax != null));
+            RoslynDebug.Assert((location != null) ^ (syntax != null));
 
             // Dev11 reports use-site diagnostics when an optional attribute is found but is bad for some other reason 
             // (comes from an unified assembly). When the symbol is not found no error is reported. See test VersionUnification_UseSiteDiagnostics_OptionalAttributes.
@@ -729,7 +729,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal Binder[] GetAllBinders()
         {
             var binders = ArrayBuilder<Binder>.GetInstance();
-            for (var binder = this; binder != null; binder = binder.Next)
+            for (Binder? binder = this; binder != null; binder = binder.Next)
             {
                 binders.Add(binder);
             }
@@ -737,5 +737,110 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 #endif
 
+        internal BoundExpression WrapWithVariablesIfAny(CSharpSyntaxNode scopeDesignator, BoundExpression expression)
+        {
+            var locals = this.GetDeclaredLocalsForScope(scopeDesignator);
+            return (locals.IsEmpty)
+                ? expression
+                : new BoundSequence(scopeDesignator, locals, ImmutableArray<BoundExpression>.Empty, expression, getType()) { WasCompilerGenerated = true };
+
+            TypeSymbol getType()
+            {
+                RoslynDebug.Assert(expression.Type is object);
+                return expression.Type;
+            }
+        }
+
+        internal BoundStatement WrapWithVariablesIfAny(CSharpSyntaxNode scopeDesignator, BoundStatement statement)
+        {
+            RoslynDebug.Assert(statement.Kind != BoundKind.StatementList);
+            var locals = this.GetDeclaredLocalsForScope(scopeDesignator);
+            if (locals.IsEmpty)
+            {
+                return statement;
+            }
+
+            return new BoundBlock(statement.Syntax, locals, ImmutableArray.Create(statement))
+            { WasCompilerGenerated = true };
+        }
+
+        /// <summary>
+        /// Should only be used with scopes that could declare local functions.
+        /// </summary>
+        internal BoundStatement WrapWithVariablesAndLocalFunctionsIfAny(CSharpSyntaxNode scopeDesignator, BoundStatement statement)
+        {
+            var locals = this.GetDeclaredLocalsForScope(scopeDesignator);
+            var localFunctions = this.GetDeclaredLocalFunctionsForScope(scopeDesignator);
+            if (locals.IsEmpty && localFunctions.IsEmpty)
+            {
+                return statement;
+            }
+
+            return new BoundBlock(statement.Syntax, locals, localFunctions,
+                                  ImmutableArray.Create(statement))
+            { WasCompilerGenerated = true };
+        }
+
+        internal string Dump()
+        {
+            return TreeDumper.DumpCompact(dumpAncestors());
+
+            TreeDumperNode dumpAncestors()
+            {
+                TreeDumperNode? current = null;
+
+                for (Binder? scope = this; scope != null; scope = scope.Next)
+                {
+                    var (description, snippet, locals) = print(scope);
+                    var sub = new List<TreeDumperNode>();
+                    if (!locals.IsEmpty())
+                    {
+                        sub.Add(new TreeDumperNode("locals", locals, null));
+                    }
+                    var currentContainer = scope.ContainingMemberOrLambda;
+                    if (currentContainer != null && currentContainer != scope.Next?.ContainingMemberOrLambda)
+                    {
+                        sub.Add(new TreeDumperNode("containing symbol", currentContainer.ToDisplayString(), null));
+                    }
+                    if (snippet != null)
+                    {
+                        sub.Add(new TreeDumperNode($"scope", $"{snippet} ({scope.ScopeDesignator?.Kind()})", null));
+                    }
+                    if (current != null)
+                    {
+                        sub.Add(current);
+                    }
+                    current = new TreeDumperNode(description, null, sub);
+                }
+
+                RoslynDebug.Assert(current is object);
+                return current;
+            }
+
+            static (string description, string? snippet, string locals) print(Binder scope)
+            {
+                var locals = string.Join(", ", scope.Locals.SelectAsArray(s => s.Name));
+                string? snippet = null;
+                if (scope.ScopeDesignator != null)
+                {
+                    var lines = scope.ScopeDesignator.ToString().Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
+                    if (lines.Length == 1)
+                    {
+                        snippet = lines[0];
+                    }
+                    else
+                    {
+                        var first = lines[0];
+                        var last = lines[lines.Length - 1].Trim();
+                        var lastSize = Math.Min(last.Length, 12);
+                        snippet = first.Substring(0, Math.Min(first.Length, 12)) + " ... " + last.Substring(last.Length - lastSize, lastSize);
+                    }
+                    snippet = snippet.IsEmpty() ? null : snippet;
+                }
+
+                var description = scope.GetType().Name;
+                return (description, snippet, locals);
+            }
+        }
     }
 }

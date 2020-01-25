@@ -1,9 +1,11 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery;
 using Roslyn.Utilities;
@@ -33,10 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.KeywordRecommenders
             return Task.FromResult(IsValidContext(position, context, cancellationToken));
         }
 
-        protected virtual bool IsValidContext(int position, CSharpSyntaxContext context, CancellationToken cancellationToken)
-        {
-            return false;
-        }
+        protected virtual bool IsValidContext(int position, CSharpSyntaxContext context, CancellationToken cancellationToken) => false;
 
         public async Task<IEnumerable<RecommendedKeyword>> RecommendKeywordsAsync(
             int position,
@@ -47,19 +46,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.KeywordRecommenders
             if (syntaxKind.HasValue)
             {
                 return SpecializedCollections.SingletonEnumerable(
-                    new RecommendedKeyword(SyntaxFacts.GetText(syntaxKind.Value), shouldFormatOnCommit: this.ShouldFormatOnCommit));
+                    new RecommendedKeyword(SyntaxFacts.GetText(syntaxKind.Value),
+                        shouldFormatOnCommit: this.ShouldFormatOnCommit,
+                        matchPriority: ShouldPreselect(context, cancellationToken) ? SymbolMatchPriority.Keyword : MatchPriority.Default));
             }
 
             return null;
         }
+
+        protected virtual bool ShouldPreselect(CSharpSyntaxContext context, CancellationToken cancellationToken) => false;
 
         internal async Task<IEnumerable<RecommendedKeyword>> RecommendKeywordsAsync_Test(int position, CSharpSyntaxContext context)
         {
             var syntaxKind = await this.RecommendKeywordAsync(position, context, CancellationToken.None).ConfigureAwait(false);
             if (syntaxKind.HasValue)
             {
+                var matchPriority = ShouldPreselect(context, CancellationToken.None) ? SymbolMatchPriority.Keyword : MatchPriority.Default;
                 return SpecializedCollections.SingletonEnumerable(
-                    new RecommendedKeyword(SyntaxFacts.GetText(syntaxKind.Value)));
+                    new RecommendedKeyword(SyntaxFacts.GetText(syntaxKind.Value), matchPriority: matchPriority));
             }
 
             return null;

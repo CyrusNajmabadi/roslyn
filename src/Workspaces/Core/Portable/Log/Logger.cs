@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Linq;
@@ -340,12 +342,14 @@ namespace Microsoft.CodeAnalysis.Internal.Log
             return CreateLogBlock(functionId, logMessage, GetNextUniqueBlockId(), token);
         }
 
-        public static Func<FunctionId, bool> GetLoggingChecker(IOptionService optionService)
+#if !CODE_STYLE
+        public static Func<FunctionId, bool> GetLoggingChecker(IGlobalOptionService optionService)
         {
             var functionIds = Enum.GetValues(typeof(FunctionId)).Cast<FunctionId>();
             var functionIdOptions = functionIds.ToDictionary(id => id, id => optionService.GetOption(FunctionIdOptions.GetOption(id)));
 
-            return (functionId) => functionIdOptions[functionId];
+            return functionId => functionIdOptions[functionId];
         }
+#endif
     }
 }

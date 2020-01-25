@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -18,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
                 If modifiers.CouldApplyToOneOf(PossibleDeclarationTypes.IteratorFunction Or PossibleDeclarationTypes.IteratorProperty) AndAlso
                    modifiers.IteratorKeyword.Kind = SyntaxKind.None Then
 
-                    Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Iterator", VBFeaturesResources.IteratorKeywordToolTip))
+                    Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Iterator", VBFeaturesResources.Indicates_an_iterator_method_that_can_use_the_Yield_statement))
                 End If
             End If
 

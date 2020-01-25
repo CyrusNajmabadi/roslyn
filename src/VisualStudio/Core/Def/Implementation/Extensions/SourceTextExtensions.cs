@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
@@ -10,8 +12,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Extensions
     {
         public static VsTextSpan GetVsTextSpanForSpan(this SourceText text, TextSpan textSpan)
         {
-            int startLine, startOffset, endLine, endOffset;
-            text.GetLinesAndOffsets(textSpan, out startLine, out startOffset, out endLine, out endOffset);
+            text.GetLinesAndOffsets(textSpan, out var startLine, out var startOffset, out var endLine, out var endOffset);
 
             return new VsTextSpan()
             {
@@ -35,8 +36,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Extensions
 
         public static VsTextSpan GetVsTextSpanForPosition(this SourceText text, int position, int virtualSpace)
         {
-            int lineNumber, offset;
-            text.GetLineAndOffset(position, out lineNumber, out offset);
+            text.GetLineAndOffset(position, out var lineNumber, out var offset);
 
             offset += virtualSpace;
 

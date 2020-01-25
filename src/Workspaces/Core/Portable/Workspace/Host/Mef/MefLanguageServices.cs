@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -31,15 +33,9 @@ namespace Microsoft.CodeAnalysis.Host.Mef
                     .Where(lz => lz.Metadata.Language == language).ToImmutableArray();
         }
 
-        public override HostWorkspaceServices WorkspaceServices
-        {
-            get { return _workspaceServices; }
-        }
+        public override HostWorkspaceServices WorkspaceServices => _workspaceServices;
 
-        public override string Language
-        {
-            get { return _language; }
-        }
+        public override string Language => _language;
 
         public bool HasServices
         {
@@ -48,14 +44,13 @@ namespace Microsoft.CodeAnalysis.Host.Mef
 
         public override TLanguageService GetService<TLanguageService>()
         {
-            Lazy<ILanguageService, LanguageServiceMetadata> service;
-            if (TryGetService(typeof(TLanguageService), out service))
+            if (TryGetService(typeof(TLanguageService), out var service))
             {
                 return (TLanguageService)service.Value;
             }
             else
             {
-                return default(TLanguageService);
+                return default;
             }
         }
 
@@ -76,10 +71,9 @@ namespace Microsoft.CodeAnalysis.Host.Mef
 
         private Lazy<ILanguageService, LanguageServiceMetadata> PickLanguageService(IEnumerable<Lazy<ILanguageService, LanguageServiceMetadata>> services)
         {
-            Lazy<ILanguageService, LanguageServiceMetadata> service;
 
             // workspace specific kind is best
-            if (TryGetServiceByLayer(_workspaceServices.Workspace.Kind, services, out service))
+            if (TryGetServiceByLayer(_workspaceServices.Workspace.Kind, services, out var service))
             {
                 return service;
             }
@@ -109,7 +103,7 @@ namespace Microsoft.CodeAnalysis.Host.Mef
             }
 
             // no service
-            return default(Lazy<ILanguageService, LanguageServiceMetadata>);
+            return default;
         }
 
         private static bool TryGetServiceByLayer(string layer, IEnumerable<Lazy<ILanguageService, LanguageServiceMetadata>> services, out Lazy<ILanguageService, LanguageServiceMetadata> service)

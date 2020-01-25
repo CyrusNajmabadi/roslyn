@@ -1,14 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.RuntimeMembers;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
@@ -145,21 +140,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         public MethodSymbol System_Object__GetHashCode
         {
             get { return this.Compilation.GetSpecialTypeMember(SpecialMember.System_Object__GetHashCode) as MethodSymbol; }
-        }
-
-        public MethodSymbol System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor
-        {
-            get { return this.Compilation.GetWellKnownTypeMember(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor) as MethodSymbol; }
-        }
-
-        public MethodSymbol System_Diagnostics_DebuggerHiddenAttribute__ctor
-        {
-            get { return this.Compilation.GetWellKnownTypeMember(WellKnownMember.System_Diagnostics_DebuggerHiddenAttribute__ctor) as MethodSymbol; }
-        }
-
-        public MethodSymbol System_Diagnostics_DebuggerBrowsableAttribute__ctor
-        {
-            get { return this.Compilation.GetWellKnownTypeMember(WellKnownMember.System_Diagnostics_DebuggerBrowsableAttribute__ctor) as MethodSymbol; }
         }
 
         public MethodSymbol System_Collections_Generic_EqualityComparer_T__Equals

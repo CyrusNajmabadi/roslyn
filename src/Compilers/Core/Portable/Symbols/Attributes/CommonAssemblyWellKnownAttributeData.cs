@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Reflection;
@@ -86,6 +88,11 @@ namespace Microsoft.CodeAnalysis
 
         #region AssemblyVersionAttributeSetting
         private Version _assemblyVersionAttributeSetting;
+
+        /// <summary>
+        /// Raw assembly version as specified in the AssemblyVersionAttribute, or Nothing if none specified.
+        /// If the string passed to AssemblyVersionAttribute contains * the version build and/or revision numbers are set to <see cref="ushort.MaxValue"/>.
+        /// </summary>
         public Version AssemblyVersionAttributeSetting
         {
             get
@@ -265,8 +272,8 @@ namespace Microsoft.CodeAnalysis
         #endregion
 
         #region AssemblyFlagsAttributeSetting
-        private AssemblyNameFlags _assemblyFlagsAttributeSetting;
-        public AssemblyNameFlags AssemblyFlagsAttributeSetting
+        private AssemblyFlags _assemblyFlagsAttributeSetting;
+        public AssemblyFlags AssemblyFlagsAttributeSetting
         {
             get
             {
@@ -313,6 +320,24 @@ namespace Microsoft.CodeAnalysis
             {
                 VerifySealed(expected: false);
                 _hasCompilationRelaxationsAttribute = value;
+                SetDataStored();
+            }
+        }
+        #endregion
+
+        #region ReferenceAssemblyAttribute
+        private bool _hasReferenceAssemblyAttribute;
+        public bool HasReferenceAssemblyAttribute
+        {
+            get
+            {
+                VerifySealed(expected: true);
+                return _hasReferenceAssemblyAttribute;
+            }
+            set
+            {
+                VerifySealed(expected: false);
+                _hasReferenceAssemblyAttribute = value;
                 SetDataStored();
             }
         }

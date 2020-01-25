@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,8 +46,8 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateParameterizedMember
                 {
                     case MethodGenerationKind.Member:
                         var text = generateProperty ?
-                            isAbstract ? FeaturesResources.GenerateAbstractProperty : FeaturesResources.GeneratePropertyIn :
-                            isAbstract ? FeaturesResources.GenerateAbstractMethod : FeaturesResources.GenerateMethodIn;
+                            isAbstract ? FeaturesResources.Generate_abstract_property_1_0 : FeaturesResources.Generate_property_1_0 :
+                            isAbstract ? FeaturesResources.Generate_abstract_method_1_0 : FeaturesResources.Generate_method_1_0;
 
                         var name = state.IdentifierToken.ValueText;
                         var destination = state.TypeToGenerateIn.Name;
@@ -55,7 +57,7 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateParameterizedMember
                     case MethodGenerationKind.ExplicitConversion:
                         return _service.GetExplicitConversionDisplayText(_state);
                     default:
-                        throw ExceptionUtilities.Unreachable;
+                        throw ExceptionUtilities.UnexpectedValue(state.MethodGenerationKind);
                 }
             }
 
@@ -72,7 +74,9 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateParameterizedMember
                         _document.Project.Solution,
                         _state.TypeToGenerateIn,
                         property,
-                        new CodeGenerationOptions(afterThisLocation: _state.IdentifierToken.GetLocation()),
+                        new CodeGenerationOptions(
+                            afterThisLocation: _state.IdentifierToken.GetLocation(),
+                            generateMethodBodies: _state.TypeToGenerateIn.TypeKind != TypeKind.Interface),
                         cancellationToken)
                         .ConfigureAwait(false);
 
@@ -86,7 +90,10 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateParameterizedMember
                         _document.Project.Solution,
                         _state.TypeToGenerateIn,
                         method,
-                        new CodeGenerationOptions(afterThisLocation: _state.Location),
+                        new CodeGenerationOptions(
+                            afterThisLocation: _state.Location,
+                            generateMethodBodies: _state.TypeToGenerateIn.TypeKind != TypeKind.Interface,
+                            parseOptions: syntaxTree.Options),
                         cancellationToken)
                         .ConfigureAwait(false);
 
@@ -102,13 +109,7 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateParameterizedMember
                 }
             }
 
-            public override string EquivalenceKey
-            {
-                get
-                {
-                    return _equivalenceKey;
-                }
-            }
+            public override string EquivalenceKey => _equivalenceKey;
         }
     }
 }

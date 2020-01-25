@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -6,18 +8,21 @@ using System.ComponentModel.Composition;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Editor.GoToDefinition;
 using Microsoft.CodeAnalysis.Editor.Host;
-using Microsoft.CodeAnalysis.Editor.Implementation.GoToDefinition;
 using Microsoft.CodeAnalysis.Editor.Undo;
 using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.GeneratedCodeRecognition;
-using Microsoft.VisualStudio.LanguageServices.Implementation;
+using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.VisualStudio.Composition;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Interop;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser.Lists;
 using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
 using Microsoft.VisualStudio.Shell;
 using Roslyn.Utilities;
+using IAsyncServiceProvider = Microsoft.VisualStudio.Shell.IAsyncServiceProvider;
 
 namespace Microsoft.VisualStudio.LanguageServices
 {
@@ -25,114 +30,36 @@ namespace Microsoft.VisualStudio.LanguageServices
     [Export(typeof(VisualStudioWorkspaceImpl))]
     internal class RoslynVisualStudioWorkspace : VisualStudioWorkspaceImpl
     {
-        private readonly IEnumerable<Lazy<INavigableItemsPresenter>> _navigableItemsPresenters;
-        private readonly IEnumerable<Lazy<IReferencedSymbolsPresenter>> _referencedSymbolsPresenters;
+        /// <remarks>
+        /// Must be lazily constructed since the <see cref="IStreamingFindUsagesPresenter"/> implementation imports a
+        /// backreference to <see cref="VisualStudioWorkspace"/>.
+        /// </remarks>
+        private readonly Lazy<IStreamingFindUsagesPresenter> _streamingPresenter;
 
         [ImportingConstructor]
-        private RoslynVisualStudioWorkspace(
-            SVsServiceProvider serviceProvider,
-            SaveEventsService saveEventsService,
-            [ImportMany] IEnumerable<Lazy<INavigableItemsPresenter>> navigableItemsPresenters,
-            [ImportMany] IEnumerable<Lazy<IReferencedSymbolsPresenter>> referencedSymbolsPresenters)
-            : base(
-                serviceProvider,
-                backgroundWork: WorkspaceBackgroundWork.ParseAndCompile)
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public RoslynVisualStudioWorkspace(
+            ExportProvider exportProvider,
+            Lazy<IStreamingFindUsagesPresenter> streamingPresenter,
+            [Import(typeof(SVsServiceProvider))] IAsyncServiceProvider asyncServiceProvider)
+            : base(exportProvider, asyncServiceProvider)
         {
-            PrimaryWorkspace.Register(this);
-
-            InitializeStandardVisualStudioWorkspace(serviceProvider, saveEventsService);
-
-            _navigableItemsPresenters = navigableItemsPresenters;
-            _referencedSymbolsPresenters = referencedSymbolsPresenters;
-        }
-
-        public override EnvDTE.FileCodeModel GetFileCodeModel(DocumentId documentId)
-        {
-            if (documentId == null)
-            {
-                throw new ArgumentNullException(nameof(documentId));
-            }
-
-            var project = ProjectTracker.GetProject(documentId.ProjectId);
-            if (project == null)
-            {
-                throw new ArgumentException(ServicesVSResources.DocumentIdNotFromWorkspace, nameof(documentId));
-            }
-
-            var document = project.GetDocumentOrAdditionalDocument(documentId);
-            if (document == null)
-            {
-                throw new ArgumentException(ServicesVSResources.DocumentIdNotFromWorkspace, nameof(documentId));
-            }
-
-            var provider = project as IProjectCodeModelProvider;
-            if (provider != null)
-            {
-                var projectCodeModel = provider.ProjectCodeModel;
-                if (projectCodeModel.CanCreateFileCodeModelThroughProject(document.FilePath))
-                {
-                    return (EnvDTE.FileCodeModel)projectCodeModel.CreateFileCodeModelThroughProject(document.FilePath);
-                }
-            }
-
-            return null;
-        }
-
-        internal override bool RenameFileCodeModelInstance(DocumentId documentId, string newFilePath)
-        {
-            if (documentId == null)
-            {
-                return false;
-            }
-
-            var project = ProjectTracker.GetProject(documentId.ProjectId);
-            if (project == null)
-            {
-                return false;
-            }
-
-            var document = project.GetDocumentOrAdditionalDocument(documentId);
-            if (document == null)
-            {
-                return false;
-            }
-
-            var codeModelProvider = project as IProjectCodeModelProvider;
-            if (codeModelProvider == null)
-            {
-                return false;
-            }
-
-            var codeModelCache = codeModelProvider.ProjectCodeModel.GetCodeModelCache();
-            if (codeModelCache == null)
-            {
-                return false;
-            }
-
-            codeModelCache.OnSourceFileRenaming(document.FilePath, newFilePath);
-
-            return true;
+            _streamingPresenter = streamingPresenter;
         }
 
         internal override IInvisibleEditor OpenInvisibleEditor(DocumentId documentId)
         {
-            var hostDocument = GetHostDocument(documentId);
-            return OpenInvisibleEditor(hostDocument);
-        }
-
-        internal override IInvisibleEditor OpenInvisibleEditor(IVisualStudioHostDocument hostDocument)
-        {
-            // We need to ensure the file is saved, only if a global undo transaction is open
             var globalUndoService = this.Services.GetService<IGlobalUndoService>();
-            var needsSave = globalUndoService.IsGlobalTransactionOpen(this);
-
             var needsUndoDisabled = false;
+
+            // Do not save the file if is open and there is not a global undo transaction.
+            var needsSave = globalUndoService.IsGlobalTransactionOpen(this) || !this.IsDocumentOpen(documentId);
             if (needsSave)
             {
-                if (this.CurrentSolution.ContainsDocument(hostDocument.Id))
+                if (this.CurrentSolution.ContainsDocument(documentId))
                 {
                     // Disable undo on generated documents
-                    needsUndoDisabled = this.Services.GetService<IGeneratedCodeRecognitionService>().IsGeneratedCode(this.CurrentSolution.GetDocument(hostDocument.Id));
+                    needsUndoDisabled = this.CurrentSolution.GetDocument(documentId).IsGeneratedCode(CancellationToken.None);
                 }
                 else
                 {
@@ -141,7 +68,9 @@ namespace Microsoft.VisualStudio.LanguageServices
                 }
             }
 
-            return new InvisibleEditor(ServiceProvider, hostDocument.FilePath, needsSave, needsUndoDisabled);
+            var document = this.CurrentSolution.GetTextDocument(documentId);
+
+            return new InvisibleEditor(ServiceProvider.GlobalProvider, document.FilePath, GetHierarchy(documentId.ProjectId), needsSave, needsUndoDisabled);
         }
 
         private static bool TryResolveSymbol(ISymbol symbol, Project project, CancellationToken cancellationToken, out ISymbol resolvedSymbol, out Project resolvedProject)
@@ -156,7 +85,7 @@ namespace Microsoft.VisualStudio.LanguageServices
             }
 
             var originalCompilation = project.GetCompilationAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-            var symbolId = SymbolKey.Create(symbol, originalCompilation, cancellationToken);
+            var symbolId = SymbolKey.Create(symbol, cancellationToken);
             var currentCompilation = currentProject.GetCompilationAsync(cancellationToken).WaitAndGetResult(cancellationToken);
             var symbolInfo = symbolId.Resolve(currentCompilation, cancellationToken: cancellationToken);
 
@@ -171,59 +100,31 @@ namespace Microsoft.VisualStudio.LanguageServices
             return true;
         }
 
-        public override bool TryGoToDefinition(ISymbol symbol, Project project, CancellationToken cancellationToken)
+        public override bool TryGoToDefinition(
+            ISymbol symbol, Project project, CancellationToken cancellationToken)
         {
-            if (!_navigableItemsPresenters.Any())
-            {
-                return false;
-            }
-
-            ISymbol searchSymbol;
-            Project searchProject;
-            if (!TryResolveSymbol(symbol, project, cancellationToken, out searchSymbol, out searchProject))
+            if (!TryResolveSymbol(symbol, project, cancellationToken,
+                    out var searchSymbol, out var searchProject))
             {
                 return false;
             }
 
             return GoToDefinitionHelpers.TryGoToDefinition(
-                searchSymbol, searchProject, _navigableItemsPresenters, cancellationToken: cancellationToken);
+                searchSymbol, searchProject,
+                _streamingPresenter.Value, cancellationToken);
         }
 
         public override bool TryFindAllReferences(ISymbol symbol, Project project, CancellationToken cancellationToken)
         {
-            if (!_referencedSymbolsPresenters.Any())
-            {
-                return false;
-            }
-
-            ISymbol searchSymbol;
-            Project searchProject;
-            if (!TryResolveSymbol(symbol, project, cancellationToken, out searchSymbol, out searchProject))
-            {
-                return false;
-            }
-
-            var searchSolution = searchProject.Solution;
-
-            var result = SymbolFinder
-                .FindReferencesAsync(searchSymbol, searchSolution, cancellationToken)
-                .WaitAndGetResult(cancellationToken).ToList();
-
-            if (result != null)
-            {
-                DisplayReferencedSymbols(searchSolution, result);
-                return true;
-            }
-
+            // Legacy API.  Previously used by ObjectBrowser to support 'FindRefs' off of an
+            // object browser item.  Now ObjectBrowser goes through the streaming-FindRefs system.
             return false;
         }
 
         public override void DisplayReferencedSymbols(Solution solution, IEnumerable<ReferencedSymbol> referencedSymbols)
         {
-            foreach (var presenter in _referencedSymbolsPresenters)
-            {
-                presenter.Value.DisplayResult(solution, referencedSymbols);
-            }
+            // Legacy API.  Previously used by ObjectBrowser to support 'FindRefs' off of an
+            // object browser item.  Now ObjectBrowser goes through the streaming-FindRefs system.
         }
 
         internal override object GetBrowseObject(SymbolListItem symbolListItem)

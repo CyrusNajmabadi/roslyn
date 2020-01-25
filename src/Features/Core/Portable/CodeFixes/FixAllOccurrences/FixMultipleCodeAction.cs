@@ -1,28 +1,26 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis.CodeFixes
 {
-    /// <summary>
-    /// Fix multiple occurrences code action.
-    /// </summary>
-    internal partial class FixMultipleCodeAction : FixAllCodeAction
+    internal partial class FixMultipleCodeAction : FixSomeCodeAction
     {
         private readonly string _title;
         private readonly string _computingFixWaitDialogMessage;
 
-        internal FixMultipleCodeAction(FixMultipleContext fixMultipleContext, FixAllProvider fixAllProvider, string title, string computingFixWaitDialogMessage, bool showPreviewChangesDialog)
-            : base(fixMultipleContext, fixAllProvider, showPreviewChangesDialog)
+        internal FixMultipleCodeAction(
+            FixAllState fixAllState,
+            string title,
+            string computingFixWaitDialogMessage)
+            : base(fixAllState, showPreviewChangesDialog: false)
         {
             _title = title;
             _computingFixWaitDialogMessage = computingFixWaitDialogMessage;
         }
 
-        public Diagnostic GetTriggerDiagnostic()
-        {
-            return ((FixMultipleContext)FixAllContext).GetTriggerDiagnostic();
-        }
-
         public override string Title => _title;
+
         internal override string Message => _computingFixWaitDialogMessage;
     }
 }

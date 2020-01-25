@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -177,9 +179,7 @@ namespace Roslyn.Utilities
                     return path;
 
                 default:
-                    // EDMAURER this is not using ExceptionUtilities.UnexpectedValue() because this file
-                    // is shared via linking with other code that doesn't have the ExceptionUtilities.
-                    throw new InvalidOperationException(string.Format("Unexpected PathKind {0}.", kind));
+                    throw ExceptionUtilities.UnexpectedValue(kind);
             }
         }
 
@@ -242,7 +242,7 @@ namespace Roslyn.Utilities
 
             try
             {
-                return PortableShim.Path.GetFullPath(path);
+                return Path.GetFullPath(path);
             }
             catch (ArgumentException e)
             {
@@ -260,7 +260,7 @@ namespace Roslyn.Utilities
 
         internal static string NormalizeDirectoryPath(string path)
         {
-            return NormalizeAbsolutePath(path).TrimEnd(PortableShim.Path.DirectorySeparatorChar, PortableShim.Path.AltDirectorySeparatorChar);
+            return NormalizeAbsolutePath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }
 
         internal static string TryNormalizeAbsolutePath(string path)
@@ -269,7 +269,7 @@ namespace Roslyn.Utilities
 
             try
             {
-                return PortableShim.Path.GetFullPath(path);
+                return Path.GetFullPath(path);
             }
             catch
             {
@@ -283,7 +283,7 @@ namespace Roslyn.Utilities
 
             try
             {
-                return PortableShim.FileStream.Create(fullPath, PortableShim.FileMode.Open, PortableShim.FileAccess.Read, PortableShim.FileShare.Read);
+                return new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             }
             catch (IOException)
             {
@@ -299,7 +299,7 @@ namespace Roslyn.Utilities
         {
             Debug.Assert(PathUtilities.IsAbsolute(fullPath));
 
-            return RethrowExceptionsAsIOException(() => PortableShim.FileStream.Create(fullPath, PortableShim.FileMode.Open, PortableShim.FileAccess.Read, PortableShim.FileShare.Read, 4096, PortableShim.FileOptions.Asynchronous));
+            return RethrowExceptionsAsIOException(() => new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous));
         }
 
         internal static T RethrowExceptionsAsIOException<T>(Func<T> operation)
@@ -366,11 +366,34 @@ namespace Roslyn.Utilities
             Debug.Assert(PathUtilities.IsAbsolute(fullPath));
             try
             {
-                return PortableShim.File.GetLastWriteTimeUtc(fullPath);
+                return File.GetLastWriteTimeUtc(fullPath);
+            }
+            catch (IOException)
+            {
+                throw;
             }
             catch (Exception e)
             {
-                throw new IOException(e.Message);
+                throw new IOException(e.Message, e);
+            }
+        }
+
+        /// <exception cref="IOException"/>
+        internal static long GetFileLength(string fullPath)
+        {
+            Debug.Assert(PathUtilities.IsAbsolute(fullPath));
+            try
+            {
+                var info = new FileInfo(fullPath);
+                return info.Length;
+            }
+            catch (IOException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                throw new IOException(e.Message, e);
             }
         }
 
@@ -378,19 +401,18 @@ namespace Roslyn.Utilities
         {
             try
             {
-                return PortableShim.File.OpenRead(path);
+                return File.OpenRead(path);
             }
             catch (ArgumentException)
             {
                 throw;
             }
-            catch (IOException e)
+            catch (DirectoryNotFoundException e)
             {
-                if (e.GetType().Name == "DirectoryNotFoundException")
-                {
-                    throw new FileNotFoundException(e.Message, path, e);
-                }
-
+                throw new FileNotFoundException(e.Message, path, e);
+            }
+            catch (IOException)
+            {
                 throw;
             }
             catch (Exception e)

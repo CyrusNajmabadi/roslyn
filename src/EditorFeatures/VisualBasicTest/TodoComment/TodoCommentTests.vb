@@ -1,21 +1,20 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Threading
-Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.TodoComments
 Imports Microsoft.CodeAnalysis.Editor.Implementation.TodoComments
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Options
+Imports Microsoft.CodeAnalysis.Host
 Imports Microsoft.CodeAnalysis.SolutionCrawler
+Imports Microsoft.CodeAnalysis.Test.Utilities.RemoteHost
 Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.EditorUtilities
-Imports Moq
-Imports Microsoft.CodeAnalysis.Editor.Shared.Options
-Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TodoComment
+    <[UseExportProvider]>
     Public Class TodoCommentTests
         <Fact>
         Public Async Function TestSingleLineTodoComment_Colon() As Task
@@ -174,18 +173,27 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TodoComment
         End Function
 
         Private Shared Async Function TestAsync(codeWithMarker As XElement) As Tasks.Task
+            Await TestAsync(codeWithMarker, remote:=False)
+            Await TestAsync(codeWithMarker, remote:=True)
+        End Function
+
+        Private Shared Async Function TestAsync(codeWithMarker As XElement, remote As Boolean) As Task
             Dim code As String = Nothing
-            Dim list As IList(Of TextSpan) = Nothing
+            Dim list As ImmutableArray(Of TextSpan) = Nothing
             MarkupTestFile.GetSpans(codeWithMarker.NormalizedValue, code, list)
 
-            Using workspace = Await TestWorkspace.CreateVisualBasicAsync(code)
+            Using workspace = TestWorkspace.CreateVisualBasic(code, openDocuments:=False)
+                workspace.TryApplyChanges(workspace.CurrentSolution.WithOptions(workspace.Options _
+                    .WithChangedOption(RemoteHostOptions.RemoteHostTest, remote)))
+
                 Dim commentTokens = New TodoCommentTokens()
-                Dim provider = New TodoCommentIncrementalAnalyzerProvider(commentTokens)
+                Dim provider = New TodoCommentIncrementalAnalyzerProvider(commentTokens, Array.Empty(Of Lazy(Of IEventListener, EventListenerMetadata))())
                 Dim worker = DirectCast(provider.CreateIncrementalAnalyzer(workspace), TodoCommentIncrementalAnalyzer)
 
                 Dim document = workspace.Documents.First()
+                Dim initialTextSnapshot = document.GetTextBuffer().CurrentSnapshot
                 Dim documentId = document.Id
-                Await worker.AnalyzeSyntaxAsync(workspace.CurrentSolution.GetDocument(documentId), CancellationToken.None)
+                Await worker.AnalyzeSyntaxAsync(workspace.CurrentSolution.GetDocument(documentId), InvocationReasons.Empty, CancellationToken.None)
 
                 Dim todoLists = worker.GetItems_TestingOnly(documentId)
 
@@ -195,7 +203,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TodoComment
                     Dim todo = todoLists(i)
                     Dim span = list(i)
 
-                    Dim line = document.InitialTextSnapshot.GetLineFromPosition(span.Start)
+                    Dim line = initialTextSnapshot.GetLineFromPosition(span.Start)
 
                     Assert.Equal(todo.MappedLine, line.LineNumber)
                     Assert.Equal(todo.MappedColumn, span.Start - line.Start.Position)

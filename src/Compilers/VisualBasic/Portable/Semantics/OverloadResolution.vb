@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Linq
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -798,7 +801,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             arguments As ImmutableArray(Of BoundExpression),
             argumentNames As ImmutableArray(Of String),
             binder As Binder,
-            callerInfoOpt As VisualBasicSyntaxNode,
+            callerInfoOpt As SyntaxNode,
             <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo),
             Optional includeEliminatedCandidates As Boolean = False,
             Optional forceExpandedForm As Boolean = False
@@ -861,7 +864,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             arguments As ImmutableArray(Of BoundExpression),
             argumentNames As ImmutableArray(Of String),
             binder As Binder,
-            callerInfoOpt As VisualBasicSyntaxNode,
+            callerInfoOpt As SyntaxNode,
             <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo),
             Optional includeEliminatedCandidates As Boolean = False,
             Optional delegateReturnType As TypeSymbol = Nothing,
@@ -992,7 +995,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             arguments As ImmutableArray(Of BoundExpression),
             argumentNames As ImmutableArray(Of String),
             binder As Binder,
-            callerInfoOpt As VisualBasicSyntaxNode,
+            callerInfoOpt As SyntaxNode,
             <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo),
             Optional includeEliminatedCandidates As Boolean = False
         ) As OverloadResolutionResult
@@ -1059,7 +1062,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             lateBindingIsAllowed As Boolean,
             binder As Binder,
             <[In](), Out()> ByRef asyncLambdaSubToFunctionMismatch As HashSet(Of BoundExpression),
-            callerInfoOpt As VisualBasicSyntaxNode,
+            callerInfoOpt As SyntaxNode,
             forceExpandedForm As Boolean,
             <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)
         ) As OverloadResolutionResult
@@ -1791,7 +1794,7 @@ ResolutionComplete:
                             Dim leftParamType As TypeSymbol = GetParameterTypeFromVirtualSignature(left, left.ArgsToParamsOpt(k))
                             Dim rightParamType As TypeSymbol = GetParameterTypeFromVirtualSignature(right, right.ArgsToParamsOpt(k))
 
-                            If Not leftParamType.IsSameTypeIgnoringCustomModifiers(rightParamType) Then
+                            If Not leftParamType.IsSameTypeIgnoringAll(rightParamType) Then
                                 ' Signatures are different, shadowing rules do not apply
                                 equallyApplicable = False
                                 Exit For
@@ -1813,7 +1816,7 @@ ResolutionComplete:
                                 Dim leftType As TypeSymbol = left.Candidate.Parameters(k).Type
                                 Dim rightType As TypeSymbol = right.Candidate.Parameters(k).Type
 
-                                If Not leftType.IsSameTypeIgnoringCustomModifiers(rightType) Then
+                                If Not leftType.IsSameTypeIgnoringAll(rightType) Then
                                     signatureMatch = False
                                     Exit For
                                 End If
@@ -2144,11 +2147,11 @@ BreakTheTie:
                 Dim argType As TypeSymbol = If(argument.Kind <> BoundKind.ArrayLiteral, argument.Type, DirectCast(argument, BoundArrayLiteral).InferredType)
 
                 If argType IsNot Nothing Then
-                    If left.IsSameTypeIgnoringCustomModifiers(argType) Then
+                    If left.IsSameTypeIgnoringAll(argType) Then
                         Return ApplicabilityComparisonResult.LeftIsMoreApplicable
                     End If
 
-                    If right.IsSameTypeIgnoringCustomModifiers(argType) Then
+                    If right.IsSameTypeIgnoringAll(argType) Then
                         Return ApplicabilityComparisonResult.RightIsMoreApplicable
                     End If
                 End If
@@ -2271,7 +2274,7 @@ BreakTheTie:
         ) As Boolean
             Debug.Assert(argument Is Nothing OrElse argument.Kind <> BoundKind.OmittedArgument)
 
-            If Not leftParamType.IsSameTypeIgnoringCustomModifiers(rightParamType) Then
+            If Not leftParamType.IsSameTypeIgnoringAll(rightParamType) Then
                 If argument IsNot Nothing Then
                     Dim leftIsExpressionTree As Boolean, rightIsExpressionTree As Boolean
                     Dim leftDelegateType As NamedTypeSymbol = leftParamType.DelegateOrExpressionDelegate(binder, leftIsExpressionTree)
@@ -2586,7 +2589,7 @@ Done:
             binder As Binder,
             <Out()> ByRef applicableNarrowingCandidates As Integer,
             <[In](), Out()> ByRef asyncLambdaSubToFunctionMismatch As HashSet(Of BoundExpression),
-            callerInfoOpt As VisualBasicSyntaxNode,
+            callerInfoOpt As SyntaxNode,
             forceExpandedForm As Boolean,
             <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)
         ) As Integer
@@ -2656,7 +2659,7 @@ Done:
         ''' 
         ''' Assumptions: 
         '''    1) This function is never called for a candidate that should be rejected due to parameter count.
-        '''    2) Omitted arguments [ Call Foo(a, , b) ] are represented by OmittedArgumentExpression node in the arguments array.
+        '''    2) Omitted arguments [ Call Goo(a, , b) ] are represented by OmittedArgumentExpression node in the arguments array.
         '''    3) Omitted argument never has name.
         '''    4) argumentNames contains Nothing for all positional arguments.
         ''' 
@@ -2702,10 +2705,29 @@ Done:
             Dim paramIndex = 0
 
             For i As Integer = 0 To arguments.Length - 1 Step 1
-
                 If Not argumentNames.IsDefault AndAlso argumentNames(i) IsNot Nothing Then
-                    ' First named argument
-                    Exit For
+                    ' A named argument
+
+                    If Not candidate.Candidate.TryGetNamedParamIndex(argumentNames(i), paramIndex) Then
+                        ' ERRID_NamedParamNotFound1
+                        ' ERRID_NamedParamNotFound2
+                        candidate.State = CandidateAnalysisResultState.ArgumentMismatch
+                        GoTo Bailout
+                    End If
+
+                    If paramIndex <> i Then
+                        ' all remaining arguments must be named
+                        Exit For
+                    End If
+
+                    If paramIndex = candidate.Candidate.ParameterCount - 1 AndAlso
+                    candidate.Candidate.Parameters(paramIndex).IsParamArray Then
+                        ' ERRID_NamedParamArrayArgument
+                        candidate.State = CandidateAnalysisResultState.ArgumentMismatch
+                        GoTo Bailout
+                    End If
+
+                    Debug.Assert(parameterToArgumentMap(paramIndex) = -1)
                 End If
 
                 positionalArguments += 1
@@ -2723,6 +2745,7 @@ Done:
                         candidate.State = CandidateAnalysisResultState.ArgumentMismatch
                         GoTo Bailout
                     Else
+                        parameterToArgumentMap(paramIndex) = i
                         paramIndex += 1
                     End If
 
@@ -2735,8 +2758,6 @@ Done:
                     paramIndex += 1
                 End If
             Next
-
-            Debug.Assert(argumentNames.IsDefault OrElse positionalArguments < arguments.Length)
 
             '§11.8.2 Applicable Methods
             '2.	Next, match each named argument to a parameter with the given name. 
@@ -2811,7 +2832,6 @@ Bailout:
 
         End Sub
 
-
         ''' <summary>
         ''' Match candidate's parameters to arguments §11.8.2 Applicable Methods.
         ''' 
@@ -2820,7 +2840,7 @@ Bailout:
         ''' 
         ''' Assumptions: 
         '''    1) This function is never called for a candidate that should be rejected due to parameter count.
-        '''    2) Omitted arguments [ Call Foo(a, , b) ] are represented by OmittedArgumentExpression node in the arguments array.
+        '''    2) Omitted arguments [ Call Goo(a, , b) ] are represented by OmittedArgumentExpression node in the arguments array.
         '''    3) Omitted argument never has name.
         '''    4) argumentNames contains Nothing for all positional arguments.
         ''' 
@@ -2836,7 +2856,7 @@ Bailout:
             argumentNames As ImmutableArray(Of String),
             binder As Binder,
             <[In](), Out()> ByRef asyncLambdaSubToFunctionMismatch As HashSet(Of BoundExpression),
-            callerInfoOpt As VisualBasicSyntaxNode,
+            callerInfoOpt As SyntaxNode,
             forceExpandedForm As Boolean,
             <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)
         )
@@ -3046,14 +3066,14 @@ Bailout:
                 Dim argument = If(argIndex = -1, Nothing, arguments(argIndex))
                 Dim defaultArgument As BoundExpression = Nothing
 
-                If argument Is Nothing Then
+                If argument Is Nothing OrElse argument.Kind = BoundKind.OmittedArgument Then
 
                     ' Deal with Optional arguments.
                     If diagnostics Is Nothing Then
                         diagnostics = DiagnosticBag.GetInstance()
                     End If
 
-                    defaultArgument = binder.GetArgumentForParameterDefaultValue(param, methodOrPropertyGroup.Syntax, diagnostics, callerInfoOpt)
+                    defaultArgument = binder.GetArgumentForParameterDefaultValue(param, If(argument, methodOrPropertyGroup).Syntax, diagnostics, callerInfoOpt)
 
                     If defaultArgument IsNot Nothing AndAlso Not diagnostics.HasAnyErrors Then
                         Debug.Assert(Not diagnostics.AsEnumerable().Any())
@@ -3188,7 +3208,7 @@ Bailout:
 
             If argument.IsSupportingAssignment() Then
 
-                If argument.IsLValue() AndAlso targetType.IsSameTypeIgnoringCustomModifiers(argument.Type) Then
+                If argument.IsLValue() AndAlso targetType.IsSameTypeIgnoringAll(argument.Type) Then
                     outConversionKind = Conversions.Identity
                     outConversionBackKind = Conversions.Identity
 
@@ -3393,8 +3413,8 @@ Bailout:
             Return True
         End Function
 
-        Private Shared Function IsWithinAppliedAttributeName(syntax As VisualBasicSyntaxNode) As Boolean
-            Dim parent As VisualBasicSyntaxNode = syntax.Parent
+        Private Shared Function IsWithinAppliedAttributeName(syntax As SyntaxNode) As Boolean
+            Dim parent As SyntaxNode = syntax.Parent
 
             While parent IsNot Nothing
                 If parent.Kind = SyntaxKind.Attribute Then
@@ -3977,7 +3997,7 @@ Bailout:
                         Dim existingType As TypeSymbol = GetParameterTypeFromVirtualSignature(existingCandidate, existingParamIndex)
                         Dim newType As TypeSymbol = GetParameterTypeFromVirtualSignature(newCandidate, newParamIndex)
 
-                        If Not existingType.IsSameTypeIgnoringCustomModifiers(newType) Then
+                        If Not existingType.IsSameTypeIgnoringAll(newType) Then
                             ' Signatures are different, shadowing rules do not apply
                             GoTo ContinueCandidatesLoop
                         End If
@@ -4021,7 +4041,7 @@ Bailout:
                         Dim existingType As TypeSymbol = existingCandidate.Candidate.Parameters(j).Type
                         Dim newType As TypeSymbol = newCandidate.Candidate.Parameters(j).Type
 
-                        If Not existingType.IsSameTypeIgnoringCustomModifiers(newType) Then
+                        If Not existingType.IsSameTypeIgnoringAll(newType) Then
                             signatureMatch = False
                             Exit For
                         End If
@@ -4350,7 +4370,7 @@ ContinueCandidatesLoop:
 
             ' See Semantics::CompareGenericityIsSignatureMismatch in native compiler.
 
-            If leftParamType.IsSameTypeIgnoringCustomModifiers(rightParamType) Then
+            If leftParamType.IsSameTypeIgnoringAll(rightParamType) Then
                 Return False
             Else
                 ' Note: Undocumented rule.
@@ -4531,8 +4551,8 @@ ContinueCandidatesLoop:
 
             ' Both are generics
             If leftType.Kind = SymbolKind.NamedType AndAlso rightType.Kind = SymbolKind.NamedType Then
-                Dim leftNamedType = DirectCast(leftType, NamedTypeSymbol)
-                Dim rightNamedType = DirectCast(rightType, NamedTypeSymbol)
+                Dim leftNamedType = DirectCast(leftType.GetTupleUnderlyingTypeOrSelf(), NamedTypeSymbol)
+                Dim rightNamedType = DirectCast(rightType.GetTupleUnderlyingTypeOrSelf(), NamedTypeSymbol)
 
                 ' If their arities are equal
                 If leftNamedType.Arity = rightNamedType.Arity Then
@@ -4592,7 +4612,7 @@ ContinueCandidatesLoop:
 
             '!!! Note, the spec does not mention this explicitly, but this rule applies only if receiver type
             '!!! is the same for both methods.
-            If Not left.Candidate.ReceiverType.IsSameTypeIgnoringCustomModifiers(right.Candidate.ReceiverType) Then
+            If Not left.Candidate.ReceiverType.IsSameTypeIgnoringAll(right.Candidate.ReceiverType) Then
                 Return False
             End If
 
@@ -4728,7 +4748,7 @@ ContinueCandidatesLoop:
             Dim leftType = left.Candidate.ReceiverType
             Dim rightType = right.Candidate.ReceiverType
 
-            If Not leftType.IsSameTypeIgnoringCustomModifiers(rightType) Then
+            If Not leftType.IsSameTypeIgnoringAll(rightType) Then
                 If DoesReceiverMatchInstance(leftType, rightType, useSiteDiagnostics) Then
                     leftWins = True
                     Return True

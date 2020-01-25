@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -19,8 +21,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
     ''' the syntax replacement doesn't break the semantics of any parenting nodes of the original expression.
     ''' </summary>
     Friend Class SpeculationAnalyzer
-        Inherits AbstractSpeculationAnalyzer(Of SyntaxNode, ExpressionSyntax, TypeSyntax, AttributeSyntax,
-                                             ArgumentSyntax, ForEachStatementSyntax, ThrowStatementSyntax, SemanticModel, Conversion)
+        Inherits AbstractSpeculationAnalyzer(Of
+            ExpressionSyntax,
+            TypeSyntax,
+            AttributeSyntax,
+            ArgumentSyntax,
+            ForEachStatementSyntax,
+            ThrowStatementSyntax,
+            Conversion)
 
         ''' <summary>
         ''' Creates a semantic analyzer for speculative syntax replacement.
@@ -139,6 +147,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
 
                 Case SyntaxKind.RangeArgument
                     semanticModel.TryGetSpeculativeSemanticModel(position, DirectCast(nodeToSpeculate, RangeArgumentSyntax), speculativeModel)
+                    Return speculativeModel
+
+                Case SyntaxKind.AsNewClause
+                    ' Speculation is not supported for AsNewClauseSyntax nodes.
+                    ' Generate an EqualsValueSyntax node with the inner NewExpression of the AsNewClauseSyntax node for speculation.
+
+                    Dim asNewClauseNode = DirectCast(nodeToSpeculate, AsNewClauseSyntax)
+                    nodeToSpeculate = SyntaxFactory.EqualsValue(asNewClauseNode.NewExpression)
+                    nodeToSpeculate = asNewClauseNode.CopyAnnotationsTo(nodeToSpeculate)
+                    semanticModel.TryGetSpeculativeSemanticModel(position, DirectCast(nodeToSpeculate, EqualsValueSyntax), speculativeModel)
                     Return speculativeModel
             End Select
 
@@ -363,6 +381,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
                 Dim newInterpolation = DirectCast(currentReplacedNode, InterpolationSyntax)
 
                 Return ReplacementBreaksInterpolation(orignalInterpolation, newInterpolation)
+            ElseIf currentOriginalNode.Kind = SyntaxKind.WithStatement Then
+                Dim originalWithStatement = DirectCast(currentOriginalNode, WithStatementSyntax)
+                Dim newWithStatement = DirectCast(currentReplacedNode, WithStatementSyntax)
+
+                Return ReplacementBreaksWithStatement(originalWithStatement, newWithStatement)
             Else
                 Dim originalCollectionRangeVariableSyntax = TryCast(currentOriginalNode, CollectionRangeVariableSyntax)
                 If originalCollectionRangeVariableSyntax IsNot Nothing Then
@@ -404,6 +427,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
             Return False
         End Function
 
+        Private Function ReplacementBreaksWithStatement(originalWithStatement As WithStatementSyntax, replacedWithStatement As WithStatementSyntax) As Boolean
+            Dim originalTypeInfo = Me.OriginalSemanticModel.GetTypeInfo(originalWithStatement.Expression)
+            Dim replacedTypeInfo = Me.SpeculativeSemanticModel.GetTypeInfo(replacedWithStatement.Expression)
+            Return Not originalTypeInfo.Equals(replacedTypeInfo)
+        End Function
+
         Private Function ReplacementBreaksCollectionInitializerAddMethod(originalInitializer As ExpressionSyntax, newInitializer As ExpressionSyntax) As Boolean
             Dim originalSymbol = Me.OriginalSemanticModel.GetCollectionInitializerSymbolInfo(originalInitializer, CancellationToken).Symbol
             Dim newSymbol = Me.SpeculativeSemanticModel.GetCollectionInitializerSymbolInfo(newInitializer, CancellationToken).Symbol
@@ -415,18 +444,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
             Return forEachControlVariable IsNot Nothing AndAlso forEachControlVariable.IsTypeInferred(Me.OriginalSemanticModel)
         End Function
 
-        Protected Overrides Function IsInvocableExpression(node As SyntaxNode) As Boolean
-            If node.IsKind(SyntaxKind.InvocationExpression) OrElse node.IsKind(SyntaxKind.ObjectCreationExpression) Then
-                Return True
-            End If
-
-            If node.IsKind(SyntaxKind.SimpleMemberAccessExpression) AndAlso
-                Not node.IsParentKind(SyntaxKind.InvocationExpression) AndAlso
-                Not node.IsParentKind(SyntaxKind.ObjectCreationExpression) Then
-                Return True
-            End If
-
-            Return False
+        Protected Overrides Function ExpressionMightReferenceMember(node As SyntaxNode) As Boolean
+            Return node.IsKind(SyntaxKind.InvocationExpression) OrElse
+                node.IsKind(SyntaxKind.SimpleMemberAccessExpression)
         End Function
 
         Protected Overrides Function GetReceiver(expression As ExpressionSyntax) As ExpressionSyntax
@@ -461,7 +481,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
             Dim argumentList = GetArgumentList(expression)
             Return If(argumentList IsNot Nothing,
                       argumentList.Arguments.AsImmutable(),
-                      ImmutableArray.Create(Of ArgumentSyntax)())
+                      Nothing)
         End Function
 
         Private Shared Function GetArgumentList(expression As ExpressionSyntax) As ArgumentListSyntax
@@ -528,7 +548,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Utilities
 
             Me.GetConversions(originalExpression, originalTargetType, newExpression, newTargetType, originalConversion, newConversion)
 
-            If originalConversion Is Nothing OrElse newConversion Is Nothing
+            If originalConversion Is Nothing OrElse newConversion Is Nothing Then
                 Return False
             End If
 

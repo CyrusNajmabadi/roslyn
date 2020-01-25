@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -130,7 +132,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Sub
 
             ''' <summary>
-            ''' Analyses method body that belongs to the given method symbol.
+            ''' Analyzes method body that belongs to the given method symbol.
             ''' </summary>
             Public Shared Function AnalyzeMethodBody(node As BoundBlock, method As MethodSymbol, symbolsCapturedWithoutCtor As ISet(Of Symbol), diagnostics As DiagnosticBag) As Analysis
                 Debug.Assert(Not node.HasErrors)
@@ -356,7 +358,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Function
 
             Public Overrides Function VisitConversion(conversion As BoundConversion) As BoundNode
-                Debug.Assert(conversion.RelaxationLambdaOpt Is Nothing AndAlso conversion.RelaxationReceiverPlaceholderOpt Is Nothing)
+                Debug.Assert(conversion.ExtendedInfoOpt Is Nothing)
 
                 Dim lambda As BoundLambda = TryCast(conversion.Operand, BoundLambda)
                 If lambda Is Nothing Then
@@ -398,7 +400,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ''' It checks for cases where variable is declared outside of the lambda in which it is being accessed
             ''' If capture is detected, than it marks variable as capturED and all lambdas involved as capturING
             ''' </summary>
-            Private Sub ReferenceVariable(variableOrParameter As Symbol, syntax As VisualBasicSyntaxNode)
+            Private Sub ReferenceVariable(variableOrParameter As Symbol, syntax As SyntaxNode)
                 ' No need to do anything if we are not in a lambda.
                 If _currentParent.MethodKind <> MethodKind.LambdaMethod Then
                     Return
@@ -437,7 +439,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End Sub
 
-            Private Sub VerifyCaptured(variableOrParameter As Symbol, syntax As VisualBasicSyntaxNode)
+            Private Sub VerifyCaptured(variableOrParameter As Symbol, syntax As SyntaxNode)
                 Dim type As TypeSymbol
                 Dim asParameter = TryCast(variableOrParameter, ParameterSymbol)
 
@@ -510,7 +512,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ''' For performance reason we may not want to check if synthetic gotos are legal.
             ''' Those are the majority, but should not be ever illegal (how user would fix them?).
             ''' </summary>
-            Private Function MayParticipateInIllegalBranch(node As BoundGotoStatement) As Boolean
+            Private Shared Function MayParticipateInIllegalBranch(node As BoundGotoStatement) As Boolean
 #If DEBUG Then
                 ' Validate synthetic branches in debug too.
                 Return True

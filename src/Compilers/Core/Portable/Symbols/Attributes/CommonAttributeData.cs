@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -7,7 +9,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -32,7 +34,6 @@ namespace Microsoft.CodeAnalysis
 
         public SyntaxReference ApplicationSyntaxReference { get { return CommonApplicationSyntaxReference; } }
         protected abstract SyntaxReference CommonApplicationSyntaxReference { get; }
-
 
         /// <summary>
         /// Constructor arguments on the attribute.
@@ -66,8 +67,13 @@ namespace Microsoft.CodeAnalysis
         /// and the attribute description has a signature with parameter count equal to the given attributeArgCount.
         /// NOTE: We don't allow early decoded attributes to have optional parameters.
         /// </summary>
-        internal static bool IsTargetEarlyAttribute(INamedTypeSymbol attributeType, int attributeArgCount, AttributeDescription description)
+        internal static bool IsTargetEarlyAttribute(INamedTypeSymbolInternal attributeType, int attributeArgCount, AttributeDescription description)
         {
+            if (attributeType.ContainingSymbol?.Kind != SymbolKind.Namespace)
+            {
+                return false;
+            }
+
             int attributeCtorsCount = description.Signatures.Length;
             for (int i = 0; i < attributeCtorsCount; i++)
             {
@@ -76,13 +82,55 @@ namespace Microsoft.CodeAnalysis
                 // NOTE: Below assumption disallows early decoding well-known attributes with optional parameters.
                 if (attributeArgCount == parameterCount)
                 {
-                    string actualNamespaceName = attributeType.ContainingNamespace.ToDisplayString(SymbolDisplayFormat.QualifiedNameOnlyFormat);
                     StringComparison options = description.MatchIgnoringCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-                    return actualNamespaceName.Equals(description.Namespace, options) && attributeType.Name.Equals(description.Name, options);
+                    return attributeType.Name.Equals(description.Name, options) && namespaceMatch(attributeType.ContainingNamespace, description.Namespace, options);
                 }
             }
 
             return false;
+
+            static bool namespaceMatch(INamespaceSymbolInternal container, string namespaceName, StringComparison options)
+            {
+                int index = namespaceName.Length;
+                bool expectDot = false;
+
+                while (true)
+                {
+                    if (container.IsGlobalNamespace)
+                    {
+                        return index == 0;
+                    }
+
+                    if (expectDot)
+                    {
+                        index--;
+
+                        if (index < 0 || namespaceName[index] != '.')
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        expectDot = true;
+                    }
+
+                    string name = container.Name;
+                    int nameLength = name.Length;
+                    index -= nameLength;
+                    if (index < 0 || String.Compare(namespaceName, index, name, 0, nameLength, options) != 0)
+                    {
+                        return false;
+                    }
+
+                    container = container.ContainingNamespace;
+
+                    if (container is null)
+                    {
+                        return false;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -183,15 +231,38 @@ namespace Microsoft.CodeAnalysis
 
         internal ConstantValue DecodeDateTimeConstantValue()
         {
-            return ConstantValue.Create(new DateTime(this.CommonConstructorArguments[0].DecodeValue<long>(SpecialType.System_Int64)));
+            long value = this.CommonConstructorArguments[0].DecodeValue<long>(SpecialType.System_Int64);
+
+            // if value is outside this range, DateTime would throw when constructed
+            if (value < DateTime.MinValue.Ticks || value > DateTime.MaxValue.Ticks)
+            {
+                return ConstantValue.Bad;
+            }
+
+            return ConstantValue.Create(new DateTime(value));
         }
 
         #endregion
 
+        internal ObsoleteAttributeData DecodeObsoleteAttribute(ObsoleteAttributeKind kind)
+        {
+            switch (kind)
+            {
+                case ObsoleteAttributeKind.Obsolete:
+                    return DecodeObsoleteAttribute();
+                case ObsoleteAttributeKind.Deprecated:
+                    return DecodeDeprecatedAttribute();
+                case ObsoleteAttributeKind.Experimental:
+                    return DecodeExperimentalAttribute();
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(kind);
+            }
+        }
+
         /// <summary>
-        /// Decode the arguments to ObsoleteAttribute. ObsoleteAttribute can have 0,1 or 2 arguments.
+        /// Decode the arguments to ObsoleteAttribute. ObsoleteAttribute can have 0, 1 or 2 arguments.
         /// </summary>
-        internal ObsoleteAttributeData DecodeObsoleteAttribute()
+        private ObsoleteAttributeData DecodeObsoleteAttribute()
         {
             ImmutableArray<TypedConstant> args = this.CommonConstructorArguments;
 
@@ -205,21 +276,21 @@ namespace Microsoft.CodeAnalysis
                 // ObsoleteAttribute(string, bool)
 
                 Debug.Assert(args.Length <= 2);
-                message = (string)args[0].Value;
+                message = (string)args[0].ValueInternal;
 
                 if (args.Length == 2)
                 {
-                    isError = (bool)args[1].Value;
+                    isError = (bool)args[1].ValueInternal;
                 }
             }
 
-            return new ObsoleteAttributeData(message, isError);
+            return new ObsoleteAttributeData(ObsoleteAttributeKind.Obsolete, message, isError);
         }
 
         /// <summary>
         /// Decode the arguments to DeprecatedAttribute. DeprecatedAttribute can have 3 or 4 arguments.
         /// </summary>
-        internal ObsoleteAttributeData DecodeDeprecatedAttribute()
+        private ObsoleteAttributeData DecodeDeprecatedAttribute()
         {
             var args = this.CommonConstructorArguments;
 
@@ -231,12 +302,23 @@ namespace Microsoft.CodeAnalysis
             {
                 // DeprecatedAttribute(String, DeprecationType, UInt32) 
                 // DeprecatedAttribute(String, DeprecationType, UInt32, Platform) 
+                // DeprecatedAttribute(String, DeprecationType, UInt32, String) 
 
-                message = (string)args[0].Value;
-                isError = ((int)args[1].Value == 1);
+                message = (string)args[0].ValueInternal;
+                isError = ((int)args[1].ValueInternal == 1);
             }
 
-            return new ObsoleteAttributeData(message, isError);
+            return new ObsoleteAttributeData(ObsoleteAttributeKind.Deprecated, message, isError);
+        }
+
+        /// <summary>
+        /// Decode the arguments to ExperimentalAttribute. ExperimentalAttribute has 0 arguments.
+        /// </summary>
+        private ObsoleteAttributeData DecodeExperimentalAttribute()
+        {
+            // ExperimentalAttribute() 
+            Debug.Assert(this.CommonConstructorArguments.Length == 0);
+            return ObsoleteAttributeData.Experimental;
         }
 
         internal static void DecodeMethodImplAttribute<T, TAttributeSyntaxNode, TAttributeData, TAttributeLocation>(
@@ -415,7 +497,7 @@ namespace Microsoft.CodeAnalysis
             //   
             //   See Roslyn Bug 8603: ETA crashes with InvalidOperationException on duplicate attributes for details.
 
-            var validOn = (AttributeTargets)positionalArg.Value;
+            var validOn = (AttributeTargets)positionalArg.ValueInternal;
             bool allowMultiple = DecodeNamedArgument(namedArgs, "AllowMultiple", SpecialType.System_Boolean, false);
             bool inherited = DecodeNamedArgument(namedArgs, "Inherited", SpecialType.System_Boolean, true);
 

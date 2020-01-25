@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -44,7 +46,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Obsolete("Use VerifyDiagnostics", true)]
         public static void TestDiagnostics(string source, params string[] diagStrings)
         {
-            var comp = CSharpTestBase.CreateCompilationWithMscorlib(source);
+            var comp = CSharpTestBase.CreateCompilation(source);
             var diagnostics = comp.GetDiagnostics();
             CompilingTestBase.TestDiagnostics(diagnostics, diagStrings);
         }
@@ -55,7 +57,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Obsolete("Use VerifyDiagnostics", true)]
         public static void TestDiagnosticsExact(string source, params string[] diagStrings)
         {
-            var comp = CSharpTestBase.CreateCompilationWithMscorlib(source);
+            var comp = CSharpTestBase.CreateCompilation(source);
             var diagnostics = comp.GetDiagnostics();
             Assert.Equal(diagStrings.Length, diagnostics.Length);
             CompilingTestBase.TestDiagnostics(diagnostics, diagStrings);
@@ -64,7 +66,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         /// <summary>
         /// OBSOLETE: Use VerifyDiagnostics from Roslyn.Compilers.CSharp.Test.Utilities instead.
         /// </summary>
-        internal protected static CSharpCompilation VerifyErrorsAndGetCompilationWithMscorlib(string text, params ErrorDescription[] expectedErrorDesp)
+        public static CSharpCompilation VerifyErrorsAndGetCompilationWithMscorlib(string text, params ErrorDescription[] expectedErrorDesp)
         {
             return VerifyErrorsAndGetCompilationWithMscorlib(new string[] { text }, expectedErrorDesp);
         }
@@ -74,7 +76,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         /// </summary>
         internal protected static CSharpCompilation VerifyErrorsAndGetCompilationWithMscorlib(string[] srcs, params ErrorDescription[] expectedErrorDesp)
         {
-            var comp = CSharpTestBase.CreateCompilationWithMscorlib(srcs);
+            var comp = CSharpTestBase.CreateCompilation(srcs);
             var actualErrors = comp.GetDiagnostics();
             VerifyErrorCodes(actualErrors, expectedErrorDesp);
             return comp;
@@ -150,7 +152,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                                              Column = lineSpan.IsValid ? lineSpan.StartLinePosition.Character + 1 : 0,
                                              IsWarning = e.Severity == DiagnosticSeverity.Warning,
                                              Parameters = (e.Arguments != null && e.Arguments.Count > 0 && e.Arguments[0] != null) ?
-                                                e.Arguments.Select(x => x != null ? x.ToString() : null).ToArray() : SpecializedCollections.EmptyArray<string>()
+                                                e.Arguments.Select(x => x != null ? x.ToString() : null).ToArray() : Array.Empty<string>()
                                          })
                                     orderby ae.Code, ae.Line, ae.Column
                                     select ae).ToList();
@@ -182,7 +184,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                     Assert.True(experr.Column == acterr.Column, String.Format("Col {0}!={1}", experr.Column, acterr.Column));
                 }
 
-                Assert.Equal(experr.IsWarning, acterr.IsWarning);
+                Assert.True(experr.IsWarning == acterr.IsWarning, String.Format("IsWarning {0}!={1}", experr.IsWarning, acterr.IsWarning));
 
                 //if the expected contains parameters, validate those too.
                 if (experr.Parameters != null)

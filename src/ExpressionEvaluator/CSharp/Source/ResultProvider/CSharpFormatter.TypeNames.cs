@@ -1,5 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
@@ -16,7 +19,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
         protected override void AppendIdentifierEscapingPotentialKeywords(StringBuilder builder, string identifier, out bool sawInvalidIdentifier)
         {
-            sawInvalidIdentifier = !IsValidIdentifier(identifier);
+            sawInvalidIdentifier = !SyntaxFacts.IsValidIdentifier(identifier);
             if (IsPotentialKeyword(identifier))
             {
                 builder.Append('@');
@@ -24,12 +27,14 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             builder.Append(identifier);
         }
 
-        protected override void AppendGenericTypeArgumentList(
+        protected override void AppendGenericTypeArguments(
             StringBuilder builder,
             Type[] typeArguments,
             int typeArgumentOffset,
-            DynamicFlagsCustomTypeInfo dynamicFlags,
-            ref int index,
+            ReadOnlyCollection<byte> dynamicFlags,
+            ref int dynamicFlagIndex,
+            ReadOnlyCollection<string> tupleElementNames,
+            ref int tupleElementIndex,
             int arity,
             bool escapeKeywordIdentifiers,
             out bool sawInvalidIdentifier)
@@ -45,10 +50,49 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
                 Type typeArgument = typeArguments[typeArgumentOffset + i];
                 bool sawSingleInvalidIdentifier;
-                AppendQualifiedTypeName(builder, typeArgument, dynamicFlags, ref index, escapeKeywordIdentifiers, out sawSingleInvalidIdentifier);
+                AppendQualifiedTypeName(
+                    builder,
+                    typeArgument,
+                    dynamicFlags,
+                    ref dynamicFlagIndex,
+                    tupleElementNames,
+                    ref tupleElementIndex,
+                    escapeKeywordIdentifiers,
+                    out sawSingleInvalidIdentifier);
                 sawInvalidIdentifier |= sawSingleInvalidIdentifier;
             }
             builder.Append('>');
+        }
+
+        protected override void AppendTupleElement(
+            StringBuilder builder,
+            Type type,
+            string nameOpt,
+            ReadOnlyCollection<byte> dynamicFlags,
+            ref int dynamicFlagIndex,
+            ReadOnlyCollection<string> tupleElementNames,
+            ref int tupleElementIndex,
+            bool escapeKeywordIdentifiers,
+            out bool sawInvalidIdentifier)
+        {
+            sawInvalidIdentifier = false;
+            bool sawSingleInvalidIdentifier;
+            AppendQualifiedTypeName(
+                builder,
+                type,
+                dynamicFlags,
+                ref dynamicFlagIndex,
+                tupleElementNames,
+                ref tupleElementIndex,
+                escapeKeywordIdentifiers,
+                sawInvalidIdentifier: out sawSingleInvalidIdentifier);
+            Debug.Assert(!sawSingleInvalidIdentifier);
+            if (!string.IsNullOrEmpty(nameOpt))
+            {
+                builder.Append(' ');
+                AppendIdentifier(builder, escapeKeywordIdentifiers, nameOpt, out sawSingleInvalidIdentifier);
+                sawInvalidIdentifier |= sawSingleInvalidIdentifier;
+            }
         }
 
         protected override void AppendRankSpecifier(StringBuilder builder, int rank)

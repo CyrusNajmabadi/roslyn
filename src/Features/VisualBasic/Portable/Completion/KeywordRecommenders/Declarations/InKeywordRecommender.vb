@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -34,14 +36,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
             ' TODO: figure out if this is the parse tree not acting correctly here. Why is this a SyntaxNonTerminal?
             If targetToken.IsFromIdentifierNode(Of ForEachStatementSyntax)(Function(forEachStatement) forEachStatement.ControlVariable) OrElse
                IsAfterCompleteAsClause(Of ForEachStatementSyntax)(context, getForEachLoopAsOpt, cancellationToken) Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("In", VBFeaturesResources.InForEachKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("In", VBFeaturesResources.Specifies_the_group_that_the_loop_variable_in_a_For_Each_statement_is_to_traverse))
             End If
 
             ' From element |
             ' Group Join element |
             If targetToken.IsFromIdentifierNode(Of CollectionRangeVariableSyntax)(Function(rangeVariable) rangeVariable.Identifier) OrElse
                IsAfterCompleteAsClause(Of CollectionRangeVariableSyntax)(context, Function(rangeVariable) rangeVariable.AsClause, cancellationToken) Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("In", VBFeaturesResources.InQueryKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("In", VBFeaturesResources.Specifies_the_group_that_the_range_variable_is_to_traverse_in_a_query))
             End If
 
             Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()

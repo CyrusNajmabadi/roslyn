@@ -1,9 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.RuntimeMembers;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -26,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // If the base class had a constructor that initializes its state a global variable would access partially initialized object. 
             // For this reason Script class must always derive directly from a class that has no state (System.Object).
 
-            CSharpSyntaxNode syntax = loweredBody.Syntax;
+            SyntaxNode syntax = loweredBody.Syntax;
 
             // base constructor call:
             Debug.Assert((object)constructor.ContainingType.BaseTypeNoUseSiteDiagnostics == null || constructor.ContainingType.BaseTypeNoUseSiteDiagnostics.SpecialType == SpecialType.System_Object);
@@ -47,6 +50,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         invokedAsExtensionMethod: false,
                         argsToParamsOpt: ImmutableArray<int>.Empty,
                         resultKind: LookupResultKind.Viable,
+                        binderOpt: null,
                         type: objectType)
                     { WasCompilerGenerated = true })
                 { WasCompilerGenerated = true };
@@ -75,7 +79,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// </remarks>
         private static void MakeSubmissionInitialization(
             ArrayBuilder<BoundStatement> statements,
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             MethodSymbol submissionConstructor,
             SynthesizedSubmissionFields synthesizedFields,
             CSharpCompilation compilation)
@@ -100,7 +104,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         objectType)
                     { WasCompilerGenerated = true },
                     thisReference,
-                    RefKind.None,
+                    false,
                     thisReference.Type)
                 { WasCompilerGenerated = true })
             { WasCompilerGenerated = true });
@@ -120,7 +124,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                                     objectType),
                                 Conversion.ExplicitReference,
                                 false,
-                                true,
+                                explicitCastInCode: true,
+                                conversionGroupOpt: null,
                                 ConstantValue.NotAvailable,
                                 hostObjectField.Type
                             ),
@@ -148,7 +153,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 { WasCompilerGenerated = true },
                                 Conversion.ExplicitReference,
                                 false,
-                                true,
+                                explicitCastInCode: true,
+                                conversionGroupOpt: null,
                                 ConstantValue.NotAvailable,
                                 targetScriptType
                             ),
@@ -162,7 +168,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <summary>
         /// Construct a body for an auto-property accessor (updating or returning the backing field).
         /// </summary>
-        internal static BoundBlock ConstructAutoPropertyAccessorBody(SourceMethodSymbol accessor)
+        internal static BoundBlock ConstructAutoPropertyAccessorBody(SourceMemberMethodSymbol accessor)
         {
             Debug.Assert(accessor.MethodKind == MethodKind.PropertyGet || accessor.MethodKind == MethodKind.PropertySet);
 
@@ -181,26 +187,23 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (accessor.MethodKind == MethodKind.PropertyGet)
             {
-                statement = new BoundReturnStatement(syntax, fieldAccess) { WasCompilerGenerated = true };
+                statement = new BoundReturnStatement(accessor.SyntaxNode, RefKind.None, fieldAccess);
             }
             else
             {
                 Debug.Assert(accessor.MethodKind == MethodKind.PropertySet);
                 var parameter = accessor.Parameters[0];
                 statement = new BoundExpressionStatement(
-                    syntax,
+                    accessor.SyntaxNode,
                     new BoundAssignmentOperator(
                         syntax,
                         fieldAccess,
                         new BoundParameter(syntax, parameter) { WasCompilerGenerated = true },
                         property.Type)
-                    { WasCompilerGenerated = true })
-                { WasCompilerGenerated = true };
+                    { WasCompilerGenerated = true });
             }
 
-            statement = new BoundSequencePoint(accessor.SyntaxNode, statement) { WasCompilerGenerated = true };
-
-            return new BoundBlock(syntax, ImmutableArray<LocalSymbol>.Empty, ImmutableArray.Create<BoundStatement>(statement)) { WasCompilerGenerated = true };
+            return BoundBlock.SynthesizedNoLocals(syntax, statement);
         }
 
         /// <summary>
@@ -300,7 +303,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 // {
                 //     return EventRegistrationTokenTable<Event>.GetOrCreateEventRegistrationTokenTable(ref _tokenTable).AddHandler(value);
                 // }   
-                BoundStatement returnStatement = BoundReturnStatement.Synthesized(syntax, processHandlerCall);
+                BoundStatement returnStatement = BoundReturnStatement.Synthesized(syntax, RefKind.None, processHandlerCall);
                 return BoundBlock.SynthesizedNoLocals(syntax, returnStatement);
             }
             else
@@ -310,7 +313,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 //     return;
                 // }  
                 BoundStatement callStatement = new BoundExpressionStatement(syntax, processHandlerCall);
-                BoundStatement returnStatement = new BoundReturnStatement(syntax, expressionOpt: null);
+                BoundStatement returnStatement = new BoundReturnStatement(syntax, RefKind.None, expressionOpt: null);
                 return BoundBlock.SynthesizedNoLocals(syntax, callStatement, returnStatement);
             }
         }
@@ -347,6 +350,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             MethodSymbol updateMethod = (MethodSymbol)compilation.GetSpecialTypeMember(updateMethodId);
 
             BoundStatement @return = new BoundReturnStatement(syntax,
+                refKind: RefKind.None,
                 expressionOpt: null)
             { WasCompilerGenerated = true };
 
@@ -358,10 +362,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                                                       memberDescriptor.Name),
                                                                       syntax.Location));
 
-                return new BoundBlock(syntax,
-                    locals: ImmutableArray<LocalSymbol>.Empty,
-                    statements: ImmutableArray.Create<BoundStatement>(@return))
-                { WasCompilerGenerated = true };
+                return BoundBlock.SynthesizedNoLocals(syntax, @return);
             }
 
             Binder.ReportUseSiteDiagnostics(updateMethod, diagnostics, syntax);
@@ -392,7 +393,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         receiverOpt: null,
                         method: updateMethod,
                         arguments: ImmutableArray.Create<BoundExpression>(boundBackingField, boundParameter)),
-                    kind: ConversionKind.ExplicitReference,
+                    conversion: Conversion.ExplicitReference,
                     type: delegateType);
 
                 // _event = (DelegateType)Delegate.Combine(_event, value);
@@ -404,12 +405,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                     { WasCompilerGenerated = true })
                 { WasCompilerGenerated = true };
 
-                return new BoundBlock(syntax,
-                    locals: ImmutableArray<LocalSymbol>.Empty,
+                return BoundBlock.SynthesizedNoLocals(syntax,
                     statements: ImmutableArray.Create<BoundStatement>(
                         eventUpdate,
-                        @return))
-                { WasCompilerGenerated = true };
+                        @return));
             }
 
             compareExchangeMethod = compareExchangeMethod.Construct(ImmutableArray.Create<TypeSymbol>(delegateType));
@@ -425,8 +424,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             for (int i = 0; i < numTemps; i++)
             {
-                tmps[i] = new SynthesizedLocal(accessor, delegateType, SynthesizedLocalKind.LoweringTemp);
-                boundTmps[i] = new BoundLocal(syntax, tmps[i], null, delegateType);
+                tmps[i] = new SynthesizedLocal(accessor, TypeWithAnnotations.Create(delegateType), SynthesizedLocalKind.LoweringTemp);
+                boundTmps[i] = new BoundLocal(syntax, tmps[i], null, delegateType) { WasCompilerGenerated = true };
             }
 
             // tmp0 = _event;
@@ -458,7 +457,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     receiverOpt: null,
                     method: updateMethod,
                     arguments: ImmutableArray.Create<BoundExpression>(boundTmps[1], boundParameter)),
-                kind: ConversionKind.ExplicitReference,
+                conversion: Conversion.ExplicitReference,
                 type: delegateType);
 
             // tmp2 = (DelegateType)Delegate.Combine(tmp1, value);
@@ -521,7 +520,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             var syntax = block.Syntax;
 
             Debug.Assert(method.MethodKind == MethodKind.Destructor);
-            Debug.Assert(syntax.Kind() == SyntaxKind.Block);
+            Debug.Assert(syntax.Kind() == SyntaxKind.Block || syntax.Kind() == SyntaxKind.ArrowExpressionClause);
 
             // If this is a destructor and a base type has a Finalize method (see GetBaseTypeFinalizeMethod for exact 
             // requirements), then we need to call that method in a finally block.  Otherwise, just return block as-is.
@@ -530,20 +529,25 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if ((object)baseTypeFinalize != null)
             {
-                BoundStatement baseFinalizeCall = new BoundSequencePointWithSpan( //sequence point to mimic Dev10
+                BoundStatement baseFinalizeCall = new BoundExpressionStatement(
                     syntax,
-                    new BoundExpressionStatement(
+                    BoundCall.Synthesized(
                         syntax,
-                        BoundCall.Synthesized(
+                        new BoundBaseReference(
                             syntax,
-                            new BoundBaseReference(
-                                syntax,
-                                method.ContainingType)
-                            { WasCompilerGenerated = true },
-                            baseTypeFinalize)
-                        )
-                    { WasCompilerGenerated = true },
-                    ((BlockSyntax)syntax).CloseBraceToken.Span);
+                            method.ContainingType)
+                        { WasCompilerGenerated = true },
+                        baseTypeFinalize))
+                { WasCompilerGenerated = true };
+
+                if (syntax.Kind() == SyntaxKind.Block)
+                {
+                    //sequence point to mimic Dev10
+                    baseFinalizeCall = new BoundSequencePointWithSpan(
+                        syntax,
+                        baseFinalizeCall,
+                        ((BlockSyntax)syntax).CloseBraceToken.Span);
+                }
 
                 return new BoundBlock(
                     syntax,

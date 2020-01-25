@@ -1,12 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics.Analyzers.NamingStyles;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
+using Microsoft.CodeAnalysis.Utilities;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Extensions
@@ -18,8 +23,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             SyntaxToken name,
             CancellationToken cancellationToken)
         {
-            var expression = name.Parent as ExpressionSyntax;
-            if (expression != null)
+            if (name.Parent is ExpressionSyntax expression)
             {
                 var results = semanticModel.LookupName(expression, namespacesAndTypesOnly: true, cancellationToken: cancellationToken);
                 if (results.Length > 0)
@@ -37,8 +41,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             bool namespacesAndTypesOnly,
             CancellationToken cancellationToken)
         {
-            var expression = name.Parent as ExpressionSyntax;
-            if (expression != null)
+            if (name.Parent is ExpressionSyntax expression)
             {
                 return semanticModel.LookupName(expression, namespacesAndTypesOnly, cancellationToken);
             }
@@ -103,11 +106,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             CancellationToken cancellationToken)
         {
             var expr = SyntaxFactory.GetStandaloneExpression(expression);
-
-            ExpressionSyntax qualifier;
-            string name;
-            int arity;
-            DecomposeName(expr, out qualifier, out name, out arity);
+            DecomposeName(expr, out var qualifier, out var name, out var arity);
 
             INamespaceOrTypeSymbol symbol = null;
             if (qualifier != null)
@@ -131,28 +130,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         {
             if (!CanBindToken(token))
             {
-                return default(SymbolInfo);
+                return default;
             }
 
-            var expression = token.Parent as ExpressionSyntax;
-            if (expression != null)
+            switch (token.Parent)
             {
-                return semanticModel.GetSymbolInfo(expression);
+                case ExpressionSyntax expression:
+                    return semanticModel.GetSymbolInfo(expression);
+                case AttributeSyntax attribute:
+                    return semanticModel.GetSymbolInfo(attribute);
+                case ConstructorInitializerSyntax constructorInitializer:
+                    return semanticModel.GetSymbolInfo(constructorInitializer);
             }
 
-            var attribute = token.Parent as AttributeSyntax;
-            if (attribute != null)
-            {
-                return semanticModel.GetSymbolInfo(attribute);
-            }
-
-            var constructorInitializer = token.Parent as ConstructorInitializerSyntax;
-            if (constructorInitializer != null)
-            {
-                return semanticModel.GetSymbolInfo(constructorInitializer);
-            }
-
-            return default(SymbolInfo);
+            return default;
         }
 
         private static bool CanBindToken(SyntaxToken token)
@@ -173,7 +164,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         /// argument.
         /// </summary>
         public static string GenerateNameForArgument(
-            this SemanticModel semanticModel, ArgumentSyntax argument)
+            this SemanticModel semanticModel, ArgumentSyntax argument, CancellationToken cancellationToken)
         {
             // If it named argument then we use the name provided.
             if (argument.NameColon != null)
@@ -181,11 +172,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 return argument.NameColon.Name.Identifier.ValueText;
             }
 
-            return semanticModel.GenerateNameForExpression(argument.Expression);
+            return semanticModel.GenerateNameForExpression(
+                argument.Expression, capitalize: false, cancellationToken: cancellationToken);
         }
 
         public static string GenerateNameForArgument(
-            this SemanticModel semanticModel, AttributeArgumentSyntax argument)
+            this SemanticModel semanticModel, AttributeArgumentSyntax argument, CancellationToken cancellationToken)
         {
             // If it named argument then we use the name provided.
             if (argument.NameEquals != null)
@@ -193,7 +185,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 return argument.NameEquals.Name.Identifier.ValueText;
             }
 
-            return semanticModel.GenerateNameForExpression(argument.Expression);
+            return semanticModel.GenerateNameForExpression(
+                argument.Expression, capitalize: false, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -201,7 +194,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         /// that expression. 
         /// </summary>
         public static string GenerateNameForExpression(
-            this SemanticModel semanticModel, ExpressionSyntax expression, bool capitalize = false)
+            this SemanticModel semanticModel, ExpressionSyntax expression,
+            bool capitalize, CancellationToken cancellationToken)
         {
             // Try to find a usable name node that we can use to name the
             // parameter.  If we have an expression that has a name as part of it
@@ -215,21 +209,30 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 {
                     return ((IdentifierNameSyntax)current).Identifier.ValueText.ToCamelCase();
                 }
-                else if (current is MemberAccessExpressionSyntax)
+                else if (current is MemberAccessExpressionSyntax memberAccess)
                 {
-                    return ((MemberAccessExpressionSyntax)current).Name.Identifier.ValueText.ToCamelCase();
+                    return memberAccess.Name.Identifier.ValueText.ToCamelCase();
                 }
-                else if (current is MemberBindingExpressionSyntax)
+                else if (current is MemberBindingExpressionSyntax memberBinding)
                 {
-                    return ((MemberBindingExpressionSyntax)current).Name.Identifier.ValueText.ToCamelCase();
+                    return memberBinding.Name.Identifier.ValueText.ToCamelCase();
                 }
-                else if (current is ConditionalAccessExpressionSyntax)
+                else if (current is ConditionalAccessExpressionSyntax conditionalAccess)
                 {
-                    current = ((ConditionalAccessExpressionSyntax)current).WhenNotNull;
+                    current = conditionalAccess.WhenNotNull;
                 }
-                else if (current is CastExpressionSyntax)
+                else if (current is CastExpressionSyntax castExpression)
                 {
-                    current = ((CastExpressionSyntax)current).Expression;
+                    current = castExpression.Expression;
+                }
+                else if (current is DeclarationExpressionSyntax decl)
+                {
+                    if (!(decl.Designation is SingleVariableDesignationSyntax name))
+                    {
+                        break;
+                    }
+
+                    return name.Identifier.ValueText.ToCamelCase();
                 }
                 else
                 {
@@ -237,67 +240,159 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 }
             }
 
+            // there was nothing in the expression to signify a name.  If we're in an argument
+            // location, then try to choose a name based on the argument name.
+            var argumentName = TryGenerateNameForArgumentExpression(
+                semanticModel, expression, cancellationToken);
+            if (argumentName != null)
+            {
+                return capitalize ? argumentName.ToPascalCase() : argumentName.ToCamelCase();
+            }
+
             // Otherwise, figure out the type of the expression and generate a name from that
             // instead.
-            var info = semanticModel.GetTypeInfo(expression);
+            var info = semanticModel.GetTypeInfo(expression, cancellationToken);
 
             // If we can't determine the type, then fallback to some placeholders.
             var type = info.Type;
             return type.CreateParameterName(capitalize);
         }
 
-        public static IList<string> GenerateParameterNames(
-            this SemanticModel semanticModel,
-            ArgumentListSyntax argumentList)
+        private static string TryGenerateNameForArgumentExpression(
+            SemanticModel semanticModel, ExpressionSyntax expression, CancellationToken cancellationToken)
         {
-            return semanticModel.GenerateParameterNames(argumentList.Arguments);
+            var topExpression = expression.WalkUpParentheses();
+            if (topExpression.IsParentKind(SyntaxKind.Argument))
+            {
+                var argument = (ArgumentSyntax)topExpression.Parent;
+                if (argument.NameColon != null)
+                {
+                    return argument.NameColon.Name.Identifier.ValueText;
+                }
+
+                if (argument.Parent is BaseArgumentListSyntax argumentList)
+                {
+                    var index = argumentList.Arguments.IndexOf(argument);
+                    if (semanticModel.GetSymbolInfo(argumentList.Parent, cancellationToken).Symbol is IMethodSymbol member && index < member.Parameters.Length)
+                    {
+                        var parameter = member.Parameters[index];
+                        if (parameter.Type.OriginalDefinition.TypeKind != TypeKind.TypeParameter)
+                        {
+                            return parameter.Name;
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
-        public static IList<string> GenerateParameterNames(
+        public static ImmutableArray<ParameterName> GenerateParameterNames(
             this SemanticModel semanticModel,
-            AttributeArgumentListSyntax argumentList)
+            ArgumentListSyntax argumentList,
+            CancellationToken cancellationToken)
         {
-            return semanticModel.GenerateParameterNames(argumentList.Arguments);
+            return semanticModel.GenerateParameterNames(
+                argumentList.Arguments, reservedNames: null, cancellationToken: cancellationToken);
         }
 
-        public static IList<string> GenerateParameterNames(
+        public static ImmutableArray<ParameterName> GenerateParameterNames(
+            this SemanticModel semanticModel,
+            AttributeArgumentListSyntax argumentList,
+            CancellationToken cancellationToken)
+        {
+            return semanticModel.GenerateParameterNames(
+                argumentList.Arguments, reservedNames: null, cancellationToken: cancellationToken);
+        }
+
+        public static ImmutableArray<ParameterName> GenerateParameterNames(
             this SemanticModel semanticModel,
             IEnumerable<ArgumentSyntax> arguments,
-            IList<string> reservedNames = null)
+            IList<string> reservedNames,
+            CancellationToken cancellationToken)
         {
-            reservedNames = reservedNames ?? SpecializedCollections.EmptyList<string>();
+            reservedNames ??= SpecializedCollections.EmptyList<string>();
 
             // We can't change the names of named parameters.  Any other names we're flexible on.
             var isFixed = reservedNames.Select(s => true).Concat(
-                arguments.Select(a => a.NameColon != null)).ToList();
+                arguments.Select(a => a.NameColon != null)).ToImmutableArray();
 
             var parameterNames = reservedNames.Concat(
-                arguments.Select(a => semanticModel.GenerateNameForArgument(a))).ToList();
+                arguments.Select(a => semanticModel.GenerateNameForArgument(a, cancellationToken))).ToImmutableArray();
 
-            return NameGenerator.EnsureUniqueness(parameterNames, isFixed).Skip(reservedNames.Count).ToList();
+            return GenerateNames(reservedNames, isFixed, parameterNames);
         }
 
-        public static IList<string> GenerateParameterNames(
+        public static ImmutableArray<ParameterName> GenerateParameterNames(
             this SemanticModel semanticModel,
-            IEnumerable<AttributeArgumentSyntax> arguments,
-            IList<string> reservedNames = null)
+            IEnumerable<ArgumentSyntax> arguments,
+            IList<string> reservedNames,
+            NamingRule parameterNamingRule,
+            CancellationToken cancellationToken)
         {
-            reservedNames = reservedNames ?? SpecializedCollections.EmptyList<string>();
+            reservedNames ??= SpecializedCollections.EmptyList<string>();
 
             // We can't change the names of named parameters.  Any other names we're flexible on.
             var isFixed = reservedNames.Select(s => true).Concat(
-                arguments.Select(a => a.NameEquals != null)).ToList();
+                arguments.Select(a => a.NameColon != null)).ToImmutableArray();
 
             var parameterNames = reservedNames.Concat(
-                arguments.Select(a => semanticModel.GenerateNameForArgument(a))).ToList();
+                arguments.Select(a => semanticModel.GenerateNameForArgument(a, cancellationToken))).ToImmutableArray();
 
-            return NameGenerator.EnsureUniqueness(parameterNames, isFixed).Skip(reservedNames.Count).ToList();
+            return GenerateNames(reservedNames, isFixed, parameterNames, parameterNamingRule);
+        }
+
+        private static ImmutableArray<ParameterName> GenerateNames(IList<string> reservedNames, ImmutableArray<bool> isFixed, ImmutableArray<string> parameterNames)
+            => NameGenerator.EnsureUniqueness(parameterNames, isFixed)
+                .Select((name, index) => new ParameterName(name, isFixed[index]))
+                .Skip(reservedNames.Count).ToImmutableArray();
+
+        private static ImmutableArray<ParameterName> GenerateNames(IList<string> reservedNames, ImmutableArray<bool> isFixed, ImmutableArray<string> parameterNames, NamingRule parameterNamingRule)
+            => NameGenerator.EnsureUniqueness(parameterNames, isFixed)
+                .Select((name, index) => new ParameterName(name, isFixed[index], parameterNamingRule))
+                .Skip(reservedNames.Count).ToImmutableArray();
+
+        public static ImmutableArray<ParameterName> GenerateParameterNames(
+            this SemanticModel semanticModel,
+            IEnumerable<AttributeArgumentSyntax> arguments,
+            IList<string> reservedNames,
+            CancellationToken cancellationToken)
+        {
+            reservedNames ??= SpecializedCollections.EmptyList<string>();
+
+            // We can't change the names of named parameters.  Any other names we're flexible on.
+            var isFixed = reservedNames.Select(s => true).Concat(
+                arguments.Select(a => a.NameEquals != null)).ToImmutableArray();
+
+            var parameterNames = reservedNames.Concat(
+                arguments.Select(a => semanticModel.GenerateNameForArgument(a, cancellationToken))).ToImmutableArray();
+
+            return GenerateNames(reservedNames, isFixed, parameterNames);
+        }
+
+        public static ImmutableArray<ParameterName> GenerateParameterNames(
+            this SemanticModel semanticModel,
+            IEnumerable<AttributeArgumentSyntax> arguments,
+            IList<string> reservedNames,
+            NamingRule parameterNamingRule,
+            CancellationToken cancellationToken)
+        {
+            reservedNames ??= SpecializedCollections.EmptyList<string>();
+
+            // We can't change the names of named parameters.  Any other names we're flexible on.
+            var isFixed = reservedNames.Select(s => true).Concat(
+                arguments.Select(a => a.NameEquals != null)).ToImmutableArray();
+
+            var parameterNames = reservedNames.Concat(
+                arguments.Select(a => semanticModel.GenerateNameForArgument(a, cancellationToken))).ToImmutableArray();
+
+            return GenerateNames(reservedNames, isFixed, parameterNames, parameterNamingRule);
         }
 
         public static ISet<INamespaceSymbol> GetUsingNamespacesInScope(this SemanticModel semanticModel, SyntaxNode location)
         {
             // Avoiding linq here for perf reasons. This is used heavily in the AddImport service
-            HashSet<INamespaceSymbol> result = null;
+            var result = new HashSet<INamespaceSymbol>();
 
             foreach (var @using in location.GetEnclosingUsingDirectives())
             {
@@ -306,13 +401,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                     var symbolInfo = semanticModel.GetSymbolInfo(@using.Name);
                     if (symbolInfo.Symbol != null && symbolInfo.Symbol.Kind == SymbolKind.Namespace)
                     {
-                        result = result ?? new HashSet<INamespaceSymbol>();
+                        result ??= new HashSet<INamespaceSymbol>();
                         result.Add((INamespaceSymbol)symbolInfo.Symbol);
                     }
                 }
             }
 
-            return result ?? SpecializedCollections.EmptySet<INamespaceSymbol>();
+            return result;
         }
 
         public static Accessibility DetermineAccessibilityConstraint(
@@ -438,7 +533,42 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 }
             }
 
+            // Type constraint must be at least as accessible as the declaring member (class, interface, delegate, method)
+            if (type.IsParentKind(SyntaxKind.TypeConstraint))
+            {
+                return AllContainingTypesArePublicOrProtected(semanticModel, type, cancellationToken)
+                    ? Accessibility.Public
+                    : Accessibility.Internal;
+            }
+
             return Accessibility.Private;
+        }
+
+        public static bool AllContainingTypesArePublicOrProtected(
+            this SemanticModel semanticModel,
+            TypeSyntax type,
+            CancellationToken cancellationToken)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            var typeDeclarations = type.GetAncestors<TypeDeclarationSyntax>();
+
+            foreach (var typeDeclaration in typeDeclarations)
+            {
+                var symbol = semanticModel.GetDeclaredSymbol(typeDeclaration, cancellationToken);
+
+                if (symbol.DeclaredAccessibility == Accessibility.Private ||
+                    symbol.DeclaredAccessibility == Accessibility.ProtectedAndInternal ||
+                    symbol.DeclaredAccessibility == Accessibility.Internal)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static TypeSyntax GetOutermostType(TypeSyntax type)

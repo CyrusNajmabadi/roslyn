@@ -1,6 +1,9 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -60,53 +63,26 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Utilities
             get { return _virtualSpaces != 0; }
         }
 
-        public int Position
-        {
-            get { return _position; }
-        }
+        public int Position => _position;
 
-        public int VirtualSpaces
-        {
-            get { return _virtualSpaces; }
-        }
+        public int VirtualSpaces => _virtualSpaces;
 
-        public SourceText Text
-        {
-            get { return _text; }
-        }
+        public SourceText Text => _text;
 
-        public SyntaxTree Tree
-        {
-            get { return _tree; }
-        }
+        public SyntaxTree Tree => _tree;
 
         public int CompareTo(VirtualTreePoint other)
         {
             if (Text != other.Text)
             {
-                throw new InvalidOperationException(EditorFeaturesResources.CantComparePositionsFromDiffSnapshots);
+                throw new InvalidOperationException(EditorFeaturesResources.Can_t_compare_positions_from_different_text_snapshots);
             }
 
-            if (Position < other.Position)
-            {
-                return -1;
-            }
-            else if (Position > other.Position)
-            {
-                return 1;
-            }
-
-            if (VirtualSpaces < other.VirtualSpaces)
-            {
-                return -1;
-            }
-            else if (VirtualSpaces > other.VirtualSpaces)
-            {
-                return 1;
-            }
-
-            return 0;
+            return ComparerWithState.CompareTo(this, other, s_comparers);
         }
+
+        private readonly static ImmutableArray<Func<VirtualTreePoint, IComparable>> s_comparers =
+            ImmutableArray.Create<Func<VirtualTreePoint, IComparable>>(p => p.Position, prop => prop.VirtualSpaces);
 
         public bool Equals(VirtualTreePoint other)
         {
@@ -125,7 +101,7 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Utilities
 
         public override string ToString()
         {
-            return string.Format("VirtualTreePoint { Tree: '{0}', Text: '{1}', Position: '{2}', VirtualSpaces '{3}' }", Tree, Text, Position, VirtualSpaces);
+            return $"VirtualTreePoint {{ Tree: '{Tree}', Text: '{Text}', Position: '{Position}', VirtualSpaces '{VirtualSpaces}' }}";
         }
 
         public TextLine GetContainingLine()

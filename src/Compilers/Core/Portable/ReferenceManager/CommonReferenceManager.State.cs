@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +8,8 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -31,17 +35,16 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Enumerates all referenced assemblies.
         /// </summary>
-        internal abstract IEnumerable<KeyValuePair<MetadataReference, IAssemblySymbol>> GetReferencedAssemblies();
+        internal abstract IEnumerable<KeyValuePair<MetadataReference, IAssemblySymbolInternal>> GetReferencedAssemblies();
 
         /// <summary>
         /// Enumerates all referenced assemblies and their aliases.
         /// </summary>
-        internal abstract IEnumerable<ValueTuple<IAssemblySymbol, ImmutableArray<string>>> GetReferencedAssemblyAliases();
+        internal abstract IEnumerable<(IAssemblySymbolInternal, ImmutableArray<string>)> GetReferencedAssemblyAliases();
 
-        internal abstract MetadataReference GetMetadataReference(IAssemblySymbol assemblySymbol);
+        internal abstract MetadataReference GetMetadataReference(IAssemblySymbolInternal assemblySymbol);
         internal abstract ImmutableArray<MetadataReference> ExplicitReferences { get; }
-        internal abstract ImmutableArray<MetadataReference> ImplicitReferences { get; }
-        internal abstract IEnumerable<KeyValuePair<AssemblyIdentity, PortableExecutableReference>> GetImplicitlyResolvedAssemblyReferences();
+        internal abstract ImmutableDictionary<AssemblyIdentity, PortableExecutableReference> ImplicitReferenceResolutions { get; }
     }
 
     internal partial class CommonReferenceManager<TCompilation, TAssemblySymbol> : CommonReferenceManager
@@ -100,7 +103,7 @@ namespace Microsoft.CodeAnalysis
         /// Maps (containing syntax tree file name, reference string) of #r directive to a resolved metadata reference.
         /// If multiple #r's in the same tree use the same value as a reference the resolved metadata reference is the same as well.
         /// </summary>
-        private IDictionary<ValueTuple<string, string>, MetadataReference> _lazyReferenceDirectiveMap;
+        private IDictionary<(string, string), MetadataReference> _lazyReferenceDirectiveMap;
 
         /// <summary>
         /// Array of unique bound #r references.
@@ -114,7 +117,18 @@ namespace Microsoft.CodeAnalysis
         private ImmutableArray<MetadataReference> _lazyDirectiveReferences;
 
         private ImmutableArray<MetadataReference> _lazyExplicitReferences;
-        private ImmutableArray<MetadataReference> _lazyImplicitReferences;
+
+        /// <summary>
+        /// Stores the results of implicit reference resolutions.
+        /// If <see cref="MetadataReferenceResolver.ResolveMissingAssemblies"/> is true the reference manager attempts to resolve assembly identities,
+        /// that do not match any explicit metadata references passed to the compilation (or specified via #r directive).
+        /// For each such assembly identity <see cref="MetadataReferenceResolver.ResolveMissingAssembly(MetadataReference, AssemblyIdentity)"/> is called
+        /// and its result is captured in this map.
+        /// The map also stores failures - the reference is null if the assembly of the given identity is not found by the resolver.
+        /// This is important to maintain consistency, especially across multiple submissions (e.g. the reference is not found during compilation of the first submission
+        /// but then it is available when the second submission is compiled).
+        /// </summary>
+        private ImmutableDictionary<AssemblyIdentity, PortableExecutableReference> _lazyImplicitReferenceResolutions;
 
         /// <summary>
         /// Diagnostics produced during reference resolution and binding.
@@ -216,7 +230,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        internal IDictionary<ValueTuple<string, string>, MetadataReference> ReferenceDirectiveMap
+        internal IDictionary<(string, string), MetadataReference> ReferenceDirectiveMap
         {
             get
             {
@@ -234,12 +248,12 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        internal override ImmutableArray<MetadataReference> ImplicitReferences
+        internal override ImmutableDictionary<AssemblyIdentity, PortableExecutableReference> ImplicitReferenceResolutions
         {
             get
             {
                 AssertBound();
-                return _lazyImplicitReferences;
+                return _lazyImplicitReferenceResolutions;
             }
         }
 
@@ -322,7 +336,7 @@ namespace Microsoft.CodeAnalysis
             Debug.Assert(_lazyReferencedModuleIndexMap == null);
             Debug.Assert(_lazyReferenceDirectiveMap == null);
             Debug.Assert(_lazyDirectiveReferences.IsDefault);
-            Debug.Assert(_lazyImplicitReferences.IsDefault);
+            Debug.Assert(_lazyImplicitReferenceResolutions == null);
             Debug.Assert(_lazyExplicitReferences.IsDefault);
             Debug.Assert(_lazyReferencedModules.IsDefault);
             Debug.Assert(_lazyReferencedModulesReferences.IsDefault);
@@ -341,7 +355,7 @@ namespace Microsoft.CodeAnalysis
             Debug.Assert(_lazyReferencedModuleIndexMap != null);
             Debug.Assert(_lazyReferenceDirectiveMap != null);
             Debug.Assert(!_lazyDirectiveReferences.IsDefault);
-            Debug.Assert(!_lazyImplicitReferences.IsDefault);
+            Debug.Assert(_lazyImplicitReferenceResolutions != null);
             Debug.Assert(!_lazyExplicitReferences.IsDefault);
             Debug.Assert(!_lazyReferencedModules.IsDefault);
             Debug.Assert(!_lazyReferencedModulesReferences.IsDefault);
@@ -373,10 +387,10 @@ namespace Microsoft.CodeAnalysis
         internal void InitializeNoLock(
             Dictionary<MetadataReference, int> referencedAssembliesMap,
             Dictionary<MetadataReference, int> referencedModulesMap,
-            IDictionary<ValueTuple<string, string>, MetadataReference> boundReferenceDirectiveMap,
+            IDictionary<(string, string), MetadataReference> boundReferenceDirectiveMap,
             ImmutableArray<MetadataReference> directiveReferences,
             ImmutableArray<MetadataReference> explicitReferences,
-            ImmutableArray<MetadataReference> implicitReferences,
+            ImmutableDictionary<AssemblyIdentity, PortableExecutableReference> implicitReferenceResolutions,
             bool containsCircularReferences,
             ImmutableArray<Diagnostic> diagnostics,
             TAssemblySymbol corLibraryOpt,
@@ -398,7 +412,7 @@ namespace Microsoft.CodeAnalysis
             _lazyReferenceDirectiveMap = boundReferenceDirectiveMap;
             _lazyDirectiveReferences = directiveReferences;
             _lazyExplicitReferences = explicitReferences;
-            _lazyImplicitReferences = implicitReferences;
+            _lazyImplicitReferenceResolutions = implicitReferenceResolutions;
 
             _lazyCorLibraryOpt = corLibraryOpt;
             _lazyReferencedModules = referencedModules;
@@ -424,7 +438,7 @@ namespace Microsoft.CodeAnalysis
             ImmutableArray<MetadataReference> references,
             ImmutableArray<ResolvedReference> referenceMap,
             int referencedModuleCount,
-            int explicitlyReferencedAsemblyCount,
+            int explicitlyReferencedAssemblyCount,
             IReadOnlyDictionary<string, List<ReferencedAssemblyIdentity>> assemblyReferencesBySimpleName,
             bool supersedeLowerVersions,
             out Dictionary<MetadataReference, int> referencedAssembliesMap,
@@ -476,13 +490,84 @@ namespace Microsoft.CodeAnalysis
                     // the item in the list is the highest version, by construction
                     for (int i = 1; i < assemblyReference.Value.Count; i++)
                     {
-                        int assemblyIndex = assemblyReference.Value[i].GetAssemblyIndex(explicitlyReferencedAsemblyCount);
+                        int assemblyIndex = assemblyReference.Value[i].GetAssemblyIndex(explicitlyReferencedAssemblyCount);
                         aliasesOfReferencedAssembliesBuilder[assemblyIndex] = s_supersededAlias;
                     }
                 }
             }
 
             aliasesOfReferencedAssemblies = aliasesOfReferencedAssembliesBuilder.ToImmutableAndFree();
+        }
+
+        /// <summary>
+        /// Calculates map from the identities of specified symbols to the corresponding identities in the original EnC baseline metadata.
+        /// The map only includes an entry for identities that differ, i.e. for symbols representing assembly references of the current compilation that have different identities 
+        /// than the corresponding identity in baseline metadata AssemblyRef table. The key comparer of the map ignores build and revision parts of the version number, 
+        /// since these might change if the original version included wildcard.
+        /// </summary>
+        /// <param name="symbols">Assembly symbols for references of the current compilation.</param>
+        /// <param name="originalIdentities">Identities in the baseline. <paramref name="originalIdentities"/>[i] corresponds to <paramref name="symbols"/>[i].</param>
+        internal static ImmutableDictionary<AssemblyIdentity, AssemblyIdentity> GetAssemblyReferenceIdentityBaselineMap(ImmutableArray<TAssemblySymbol> symbols, ImmutableArray<AssemblyIdentity> originalIdentities)
+        {
+            Debug.Assert(originalIdentities.Length == symbols.Length);
+
+            ImmutableDictionary<AssemblyIdentity, AssemblyIdentity>.Builder lazyBuilder = null;
+            for (int i = 0; i < originalIdentities.Length; i++)
+            {
+                var symbolIdentity = symbols[i].Identity;
+                var versionPattern = symbols[i].AssemblyVersionPattern;
+                var originalIdentity = originalIdentities[i];
+
+                if ((object)versionPattern != null)
+                {
+                    Debug.Assert(versionPattern.Build == ushort.MaxValue || versionPattern.Revision == ushort.MaxValue);
+
+                    lazyBuilder = lazyBuilder ?? ImmutableDictionary.CreateBuilder<AssemblyIdentity, AssemblyIdentity>();
+
+                    var sourceIdentity = symbolIdentity.WithVersion(versionPattern);
+
+                    if (lazyBuilder.ContainsKey(sourceIdentity))
+                    {
+                        // The compilation references multiple assemblies whose versions only differ in auto-generated build and/or revision numbers.
+                        throw new NotSupportedException(CodeAnalysisResources.CompilationReferencesAssembliesWithDifferentAutoGeneratedVersion);
+                    }
+
+                    lazyBuilder.Add(sourceIdentity, originalIdentity);
+                }
+                else
+                {
+                    // by construction of the arguments:
+                    Debug.Assert(originalIdentity == symbolIdentity);
+                }
+            }
+
+            return lazyBuilder?.ToImmutable() ?? ImmutableDictionary<AssemblyIdentity, AssemblyIdentity>.Empty;
+        }
+
+        internal static bool CompareVersionPartsSpecifiedInSource(Version version, Version candidateVersion, TAssemblySymbol candidateSymbol)
+        {
+            // major and minor parts must match exactly
+
+            if (version.Major != candidateVersion.Major || version.Minor != candidateVersion.Minor)
+            {
+                return false;
+            }
+
+            // build and revision parts can differ only if the corresponding source versions were auto-generated:
+            var versionPattern = candidateSymbol.AssemblyVersionPattern;
+            Debug.Assert((object)versionPattern == null || versionPattern.Build == ushort.MaxValue || versionPattern.Revision == ushort.MaxValue);
+
+            if (((object)versionPattern == null || versionPattern.Build < ushort.MaxValue) && version.Build != candidateVersion.Build)
+            {
+                return false;
+            }
+
+            if ((object)versionPattern == null && version.Revision != candidateVersion.Revision)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         // #r references are recursive, their aliases should be merged into all their dependencies.
@@ -558,9 +643,9 @@ namespace Microsoft.CodeAnalysis
         // for testing purposes
         internal IEnumerable<string> ExternAliases => AliasesOfReferencedAssemblies.SelectMany(aliases => aliases);
 
-        internal sealed override IEnumerable<KeyValuePair<MetadataReference, IAssemblySymbol>> GetReferencedAssemblies()
+        internal sealed override IEnumerable<KeyValuePair<MetadataReference, IAssemblySymbolInternal>> GetReferencedAssemblies()
         {
-            return ReferencedAssembliesMap.Select(ra => KeyValuePair.Create(ra.Key, (IAssemblySymbol)ReferencedAssemblies[ra.Value]));
+            return ReferencedAssembliesMap.Select(ra => KeyValuePairUtil.Create(ra.Key, (IAssemblySymbolInternal)ReferencedAssemblies[ra.Value]));
         }
 
         internal TAssemblySymbol GetReferencedAssemblySymbol(MetadataReference reference)
@@ -578,7 +663,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Gets the <see cref="MetadataReference"/> that corresponds to the assembly symbol. 
         /// </summary>
-        internal override MetadataReference GetMetadataReference(IAssemblySymbol assemblySymbol)
+        internal override MetadataReference GetMetadataReference(IAssemblySymbolInternal assemblySymbol)
         {
             foreach (var entry in ReferencedAssembliesMap)
             {
@@ -591,11 +676,11 @@ namespace Microsoft.CodeAnalysis
             return null;
         }
 
-        internal override IEnumerable<ValueTuple<IAssemblySymbol, ImmutableArray<string>>> GetReferencedAssemblyAliases()
+        internal override IEnumerable<(IAssemblySymbolInternal, ImmutableArray<string>)> GetReferencedAssemblyAliases()
         {
             for (int i = 0; i < ReferencedAssemblies.Length; i++)
             {
-                yield return ValueTuple.Create((IAssemblySymbol)ReferencedAssemblies[i], AliasesOfReferencedAssemblies[i]);
+                yield return (ReferencedAssemblies[i], AliasesOfReferencedAssemblies[i]);
             }
         }
 
@@ -603,14 +688,6 @@ namespace Microsoft.CodeAnalysis
         {
             var aliases = AliasesOfReferencedAssemblies[referencedAssemblyIndex];
             return aliases.Length == 0 || aliases.IndexOf(MetadataReferenceProperties.GlobalAlias, StringComparer.Ordinal) >= 0;
-        }
-
-        internal override IEnumerable<KeyValuePair<AssemblyIdentity, PortableExecutableReference>> GetImplicitlyResolvedAssemblyReferences()
-        {
-            foreach (PortableExecutableReference reference in ImplicitReferences)
-            {
-                yield return KeyValuePair.Create(ReferencedAssemblies[ReferencedAssembliesMap[reference]].Identity, reference);
-            }
         }
 
         #endregion

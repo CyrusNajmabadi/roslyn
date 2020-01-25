@@ -1,12 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Composition;
-using System.Diagnostics;
-using System.Linq;
-using Microsoft.CodeAnalysis.Host.Mef;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Host
@@ -23,18 +21,12 @@ namespace Microsoft.CodeAnalysis.Host
 
         public MetadataReferenceCache(Func<string, MetadataReferenceProperties, MetadataReference> createReference)
         {
-            if (createReference == null)
-            {
-                throw new ArgumentNullException(nameof(createReference));
-            }
-
-            _createReference = createReference;
+            _createReference = createReference ?? throw new ArgumentNullException(nameof(createReference));
         }
 
         public MetadataReference GetReference(string path, MetadataReferenceProperties properties)
         {
-            ReferenceSet referenceSet;
-            if (!_referenceSets.TryGetValue(path, out referenceSet))
+            if (!_referenceSets.TryGetValue(path, out var referenceSet))
             {
                 referenceSet = ImmutableInterlocked.GetOrAdd(ref _referenceSets, path, new ReferenceSet(this));
             }
@@ -64,10 +56,8 @@ namespace Microsoft.CodeAnalysis.Host
             {
                 using (_gate.DisposableWait())
                 {
-                    WeakReference<MetadataReference> weakref;
                     MetadataReference mref = null;
-
-                    if (!(_references.TryGetValue(properties, out weakref) && weakref.TryGetTarget(out mref)))
+                    if (!(_references.TryGetValue(properties, out var weakref) && weakref.TryGetTarget(out mref)))
                     {
                         // try to base this metadata reference off of an existing one, so we don't load the metadata bytes twice.
                         foreach (var wr in _references.Values)

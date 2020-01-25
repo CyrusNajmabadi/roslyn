@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -18,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Decl
             End If
 
             If context.TargetToken.IsChildToken(Of DeclareStatementSyntax)(Function(declaration) declaration.Identifier) Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Lib", VBFeaturesResources.LibKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Lib", VBFeaturesResources.Introduces_a_clause_that_identifies_the_external_file_DLL_or_code_resource_containing_an_external_procedure))
             Else
                 Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()
             End If

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -30,10 +32,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             return kinds.Contains(trivia.Kind());
         }
 
+        public static bool IsSingleOrMultiLineComment(this SyntaxTrivia trivia)
+            => trivia.IsKind(SyntaxKind.MultiLineCommentTrivia) || trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
+
         public static bool IsRegularComment(this SyntaxTrivia trivia)
-        {
-            return trivia.IsSingleLineComment() || trivia.IsMultiLineComment() || trivia.IsShebangDirective();
-        }
+            => trivia.IsSingleOrMultiLineComment() || trivia.IsShebangDirective();
+
+        public static bool IsWhitespaceOrSingleOrMultiLineComment(this SyntaxTrivia trivia)
+            => trivia.IsWhitespace() || trivia.IsSingleOrMultiLineComment();
 
         public static bool IsRegularOrDocComment(this SyntaxTrivia trivia)
         {
@@ -41,19 +47,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         }
 
         public static bool IsSingleLineComment(this SyntaxTrivia trivia)
-        {
-            return trivia.Kind() == SyntaxKind.SingleLineCommentTrivia;
-        }
+            => trivia.Kind() == SyntaxKind.SingleLineCommentTrivia;
 
         public static bool IsMultiLineComment(this SyntaxTrivia trivia)
-        {
-            return trivia.Kind() == SyntaxKind.MultiLineCommentTrivia;
-        }
+            => trivia.Kind() == SyntaxKind.MultiLineCommentTrivia;
 
         public static bool IsShebangDirective(this SyntaxTrivia trivia)
-        {
-            return trivia.Kind() == SyntaxKind.ShebangDirectiveTrivia;
-        }
+            => trivia.Kind() == SyntaxKind.ShebangDirectiveTrivia;
 
         public static bool IsCompleteMultiLineComment(this SyntaxTrivia trivia)
         {
@@ -146,7 +146,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             if (trivia.Any())
             {
                 var sb = new StringBuilder();
-                trivia.Select(t => t.ToFullString()).Do((s) => sb.Append(s));
+                trivia.Select(t => t.ToFullString()).Do(s => sb.Append(s));
                 return sb.ToString();
             }
             else
@@ -167,9 +167,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         }
 
         public static bool IsWhitespaceOrEndOfLine(this SyntaxTrivia trivia)
-        {
-            return trivia.Kind() == SyntaxKind.WhitespaceTrivia || trivia.Kind() == SyntaxKind.EndOfLineTrivia;
-        }
+            => IsWhitespace(trivia) || IsEndOfLine(trivia);
+
+        public static bool IsEndOfLine(this SyntaxTrivia trivia)
+            => trivia.Kind() == SyntaxKind.EndOfLineTrivia;
+
+        public static bool IsWhitespace(this SyntaxTrivia trivia)
+            => trivia.Kind() == SyntaxKind.WhitespaceTrivia;
 
         public static SyntaxTrivia GetPreviousTrivia(
             this SyntaxTrivia trivia, SyntaxTree syntaxTree, CancellationToken cancellationToken, bool findInsideTrivia = false)
@@ -177,10 +181,34 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             var span = trivia.FullSpan;
             if (span.Start == 0)
             {
-                return default(SyntaxTrivia);
+                return default;
             }
 
             return syntaxTree.GetRoot(cancellationToken).FindTrivia(span.Start - 1, findInsideTrivia);
+        }
+
+        public static IEnumerable<SyntaxTrivia> FilterComments(this IEnumerable<SyntaxTrivia> trivia, bool addElasticMarker)
+        {
+            var previousIsSingleLineComment = false;
+            foreach (var t in trivia)
+            {
+                if (previousIsSingleLineComment && t.IsEndOfLine())
+                {
+                    yield return t;
+                }
+
+                if (t.IsSingleOrMultiLineComment())
+                {
+                    yield return t;
+                }
+
+                previousIsSingleLineComment = t.IsSingleLineComment();
+            }
+
+            if (addElasticMarker)
+            {
+                yield return SyntaxFactory.ElasticMarker;
+            }
         }
 
 #if false

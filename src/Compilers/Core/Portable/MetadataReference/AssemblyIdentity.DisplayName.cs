@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
@@ -7,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -55,6 +58,19 @@ namespace Microsoft.CodeAnalysis
         public override string ToString()
         {
             return GetDisplayName(fullKey: false);
+        }
+
+        internal static string PublicKeyToString(ImmutableArray<byte> key)
+        {
+            if (key.IsDefaultOrEmpty)
+            {
+                return "";
+            }
+
+            PooledStringBuilder sb = PooledStringBuilder.GetInstance();
+            StringBuilder builder = sb.Builder;
+            AppendKey(sb, key);
+            return sb.ToStringAndFree();
         }
 
         private string BuildDisplayName(bool fullKey)
@@ -619,24 +635,15 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private const int MaxPublicKeyBytes = 2048;
-
         private static bool TryParsePublicKey(string value, out ImmutableArray<byte> key)
         {
-            ImmutableArray<byte> result;
-            if (value.Length > (MaxPublicKeyBytes * 2) || !TryParseHexBytes(value, out result))
+            if (!TryParseHexBytes(value, out key) ||
+                !MetadataHelpers.IsValidPublicKey(key))
             {
                 key = default(ImmutableArray<byte>);
                 return false;
             }
 
-            if (!MetadataHelpers.IsValidPublicKey(result))
-            {
-                key = default(ImmutableArray<byte>);
-                return false;
-            }
-
-            key = result;
             return true;
         }
 
@@ -718,6 +725,11 @@ namespace Microsoft.CodeAnalysis
 
         private static void EscapeName(StringBuilder result, string name)
         {
+            if (string.IsNullOrEmpty(name))
+            {
+                return;
+            }
+
             bool quoted = false;
             if (IsWhiteSpace(name[0]) || IsWhiteSpace(name[name.Length - 1]))
             {

@@ -1,5 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -27,7 +28,7 @@ namespace Microsoft.CodeAnalysis
             var languageServices = tmpWorkspace.Services.GetLanguageServices(language);
             if (languageServices == null)
             {
-                throw new ArgumentException(WorkspacesResources.UnrecognizedLanguageName);
+                throw new ArgumentException(WorkspacesResources.Unrecognized_language_name);
             }
 
             var commandLineParser = languageServices.GetRequiredService<ICommandLineParserService>();
@@ -36,8 +37,10 @@ namespace Microsoft.CodeAnalysis
             var metadataService = tmpWorkspace.Services.GetRequiredService<IMetadataService>();
 
             // we only support file paths in /r command line arguments
+            var relativePathResolver =
+                new RelativePathResolver(commandLineArguments.ReferencePaths, commandLineArguments.BaseDirectory);
             var commandLineMetadataReferenceResolver = new WorkspaceMetadataFileReferenceResolver(
-                metadataService, new RelativePathResolver(commandLineArguments.ReferencePaths, commandLineArguments.BaseDirectory));
+                metadataService, relativePathResolver);
 
             var analyzerLoader = tmpWorkspace.Services.GetRequiredService<IAnalyzerService>().GetLoader();
             var xmlFileResolver = new XmlFileResolver(commandLineArguments.BaseDirectory);
@@ -48,20 +51,20 @@ namespace Microsoft.CodeAnalysis
             var unresolvedMetadataReferences = boundMetadataReferences.FirstOrDefault(r => r is UnresolvedMetadataReference);
             if (unresolvedMetadataReferences != null)
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.CantResolveMetadataReference, ((UnresolvedMetadataReference)unresolvedMetadataReferences).Reference));
+                throw new ArgumentException(string.Format(WorkspacesResources.Can_t_resolve_metadata_reference_colon_0, ((UnresolvedMetadataReference)unresolvedMetadataReferences).Reference));
             }
 
             // resolve all analyzer references.
             foreach (var path in commandLineArguments.AnalyzerReferences.Select(r => r.FilePath))
             {
-                analyzerLoader.AddDependencyLocation(path);
+                analyzerLoader.AddDependencyLocation(relativePathResolver.ResolvePath(path, baseFilePath: null));
             }
 
             var boundAnalyzerReferences = commandLineArguments.ResolveAnalyzerReferences(analyzerLoader);
             var unresolvedAnalyzerReferences = boundAnalyzerReferences.FirstOrDefault(r => r is UnresolvedAnalyzerReference);
             if (unresolvedAnalyzerReferences != null)
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.CantResolveAnalyzerReference, ((UnresolvedAnalyzerReference)unresolvedAnalyzerReferences).Display));
+                throw new ArgumentException(string.Format(WorkspacesResources.Can_t_resolve_analyzer_reference_colon_0, ((UnresolvedAnalyzerReference)unresolvedAnalyzerReferences).Display));
             }
 
             AssemblyIdentityComparer assemblyIdentityComparer;
@@ -69,14 +72,13 @@ namespace Microsoft.CodeAnalysis
             {
                 try
                 {
-                    using (var appConfigStream = new FileStream(commandLineArguments.AppConfigPath, FileMode.Open, FileAccess.Read))
-                    {
-                        assemblyIdentityComparer = DesktopAssemblyIdentityComparer.LoadFromXml(appConfigStream);
-                    }
+                    using var appConfigStream = new FileStream(commandLineArguments.AppConfigPath, FileMode.Open, FileAccess.Read);
+
+                    assemblyIdentityComparer = DesktopAssemblyIdentityComparer.LoadFromXml(appConfigStream);
                 }
                 catch (Exception e)
                 {
-                    throw new ArgumentException(string.Format(WorkspacesResources.ErrorWhileReadingSpecifiedConfigFile, e.Message));
+                    throw new ArgumentException(string.Format(WorkspacesResources.An_error_occurred_while_reading_the_specified_configuration_file_colon_0, e.Message));
                 }
             }
             else
@@ -94,8 +96,8 @@ namespace Microsoft.CodeAnalysis
                     ? Path.GetFullPath(fileArg.Path)
                     : Path.GetFullPath(Path.Combine(projectDirectory, fileArg.Path));
 
-                var relativePath = FilePathUtilities.GetRelativePath(projectDirectory, absolutePath);
-                var isWithinProject = FilePathUtilities.IsNestedPath(projectDirectory, absolutePath);
+                var relativePath = PathUtilities.GetRelativePath(projectDirectory, absolutePath);
+                var isWithinProject = PathUtilities.IsChildPath(projectDirectory, absolutePath);
 
                 var folderRoot = isWithinProject ? Path.GetDirectoryName(relativePath) : "";
                 var folders = isWithinProject ? GetFolders(relativePath) : null;
@@ -121,8 +123,8 @@ namespace Microsoft.CodeAnalysis
                         ? Path.GetFullPath(fileArg.Path)
                         : Path.GetFullPath(Path.Combine(projectDirectory, fileArg.Path));
 
-                var relativePath = FilePathUtilities.GetRelativePath(projectDirectory, absolutePath);
-                var isWithinProject = FilePathUtilities.IsNestedPath(projectDirectory, absolutePath);
+                var relativePath = PathUtilities.GetRelativePath(projectDirectory, absolutePath);
+                var isWithinProject = PathUtilities.IsChildPath(projectDirectory, absolutePath);
 
                 var folderRoot = isWithinProject ? Path.GetDirectoryName(relativePath) : "";
                 var folders = isWithinProject ? GetFolders(relativePath) : null;

@@ -1,10 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Roslyn.Utilities;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
+using System;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
@@ -21,7 +24,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert(containingType.IsScriptClass);
 
             _containingType = containingType;
-            CalculateReturnType(containingType.DeclaringCompilation, diagnostics, out _resultType, out _returnType);
+            CalculateReturnType(containingType, diagnostics, out _resultType, out _returnType);
         }
 
         public override string Name
@@ -104,6 +107,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return false; }
         }
 
+        public override RefKind RefKind
+        {
+            get { return RefKind.None; }
+        }
+
         public override bool IsVirtual
         {
             get { return false; }
@@ -126,22 +134,26 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         public override bool ReturnsVoid
         {
-            get { return _returnType.SpecialType == SpecialType.System_Void; }
+            get { return _returnType.IsVoidType(); }
         }
 
-        public override TypeSymbol ReturnType
+        public override TypeWithAnnotations ReturnTypeWithAnnotations
         {
-            get { return _returnType; }
+            get { return TypeWithAnnotations.Create(_returnType); }
         }
 
-        public override ImmutableArray<CustomModifier> ReturnTypeCustomModifiers
+        public override FlowAnalysisAnnotations ReturnTypeFlowAnalysisAnnotations => FlowAnalysisAnnotations.None;
+
+        public override ImmutableHashSet<string> ReturnNotNullIfParameterNotNull => ImmutableHashSet<string>.Empty;
+
+        public override ImmutableArray<CustomModifier> RefCustomModifiers
         {
             get { return ImmutableArray<CustomModifier>.Empty; }
         }
 
-        public override ImmutableArray<TypeSymbol> TypeArguments
+        public override ImmutableArray<TypeWithAnnotations> TypeArgumentsWithAnnotations
         {
-            get { return ImmutableArray<TypeSymbol>.Empty; }
+            get { return ImmutableArray<TypeWithAnnotations>.Empty; }
         }
 
         public override ImmutableArray<TypeParameterSymbol> TypeParameters
@@ -225,19 +237,26 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         private static void CalculateReturnType(
-            CSharpCompilation compilation,
+            SourceMemberContainerTypeSymbol containingType,
             DiagnosticBag diagnostics,
             out TypeSymbol resultType,
             out TypeSymbol returnType)
         {
-            var submissionReturnType = compilation.SubmissionReturnType ?? typeof(object);
+            CSharpCompilation compilation = containingType.DeclaringCompilation;
+            var submissionReturnTypeOpt = compilation.ScriptCompilationInfo?.ReturnTypeOpt;
             var taskT = compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task_T);
             var useSiteDiagnostic = taskT.GetUseSiteDiagnostic();
             if (useSiteDiagnostic != null)
             {
                 diagnostics.Add(useSiteDiagnostic, NoLocation.Singleton);
             }
-            resultType = compilation.GetTypeByReflectionType(submissionReturnType, diagnostics);
+            // If no explicit return type is set on ScriptCompilationInfo, default to
+            // System.Object from the target corlib. This allows cross compiling scripts
+            // to run on a target corlib that may differ from the host compiler's corlib.
+            // cf. https://github.com/dotnet/roslyn/issues/8506
+            resultType = (object)submissionReturnTypeOpt == null
+                ? compilation.GetSpecialType(SpecialType.System_Object)
+                : compilation.GetTypeByReflectionType(submissionReturnTypeOpt, diagnostics);
             returnType = taskT.Construct(resultType);
         }
     }

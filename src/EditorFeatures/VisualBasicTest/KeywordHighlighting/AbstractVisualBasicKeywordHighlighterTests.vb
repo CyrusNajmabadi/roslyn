@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
@@ -10,15 +12,15 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         Inherits AbstractKeywordHighlighterTests
 
         Protected Overrides Function GetOptions() As IEnumerable(Of ParseOptions)
-            Return {TestOptions.Regular}
+            Return SpecializedCollections.SingletonEnumerable(TestOptions.Regular)
         End Function
 
         Protected Overloads Function TestAsync(element As XElement) As Threading.Tasks.Task
             Return TestAsync(element.NormalizedValue)
         End Function
 
-        Protected Overrides Function CreateWorkspaceFromFileAsync(code As String, options As ParseOptions) As Threading.Tasks.Task(Of TestWorkspace)
-            Return TestWorkspace.CreateVisualBasicAsync(code, DirectCast(options, ParseOptions))
+        Protected Overrides Function CreateWorkspaceFromFile(code As String, options As ParseOptions) As TestWorkspace
+            Return TestWorkspace.CreateVisualBasic(code, DirectCast(options, ParseOptions))
         End Function
     End Class
 End Namespace

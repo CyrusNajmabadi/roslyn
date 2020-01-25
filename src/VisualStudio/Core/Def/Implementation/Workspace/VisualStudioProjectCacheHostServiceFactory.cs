@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Composition;
@@ -14,6 +16,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Workspaces
     {
         private const int ImplicitCacheTimeoutInMS = 10000;
 
+        [ImportingConstructor]
+        public VisualStudioProjectCacheHostServiceFactory()
+        {
+        }
+
         public IWorkspaceService CreateService(HostWorkspaceServices workspaceServices)
         {
             // we support active document tracking only for visual studio workspace host.
@@ -27,6 +34,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Workspaces
 
         private static IWorkspaceService GetMiscProjectCache(HostWorkspaceServices workspaceServices)
         {
+            if (workspaceServices.Workspace.Kind != WorkspaceKind.Host)
+            {
+                return new ProjectCacheService(workspaceServices.Workspace);
+            }
+
             var projectCacheService = new ProjectCacheService(workspaceServices.Workspace, ImplicitCacheTimeoutInMS);
 
             // Also clear the cache when the solution is cleared or removed.
@@ -43,8 +55,12 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Workspaces
 
         private static IWorkspaceService GetVisualStudioProjectCache(HostWorkspaceServices workspaceServices)
         {
-            var projectCacheService = new ProjectCacheService(workspaceServices.Workspace, ImplicitCacheTimeoutInMS);
+            // We will finish setting this up in VisualStudioWorkspaceImpl.DeferredInitializationState
+            return new ProjectCacheService(workspaceServices.Workspace, ImplicitCacheTimeoutInMS);
+        }
 
+        internal static void ConnectProjectCacheServiceToDocumentTracking(HostWorkspaceServices workspaceServices, ProjectCacheService projectCacheService)
+        {
             var documentTrackingService = workspaceServices.GetService<IDocumentTrackingService>();
 
             // Subscribe to events so that we can cache items from the active document's project
@@ -65,8 +81,6 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Workspaces
                     manager.Clear();
                 }
             };
-
-            return projectCacheService;
         }
 
         private class ActiveProjectCacheManager
@@ -86,7 +100,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Workspaces
                 if (documentTrackingService != null)
                 {
                     documentTrackingService.ActiveDocumentChanged += UpdateCache;
-                    UpdateCache(null, documentTrackingService.GetActiveDocument());
+                    UpdateCache(null, documentTrackingService.TryGetActiveDocument());
                 }
             }
 

@@ -1,13 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
-Imports System.Text.RegularExpressions
-Imports Microsoft.CodeAnalysis.Collections
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -33,7 +31,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function BindIsExpression(
              left As BoundExpression,
              right As BoundExpression,
-             node As VisualBasicSyntaxNode,
+             node As SyntaxNode,
              [isNot] As Boolean,
              diagnostics As DiagnosticBag
         ) As BoundExpression
@@ -51,7 +49,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                              left,
                                              right,
                                              checked:=False,
-                                             Type:=booleanType,
+                                             type:=booleanType,
                                              hasErrors:=booleanType.IsErrorType())
 
             ' TODO: Add rewrite for Nullable.
@@ -177,7 +175,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 binary = DirectCast(child, BinaryExpressionSyntax)
             Loop
 
-            Dim compoundStringLength As Integer = 0
             Dim left As BoundExpression = BindValue(child, diagnostics, propagateIsOperandOfConditionalBranch)
 
             Do
@@ -188,8 +185,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 left = BindBinaryOperator(binary, left, right, binary.OperatorToken.Kind,
                                           OverloadResolution.MapBinaryOperatorKind(binary.Kind),
                                           If(binary Is node, isOperandOfConditionalBranch, propagateIsOperandOfConditionalBranch),
-                                          diagnostics,
-                                          compoundStringLength:=compoundStringLength)
+                                          diagnostics)
 
                 child = binary
             Loop While child IsNot node
@@ -198,15 +194,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function BindBinaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             left As BoundExpression,
             right As BoundExpression,
             operatorTokenKind As SyntaxKind,
             preliminaryOperatorKind As BinaryOperatorKind,
             isOperandOfConditionalBranch As Boolean,
             diagnostics As DiagnosticBag,
-            Optional isSelectCase As Boolean = False,
-            <[In], Out> Optional ByRef compoundStringLength As Integer = 0
+            Optional isSelectCase As Boolean = False
         ) As BoundExpression
 
             Debug.Assert(left.IsValue)
@@ -308,7 +303,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If intrinsicOperatorType = SpecialType.None Then
                 ' Must be a bitwise operation with enum type.
                 Debug.Assert(leftType.GetNullableUnderlyingTypeOrSelf().IsEnumType() AndAlso
-                             leftType.GetNullableUnderlyingTypeOrSelf().IsSameTypeIgnoringCustomModifiers(rightType.GetNullableUnderlyingTypeOrSelf()))
+                             leftType.GetNullableUnderlyingTypeOrSelf().IsSameTypeIgnoringAll(rightType.GetNullableUnderlyingTypeOrSelf()))
 
                 If (operatorKind And BinaryOperatorKind.Lifted) = 0 OrElse leftType.IsNullableType() Then
                     operandType = leftType
@@ -326,7 +321,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim operatorResultType As TypeSymbol = operandType
 
             Dim forceToBooleanType As TypeSymbol = Nothing
-            Dim applyIsTrue As Boolean = False
 
             Select Case preliminaryOperatorKind
 
@@ -359,13 +353,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                  ErrorFactory.ErrorInfo(
                                                      If(preliminaryOperatorKind = BinaryOperatorKind.Equals,
                                                         ERRID.WRN_EqualToLiteralNothing, ERRID.WRN_NotEqualToLiteralNothing)))
-                            End If
-
-                            If isOperandOfConditionalBranch Then
-                                ' TODO: I believe the IsTrue is just an optimization to prevent Nullable from unnecessary bubbling up the tree.
-                                ' Perhaps we can do this optimization as a rewrite.
-                                applyIsTrue = True
-                                forceToBooleanType = booleanType
                             End If
                         Else
                             If Not operatorResultType.IsObjectType() Then
@@ -450,8 +437,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End If
 
+            Dim beforeConversion As BoundExpression = left
             left = ApplyConversion(left.Syntax, operandType, left, explicitSemanticForConcatArgument, diagnostics,
                                    explicitSemanticForConcatArgument:=explicitSemanticForConcatArgument)
+
+            If explicitSemanticForConcatArgument AndAlso left IsNot beforeConversion AndAlso left.Kind = BoundKind.Conversion Then
+                Dim conversion = DirectCast(left, BoundConversion)
+                left = conversion.Update(conversion.Operand, conversion.ConversionKind, conversion.Checked, explicitCastInCode:=False,
+                                         constantValueOpt:=conversion.ConstantValueOpt, extendedInfoOpt:=conversion.ExtendedInfoOpt,
+                                         type:=conversion.Type)
+            End If
 
             If (preliminaryOperatorKind = BinaryOperatorKind.LeftShift OrElse preliminaryOperatorKind = BinaryOperatorKind.RightShift) AndAlso
                 Not operandType.IsObjectType() Then
@@ -469,8 +464,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 right = ApplyImplicitConversion(right.Syntax, rightTargetType, right, diagnostics)
             Else
+                beforeConversion = right
+
                 right = ApplyConversion(right.Syntax, operandType, right, explicitSemanticForConcatArgument, diagnostics,
                                         explicitSemanticForConcatArgument:=explicitSemanticForConcatArgument)
+
+                If explicitSemanticForConcatArgument AndAlso right IsNot beforeConversion AndAlso right.Kind = BoundKind.Conversion Then
+                    Dim conversion = DirectCast(right, BoundConversion)
+                    right = conversion.Update(conversion.Operand, conversion.ConversionKind, conversion.Checked, explicitCastInCode:=False,
+                                              constantValueOpt:=conversion.ConstantValueOpt, extendedInfoOpt:=conversion.ExtendedInfoOpt,
+                                              type:=conversion.Type)
+                End If
             End If
 
             If (operatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.Add AndAlso operatorResultType.IsStringType() Then
@@ -485,7 +489,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If Not (left.HasErrors OrElse right.HasErrors) Then
                 Dim integerOverflow As Boolean = False
                 Dim divideByZero As Boolean = False
-                Dim compoundLengthOutOfLimit As Boolean = False
+                Dim lengthOutOfLimit As Boolean = False
 
                 value = OverloadResolution.TryFoldConstantBinaryOperator(operatorKind,
                                                                          left,
@@ -493,16 +497,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                          operatorResultType,
                                                                          integerOverflow,
                                                                          divideByZero,
-                                                                         compoundLengthOutOfLimit,
-                                                                         compoundStringLength)
+                                                                         lengthOutOfLimit)
 
                 If value IsNot Nothing Then
                     If divideByZero Then
                         Debug.Assert(value.IsBad)
                         ReportDiagnostic(diagnostics, node, ErrorFactory.ErrorInfo(ERRID.ERR_ZeroDivide))
-                    ElseIf compoundLengthOutOfLimit
+                    ElseIf lengthOutOfLimit Then
                         Debug.Assert(value.IsBad)
-                        ReportDiagnostic(diagnostics, node, ErrorFactory.ErrorInfo(ERRID.ERR_ConstantStringTooLong))
+                        ReportDiagnostic(diagnostics, right.Syntax, ErrorFactory.ErrorInfo(ERRID.ERR_ConstantStringTooLong))
                     ElseIf (value.IsBad OrElse integerOverflow) Then
                         ' Overflows are reported regardless of the value of OptionRemoveIntegerOverflowChecks, Dev10 behavior.
                         ReportDiagnostic(diagnostics, node, ErrorFactory.ErrorInfo(ERRID.ERR_ExpressionOverflow1, operatorResultType))
@@ -515,16 +518,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End If
 
-            Dim result As BoundExpression = New BoundBinaryOperator(node, operatorKind, left, right, CheckOverflow, value, operatorResultType, hasError)
-
-            Debug.Assert(Not applyIsTrue OrElse forceToBooleanType IsNot Nothing)
+            Dim result As BoundExpression = New BoundBinaryOperator(node, operatorKind Or If(isOperandOfConditionalBranch, BinaryOperatorKind.IsOperandOfConditionalBranch, Nothing),
+                                                                    left, right, CheckOverflow, value, operatorResultType, hasError)
 
             If forceToBooleanType IsNot Nothing Then
                 Debug.Assert(forceToBooleanType.IsBooleanType())
-
-                If applyIsTrue Then
-                    Return ApplyNullableIsTrueOperator(result, forceToBooleanType)
-                End If
 
                 result = ApplyConversion(node, forceToBooleanType, result, isExplicit:=True, diagnostics:=diagnostics)
             End If
@@ -542,7 +540,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function ForceLiftToEmptyString(left As BoundExpression, stringType As TypeSymbol, diagnostics As DiagnosticBag) As BoundExpression
             Debug.Assert(stringType.IsStringType)
 
-            Dim nothingStr = New BoundLiteral(left.Syntax, ConstantValue.Nothing, stringType)
+            Dim nothingStr = New BoundLiteral(left.Syntax, ConstantValue.Nothing, stringType).MakeCompilerGenerated()
 
             Return AnalyzeConversionAndCreateBinaryConditionalExpression(left.Syntax,
                                                                          left,
@@ -551,11 +549,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                          stringType,
                                                                          False,
                                                                          diagnostics,
-                                                                         explicitConversion:=True)
+                                                                         explicitConversion:=True).MakeCompilerGenerated()
         End Function
 
         Private Function BindUserDefinedNonShortCircuitingBinaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             opKind As BinaryOperatorKind,
             left As BoundExpression,
             right As BoundExpression,
@@ -621,7 +619,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '''     !T.IsTrue(temp = x) ? T.Or(temp, y) : temp
         ''' </summary>
         Private Function BindUserDefinedShortCircuitingOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             opKind As BinaryOperatorKind,
             left As BoundExpression,
             right As BoundExpression,
@@ -656,8 +654,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 bitwiseKind = bitwiseKind Or BinaryOperatorKind.Lifted
             End If
 
-            If Not operatorType.IsSameTypeIgnoringCustomModifiers(bitwiseCandidate.Parameters(0).Type) OrElse
-               Not operatorType.IsSameTypeIgnoringCustomModifiers(bitwiseCandidate.Parameters(1).Type) Then
+            If Not operatorType.IsSameTypeIgnoringAll(bitwiseCandidate.Parameters(0).Type) OrElse
+               Not operatorType.IsSameTypeIgnoringAll(bitwiseCandidate.Parameters(1).Type) Then
                 ReportDiagnostic(diagnostics, node, ERRID.ERR_UnacceptableLogicalOperator3,
                                  bitwiseCandidate.UnderlyingSymbol,
                                  bitwiseCandidate.UnderlyingSymbol.ContainingType,
@@ -708,7 +706,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim checkCandidate As OverloadResolution.Candidate = leftCheckOperator.BestResult.Value.Candidate
             Debug.Assert(checkCandidate.ReturnType.IsBooleanType() OrElse checkCandidate.ReturnType.IsNullableOfBoolean())
 
-            If Not operatorType.IsSameTypeIgnoringCustomModifiers(checkCandidate.Parameters(0).Type) Then
+            If Not operatorType.IsSameTypeIgnoringAll(checkCandidate.Parameters(0).Type) Then
                 ReportDiagnostic(diagnostics, node, ERRID.ERR_BinaryOperands3,
                                  SyntaxFacts.GetText(If(opKind = BinaryOperatorKind.AndAlso, SyntaxKind.AndAlsoKeyword, SyntaxKind.OrElseKeyword)),
                                  left.Type, right.Type)
@@ -718,9 +716,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 bitwise = BindUserDefinedNonShortCircuitingBinaryOperator(node, bitwiseKind, left, right, bitwiseOperator, diagnostics)
             Else
                 ' Convert the operands to the operator type.
-                Dim operands As ImmutableArray(Of BoundExpression) = PassArguments(node, bitwiseAnalysis,
-                                                                                  ImmutableArray.Create(Of BoundExpression)(left, right),
-                                                                                  diagnostics)
+                Dim argumentInfo As (Arguments As ImmutableArray(Of BoundExpression), DefaultArguments As BitVector) =
+                    PassArguments(node, bitwiseAnalysis, ImmutableArray.Create(Of BoundExpression)(left, right), diagnostics)
+                Debug.Assert(argumentInfo.DefaultArguments.IsNull)
                 bitwiseAnalysis.ConversionsOpt = Nothing
 
                 bitwise = New BoundUserDefinedBinaryOperator(node, bitwiseKind,
@@ -730,14 +728,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                                           DirectCast(bitwiseCandidate.UnderlyingSymbol, MethodSymbol)),
                                                                                       LookupResultKind.Good, Nothing,
                                                                                       QualificationKind.Unqualified).MakeCompilerGenerated(),
-                                                                 ImmutableArray.Create(Of BoundExpression)(leftPlaceholder, operands(1)),
+                                                                 ImmutableArray.Create(Of BoundExpression)(leftPlaceholder, argumentInfo.Arguments(1)),
                                                                  bitwiseAnalysis,
                                                                  bitwiseOperator.AsyncLambdaSubToFunctionMismatch,
                                                                  diagnostics),
                                                              CheckOverflow,
                                                              operatorType)
 
-                leftOperand = operands(0)
+                leftOperand = argumentInfo.Arguments(0)
             End If
 
             Dim testOp As BoundUserDefinedUnaryOperator = BindUserDefinedUnaryOperator(node,
@@ -768,8 +766,7 @@ Done:
             Return New BoundUserDefinedShortCircuitingOperator(node, leftOperand, leftPlaceholder, test, bitwise, operatorType, hasErrors)
         End Function
 
-
-        Private Sub ReportBinaryOperatorOnObject(
+        Private Shared Sub ReportBinaryOperatorOnObject(
             operatorTokenKind As SyntaxKind,
             operand As BoundExpression,
             preliminaryOperatorKind As BinaryOperatorKind,
@@ -810,7 +807,7 @@ Done:
         ''' lookups and construction of new instances of symbols.
         ''' </summary>
         Private Function GetSpecialTypeForBinaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             leftType As TypeSymbol,
             rightType As TypeSymbol,
             specialType As SpecialType,
@@ -875,7 +872,7 @@ Done:
         ''' Get symbol for a Nullable type of particular type, reuse symbols for operand types to avoid type 
         ''' lookups and construction of new instances of symbols.
         ''' </summary>
-        Private Function GetNullableTypeForBinaryOperator(
+        Private Shared Function GetNullableTypeForBinaryOperator(
             leftType As TypeSymbol,
             rightType As TypeSymbol,
             ofType As TypeSymbol
@@ -934,7 +931,7 @@ Done:
         End Function
 
         Private Sub ReportUndefinedOperatorError(
-            syntax As VisualBasicSyntaxNode,
+            syntax As SyntaxNode,
             left As BoundExpression,
             right As BoundExpression,
             operatorTokenKind As SyntaxKind,
@@ -1172,13 +1169,13 @@ Done:
                 Else
                     resultType = GetSpecialType(intrinsicOperatorType, node.Operand, diagnostics)
 
-                    If operandType.OriginalDefinition.SpecialType = SpecialType.System_Nullable_T Then
+                    If operandType.IsNullableType() Then
                         resultType = DirectCast(operandType.OriginalDefinition, NamedTypeSymbol).Construct(resultType)
                     End If
                 End If
             End If
 
-            Debug.Assert(((operatorKind And UnaryOperatorKind.Lifted) <> 0) = (resultType.OriginalDefinition.SpecialType = SpecialType.System_Nullable_T))
+            Debug.Assert(((operatorKind And UnaryOperatorKind.Lifted) <> 0) = resultType.IsNullableType())
 
             ' Option Strict disallows all unary operations on Object operands. Otherwise just warn.
             If operandType.SpecialType = SpecialType.System_Object Then
@@ -1212,7 +1209,7 @@ Done:
         End Function
 
         Private Function BindUserDefinedUnaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             opKind As UnaryOperatorKind,
             operand As BoundExpression,
             <[In]> ByRef userDefinedOperator As OverloadResolution.OverloadResolutionResult,
@@ -1251,7 +1248,7 @@ Done:
             Return New BoundUserDefinedUnaryOperator(node, opKind, result, result.Type)
         End Function
 
-        Private Sub ReportUndefinedOperatorError(
+        Private Shared Sub ReportUndefinedOperatorError(
             syntax As UnaryExpressionSyntax,
             operand As BoundExpression,
             diagnostics As DiagnosticBag

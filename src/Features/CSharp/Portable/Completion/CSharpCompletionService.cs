@@ -1,65 +1,123 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
+using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Completion.SuggestionMode;
+using Microsoft.CodeAnalysis.EmbeddedLanguages.LanguageServices;
+using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
-using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.Completion
 {
-    [ExportLanguageService(typeof(ICompletionService), LanguageNames.CSharp), Shared]
-    internal class CSharpCompletionService : AbstractCompletionService
+    [ExportLanguageServiceFactory(typeof(CompletionService), LanguageNames.CSharp), Shared]
+    internal class CSharpCompletionServiceFactory : ILanguageServiceFactory
     {
-        private readonly IEnumerable<CompletionListProvider> _defaultCompletionProviders =
-            new CompletionListProvider[]
-            {
+        [ImportingConstructor]
+        public CSharpCompletionServiceFactory()
+        {
+        }
+
+        public ILanguageService CreateLanguageService(HostLanguageServices languageServices)
+        {
+            return new CSharpCompletionService(languageServices.WorkspaceServices.Workspace);
+        }
+    }
+
+    internal class CSharpCompletionService : CommonCompletionService
+    {
+        private readonly Workspace _workspace;
+        private readonly ImmutableArray<CompletionProvider> _defaultCompletionProviders;
+
+        public CSharpCompletionService(
+            Workspace workspace, ImmutableArray<CompletionProvider>? exclusiveProviders = null)
+            : base(workspace, exclusiveProviders)
+        {
+            _workspace = workspace;
+
+            var defaultCompletionProviders = ImmutableArray.Create<CompletionProvider>(
                 new AttributeNamedParameterCompletionProvider(),
                 new NamedParameterCompletionProvider(),
-                new SpeculativeTCompletionProvider(),
                 new KeywordCompletionProvider(),
+                new SpeculativeTCompletionProvider(),
                 new SymbolCompletionProvider(),
-                new ExplicitInterfaceCompletionProvider(),
+                new ExplicitInterfaceMemberCompletionProvider(),
+                new ExplicitInterfaceTypeCompletionProvider(),
                 new ObjectCreationCompletionProvider(),
                 new ObjectInitializerCompletionProvider(),
-                new SpeculativeTCompletionProvider(),
                 new CSharpSuggestionModeCompletionProvider(),
                 new EnumAndCompletionListTagCompletionProvider(),
                 new CrefCompletionProvider(),
                 new SnippetCompletionProvider(),
                 new ExternAliasCompletionProvider(),
-            }.ToImmutableArray();
+                new OverrideCompletionProvider(),
+                new PartialMethodCompletionProvider(),
+                new PartialTypeCompletionProvider(),
+                new XmlDocCommentCompletionProvider(),
+                new TupleNameCompletionProvider(),
+                new DeclarationNameCompletionProvider(),
+                new InternalsVisibleToCompletionProvider(),
+                new PropertySubpatternCompletionProvider(),
+                new TypeImportCompletionProvider(),
+                new ExtensionMethodImportCompletionProvider());
 
-        public override IEnumerable<CompletionListProvider> GetDefaultCompletionProviders()
+            var languageServices = workspace.Services.GetLanguageServices(LanguageNames.CSharp);
+            var languagesProvider = languageServices.GetService<IEmbeddedLanguagesProvider>();
+            if (languagesProvider != null)
+            {
+                defaultCompletionProviders = defaultCompletionProviders.Add(
+                    new EmbeddedLanguageCompletionProvider(languagesProvider));
+            }
+
+            _defaultCompletionProviders = defaultCompletionProviders;
+        }
+
+        public override string Language => LanguageNames.CSharp;
+
+        protected override ImmutableArray<CompletionProvider> GetBuiltInProviders()
         {
             return _defaultCompletionProviders;
         }
 
-        public override async Task<TextSpan> GetDefaultTrackingSpanAsync(Document document, int position, CancellationToken cancellationToken)
+        public override TextSpan GetDefaultCompletionListSpan(SourceText text, int caretPosition)
         {
-            var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            return CompletionUtilities.GetTextChangeSpan(text, position);
+            return CompletionUtilities.GetCompletionItemSpan(text, caretPosition);
         }
 
-        protected override bool TriggerOnBackspace(SourceText text, int position, CompletionTriggerInfo triggerInfo, OptionSet options)
-        {
-            return false;
-        }
+        private CompletionRules _latestRules = CompletionRules.Default;
 
-        public override CompletionRules GetCompletionRules()
+        public override CompletionRules GetRules()
         {
-            return new CSharpCompletionRules(this);
-        }
+            var options = _workspace.Options;
 
-        protected override string GetLanguageName()
-        {
-            return LanguageNames.CSharp;
+            var enterRule = options.GetOption(CompletionOptions.EnterKeyBehavior, LanguageNames.CSharp);
+            var snippetRule = options.GetOption(CompletionOptions.SnippetsBehavior, LanguageNames.CSharp);
+
+            // Although EnterKeyBehavior is a per-language setting, the meaning of an unset setting (Default) differs between C# and VB
+            // In C# the default means Never to maintain previous behavior
+            if (enterRule == EnterKeyRule.Default)
+            {
+                enterRule = EnterKeyRule.Never;
+            }
+
+            if (snippetRule == SnippetsRule.Default)
+            {
+                snippetRule = SnippetsRule.AlwaysInclude;
+            }
+
+            // use interlocked + stored rules to reduce # of times this gets created when option is different than default
+            var newRules = _latestRules.WithDefaultEnterKeyRule(enterRule)
+                                       .WithSnippetsRule(snippetRule);
+
+            Interlocked.Exchange(ref _latestRules, newRules);
+
+            return newRules;
         }
     }
 }

@@ -1,7 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Diagnostics;
+using Microsoft.Cci;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.Emit;
 
@@ -12,18 +15,21 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
     {
         #region IEventDefinition Members
 
-        IEnumerable<Cci.IMethodReference> Cci.IEventDefinition.Accessors
+        IEnumerable<Cci.IMethodReference> Cci.IEventDefinition.GetAccessors(EmitContext context)
         {
-            get
+            CheckDefinitionInvariant();
+
+            var addMethod = this.AddMethod;
+            Debug.Assert((object)addMethod != null);
+            if (addMethod.ShouldInclude(context))
             {
-                CheckDefinitionInvariant();
-
-                var addMethod = this.AddMethod;
-                Debug.Assert((object)addMethod != null);
                 yield return addMethod;
+            }
 
-                var removeMethod = this.RemoveMethod;
-                Debug.Assert((object)removeMethod != null);
+            var removeMethod = this.RemoveMethod;
+            Debug.Assert((object)removeMethod != null);
+            if (removeMethod.ShouldInclude(context))
+            {
                 yield return removeMethod;
             }
         }

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -26,30 +28,30 @@ namespace Microsoft.CodeAnalysis.Diagnostics.Log
             "Analyzer.OperationBlock",
             "Analyzer.OperationBlockEnd",
             "Analyzer.OperationBlockStart",
+            "Analyzer.SymbolEnd",
+            "Analyzer.SymbolStart",
+            "Analyzer.Suppression",
         };
 
-        private readonly DiagnosticAnalyzerService _owner;
+        private readonly DiagnosticAnalyzerService _analyzerService;
         private ImmutableDictionary<Type, AnalyzerInfo> _analyzerInfoMap;
 
-        public DiagnosticLogAggregator(DiagnosticAnalyzerService owner)
+        public DiagnosticLogAggregator(DiagnosticAnalyzerService analyzerService)
         {
-            _owner = owner;
+            _analyzerService = analyzerService;
             _analyzerInfoMap = ImmutableDictionary<Type, AnalyzerInfo>.Empty;
         }
 
-        public IEnumerable<KeyValuePair<Type, AnalyzerInfo>> AnalyzerInfoMap
-        {
-            get { return _analyzerInfoMap; }
-        }
+        public IEnumerable<KeyValuePair<Type, AnalyzerInfo>> AnalyzerInfoMap => _analyzerInfoMap;
 
-        public void UpdateAnalyzerTypeCount(DiagnosticAnalyzer analyzer, AnalyzerTelemetryInfo analyzerTelemetryInfo, Project projectOpt)
+        public void UpdateAnalyzerTypeCount(DiagnosticAnalyzer analyzer, AnalyzerTelemetryInfo analyzerTelemetryInfo)
         {
-            var telemetry = DiagnosticAnalyzerLogger.AllowsTelemetry(_owner, analyzer, projectOpt?.Id);
+            var isTelemetryAllowed = DiagnosticAnalyzerLogger.AllowsTelemetry(analyzer, _analyzerService);
 
             ImmutableInterlocked.AddOrUpdate(
                 ref _analyzerInfoMap,
                 analyzer.GetType(),
-                addValue: new AnalyzerInfo(analyzer, analyzerTelemetryInfo, telemetry),
+                addValue: new AnalyzerInfo(analyzer, analyzerTelemetryInfo, isTelemetryAllowed),
                 updateValueFactory: (k, ai) =>
                 {
                     ai.SetAnalyzerTypeCount(analyzerTelemetryInfo);
@@ -86,6 +88,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics.Log
                 Counts[11] = analyzerTelemetryInfo.OperationBlockActionsCount;
                 Counts[12] = analyzerTelemetryInfo.OperationBlockEndActionsCount;
                 Counts[13] = analyzerTelemetryInfo.OperationBlockStartActionsCount;
+                Counts[14] = analyzerTelemetryInfo.SymbolStartActionsCount;
+                Counts[15] = analyzerTelemetryInfo.SymbolEndActionsCount;
+                Counts[16] = analyzerTelemetryInfo.SuppressionActionsCount;
             }
         }
     }

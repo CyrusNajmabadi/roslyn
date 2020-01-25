@@ -1,14 +1,19 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeGen;
+using Microsoft.CodeAnalysis.Debugging;
 using Microsoft.CodeAnalysis.Emit;
-using Roslyn.Utilities;
 using EmitContext = Microsoft.CodeAnalysis.Emit.EmitContext;
 
 namespace Microsoft.Cci
@@ -23,47 +28,47 @@ namespace Microsoft.Cci
         /// C/C++ style calling convention for unmanaged methods. The call stack is cleaned up by the caller, 
         /// which makes this convention suitable for calling methods that accept extra arguments.
         /// </summary>
-        C = 1,
+        C = SignatureCallingConvention.CDecl,
 
         /// <summary>
         /// The convention for calling managed methods with a fixed number of arguments.
         /// </summary>
-        Default = 0,
+        Default = SignatureCallingConvention.Default,
 
         /// <summary>
         /// The convention for calling managed methods that accept extra arguments.
         /// </summary>
-        ExtraArguments = 5,
+        ExtraArguments = SignatureCallingConvention.VarArgs,
 
         /// <summary>
         /// Arguments are passed in registers when possible. This calling convention is not yet supported.
         /// </summary>
-        FastCall = 4,
+        FastCall = SignatureCallingConvention.FastCall,
 
         /// <summary>
         /// Win32 API calling convention for calling unmanaged methods via PlatformInvoke. The call stack is cleaned up by the callee.
         /// </summary>
-        Standard = 2,
+        Standard = SignatureCallingConvention.StdCall,
 
         /// <summary>
         /// C++ member unmanaged method (non-vararg) calling convention. The callee cleans the stack and the this pointer is pushed on the stack last.
         /// </summary>
-        ThisCall = 3,
+        ThisCall = SignatureCallingConvention.ThisCall,
 
         /// <summary>
         /// The convention for calling a generic method.
         /// </summary>
-        Generic = 0x10,
+        Generic = SignatureAttributes.Generic,
 
         /// <summary>
         /// The convention for calling an instance method with an implicit this parameter (the method does not have an explicit parameter definition for this).
         /// </summary>
-        HasThis = 0x20,
+        HasThis = SignatureAttributes.Instance,
 
         /// <summary>
         /// The convention for calling an instance method that explicitly declares its first parameter to correspond to the this instance.
         /// </summary>
-        ExplicitThis = 0x40
+        ExplicitThis = SignatureAttributes.ExplicitThis
     }
 
     /// <summary>
@@ -75,7 +80,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// A list of methods that are associated with the event.
         /// </summary>
-        IEnumerable<IMethodReference> Accessors { get; }
+        IEnumerable<IMethodReference> GetAccessors(EmitContext context);
 
         /// <summary>
         /// The method used to add a handler to the event.
@@ -85,7 +90,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// The method used to call the event handlers when the event occurs. May be null.
         /// </summary>
-        IMethodReference/*?*/ Caller { get; }
+        IMethodReference? Caller { get; }
 
         /// <summary>
         /// True if the event gets special treatment from the runtime.
@@ -118,7 +123,7 @@ namespace Microsoft.Cci
         /// The compile time value of the field. This value should be used directly in IL, rather than a reference to the field.
         /// If the field does not have a valid compile time value, Dummy.Constant is returned.
         /// </summary>
-        IMetadataConstant GetCompileTimeValue(EmitContext context);
+        MetadataConstant? GetCompileTimeValue(EmitContext context);
 
         /// <summary>
         /// Mapped field data, or null if the field is not mapped.
@@ -166,7 +171,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// Specifies how this field is marshalled when it is accessed from unmanaged code.
         /// </summary>
-        IMarshallingInformation MarshallingInformation
+        IMarshallingInformation? MarshallingInformation
         {
             get;
             // ^ requires this.IsMarshalledExplicitly;
@@ -184,7 +189,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// Offset of the field.
         /// </summary>
-        uint Offset
+        int Offset
         {
             get;
             // ^ requires this.ContainingTypeDefinition.Layout == LayoutKind.Explicit;
@@ -204,10 +209,10 @@ namespace Microsoft.Cci
         /// <summary>
         /// The Field being referred to.
         /// </summary>
-        IFieldDefinition GetResolvedField(EmitContext context);
+        IFieldDefinition? GetResolvedField(EmitContext context);
 
 
-        ISpecializedFieldReference AsSpecializedFieldReference { get; }
+        ISpecializedFieldReference? AsSpecializedFieldReference { get; }
 
 
         /// <summary>
@@ -228,7 +233,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// The compile time value of the definition, if it is a local constant.
         /// </summary>
-        IMetadataConstant CompileTimeValue
+        MetadataConstant CompileTimeValue
         {
             get;
         }
@@ -256,27 +261,28 @@ namespace Microsoft.Cci
         LocalSlotConstraints Constraints { get; }
 
         /// <summary>
-        /// True if the local variable is of type Dynamic.
-        /// </summary>
-        bool IsDynamic { get; }
-
-        /// <summary>
         /// Each local has an attributes field in the PDB.  To match the native compiler,
-        /// we emit "1" for locals that should definitely not bind in the debugger and "0"
+        /// we emit <see cref="LocalVariableAttributes.DebuggerHidden"/> for locals that should 
+        /// definitely not bind in the debugger and <see cref="LocalVariableAttributes.None"/>
         /// for all other locals.
         /// </summary>
         /// <remarks>
-        /// A value of "1" is a sufficient, but not a necessary, condition for hiding the
-        /// local in the debugger.  Locals with value "0" may also be hidden.
+        /// A value of <see cref="LocalVariableAttributes.DebuggerHidden"/> is a sufficient, but not a necessary, condition for hiding the
+        /// local in the debugger.  Locals with value <see cref="LocalVariableAttributes.None"/> may also be hidden.
         /// 
         /// Hidden locals must still be emitted because they participate in evaluation.
         /// </remarks>
-        uint PdbAttributes { get; }
+        LocalVariableAttributes PdbAttributes { get; }
 
         /// <summary>
-        /// Should return the synthesized dynamic attributes of the local definition if any. Else null.
+        /// The synthesized dynamic attributes of the local definition if any, or empty.
         /// </summary>
-        ImmutableArray<TypedConstant> DynamicTransformFlags { get; }
+        ImmutableArray<bool> DynamicTransformFlags { get; }
+
+        /// <summary>
+        /// The tuple element names of the local definition if any, or empty.
+        /// </summary>
+        ImmutableArray<string> TupleElementNames { get; }
 
         /// <summary>
         /// The type of the local.
@@ -299,7 +305,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// Optional serialized local signature.
         /// </summary>
-        byte[] Signature { get; }
+        byte[]? Signature { get; }
 
         /// <summary>
         /// Local id, or <see cref="LocalDebugId.None"/> if this is a local constant, short-lived temp variable, 
@@ -309,69 +315,10 @@ namespace Microsoft.Cci
     }
 
     /// <summary>
-    /// Represents additional info needed by async method implementation methods 
-    /// (MoveNext() methods) to properly emit necessary PDB data for async debugging.
-    /// </summary>
-    internal class AsyncMethodBodyDebugInfo
-    {
-        /// <summary>
-        ///  Original async method transformed into MoveNext() 
-        /// </summary>
-        public readonly IMethodDefinition KickoffMethod;
-
-        /// <summary> 
-        /// IL offset of catch handler or -1 
-        /// </summary>
-        public readonly int CatchHandlerOffset;
-
-        /// <summary> 
-        /// Set of IL offsets where await operators yield control
-        ///  </summary>
-        public readonly ImmutableArray<int> YieldOffsets;
-
-        /// <summary> 
-        /// Set of IL offsets where await operators are to be resumed 
-        /// </summary>
-        public readonly ImmutableArray<int> ResumeOffsets;
-
-        public AsyncMethodBodyDebugInfo(
-            IMethodDefinition kickoffMethod,
-            int catchHandlerOffset,
-            ImmutableArray<int> yieldOffsets,
-            ImmutableArray<int> resumeOffsets)
-        {
-            Debug.Assert(!yieldOffsets.IsDefault && !resumeOffsets.IsDefault && yieldOffsets.Length == resumeOffsets.Length);
-
-            this.KickoffMethod = kickoffMethod;
-            this.CatchHandlerOffset = catchHandlerOffset;
-            this.YieldOffsets = yieldOffsets;
-            this.ResumeOffsets = resumeOffsets;
-        }
-    }
-
-    /// <summary>
     /// A metadata (IL) level representation of the body of a method or of a property/event accessor.
     /// </summary>
     internal interface IMethodBody
     {
-        /// <summary>
-        /// Calls the visitor.Visit(T) method where T is the most derived object model node interface type implemented by the concrete type
-        /// of the object implementing IDoubleDispatcher. The dispatch method does not invoke Dispatch on any child objects. If child traversal
-        /// is desired, the implementations of the Visit methods should do the subsequent dispatching.
-        /// </summary>
-        void Dispatch(MetadataVisitor visitor);
-
-        ///// <summary>
-        ///// Returns the IL operation that is located at the given offset. If no operation exists the given offset, Dummy.Operation is returned.
-        ///// The offset of the operation that follows the operation at the given offset is returned as the value of the second parameter.
-        ///// If the given offset is invalid, or is the offset of the last operation in the method body, offsetOfNextOperation will be set to -1.
-        ///// </summary>
-        ///// <param name="offset">The offset of the operation to be returned by this method.</param>
-        ///// <param name="offsetOfNextOperation">The offset of the operation that follows the one returned by this method. If no such operation exists, the value is -1.</param>
-        // IOperation GetOperationAt(int offset, out int offsetOfNextOperation);
-        //// ^ requires 0 <= offset;
-        //// ^ ensures offsetOfNextOperation == -1 || offsetOfNextOperation > offset;
-
         /// <summary>
         /// A list exception data within the method body IL.
         /// </summary>
@@ -384,7 +331,12 @@ namespace Microsoft.Cci
         /// <summary>
         /// True if the locals are initialized by zeroing the stack upon method entry.
         /// </summary>
-        bool LocalsAreZeroed { get; }
+        bool AreLocalsZeroed { get; }
+
+        /// <summary>
+        /// True if there's a stackalloc somewhere in the method.
+        /// </summary>
+        bool HasStackalloc { get; }
 
         /// <summary>
         /// The local variables of the method.
@@ -398,9 +350,9 @@ namespace Microsoft.Cci
         IMethodDefinition MethodDefinition { get; }
 
         /// <summary>
-        /// Debugging information associated with an async method to support EE.
+        /// Debugging information associated with a MoveNext method of a state machine.
         /// </summary>
-        AsyncMethodBodyDebugInfo AsyncDebugInfo { get; }
+        StateMachineMoveNextBodyDebugInfo MoveNextBodyInfo { get; }
 
         /// <summary>
         /// The maximum number of elements on the evaluation stack during the execution of the method.
@@ -408,9 +360,7 @@ namespace Microsoft.Cci
         ushort MaxStack { get; }
 
         ImmutableArray<byte> IL { get; }
-        bool HasAnySequencePoints { get; }
-        ImmutableArray<SequencePoint> GetSequencePoints();
-        ImmutableArray<SequencePoint> GetLocations();
+        ImmutableArray<SequencePoint> SequencePoints { get; }
 
         /// <summary>
         /// Returns true if there is at least one dynamic local within the MethodBody
@@ -473,6 +423,8 @@ namespace Microsoft.Cci
 
         ImmutableArray<ClosureDebugInfo> ClosureDebugInfo { get; }
         ImmutableArray<LambdaDebugInfo> LambdaDebugInfo { get; }
+
+        DynamicAnalysisMethodBodyData DynamicAnalysisData { get; }
     }
 
     /// <summary>
@@ -605,7 +557,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// Custom attributes associated with the method's return value.
         /// </summary>
-        IEnumerable<ICustomAttribute> ReturnValueAttributes { get; }
+        IEnumerable<ICustomAttribute> GetReturnValueAttributes(EmitContext context);
 
         /// <summary>
         /// The return value has associated marshalling information.
@@ -651,7 +603,7 @@ namespace Microsoft.Cci
         /// A compile time constant value that should be supplied as the corresponding argument value by callers that do not explicitly specify an argument value for this parameter.
         /// Null if the parameter doesn't have default value.
         /// </summary>
-        IMetadataConstant GetDefaultValue(EmitContext context);
+        MetadataConstant? GetDefaultValue(EmitContext context);
 
         /// <summary>
         /// True if the parameter has a default value that should be supplied as the argument value by a caller for which the argument value has not been explicitly specified.
@@ -685,7 +637,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// Specifies how this parameter is marshalled when it is accessed from unmanaged code.
         /// </summary>
-        IMarshallingInformation MarshallingInformation
+        IMarshallingInformation? MarshallingInformation
         {
             get;
             // ^ requires this.IsMarshalledExplicitly;
@@ -710,12 +662,12 @@ namespace Microsoft.Cci
         /// <summary>
         /// A list of methods that are associated with the property.
         /// </summary>
-        IEnumerable<IMethodReference> Accessors { get; }
+        IEnumerable<IMethodReference> GetAccessors(EmitContext context);
 
         /// <summary>
         /// A compile time constant value that provides the default value for the property. (Who uses this and why?)
         /// </summary>
-        IMetadataConstant DefaultValue
+        MetadataConstant? DefaultValue
         {
             get;
             // ^ requires this.HasDefaultValue;
@@ -724,7 +676,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// The method used to get the value of this property. May be absent (null).
         /// </summary>
-        IMethodReference/*?*/ Getter { get; }
+        IMethodReference? Getter { get; }
 
         /// <summary>
         /// True if this property has a compile time constant associated with that serves as a default value for the property. (Who uses this and why?)
@@ -749,7 +701,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// The method used to set the value of this property. May be absent (null).
         /// </summary>
-        IMethodReference/*?*/ Setter { get; }
+        IMethodReference? Setter { get; }
     }
 
     /// <summary>
@@ -774,9 +726,17 @@ namespace Microsoft.Cci
         ImmutableArray<IParameterTypeInformation> GetParameters(EmitContext context);
 
         /// <summary>
-        /// Returns the list of custom modifiers, if any, associated with the returned value. Evaluate this property only if ReturnValueIsModified is true.
+        /// Returns the list of custom modifiers, if any, associated with the return type. 
         /// </summary>
         ImmutableArray<ICustomModifier> ReturnValueCustomModifiers
+        {
+            get;
+        }
+
+        /// <summary>
+        /// Returns the list of custom modifiers, if any, associated with the ref modifier. 
+        /// </summary>
+        ImmutableArray<ICustomModifier> RefCustomModifiers
         {
             get;
         }
@@ -831,7 +791,8 @@ namespace Microsoft.Cci
         /// type of a generic type instance), then the unspecialized member refers to a member from the unspecialized containing type. (I.e. the unspecialized member always
         /// corresponds to a definition that is not obtained via specialization.)
         /// </summary>
-        IEventDefinition/*!*/ UnspecializedVersion
+        [NotNull]
+        IEventDefinition UnspecializedVersion
         {
             get;
         }
@@ -875,7 +836,8 @@ namespace Microsoft.Cci
         /// type of a generic type instance), then the unspecialized member refers to a member from the unspecialized containing type. (I.e. the unspecialized member always
         /// corresponds to a definition that is not obtained via specialization.)
         /// </summary>
-        IPropertyDefinition/*!*/ UnspecializedVersion
+        [NotNull]
+        IPropertyDefinition UnspecializedVersion
         {
             get;
         }
@@ -909,7 +871,7 @@ namespace Microsoft.Cci
         /// <summary>
         /// The method being referred to.
         /// </summary>
-        IMethodDefinition GetResolvedMethod(EmitContext context);
+        IMethodDefinition? GetResolvedMethod(EmitContext context);
         // ^ ensures this is IMethodDefinition ==> result == this;
 
         /// <summary>
@@ -917,8 +879,8 @@ namespace Microsoft.Cci
         /// </summary>
         ImmutableArray<IParameterTypeInformation> ExtraParameters { get; }
 
-        IGenericMethodInstanceReference AsGenericMethodInstanceReference { get; }
-        ISpecializedMethodReference AsSpecializedMethodReference { get; }
+        IGenericMethodInstanceReference? AsGenericMethodInstanceReference { get; }
+        ISpecializedMethodReference? AsSpecializedMethodReference { get; }
     }
 
     /// <summary>
@@ -957,16 +919,6 @@ namespace Microsoft.Cci
         new string Name { get; }
     }
 
-    internal enum EncFuncCode
-    {
-        Default = 0,
-        AddMethod = 1,
-        AddField = 2,
-        AddParameter = 3,
-        AddProperty = 4,
-        AddEvent = 5
-    }
-
     internal static class Extensions
     {
         internal static bool HasBody(this IMethodDefinition methodDef)
@@ -976,6 +928,33 @@ namespace Microsoft.Cci
 
             return !methodDef.IsAbstract && !methodDef.IsExternal &&
                 (methodDef.ContainingTypeDefinition == null || !methodDef.ContainingTypeDefinition.IsComObject);
+        }
+
+        /// <summary>
+        /// When emitting ref assemblies, some members will not be included.
+        /// </summary>
+        public static bool ShouldInclude(this ITypeDefinitionMember member, EmitContext context)
+        {
+            if (context.IncludePrivateMembers)
+            {
+                return true;
+            }
+
+            var method = member as IMethodDefinition;
+            if (method != null && method.IsVirtual)
+            {
+                return true;
+            }
+
+            switch (member.Visibility)
+            {
+                case TypeMemberVisibility.Private:
+                    return context.IncludePrivateMembers;
+                case TypeMemberVisibility.Assembly:
+                case TypeMemberVisibility.FamilyAndAssembly:
+                    return context.IncludePrivateMembers || context.Module.SourceAssemblyOpt?.InternalsAreVisible == true;
+            }
+            return true;
         }
     }
 }

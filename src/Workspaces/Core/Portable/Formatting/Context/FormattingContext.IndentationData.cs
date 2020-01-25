@@ -1,7 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Formatting.Rules;
 using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Text;
@@ -45,10 +46,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                 _indentation = indentation;
             }
 
-            public override int Indentation
-            {
-                get { return _indentation; }
-            }
+            public override int Indentation => _indentation;
         }
 
         private class LazyIndentationData : IndentationData
@@ -60,10 +58,7 @@ namespace Microsoft.CodeAnalysis.Formatting
                 _indentationGetter = indentationGetter;
             }
 
-            public override int Indentation
-            {
-                get { return _indentationGetter.Value; }
-            }
+            public override int Indentation => _indentationGetter.Value;
         }
 
         private class RelativeIndentationData : LazyIndentationData

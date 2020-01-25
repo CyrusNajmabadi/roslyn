@@ -1,6 +1,7 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class ImplementsKeywordRecommenderTests
@@ -8,14 +9,14 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.De
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsAfterClassDeclarationTest() As Task
             Await VerifyRecommendationsContainAsync(<File>
-Class Foo
+Class Goo
 |</File>, "Implements")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsAfterClassDeclarationAndBlankLineTest() As Task
             Await VerifyRecommendationsContainAsync(<File>
-Class Foo
+Class Goo
 
 |</File>, "Implements")
         End Function
@@ -23,22 +24,22 @@ Class Foo
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsAfterImplementsTest() As Task
             Await VerifyRecommendationsContainAsync(<File>
-Class Foo
-Implements IFooable
+Class Goo
+Implements IGooable
 |</File>, "Implements")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsInStructureTest() As Task
             Await VerifyRecommendationsContainAsync(<File>
-Structure Foo
+Structure Goo
 |</File>, "Implements")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsAfterInheritsTest() As Task
             Await VerifyRecommendationsContainAsync(<File>
-Class Foo
+Class Goo
 Inherits Base
 |</File>, "Implements")
         End Function
@@ -46,17 +47,17 @@ Inherits Base
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsAfterMethodInClassImplementingInterfaceTest() As Task
             Await VerifyRecommendationsContainAsync(<File>
-Class Foo
-Implements IFooable
-Sub Foo() |
+Class Goo
+Implements IGooable
+Sub Goo() |
 |</File>, "Implements")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Async Function ImplementsNotAfterMethodInClassNotImplementingInterfaceTest() As Task
             Await VerifyRecommendationsMissingAsync(<File>
-Class Foo
-Sub Foo() |
+Class Goo
+Sub Goo() |
 |</File>, "Implements")
         End Function
 
@@ -65,11 +66,11 @@ Sub Foo() |
         Public Async Function ImplementsAfterPropertyNameTest() As Task
             Await VerifyRecommendationsContainAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x |
 </File>,
 "Implements")
@@ -80,11 +81,11 @@ Class bar
         Public Async Function NoImplementsAfterPropertyOpenParenTest() As Task
             Await VerifyRecommendationsMissingAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x( |
 </File>,
 "Implements")
@@ -95,11 +96,11 @@ Class bar
         Public Async Function ImplementsAfterPropertyCloseParenTest() As Task
             Await VerifyRecommendationsContainAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() |
 </File>,
 "Implements")
@@ -110,11 +111,11 @@ Class bar
         Public Async Function NoImplementsAfterPropertyAsTest() As Task
             Await VerifyRecommendationsMissingAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As |
 </File>,
 "Implements")
@@ -125,11 +126,11 @@ Class bar
         Public Async Function ImplementsAfterCompletePropertyAsClauseTest() As Task
             Await VerifyRecommendationsContainAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As Integer |
 </File>,
 "Implements")
@@ -140,11 +141,11 @@ Class bar
         Public Async Function NoImplementsAfterIncompletePropertyAsClauseInitializerTest() As Task
             Await VerifyRecommendationsMissingAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As Integer = |
 </File>,
 "Implements")
@@ -155,11 +156,11 @@ Class bar
         Public Async Function ImplementsAfterCompletePropertyAsClauseInitializerTest() As Task
             Await VerifyRecommendationsContainAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As Integer = 3 |
 </File>,
 "Implements")
@@ -170,11 +171,11 @@ Class bar
         Public Async Function NoImplementsAfterIncompletePropertyAsNewClauseTest() As Task
             Await VerifyRecommendationsMissingAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Object
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As New |
 </File>,
 "Implements")
@@ -185,11 +186,11 @@ Class bar
         Public Async Function ImplementsAfterCompletePropertyAsNewClauseTest() As Task
             Await VerifyRecommendationsContainAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Object
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As New Object |
 </File>,
 "Implements")
@@ -200,11 +201,11 @@ Class bar
         Public Async Function NoImplementsAfterPropertyAsNewClauseOpenParenTest() As Task
             Await VerifyRecommendationsMissingAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Object
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As New Object( |
 </File>,
 "Implements")
@@ -215,11 +216,11 @@ Class bar
         Public Async Function ImplementsAfterPropertyAsNewClauseCloseParenTest() As Task
             Await VerifyRecommendationsContainAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As Object
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As New Object() |
 </File>,
 "Implements")
@@ -230,11 +231,11 @@ Class bar
         Public Async Function NoImplementsAfterPropertyAsNamespaceDotTest() As Task
             Await VerifyRecommendationsMissingAsync(
 <File>
-Interface foo
+Interface goo
     Property x() As System.Collections.Generic.List(Of T)
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As System.|
 </File>,
 "Implements")
@@ -246,11 +247,11 @@ Class bar
             Await VerifyRecommendationsMissingAsync(
 <File>
 Imports System.Collections.Generic
-Interface foo
+Interface goo
     Property x() As List(Of T)
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As List(Of |
 </File>,
 "Implements")
@@ -262,11 +263,11 @@ Class bar
             Await VerifyRecommendationsMissingAsync(
 <File>
 Imports System.Collections.Generic
-Interface foo
+Interface goo
     Property x() As List(Of T)
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x() As List(Of bar |
 </File>,
 "Implements")
@@ -278,11 +279,11 @@ Class bar
             Await VerifyRecommendationsMissingAsync(
 <File>
 Imports System.Collections.Generic
-Interface foo
+Interface goo
     Property x(i As Integer) As Integer
 End Interface
 Class bar
-    Implements foo
+    Implements goo
     Property x(i As Integer |
 </File>,
 "Implements")

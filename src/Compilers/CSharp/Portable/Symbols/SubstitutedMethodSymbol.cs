@@ -1,14 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
@@ -19,14 +16,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
     // C<X> is a ConstructedTypeSymbol.
     // C<X>.M<> is a SubstitutedMethodSymbol. It has parameters of types X and U.
     // C<X>.M<Y> is a ConstructedMethodSymbol.
-    internal class SubstitutedMethodSymbol : MethodSymbol
+    internal class SubstitutedMethodSymbol : WrappedMethodSymbol
     {
         private readonly NamedTypeSymbol _containingType;
-        protected readonly MethodSymbol originalDefinition;
+        private readonly MethodSymbol _underlyingMethod;
         private readonly TypeMap _inputMap;
         private readonly MethodSymbol _constructedFrom;
 
-        private TypeSymbol _lazyReturnType;
+        private TypeWithAnnotations.Boxed _lazyReturnType;
         private ImmutableArray<ParameterSymbol> _lazyParameters;
         private TypeMap _lazyMap;
         private ImmutableArray<TypeParameterSymbol> _lazyTypeParameters;
@@ -37,16 +34,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private int _hashCode; // computed on demand
 
-        internal SubstitutedMethodSymbol(SubstitutedNamedTypeSymbol containingSymbol, MethodSymbol originalDefinition)
+        internal SubstitutedMethodSymbol(NamedTypeSymbol containingSymbol, MethodSymbol originalDefinition)
             : this(containingSymbol, containingSymbol.TypeSubstitution, originalDefinition, constructedFrom: null)
         {
+            Debug.Assert(containingSymbol is SubstitutedNamedTypeSymbol || containingSymbol is SubstitutedErrorTypeSymbol);
+            Debug.Assert(TypeSymbol.Equals(originalDefinition.ContainingType, containingSymbol.OriginalDefinition, TypeCompareKind.ConsiderEverything2));
         }
 
         protected SubstitutedMethodSymbol(NamedTypeSymbol containingSymbol, TypeMap map, MethodSymbol originalDefinition, MethodSymbol constructedFrom)
         {
+            Debug.Assert((object)originalDefinition != null);
             Debug.Assert(originalDefinition.IsDefinition);
             _containingType = containingSymbol;
-            this.originalDefinition = originalDefinition;
+            _underlyingMethod = originalDefinition;
             _inputMap = map;
             if ((object)constructedFrom != null)
             {
@@ -61,17 +61,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
+        public override MethodSymbol UnderlyingMethod
+        {
+            get
+            {
+                return _underlyingMethod;
+            }
+        }
+
         public override MethodSymbol ConstructedFrom
         {
             get
             {
                 return _constructedFrom;
             }
-        }
-
-        public override string GetDocumentationCommentXml(CultureInfo preferredCulture = null, bool expandIncludes = false, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return originalDefinition.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken);
         }
 
         private TypeMap Map
@@ -103,122 +106,33 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert(ReferenceEquals(_constructedFrom, this));
 
             // We're creating a new unconstructed Method from another; alpha-rename type parameters.
-            var newMap = _inputMap.WithAlphaRename(this.originalDefinition, this, out typeParameters);
+            var newMap = _inputMap.WithAlphaRename(this.OriginalDefinition, this, out typeParameters);
 
             var prevMap = Interlocked.CompareExchange(ref _lazyMap, newMap, null);
             if (prevMap != null)
             {
                 // There is a race with another thread who has already set the map
                 // need to ensure that typeParameters, matches the map
-                typeParameters = prevMap.SubstituteTypeParameters(this.originalDefinition.TypeParameters);
+                typeParameters = prevMap.SubstituteTypeParameters(this.OriginalDefinition.TypeParameters);
             }
 
             ImmutableInterlocked.InterlockedCompareExchange(ref _lazyTypeParameters, typeParameters, default(ImmutableArray<TypeParameterSymbol>));
             Debug.Assert(_lazyTypeParameters != null);
         }
 
-        internal sealed override Microsoft.Cci.CallingConvention CallingConvention
-        {
-            get
-            {
-                return originalDefinition.CallingConvention;
-            }
-        }
-
-        public sealed override int Arity
-        {
-            get
-            {
-                return originalDefinition.Arity;
-            }
-        }
-
-        public sealed override string Name
-        {
-            get
-            {
-                return originalDefinition.Name;
-            }
-        }
-
-        internal sealed override bool HasSpecialName
-        {
-            get
-            {
-                return originalDefinition.HasSpecialName;
-            }
-        }
-
-        internal sealed override System.Reflection.MethodImplAttributes ImplementationAttributes
-        {
-            get
-            {
-                return originalDefinition.ImplementationAttributes;
-            }
-        }
-
-        internal sealed override bool RequiresSecurityObject
-        {
-            get
-            {
-                return originalDefinition.RequiresSecurityObject;
-            }
-        }
-
-        public sealed override DllImportData GetDllImportData()
-        {
-            return originalDefinition.GetDllImportData();
-        }
-
-        internal sealed override MarshalPseudoCustomAttributeData ReturnValueMarshallingInformation
-        {
-            get { return originalDefinition.ReturnValueMarshallingInformation; }
-        }
-
-        internal sealed override bool HasDeclarativeSecurity
-        {
-            get { return originalDefinition.HasDeclarativeSecurity; }
-        }
-
-        internal sealed override IEnumerable<Microsoft.Cci.SecurityAttribute> GetSecurityInformation()
-        {
-            return originalDefinition.GetSecurityInformation();
-        }
-
-        internal sealed override ImmutableArray<string> GetAppliedConditionalSymbols()
-        {
-            return originalDefinition.GetAppliedConditionalSymbols();
-        }
-
         public sealed override AssemblySymbol ContainingAssembly
         {
             get
             {
-                return originalDefinition.ContainingAssembly;
+                return OriginalDefinition.ContainingAssembly;
             }
         }
 
-        public sealed override ImmutableArray<Location> Locations
+        public override ImmutableArray<TypeWithAnnotations> TypeArgumentsWithAnnotations
         {
             get
             {
-                return originalDefinition.Locations;
-            }
-        }
-
-        public sealed override ImmutableArray<SyntaxReference> DeclaringSyntaxReferences
-        {
-            get
-            {
-                return originalDefinition.DeclaringSyntaxReferences;
-            }
-        }
-
-        public override ImmutableArray<TypeSymbol> TypeArguments
-        {
-            get
-            {
-                return TypeParameters.Cast<TypeParameterSymbol, TypeSymbol>();
+                return GetTypeParametersAsTypeArguments();
             }
         }
 
@@ -226,79 +140,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get
             {
-                return originalDefinition;
-            }
-        }
-
-        public sealed override bool IsExtern
-        {
-            get
-            {
-                return originalDefinition.IsExtern;
-            }
-        }
-
-        public sealed override bool IsSealed
-        {
-            get
-            {
-                return originalDefinition.IsSealed;
-            }
-        }
-
-        public sealed override bool IsVirtual
-        {
-            get
-            {
-                return originalDefinition.IsVirtual;
-            }
-        }
-
-        public sealed override bool IsAsync
-        {
-            get
-            {
-                return originalDefinition.IsAsync;
-            }
-        }
-
-        public sealed override bool IsAbstract
-        {
-            get
-            {
-                return originalDefinition.IsAbstract;
-            }
-        }
-
-        public sealed override bool IsOverride
-        {
-            get
-            {
-                return originalDefinition.IsOverride;
-            }
-        }
-
-        public sealed override bool IsStatic
-        {
-            get
-            {
-                return originalDefinition.IsStatic;
-            }
-        }
-
-        public sealed override bool IsExtensionMethod
-        {
-            get
-            {
-                return originalDefinition.IsExtensionMethod;
-            }
-        }
-
-        internal override ObsoleteAttributeData ObsoleteAttributeData
-        {
-            get
-            {
-                return originalDefinition.ObsoleteAttributeData;
+                return _underlyingMethod;
             }
         }
 
@@ -306,8 +148,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get
             {
-                var method = originalDefinition.ReducedFrom;
-                return ((object)method == null) ? null : method.Construct(this.TypeArguments);
+                var method = OriginalDefinition.ReducedFrom;
+                return ((object)method == null) ? null : method.Construct(this.TypeArgumentsWithAnnotations);
             }
         }
 
@@ -328,52 +170,18 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         public override TypeSymbol GetTypeInferredDuringReduction(TypeParameterSymbol reducedFromTypeParameter)
         {
             // This will throw if API shouldn't be supported or there is a problem with the argument.
-            var notUsed = originalDefinition.GetTypeInferredDuringReduction(reducedFromTypeParameter);
+            var notUsed = OriginalDefinition.GetTypeInferredDuringReduction(reducedFromTypeParameter);
 
-            Debug.Assert((object)notUsed == null && (object)originalDefinition.ReducedFrom != null);
-            return this.TypeArguments[reducedFromTypeParameter.Ordinal];
+            Debug.Assert((object)notUsed == null && (object)OriginalDefinition.ReducedFrom != null);
+            return this.TypeArgumentsWithAnnotations[reducedFromTypeParameter.Ordinal].Type;
         }
 
         public sealed override MethodSymbol ReducedFrom
         {
             get
             {
-                return originalDefinition.ReducedFrom;
+                return OriginalDefinition.ReducedFrom;
             }
-        }
-
-        public sealed override bool HidesBaseMethodsByName
-        {
-            get
-            {
-                return originalDefinition.HidesBaseMethodsByName;
-            }
-        }
-
-        public sealed override Accessibility DeclaredAccessibility
-        {
-            get
-            {
-                return originalDefinition.DeclaredAccessibility;
-            }
-        }
-
-        internal sealed override bool IsMetadataVirtual(bool ignoreInterfaceImplementationChanges = false)
-        {
-            return originalDefinition.IsMetadataVirtual(ignoreInterfaceImplementationChanges);
-        }
-
-        internal override bool IsMetadataFinal
-        {
-            get
-            {
-                return originalDefinition.IsMetadataFinal;
-            }
-        }
-
-        internal sealed override bool IsMetadataNewSlot(bool ignoreInterfaceImplementationChanges = false)
-        {
-            return originalDefinition.IsMetadataNewSlot(ignoreInterfaceImplementationChanges);
         }
 
         public sealed override Symbol ContainingSymbol
@@ -394,23 +202,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         public sealed override ImmutableArray<CSharpAttributeData> GetAttributes()
         {
-            return this.originalDefinition.GetAttributes();
+            return this.OriginalDefinition.GetAttributes();
+        }
+
+        public override ImmutableArray<CSharpAttributeData> GetReturnTypeAttributes()
+        {
+            return this.OriginalDefinition.GetReturnTypeAttributes();
         }
 
         public sealed override Symbol AssociatedSymbol
         {
             get
             {
-                Symbol underlying = originalDefinition.AssociatedSymbol;
+                Symbol underlying = OriginalDefinition.AssociatedSymbol;
                 return ((object)underlying == null) ? null : underlying.SymbolAsMember(ContainingType);
-            }
-        }
-
-        public sealed override MethodKind MethodKind
-        {
-            get
-            {
-                return originalDefinition.MethodKind;
             }
         }
 
@@ -418,68 +223,30 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             get
             {
-                return originalDefinition.ReturnsVoid;
+                return OriginalDefinition.ReturnsVoid;
             }
         }
 
-        public sealed override bool IsGenericMethod
+        public sealed override TypeWithAnnotations ReturnTypeWithAnnotations
         {
             get
             {
-                return originalDefinition.IsGenericMethod;
-            }
-        }
-
-        public sealed override bool IsImplicitlyDeclared
-        {
-            get
-            {
-                return this.originalDefinition.IsImplicitlyDeclared;
-            }
-        }
-
-        internal sealed override bool GenerateDebugInfo
-        {
-            get
-            {
-                return this.originalDefinition.GenerateDebugInfo;
-            }
-        }
-
-        public sealed override bool IsVararg
-        {
-            get
-            {
-                return originalDefinition.IsVararg;
-            }
-        }
-
-        public sealed override TypeSymbol ReturnType
-        {
-            get
-            {
-                var returnType = _lazyReturnType;
-                if (returnType != null)
+                if (_lazyReturnType == null)
                 {
-                    return returnType;
+                    var returnType = Map.SubstituteType(OriginalDefinition.ReturnTypeWithAnnotations);
+                    Interlocked.CompareExchange(ref _lazyReturnType, new TypeWithAnnotations.Boxed(returnType), null);
                 }
-
-                returnType = Map.SubstituteType(originalDefinition.ReturnType).Type;
-                return Interlocked.CompareExchange(ref _lazyReturnType, returnType, null) ?? returnType;
+                return _lazyReturnType.Value;
             }
         }
 
-        public sealed override ImmutableArray<CustomModifier> ReturnTypeCustomModifiers
+
+        public sealed override ImmutableArray<CustomModifier> RefCustomModifiers
         {
             get
             {
-                return Map.SubstituteCustomModifiers(originalDefinition.ReturnType, originalDefinition.ReturnTypeCustomModifiers);
+                return Map.SubstituteCustomModifiers(OriginalDefinition.RefCustomModifiers);
             }
-        }
-
-        internal sealed override int ParameterCount
-        {
-            get { return this.originalDefinition.ParameterCount; }
         }
 
         public sealed override ImmutableArray<ParameterSymbol> Parameters
@@ -497,7 +264,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         internal sealed override bool IsExplicitInterfaceImplementation
         {
-            get { return this.originalDefinition.IsExplicitInterfaceImplementation; }
+            get { return this.OriginalDefinition.IsExplicitInterfaceImplementation; }
         }
 
         public sealed override ImmutableArray<MethodSymbol> ExplicitInterfaceImplementations
@@ -513,7 +280,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 {
                     ImmutableInterlocked.InterlockedCompareExchange(
                         ref _lazyExplicitInterfaceImplementations,
-                        ExplicitInterfaceHelpers.SubstituteExplicitInterfaceImplementations(this.originalDefinition.ExplicitInterfaceImplementations, Map),
+                        ExplicitInterfaceHelpers.SubstituteExplicitInterfaceImplementations(this.OriginalDefinition.ExplicitInterfaceImplementations, Map),
                         default(ImmutableArray<MethodSymbol>));
                 }
                 return _lazyExplicitInterfaceImplementations;
@@ -537,7 +304,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         internal sealed override bool CallsAreOmitted(SyntaxTree syntaxTree)
         {
-            return originalDefinition.CallsAreOmitted(syntaxTree);
+            return OriginalDefinition.CallsAreOmitted(syntaxTree);
         }
 
         internal sealed override TypeMap TypeSubstitution
@@ -553,7 +320,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             // There should never be any reason to call this in normal compilation
             // scenarios, but the behavior should be sensible if it does occur.
             ParameterSymbol originalThisParameter;
-            if (!originalDefinition.TryGetThisParameter(out originalThisParameter))
+            if (!OriginalDefinition.TryGetThisParameter(out originalThisParameter))
             {
                 thisParameter = null;
                 return false;
@@ -567,7 +334,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private ImmutableArray<ParameterSymbol> SubstituteParameters()
         {
-            var unsubstitutedParameters = originalDefinition.Parameters;
+            var unsubstitutedParameters = OriginalDefinition.Parameters;
             int count = unsubstitutedParameters.Length;
 
             if (count == 0)
@@ -601,28 +368,26 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             // may still be considered equal, we do not want to give different hashcode to such types.
             //
             // Example:
-            //   Having original method A<U>.Foo<V>() we create two _unconstructed_ methods
-            //    A<int>.Foo<V'>
-            //    A<int>.Foo<V">     
+            //   Having original method A<U>.Goo<V>() we create two _unconstructed_ methods
+            //    A<int>.Goo<V'>
+            //    A<int>.Goo<V">     
             //  Note that V' and V" are type parameters substituted via alpha-renaming of original V
             //  These are different objects, but represent the same "type parameter at index 1"
             //
             //  In short - we are not interested in the type arguments of unconstructed methods.
             if ((object)ConstructedFrom != (object)this)
             {
-                foreach (var arg in this.TypeArguments)
+                foreach (var arg in this.TypeArgumentsWithAnnotations)
                 {
-                    code = Hash.Combine(arg, code);
+                    code = Hash.Combine(arg.Type, code);
                 }
             }
 
             return code;
         }
 
-        public override bool Equals(object obj)
+        public sealed override bool Equals(Symbol obj, TypeCompareKind compareKind)
         {
-            if ((object)this == obj) return true;
-
             SubstitutedMethodSymbol other = obj as SubstitutedMethodSymbol;
             if ((object)other == null) return false;
 
@@ -634,7 +399,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             // This checks if the methods have the same definition and the type parameters on the containing types have been
             // substituted in the same way.
-            if (this.ContainingType != other.ContainingType) return false;
+            if (!TypeSymbol.Equals(this.ContainingType, other.ContainingType, compareKind)) return false;
 
             // If both are declarations, then we don't need to check type arguments
             // If exactly one is a declaration, then they re not equal
@@ -650,7 +415,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             int arity = this.Arity;
             for (int i = 0; i < arity; i++)
             {
-                if (this.TypeArguments[i] != other.TypeArguments[i])
+                if (!this.TypeArgumentsWithAnnotations[i].Equals(other.TypeArgumentsWithAnnotations[i], compareKind))
                 {
                     return false;
                 }

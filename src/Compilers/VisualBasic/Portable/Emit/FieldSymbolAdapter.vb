@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.Cci
+Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.VisualBasic.Emit
 
@@ -55,11 +58,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim moduleBeingBuilt As PEModuleBuilder = DirectCast(context.Module, PEModuleBuilder)
             Debug.Assert(Me.IsDefinitionOrDistinct())
 
-            If Not Me.IsDefinition Then
-                Return moduleBeingBuilt.Translate(Me.ContainingType, syntaxNodeOpt:=DirectCast(context.SyntaxNodeOpt, VisualBasicSyntaxNode), diagnostics:=context.Diagnostics)
-            End If
-
-            Return Me.ContainingType
+            Return moduleBeingBuilt.Translate(Me.ContainingType, syntaxNodeOpt:=DirectCast(context.SyntaxNodeOpt, VisualBasicSyntaxNode), diagnostics:=context.Diagnostics, needDeclaration:=Me.IsDefinition)
         End Function
 
         Friend NotOverridable Overrides Sub IReferenceDispatch(visitor As MetadataVisitor) ' Implements IReference.Dispatch
@@ -93,13 +92,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private Function IFieldDefinition_GetCompileTimeValue(context As EmitContext) As IMetadataConstant Implements IFieldDefinition.GetCompileTimeValue
+        Private Function IFieldDefinition_GetCompileTimeValue(context As EmitContext) As MetadataConstant Implements IFieldDefinition.GetCompileTimeValue
             CheckDefinitionInvariant()
 
             Return GetMetadataConstantValue(context)
         End Function
 
-        Friend Function GetMetadataConstantValue(context As EmitContext) As IMetadataConstant
+        Friend Function GetMetadataConstantValue(context As EmitContext) As MetadataConstant
             ' do not return a compile time value for const fields of types DateTime or Decimal because they
             ' are only const from a VB point of view
             If Me.IsMetadataConstant Then
@@ -202,11 +201,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private ReadOnly Property IFieldDefinitionOffset As UInteger Implements IFieldDefinition.Offset
+        Private ReadOnly Property IFieldDefinitionOffset As Integer Implements IFieldDefinition.Offset
             Get
                 CheckDefinitionInvariant()
-                Dim offset = Me.TypeLayoutOffset
-                Return CUInt(If(offset, 0))
+                Return If(TypeLayoutOffset, 0)
             End Get
         End Property
 

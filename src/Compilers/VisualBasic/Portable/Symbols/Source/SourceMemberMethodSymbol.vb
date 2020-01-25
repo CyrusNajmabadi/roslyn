@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -321,7 +324,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             For i = 0 To arity - 1
                 Dim typeParamSyntax = typeParamsSyntax(i)
                 Dim ident = typeParamSyntax.Identifier
-                binder.DisallowTypeCharacter(ident, diagBag, ERRID.ERR_TypeCharOnGenericParam)
+                Binder.DisallowTypeCharacter(ident, diagBag, ERRID.ERR_TypeCharOnGenericParam)
                 typeParameters(i) = New SourceTypeParameterOnMethodSymbol(Me, i, ident.ValueText,
                                                                           binder.GetSyntaxReference(typeParamSyntax))
 
@@ -541,12 +544,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Sub
 
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
             If Me.IsPartial Then
                 Throw ExceptionUtilities.Unreachable
             End If
 
-            Return MyBase.GetBoundMethodBody(diagnostics, methodBodyBinder)
+            Return MyBase.GetBoundMethodBody(compilationState, diagnostics, methodBodyBinder)
         End Function
 
 #End Region
@@ -685,29 +688,33 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End If
 
                 ' if was found in one of bases, need to override it
-                If witheventsProperty.ContainingType <> Me.ContainingType Then
+                If Not TypeSymbol.Equals(witheventsProperty.ContainingType, Me.ContainingType, TypeCompareKind.ConsiderEverything) Then
                     witheventsPropertyInCurrentClass = DirectCast(Me.ContainingType, SourceNamedTypeSymbol).GetOrAddWithEventsOverride(witheventsProperty)
                 Else
                     witheventsPropertyInCurrentClass = witheventsProperty
                 End If
 
-                typeBinder.ReportDiagnosticsIfObsolete(diagBag, witheventsPropertyInCurrentClass, singleHandleClause.EventContainer)
+                typeBinder.ReportDiagnosticsIfObsoleteOrNotSupportedByRuntime(diagBag, witheventsPropertyInCurrentClass, singleHandleClause.EventContainer)
             Else
                 Binder.ReportDiagnostic(diagBag, singleHandleClause.EventContainer, ERRID.ERR_HandlesSyntaxInClass)
                 Return Nothing
             End If
 
-            typeBinder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventContainingType)
-
-            ' Bind event symbol
             Dim eventName As String = singleHandleClause.EventMember.Identifier.ValueText
-            Dim eventSymbol As EventSymbol = FindEvent(eventContainingType,
-                                                       typeBinder,
-                                                       eventName,
-                                                       handlesKind = HandledEventKind.MyBase,
-                                                       useSiteDiagnostics,
-                                                       candidateEventSymbols,
-                                                       resultKind)
+            Dim eventSymbol As EventSymbol = Nothing
+
+            If eventContainingType IsNot Nothing Then
+                Binder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventContainingType)
+
+                ' Bind event symbol
+                eventSymbol = FindEvent(eventContainingType,
+                                        typeBinder,
+                                        eventName,
+                                        handlesKind = HandledEventKind.MyBase,
+                                        useSiteDiagnostics,
+                                        candidateEventSymbols,
+                                        resultKind)
+            End If
 
             diagBag.Add(singleHandleClause.EventMember, useSiteDiagnostics)
 
@@ -715,19 +722,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 'Event '{0}' cannot be found.
                 Binder.ReportDiagnostic(diagBag, singleHandleClause.EventMember, ERRID.ERR_EventNotFound1, eventName)
                 Return Nothing
-
             End If
 
-            typeBinder.ReportDiagnosticsIfObsolete(diagBag, eventSymbol, singleHandleClause.EventMember)
+            typeBinder.ReportDiagnosticsIfObsoleteOrNotSupportedByRuntime(diagBag, eventSymbol, singleHandleClause.EventMember)
 
-            typeBinder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventSymbol)
+            Binder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventSymbol)
 
             If eventSymbol.AddMethod IsNot Nothing Then
-                typeBinder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventSymbol.AddMethod)
+                Binder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventSymbol.AddMethod)
             End If
 
             If eventSymbol.RemoveMethod IsNot Nothing Then
-                typeBinder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventSymbol.RemoveMethod)
+                Binder.ReportUseSiteError(diagBag, singleHandleClause.EventMember, eventSymbol.RemoveMethod)
             End If
 
             ' For WinRT events, we require that certain well-known members be present (needed in synthesize code).
@@ -999,10 +1005,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             For Each attr In attrs
                 If attr.AttributeClass Is compilation.GetWellKnownType(WellKnownType.System_ComponentModel_DesignerSerializationVisibilityAttribute) Then
                     Dim args = attr.CommonConstructorArguments
-                    If args.Count = 1 Then
+                    If args.Length = 1 Then
                         Dim arg = args(0)
                         Const DESIGNERSERIALIZATIONVISIBILITYTYPE_CONTENT As Integer = 2
-                        If arg.Kind <> TypedConstantKind.Array AndAlso CInt(arg.Value) = DESIGNERSERIALIZATIONVISIBILITYTYPE_CONTENT Then
+                        If arg.Kind <> TypedConstantKind.Array AndAlso CInt(arg.ValueInternal) = DESIGNERSERIALIZATIONVISIBILITYTYPE_CONTENT Then
                             Return True
                         End If
                     End If

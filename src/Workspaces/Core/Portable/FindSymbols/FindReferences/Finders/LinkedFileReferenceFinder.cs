@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -11,10 +13,13 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
 {
     internal class LinkedFileReferenceFinder : IReferenceFinder
     {
-        public async Task<IEnumerable<ISymbol>> DetermineCascadedSymbolsAsync(ISymbol symbol, Solution solution, IImmutableSet<Project> projects = null, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<ImmutableArray<SymbolAndProjectId>> DetermineCascadedSymbolsAsync(
+            SymbolAndProjectId symbolAndProjectId, Solution solution, IImmutableSet<Project> projects,
+            FindReferencesSearchOptions options, CancellationToken cancellationToken)
         {
-            var linkedSymbols = new HashSet<ISymbol>();
+            var linkedSymbols = new HashSet<SymbolAndProjectId>();
 
+            var symbol = symbolAndProjectId.Symbol;
             foreach (var location in symbol.DeclaringSyntaxReferences)
             {
                 var originalDocument = solution.GetDocument(location.SyntaxTree);
@@ -24,7 +29,7 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
                 // Document once https://github.com/dotnet/roslyn/issues/5260 is fixed.
                 if (originalDocument == null)
                 {
-                    Debug.Assert(solution.Workspace.Kind == "Interactive");
+                    Debug.Assert(solution.Workspace.Kind == WorkspaceKind.Interactive || solution.Workspace.Kind == WorkspaceKind.MiscellaneousFiles);
                     continue;
                 }
 
@@ -46,30 +51,37 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
 
                     if (linkedSymbol != null &&
                         linkedSymbol.Kind == symbol.Kind &&
-                        linkedSymbol.Name == symbol.Name &&
-                        !linkedSymbols.Contains(linkedSymbol))
+                        linkedSymbol.Name == symbol.Name)
                     {
-                        linkedSymbols.Add(linkedSymbol);
+                        var linkedSymbolAndProjectId = SymbolAndProjectId.Create(linkedSymbol, linkedDocument.Project.Id);
+                        if (!linkedSymbols.Contains(linkedSymbolAndProjectId))
+                        {
+                            linkedSymbols.Add(linkedSymbolAndProjectId);
+                        }
                     }
                 }
             }
 
-            return linkedSymbols;
+            return linkedSymbols.ToImmutableArray();
         }
 
-        public Task<IEnumerable<Document>> DetermineDocumentsToSearchAsync(ISymbol symbol, Project project, IImmutableSet<Document> documents, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<ImmutableArray<Document>> DetermineDocumentsToSearchAsync(
+            ISymbol symbol, Project project, IImmutableSet<Document> documents,
+            FindReferencesSearchOptions options, CancellationToken cancellationToken)
         {
-            return SpecializedTasks.EmptyEnumerable<Document>();
+            return SpecializedTasks.EmptyImmutableArray<Document>();
         }
 
-        public Task<IEnumerable<Project>> DetermineProjectsToSearchAsync(ISymbol symbol, Solution solution, IImmutableSet<Project> projects = null, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<ImmutableArray<Project>> DetermineProjectsToSearchAsync(ISymbol symbol, Solution solution, IImmutableSet<Project> projects = null, CancellationToken cancellationToken = default)
         {
-            return SpecializedTasks.EmptyEnumerable<Project>();
+            return SpecializedTasks.EmptyImmutableArray<Project>();
         }
 
-        public Task<IEnumerable<ReferenceLocation>> FindReferencesInDocumentAsync(ISymbol symbol, Document document, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<ImmutableArray<FinderLocation>> FindReferencesInDocumentAsync(
+            SymbolAndProjectId symbolAndProjectId, Document document, SemanticModel semanticModel,
+            FindReferencesSearchOptions options, CancellationToken cancellationToken)
         {
-            return SpecializedTasks.EmptyEnumerable<ReferenceLocation>();
+            return SpecializedTasks.EmptyImmutableArray<FinderLocation>();
         }
     }
 }

@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -21,19 +23,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
 
         public ProvideAutomationPropertiesAttribute(string category, string page, string packageGuid, int profileNodeLabelId, int profileNodeDescriptionId, string resourcePackageGuid = null)
         {
-            if (category == null)
-            {
-                throw new ArgumentNullException(nameof(category));
-            }
-
-            if (page == null)
-            {
-                throw new ArgumentNullException(nameof(page));
-            }
-
             this.PackageGuid = Guid.Parse(packageGuid);
-            this.Category = category;
-            this.Page = page;
+            this.Category = category ?? throw new ArgumentNullException(nameof(category));
+            this.Page = page ?? throw new ArgumentNullException(nameof(page));
             this.ProfileNodeLabelId = profileNodeLabelId;
             this.ProfileNodeDescriptionId = profileNodeDescriptionId;
 
@@ -45,21 +37,19 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
 
         public override void Register(RegistrationContext context)
         {
-            using (var key = context.CreateKey("AutomationProperties\\" + Category + "\\" + Page))
+            using var key = context.CreateKey("AutomationProperties\\" + Category + "\\" + Page);
+            key.SetValue(null, "#" + ProfileNodeLabelId.ToString());
+            key.SetValue("Description", "#" + ProfileNodeDescriptionId.ToString());
+            key.SetValue("Name", Page);
+            key.SetValue("Package", PackageGuid.ToString("B"));
+
+            if (ResourcePackageGuid.HasValue)
             {
-                key.SetValue(null, "#" + ProfileNodeLabelId.ToString());
-                key.SetValue("Description", "#" + ProfileNodeDescriptionId.ToString());
-                key.SetValue("Name", Page);
-                key.SetValue("Package", PackageGuid.ToString("B"));
-
-                if (ResourcePackageGuid.HasValue)
-                {
-                    key.SetValue("ResourcePackage", ResourcePackageGuid.Value.ToString("B"));
-                }
-
-                key.SetValue("ProfileSave", 1);
-                key.SetValue("VSSettingsMigration", (int)ProfileMigrationType.PassThrough);
+                key.SetValue("ResourcePackage", ResourcePackageGuid.Value.ToString("B"));
             }
+
+            key.SetValue("ProfileSave", 1);
+            key.SetValue("VSSettingsMigration", (int)ProfileMigrationType.PassThrough);
         }
 
         public override void Unregister(RegistrationContext context)

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
@@ -303,7 +305,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Return New BoundWithStatement(node,
                                           Me._withBlockInfo.OriginalExpression,
-                                          boundBlockBinder.BindBlock(node, node.Statements, diagnostics),
+                                          boundBlockBinder.BindBlock(node, node.Statements, diagnostics).MakeCompilerGenerated(),
                                           Me)
         End Function
 
@@ -313,7 +315,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         ''' <summary> Asserts that the node is NOT from With statement expression </summary>
         <Conditional("DEBUG")>
-        Private Sub AssertExpressionIsNotFromStatementExpression(node As VisualBasicSyntaxNode)
+        Private Sub AssertExpressionIsNotFromStatementExpression(node As SyntaxNode)
             While node IsNot Nothing
                 Debug.Assert(node IsNot Me.Expression)
                 node = node.Parent
@@ -327,7 +329,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return MyBase.BindStatement(node, diagnostics)
         End Function
 
-        Public Overrides Function GetBinder(node As VisualBasicSyntaxNode) As Binder
+        Public Overrides Function GetBinder(node As SyntaxNode) As Binder
             AssertExpressionIsNotFromStatementExpression(node)
             Return MyBase.GetBinder(node)
         End Function

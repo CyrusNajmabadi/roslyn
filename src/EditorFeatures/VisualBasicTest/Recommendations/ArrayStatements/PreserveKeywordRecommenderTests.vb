@@ -1,11 +1,7 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.ArrayStatements
     Public Class PreserveKeywordRecommenderTests
@@ -52,6 +48,14 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Ar
         Public Async Function AfterExplicitLineContinuationTest() As Task
             Await VerifyRecommendationsContainAsync(
 <MethodBody>ReDim _
+| </MethodBody>, "Preserve")
+        End Function
+
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function AfterExplicitLineContinuationTestCommentsAfterLineContinuation() As Task
+            Await VerifyRecommendationsContainAsync(
+<MethodBody>ReDim _ ' Test
 | </MethodBody>, "Preserve")
         End Function
     End Class

@@ -1,9 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis.Diagnostics.Telemetry;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
@@ -20,7 +23,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             private readonly Dictionary<ISymbol, AnalyzerStateData> _pendingSymbols = new Dictionary<ISymbol, AnalyzerStateData>();
             private readonly Dictionary<ISymbol, Dictionary<int, DeclarationAnalyzerStateData>> _pendingDeclarations = new Dictionary<ISymbol, Dictionary<int, DeclarationAnalyzerStateData>>();
 
-            private Dictionary<SyntaxTree, AnalyzerStateData> _lazyPendingSyntaxAnalysisTrees = null;
+            private Dictionary<SyntaxTree, AnalyzerStateData> _lazySyntaxTreesWithAnalysisData = null;
+            private int _pendingSyntaxAnalysisTreesCount = 0;
+            private Dictionary<ISymbol, AnalyzerStateData> _lazyPendingSymbolEndAnalyses = null;
 
             private readonly ObjectPool<AnalyzerStateData> _analyzerStateDataPool;
             private readonly ObjectPool<DeclarationAnalyzerStateData> _declarationAnalyzerStateDataPool;
@@ -51,8 +56,28 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             {
                 lock (_gate)
                 {
-                    return _lazyPendingSyntaxAnalysisTrees != null &&
-                        (treeOpt != null ? _lazyPendingSyntaxAnalysisTrees.ContainsKey(treeOpt) : _lazyPendingSyntaxAnalysisTrees.Count > 0);
+                    if (_pendingSyntaxAnalysisTreesCount == 0)
+                    {
+                        return false;
+                    }
+
+                    Debug.Assert(_lazySyntaxTreesWithAnalysisData != null);
+
+                    if (treeOpt == null)
+                    {
+                        // We have syntax analysis pending for at least one tree.
+                        return true;
+                    }
+
+                    AnalyzerStateData state;
+                    if (!_lazySyntaxTreesWithAnalysisData.TryGetValue(treeOpt, out state))
+                    {
+                        // We haven't even started analysis for this tree.
+                        return true;
+                    }
+
+                    // See if we have completed analysis for this tree.
+                    return state.StateKind == StateKind.FullyProcessed;
                 }
             }
 
@@ -60,7 +85,8 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             {
                 lock (_gate)
                 {
-                    return _pendingSymbols.ContainsKey(symbol);
+                    return _pendingSymbols.ContainsKey(symbol) ||
+                        _lazyPendingSymbolEndAnalyses?.ContainsKey(symbol) == true;
                 }
             }
 
@@ -103,7 +129,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 }
             }
 
-            private static void MarkEntityProcessed_NoLock<TAnalysisEntity, TAnalyzerStateData>(TAnalysisEntity analysisEntity, Dictionary<TAnalysisEntity, TAnalyzerStateData> pendingEntities, ObjectPool<TAnalyzerStateData> pool)
+            private static bool MarkEntityProcessed_NoLock<TAnalysisEntity, TAnalyzerStateData>(TAnalysisEntity analysisEntity, Dictionary<TAnalysisEntity, TAnalyzerStateData> pendingEntities, ObjectPool<TAnalyzerStateData> pool)
                 where TAnalyzerStateData : AnalyzerStateData
             {
                 TAnalyzerStateData state;
@@ -111,17 +137,92 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 {
                     pendingEntities.Remove(analysisEntity);
                     FreeState_NoLock(state, pool);
+                    return true;
                 }
+
+                return false;
             }
 
-            private bool TryStartAnalyzingDeclaration_NoLock(ISymbol symbol, int declarationIndex, out DeclarationAnalyzerStateData state)
+            private bool TryStartSyntaxAnalysis_NoLock(SyntaxTree tree, out AnalyzerStateData state)
             {
-                Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap;
-                if (!_pendingDeclarations.TryGetValue(symbol, out declarationDataMap))
+                if (_pendingSyntaxAnalysisTreesCount == 0)
                 {
                     state = null;
                     return false;
                 }
+
+                if (_lazySyntaxTreesWithAnalysisData.TryGetValue(tree, out state))
+                {
+                    if (state.StateKind != StateKind.ReadyToProcess)
+                    {
+                        state = null;
+                        return false;
+                    }
+                }
+                else
+                {
+                    state = _analyzerStateDataPool.Allocate();
+                }
+
+                state.SetStateKind(StateKind.InProcess);
+                Debug.Assert(state.StateKind == StateKind.InProcess);
+                _lazySyntaxTreesWithAnalysisData[tree] = state;
+                return true;
+            }
+
+            private void MarkSyntaxTreeProcessed_NoLock(SyntaxTree tree)
+            {
+                if (_pendingSyntaxAnalysisTreesCount == 0)
+                {
+                    return;
+                }
+
+                Debug.Assert(_lazySyntaxTreesWithAnalysisData != null);
+
+                var wasAlreadyFullyProcessed = false;
+                AnalyzerStateData state;
+                if (_lazySyntaxTreesWithAnalysisData.TryGetValue(tree, out state))
+                {
+                    if (state.StateKind != StateKind.FullyProcessed)
+                    {
+                        FreeState_NoLock(state, _analyzerStateDataPool);
+                    }
+                    else
+                    {
+                        wasAlreadyFullyProcessed = true;
+                    }
+                }
+
+                if (!wasAlreadyFullyProcessed)
+                {
+                    _pendingSyntaxAnalysisTreesCount--;
+                }
+
+                _lazySyntaxTreesWithAnalysisData[tree] = AnalyzerStateData.FullyProcessedInstance;
+            }
+
+            private Dictionary<int, DeclarationAnalyzerStateData> EnsureDeclarationDataMap_NoLock(ISymbol symbol, Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap)
+            {
+                Debug.Assert(_pendingDeclarations[symbol] == declarationDataMap);
+
+                if (declarationDataMap == null)
+                {
+                    declarationDataMap = _currentlyAnalyzingDeclarationsMapPool.Allocate();
+                    _pendingDeclarations[symbol] = declarationDataMap;
+                }
+
+                return declarationDataMap;
+            }
+
+            private bool TryStartAnalyzingDeclaration_NoLock(ISymbol symbol, int declarationIndex, out DeclarationAnalyzerStateData state)
+            {
+                if (!_pendingDeclarations.TryGetValue(symbol, out var declarationDataMap))
+                {
+                    state = null;
+                    return false;
+                }
+
+                declarationDataMap = EnsureDeclarationDataMap_NoLock(symbol, declarationDataMap);
 
                 if (declarationDataMap.TryGetValue(declarationIndex, out state))
                 {
@@ -142,24 +243,16 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 return true;
             }
 
-            private void MarkDeclarationProcessed(ISymbol symbol, int declarationIndex)
-            {
-                lock (_gate)
-                {
-                    MarkDeclarationProcessed_NoLock(symbol, declarationIndex);
-                }
-            }
-
             private void MarkDeclarationProcessed_NoLock(ISymbol symbol, int declarationIndex)
             {
-                Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap;
-                if (!_pendingDeclarations.TryGetValue(symbol, out declarationDataMap))
+                if (!_pendingDeclarations.TryGetValue(symbol, out var declarationDataMap))
                 {
                     return;
                 }
 
-                DeclarationAnalyzerStateData state;
-                if (declarationDataMap.TryGetValue(declarationIndex, out state))
+                declarationDataMap = EnsureDeclarationDataMap_NoLock(symbol, declarationDataMap);
+
+                if (declarationDataMap.TryGetValue(declarationIndex, out var state))
                 {
                     FreeDeclarationAnalyzerState_NoLock(state);
                 }
@@ -169,18 +262,20 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
             private void MarkDeclarationsProcessed_NoLock(ISymbol symbol)
             {
-                Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap;
-                if (_pendingDeclarations.TryGetValue(symbol, out declarationDataMap))
+                if (_pendingDeclarations.TryGetValue(symbol, out var declarationDataMap))
                 {
                     FreeDeclarationDataMap_NoLock(declarationDataMap);
                     _pendingDeclarations.Remove(symbol);
                 }
             }
 
-            private void FreeDeclarationDataMap_NoLock(Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap)
+            private void FreeDeclarationDataMap_NoLock(Dictionary<int, DeclarationAnalyzerStateData> declarationDataMapOpt)
             {
-                declarationDataMap.Clear();
-                _currentlyAnalyzingDeclarationsMapPool.Free(declarationDataMap);
+                if (declarationDataMapOpt is object)
+                {
+                    declarationDataMapOpt.Clear();
+                    _currentlyAnalyzingDeclarationsMapPool.Free(declarationDataMapOpt);
+                }
             }
 
             private void FreeDeclarationAnalyzerState_NoLock(DeclarationAnalyzerStateData state)
@@ -196,7 +291,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             private static void FreeState_NoLock<TAnalyzerStateData>(TAnalyzerStateData state, ObjectPool<TAnalyzerStateData> pool)
                 where TAnalyzerStateData : AnalyzerStateData
             {
-                if (state != null)
+                if (state != null && !ReferenceEquals(state, AnalyzerStateData.FullyProcessedInstance))
                 {
                     state.Free();
                     pool.Free(state);
@@ -222,14 +317,13 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
             private bool IsDeclarationComplete_NoLock(ISymbol symbol, int declarationIndex)
             {
-                Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap;
-                if (!_pendingDeclarations.TryGetValue(symbol, out declarationDataMap))
+                if (!_pendingDeclarations.TryGetValue(symbol, out var declarationDataMap))
                 {
                     return true;
                 }
 
-                DeclarationAnalyzerStateData state;
-                if (!declarationDataMap.TryGetValue(declarationIndex, out state))
+                if (declarationDataMap == null ||
+                    !declarationDataMap.TryGetValue(declarationIndex, out var state))
                 {
                     return false;
                 }
@@ -239,13 +333,13 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
             private bool AreDeclarationsProcessed_NoLock(ISymbol symbol, int declarationsCount)
             {
-                Dictionary<int, DeclarationAnalyzerStateData> declarationDataMap;
-                if (!_pendingDeclarations.TryGetValue(symbol, out declarationDataMap))
+                Debug.Assert(declarationsCount > 0);
+                if (!_pendingDeclarations.TryGetValue(symbol, out var declarationDataMap))
                 {
                     return true;
                 }
 
-                return declarationDataMap.Count == declarationsCount &&
+                return declarationDataMap?.Count == declarationsCount &&
                     declarationDataMap.Values.All(state => state.StateKind == StateKind.FullyProcessed);
             }
 
@@ -264,9 +358,22 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 return TryStartProcessingEntity(symbol, _pendingSymbols, _analyzerStateDataPool, out state);
             }
 
+            public bool TryStartSymbolEndAnalysis(ISymbol symbol, out AnalyzerStateData state)
+            {
+                return TryStartProcessingEntity(symbol, _lazyPendingSymbolEndAnalyses, _analyzerStateDataPool, out state);
+            }
+
             public void MarkSymbolComplete(ISymbol symbol)
             {
                 MarkEntityProcessed(symbol, _pendingSymbols, _analyzerStateDataPool);
+            }
+
+            public void MarkSymbolEndAnalysisComplete(ISymbol symbol)
+            {
+                if (_lazyPendingSymbolEndAnalyses != null)
+                {
+                    MarkEntityProcessed(symbol, _lazyPendingSymbolEndAnalyses, _analyzerStateDataPool);
+                }
             }
 
             public bool TryStartAnalyzingDeclaration(ISymbol symbol, int declarationIndex, out DeclarationAnalyzerStateData state)
@@ -303,15 +410,18 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
             public bool TryStartSyntaxAnalysis(SyntaxTree tree, out AnalyzerStateData state)
             {
-                Debug.Assert(_lazyPendingSyntaxAnalysisTrees != null);
-                return TryStartProcessingEntity(tree, _lazyPendingSyntaxAnalysisTrees, _analyzerStateDataPool, out state);
+                lock (_gate)
+                {
+                    Debug.Assert(_lazySyntaxTreesWithAnalysisData != null);
+                    return TryStartSyntaxAnalysis_NoLock(tree, out state);
+                }
             }
 
             public void MarkSyntaxAnalysisComplete(SyntaxTree tree)
             {
-                if (_lazyPendingSyntaxAnalysisTrees != null)
+                lock (_gate)
                 {
-                    MarkEntityProcessed(tree, _lazyPendingSyntaxAnalysisTrees, _analyzerStateDataPool);
+                    MarkSyntaxTreeProcessed_NoLock(tree);
                 }
             }
 
@@ -324,17 +434,26 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     {
                         var needsAnalysis = false;
                         var symbol = symbolEvent.Symbol;
-                        if (!AnalysisScope.ShouldSkipSymbolAnalysis(symbolEvent) && actionCounts.SymbolActionsCount > 0)
+                        var skipSymbolAnalysis = AnalysisScope.ShouldSkipSymbolAnalysis(symbolEvent);
+                        if (!skipSymbolAnalysis && actionCounts.SymbolActionsCount > 0)
                         {
                             needsAnalysis = true;
                             _pendingSymbols[symbol] = null;
                         }
 
-                        if (!AnalysisScope.ShouldSkipDeclarationAnalysis(symbol) &&
+                        var skipDeclarationAnalysis = AnalysisScope.ShouldSkipDeclarationAnalysis(symbol);
+                        if (!skipDeclarationAnalysis &&
                             actionCounts.HasAnyExecutableCodeActions)
                         {
                             needsAnalysis = true;
-                            _pendingDeclarations[symbol] = _currentlyAnalyzingDeclarationsMapPool.Allocate();
+                            _pendingDeclarations[symbol] = null;
+                        }
+
+                        if (actionCounts.SymbolStartActionsCount > 0 && (!skipSymbolAnalysis || !skipDeclarationAnalysis))
+                        {
+                            needsAnalysis = true;
+                            _lazyPendingSymbolEndAnalyses = _lazyPendingSymbolEndAnalyses ?? new Dictionary<ISymbol, AnalyzerStateData>();
+                            _lazyPendingSymbolEndAnalyses[symbol] = null;
                         }
 
                         if (!needsAnalysis)
@@ -346,14 +465,8 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     {
                         if (actionCounts.SyntaxTreeActionsCount > 0)
                         {
-                            var trees = compilationEvent.Compilation.SyntaxTrees;
-                            var map = new Dictionary<SyntaxTree, AnalyzerStateData>(trees.Count());
-                            foreach (var tree in trees)
-                            {
-                                map[tree] = null;
-                            }
-
-                            _lazyPendingSyntaxAnalysisTrees = map;
+                            _lazySyntaxTreesWithAnalysisData = new Dictionary<SyntaxTree, AnalyzerStateData>();
+                            _pendingSyntaxAnalysisTreesCount = compilationEvent.Compilation.SyntaxTrees.Count();
                         }
 
                         if (actionCounts.CompilationActionsCount == 0)
@@ -371,35 +484,51 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 return IsEntityFullyProcessed(compilationEvent, _pendingEvents);
             }
 
-            public void OnSymbolDeclaredEventProcessed(SymbolDeclaredCompilationEvent symbolDeclaredEvent)
+            public bool IsSymbolComplete(ISymbol symbol)
+            {
+                return IsEntityFullyProcessed(symbol, _pendingSymbols);
+            }
+
+            public bool IsSymbolEndAnalysisComplete(ISymbol symbol)
+            {
+                return IsEntityFullyProcessed(symbol, _lazyPendingSymbolEndAnalyses);
+            }
+
+            public bool OnSymbolDeclaredEventProcessed(SymbolDeclaredCompilationEvent symbolDeclaredEvent)
             {
                 lock (_gate)
                 {
-                    OnSymbolDeclaredEventProcessed_NoLock(symbolDeclaredEvent);
+                    return OnSymbolDeclaredEventProcessed_NoLock(symbolDeclaredEvent);
                 }
             }
 
-            private void OnSymbolDeclaredEventProcessed_NoLock(SymbolDeclaredCompilationEvent symbolDeclaredEvent)
+            private bool OnSymbolDeclaredEventProcessed_NoLock(SymbolDeclaredCompilationEvent symbolDeclaredEvent)
             {
                 // Check if the symbol event has been completely processed or not.
 
                 // Have the symbol actions executed?
                 if (!IsEntityFullyProcessed_NoLock(symbolDeclaredEvent.Symbol, _pendingSymbols))
                 {
-                    return;
+                    return false;
                 }
 
                 // Have the node/code block actions executed for all symbol declarations?
                 if (!AreDeclarationsProcessed_NoLock(symbolDeclaredEvent.Symbol, symbolDeclaredEvent.DeclaringSyntaxReferences.Length))
                 {
-                    return;
+                    return false;
                 }
 
-                // Mark the symbol event completely processed.
-                MarkEntityProcessed_NoLock(symbolDeclaredEvent, _pendingEvents, _analyzerStateDataPool);
+                // Have the symbol end actions, if any, executed?
+                if (_lazyPendingSymbolEndAnalyses != null && !IsEntityFullyProcessed_NoLock(symbolDeclaredEvent.Symbol, _lazyPendingSymbolEndAnalyses))
+                {
+                    return false;
+                }
 
                 // Mark declarations completely processed.
                 MarkDeclarationsProcessed_NoLock(symbolDeclaredEvent.Symbol);
+
+                // Mark the symbol event completely processed.
+                return MarkEntityProcessed_NoLock(symbolDeclaredEvent, _pendingEvents, _analyzerStateDataPool);
             }
         }
     }

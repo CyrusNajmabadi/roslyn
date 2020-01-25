@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -6,42 +8,38 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.Test.Utilities;
-using Microsoft.CodeAnalysis.Text;
-using Roslyn.Test.Utilities;
-using Xunit;
 
 namespace Microsoft.CodeAnalysis.UnitTests.Diagnostics
 {
+    [UseExportProvider]
     public class SuppressMessageAttributeWorkspaceTests : SuppressMessageAttributeTests
     {
         protected override async Task VerifyAsync(string source, string language, DiagnosticAnalyzer[] analyzers, DiagnosticDescription[] expectedDiagnostics, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null, bool logAnalyzerExceptionAsDiagnostics = true, string rootNamespace = null)
         {
-            using (var workspace = await CreateWorkspaceFromFileAsync(source, language, rootNamespace))
+            using var workspace = CreateWorkspaceFromFile(source, language, rootNamespace);
+            var documentId = workspace.Documents[0].Id;
+            var document = workspace.CurrentSolution.GetDocument(documentId);
+            var span = (await document.GetSyntaxRootAsync()).FullSpan;
+
+            var actualDiagnostics = new List<Diagnostic>();
+            foreach (var analyzer in analyzers)
             {
-                var documentId = workspace.Documents[0].Id;
-                var document = workspace.CurrentSolution.GetDocument(documentId);
-                var span = (await document.GetSyntaxRootAsync()).FullSpan;
-
-                var actualDiagnostics = new List<Diagnostic>();
-                foreach (var analyzer in analyzers)
-                {
-                    actualDiagnostics.AddRange(
-                        await DiagnosticProviderTestUtilities.GetAllDiagnosticsAsync(analyzer, document, span, onAnalyzerException, logAnalyzerExceptionAsDiagnostics));
-                }
-
-                actualDiagnostics.Verify(expectedDiagnostics);
+                actualDiagnostics.AddRange(
+                    await DiagnosticProviderTestUtilities.GetAllDiagnosticsAsync(analyzer, document, span, onAnalyzerException));
             }
+
+            actualDiagnostics.Verify(expectedDiagnostics);
         }
 
-        private static Task<TestWorkspace> CreateWorkspaceFromFileAsync(string source, string language, string rootNamespace)
+        private static TestWorkspace CreateWorkspaceFromFile(string source, string language, string rootNamespace)
         {
             if (language == LanguageNames.CSharp)
             {
-                return TestWorkspace.CreateCSharpAsync(source);
+                return TestWorkspace.CreateCSharp(source);
             }
             else
             {
-                return TestWorkspace.CreateVisualBasicAsync(
+                return TestWorkspace.CreateVisualBasic(
                     source,
                     compilationOptions: new VisualBasic.VisualBasicCompilationOptions(
                         OutputKind.DynamicallyLinkedLibrary, rootNamespace: rootNamespace));

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -44,9 +46,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         ''' <summary>
-        ''' Compares anonymous types ignoring custom modifiers
+        ''' Compares anonymous types
         ''' </summary>
-        Public Shared Function EqualsIgnoringCustomModifiers(left As TypeSymbol, right As TypeSymbol) As Boolean
+        Public Shared Function IsSameType(left As TypeSymbol, right As TypeSymbol, compareKind As TypeCompareKind) As Boolean
+
             If left.TypeKind <> right.TypeKind Then
                 Return False
             End If
@@ -61,7 +64,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim count As Integer = leftDescr.Fields.Length
             Debug.Assert(count = rightDescr.Fields.Length)
             For i = 0 To count - 1
-                If Not leftDescr.Fields(i).Type.IsSameTypeIgnoringCustomModifiers(rightDescr.Fields(i).Type) Then
+                If Not leftDescr.Fields(i).Type.IsSameType(rightDescr.Fields(i).Type, compareKind) Then
                     Return False
                 End If
             Next

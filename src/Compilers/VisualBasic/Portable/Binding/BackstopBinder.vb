@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.RuntimeMembers
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -28,11 +31,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides Function CheckAccessibility(sym As Symbol,
                                                      <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo),
                                                      Optional accessThroughType As TypeSymbol = Nothing,
-                                                     Optional basesBeingResolved As ConsList(Of Symbol) = Nothing) As AccessCheckResult
+                                                     Optional basesBeingResolved As BasesBeingResolved = Nothing) As AccessCheckResult
             Throw ExceptionUtilities.Unreachable
         End Function
 
-        Public Overrides Function GetBinder(node As VisualBasicSyntaxNode) As Binder
+        Public Overrides Function GetBinder(node As SyntaxNode) As Binder
             Throw ExceptionUtilities.Unreachable
         End Function
 
@@ -61,6 +64,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
+        Public Overrides ReadOnly Property AdditionalContainingMembers As ImmutableArray(Of Symbol)
+            Get
+                Throw ExceptionUtilities.Unreachable
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property IsInQuery As Boolean
             Get
                 ' we should stop at the method or type binder.
@@ -79,13 +88,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Throw ExceptionUtilities.Unreachable
             End Get
         End Property
-
-        Public Overrides Function GetErrorSymbol(name As String,
-                                                 errorInfo As DiagnosticInfo,
-                                                 candidateSymbols As ImmutableArray(Of Symbol),
-                                                 resultKind As LookupResultKind) As ErrorTypeSymbol
-            Throw ExceptionUtilities.Unreachable
-        End Function
 
         Public Overrides Function GetSyntaxReference(node As VisualBasicSyntaxNode) As SyntaxReference
             Throw ExceptionUtilities.Unreachable

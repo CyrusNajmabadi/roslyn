@@ -1,17 +1,23 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.Extensions
 {
     internal static class TypeSyntaxExtensions
     {
+        public static bool IsVoid(this TypeSyntax typeSyntax)
+        {
+            return typeSyntax.IsKind(SyntaxKind.PredefinedType) &&
+                ((PredefinedTypeSyntax)typeSyntax).Keyword.IsKind(SyntaxKind.VoidKeyword);
+        }
+
         public static bool IsPartial(this TypeSyntax typeSyntax)
         {
             return typeSyntax is IdentifierNameSyntax &&
@@ -39,15 +45,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 return false;
             }
 
-            var nameSyntax = typeSyntax as NameSyntax;
-            if (nameSyntax == null)
+            if (!(typeSyntax is NameSyntax nameSyntax))
             {
                 return false;
             }
 
             var nameToken = nameSyntax.GetNameToken();
 
-            var symbols = semanticModelOpt.LookupName(nameToken, namespacesAndTypesOnly: true, cancellationToken: cancellationToken);
+            var symbols = semanticModelOpt.LookupName(nameToken, namespacesAndTypesOnly: true, cancellationToken);
             var firstSymbol = symbols.FirstOrDefault();
 
             var typeSymbol = firstSymbol != null && firstSymbol.Kind == SymbolKind.Alias
@@ -86,5 +91,26 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
 
             return true;
         }
+
+        public static TypeSyntax GenerateReturnTypeSyntax(this IMethodSymbol method)
+        {
+            var returnType = method.ReturnType;
+
+            if (method.ReturnsByRef)
+            {
+                return returnType.GenerateRefTypeSyntax();
+            }
+            else if (method.ReturnsByRefReadonly)
+            {
+                return returnType.GenerateRefReadOnlyTypeSyntax();
+            }
+            else
+            {
+                return returnType.GenerateTypeSyntax();
+            }
+        }
+
+        public static TypeSyntax StripRefIfNeeded(this TypeSyntax type)
+            => type is RefTypeSyntax refType ? refType.Type : type;
     }
 }

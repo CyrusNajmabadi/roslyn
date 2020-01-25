@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -20,6 +22,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         {
             _container = container;
         }
+
+        protected override NamedTypeSymbol WithTupleDataCore(TupleExtraData newData)
+            => throw new NotImplementedException();
 
         public override int Arity
         {
@@ -45,27 +50,11 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             }
         }
 
-        internal override ImmutableArray<TypeSymbol> TypeArgumentsNoUseSiteDiagnostics
+        internal override ImmutableArray<TypeWithAnnotations> TypeArgumentsWithAnnotationsNoUseSiteDiagnostics
         {
             get
             {
-                return ImmutableArray.Create<TypeSymbol>();
-            }
-        }
-
-        internal override bool HasTypeArgumentsCustomModifiers
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        internal override ImmutableArray<ImmutableArray<CustomModifier>> TypeArgumentsCustomModifiers
-        {
-            get
-            {
-                return ImmutableArray<ImmutableArray<CustomModifier>>.Empty;
+                return ImmutableArray.Create<TypeWithAnnotations>();
             }
         }
 
@@ -197,6 +186,22 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             }
         }
 
+        public sealed override bool IsRefLikeType
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        public sealed override bool IsReadOnly
+        {
+            get
+            {
+                return false;
+            }
+        }
+
         public override bool IsAbstract
         {
             get
@@ -213,6 +218,14 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             }
         }
 
+        public sealed override bool AreLocalsZeroed
+        {
+            get
+            {
+                throw ExceptionUtilities.Unreachable;
+            }
+        }
+
         public override bool MightContainExtensionMethods
         {
             get
@@ -221,12 +234,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             }
         }
 
-        internal override NamedTypeSymbol BaseTypeNoUseSiteDiagnostics
-        {
-            get { throw new NotImplementedException(); }
-        }
+        internal override NamedTypeSymbol BaseTypeNoUseSiteDiagnostics => throw new NotImplementedException();
 
-        internal override ImmutableArray<NamedTypeSymbol> InterfacesNoUseSiteDiagnostics(ConsList<Symbol> basesBeingResolved)
+        internal override ImmutableArray<NamedTypeSymbol> InterfacesNoUseSiteDiagnostics(ConsList<TypeSymbol> basesBeingResolved)
         {
             throw new NotImplementedException();
         }
@@ -236,23 +246,19 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             throw new NotImplementedException();
         }
 
-        internal override NamedTypeSymbol GetDeclaredBaseType(ConsList<Symbol> basesBeingResolved)
+        internal override NamedTypeSymbol GetDeclaredBaseType(ConsList<TypeSymbol> basesBeingResolved)
         {
             throw new NotImplementedException();
         }
 
-        internal override ImmutableArray<NamedTypeSymbol> GetDeclaredInterfaces(ConsList<Symbol> basesBeingResolved)
+        internal override ImmutableArray<NamedTypeSymbol> GetDeclaredInterfaces(ConsList<TypeSymbol> basesBeingResolved)
         {
             throw new NotImplementedException();
         }
 
-        internal sealed override bool IsManagedType
-        {
-            get
-            {
-                return true;
-            }
-        }
+        internal override bool HasCodeAnalysisEmbeddedAttribute => false;
+
+        internal sealed override ManagedKind ManagedKind => ManagedKind.Managed;
 
         internal override bool ShouldAddWinRTMembers
         {
@@ -287,7 +293,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             get { return DefaultMarshallingCharSet; }
         }
 
-        internal override bool IsSerializable
+        public override bool IsSerializable
         {
             get { return false; }
         }

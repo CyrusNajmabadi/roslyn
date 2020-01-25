@@ -1,18 +1,18 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Composition;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Roslyn.Utilities;
 
@@ -24,27 +24,21 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
     {
         private const string GetPrefix = "Get";
 
+        [ImportingConstructor]
+        public ReplaceMethodWithPropertyCodeRefactoringProvider()
+        {
+        }
+
         public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
         {
-            var document = context.Document;
+            var (document, _, cancellationToken) = context;
             var service = document.GetLanguageService<IReplaceMethodWithPropertyService>();
             if (service == null)
             {
                 return;
             }
 
-            var cancellationToken = context.CancellationToken;
-
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            var position = context.Span.Start;
-            var token = root.FindToken(position);
-
-            if (!token.Span.Contains(context.Span))
-            {
-                return;
-            }
-
-            var methodDeclaration = service.GetMethodDeclaration(token);
+            var methodDeclaration = await service.GetMethodDeclarationAsync(context).ConfigureAwait(false);
             if (methodDeclaration == null)
             {
                 return;
@@ -52,7 +46,8 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
 
             // Ok, we're in the signature of the method.  Now see if the method is viable to be 
             // replaced with a property.
-            var methodName = service.GetMethodName(methodDeclaration);
+            var generator = SyntaxGenerator.GetGenerator(document);
+            var methodName = generator.GetName(methodDeclaration);
 
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration) as IMethodSymbol;
@@ -69,9 +64,10 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
 
             // Looks good!
             context.RegisterRefactoring(new ReplaceMethodWithPropertyCodeAction(
-                string.Format(FeaturesResources.Replace0WithProperty, methodName),
-                c => ReplaceMethodsWithProperty(context.Document, propertyName, nameChanged, methodSymbol, setMethod: null, cancellationToken: c),
-                methodName));
+                string.Format(FeaturesResources.Replace_0_with_property, methodName),
+                c => ReplaceMethodsWithProperty(document, propertyName, nameChanged, methodSymbol, setMethod: null, cancellationToken: c),
+                methodName),
+                methodDeclaration.Span);
 
             // If this method starts with 'Get' see if there's an associated 'Set' method we could 
             // replace as well.
@@ -81,9 +77,10 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
                 if (setMethod != null)
                 {
                     context.RegisterRefactoring(new ReplaceMethodWithPropertyCodeAction(
-                        string.Format(FeaturesResources.Replace0and1WithProperty, methodName, setMethod.Name),
-                        c => ReplaceMethodsWithProperty(context.Document, propertyName, nameChanged, methodSymbol, setMethod, cancellationToken: c),
-                        methodName + "-get/set"));
+                        string.Format(FeaturesResources.Replace_0_and_1_with_property, methodName, setMethod.Name),
+                        c => ReplaceMethodsWithProperty(document, propertyName, nameChanged, methodSymbol, setMethod, cancellationToken: c),
+                        methodName + "-get/set"),
+                        methodDeclaration.Span);
                 }
             }
         }
@@ -123,13 +120,29 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
                 !getMethod.IsAsync &&
                 getMethod.Parameters.Length == 0 &&
                 !getMethod.ReturnsVoid &&
-                getMethod.DeclaringSyntaxReferences.Length == 1;
+                getMethod.DeclaringSyntaxReferences.Length == 1 &&
+                !OverridesMethodFromSystemObject(getMethod);
+        }
+
+        private static bool OverridesMethodFromSystemObject(IMethodSymbol method)
+        {
+            for (var current = method; current != null; current = current.OverriddenMethod)
+            {
+                if (current.ContainingType.SpecialType == SpecialType.System_Object)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsValidSetMethod(IMethodSymbol setMethod, IMethodSymbol getMethod)
         {
             return IsValidSetMethod(setMethod) &&
-                setMethod.Parameters.Length == 1 && Equals(setMethod.Parameters[0].Type, getMethod.ReturnType) &&
+                setMethod.Parameters.Length == 1 &&
+                setMethod.Parameters[0].RefKind == RefKind.None &&
+                SymbolEqualityComparer.IncludeNullability.Equals(setMethod.Parameters[0].Type, getMethod.ReturnType) &&
                 setMethod.IsAbstract == getMethod.IsAbstract;
         }
 
@@ -152,11 +165,14 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
         {
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
 
-            var originalSolution = document.Project.Solution;
-            var getMethodReferences = await SymbolFinder.FindReferencesAsync(getMethod, originalSolution, cancellationToken).ConfigureAwait(false);
+            var project = document.Project;
+            var originalSolution = project.Solution;
+            var getMethodReferences = await SymbolFinder.FindReferencesAsync(
+                new SymbolAndProjectId(getMethod, project.Id), originalSolution, cancellationToken).ConfigureAwait(false);
             var setMethodReferences = setMethod == null
                 ? SpecializedCollections.EmptyEnumerable<ReferencedSymbol>()
-                : await SymbolFinder.FindReferencesAsync(setMethod, originalSolution, cancellationToken).ConfigureAwait(false);
+                : await SymbolFinder.FindReferencesAsync(
+                    new SymbolAndProjectId(setMethod, project.Id), originalSolution, cancellationToken).ConfigureAwait(false);
 
             // Get the warnings we'd like to put at the definition site.
             var definitionWarning = GetDefinitionIssues(getMethodReferences);
@@ -235,7 +251,7 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
                     {
                         // Warn the user that we can't properly replace this method with a property.
                         editor.ReplaceNode(nameToken.Parent, nameToken.Parent.WithAdditionalAnnotations(
-                            ConflictAnnotation.Create(FeaturesResources.MethodReferencedImplicitly)));
+                            ConflictAnnotation.Create(FeaturesResources.Method_referenced_implicitly)));
                     }
                     else
                     {
@@ -265,7 +281,7 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
                     {
                         // Warn the user that we can't properly replace this method with a property.
                         editor.ReplaceNode(nameToken.Parent, nameToken.Parent.WithAdditionalAnnotations(
-                            ConflictAnnotation.Create(FeaturesResources.MethodReferencedImplicitly)));
+                            ConflictAnnotation.Create(FeaturesResources.Method_referenced_implicitly)));
                     }
                     else
                     {
@@ -324,16 +340,22 @@ namespace Microsoft.CodeAnalysis.ReplaceMethodWithProperty
             var service = updatedDocument.GetLanguageService<IReplaceMethodWithPropertyService>();
 
             var semanticModel = await updatedDocument.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var syntaxTree = await updatedDocument.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
             var root = await updatedDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 
             var editor = new SyntaxEditor(root, updatedSolution.Workspace);
+
+            var documentOptions = await updatedDocument.GetOptionsAsync(cancellationToken).ConfigureAwait(false);
+            var parseOptions = syntaxTree.Options;
 
             // First replace all the get methods with properties.
             foreach (var getSetPair in getSetPairs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                service.ReplaceGetMethodWithProperty(editor, semanticModel, getSetPair, propertyName, nameChanged);
+                service.ReplaceGetMethodWithProperty(
+                    documentOptions, parseOptions, editor, semanticModel,
+                    getSetPair, propertyName, nameChanged);
             }
 
             // Then remove all the set methods.

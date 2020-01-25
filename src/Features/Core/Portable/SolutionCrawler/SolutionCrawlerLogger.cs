@@ -1,22 +1,23 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.Diagnostics.EngineV2;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.SolutionCrawler
 {
-    internal class SolutionCrawlerLogger
+    internal static class SolutionCrawlerLogger
     {
         private const string Id = nameof(Id);
         private const string Kind = nameof(Kind);
         private const string Analyzer = nameof(Analyzer);
         private const string DocumentCount = nameof(DocumentCount);
+        private const string Languages = nameof(Languages);
         private const string HighPriority = nameof(HighPriority);
         private const string Enabled = nameof(Enabled);
         private const string AnalyzerCount = nameof(AnalyzerCount);
@@ -68,14 +69,20 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
             }));
         }
 
-        public static void LogReanalyze(int correlationId, IIncrementalAnalyzer analyzer, IEnumerable<DocumentId> documentIds, bool highPriority)
+        public static void LogReanalyze(
+            int correlationId,
+            IIncrementalAnalyzer analyzer,
+            int documentCount,
+            string languages,
+            bool highPriority)
         {
             Logger.Log(FunctionId.WorkCoordinatorRegistrationService_Reanalyze, KeyValueLogMessage.Create(m =>
             {
                 m[Id] = correlationId;
                 m[Analyzer] = analyzer.ToString();
-                m[DocumentCount] = documentIds == null ? 0 : documentIds.Count();
+                m[DocumentCount] = documentCount;
                 m[HighPriority] = highPriority;
+                m[Languages] = languages;
             }));
         }
 
@@ -88,18 +95,20 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
             }));
         }
 
-        public static void LogActiveFileAnalyzers(int correlationId, Workspace workspace, ImmutableArray<IIncrementalAnalyzer> reordered)
+        public static void LogAnalyzers(int correlationId, Workspace workspace, ImmutableArray<IIncrementalAnalyzer> reordered, bool onlyHighPriorityAnalyzer)
         {
-            LogAnalyzersWorker(
-                FunctionId.IncrementalAnalyzerProcessor_ActiveFileAnalyzers, FunctionId.IncrementalAnalyzerProcessor_ActiveFileAnalyzer,
-                correlationId, workspace, reordered);
-        }
-
-        public static void LogAnalyzers(int correlationId, Workspace workspace, ImmutableArray<IIncrementalAnalyzer> reordered)
-        {
-            LogAnalyzersWorker(
-                FunctionId.IncrementalAnalyzerProcessor_Analyzers, FunctionId.IncrementalAnalyzerProcessor_Analyzer,
-                correlationId, workspace, reordered);
+            if (onlyHighPriorityAnalyzer)
+            {
+                LogAnalyzersWorker(
+                    FunctionId.IncrementalAnalyzerProcessor_ActiveFileAnalyzers, FunctionId.IncrementalAnalyzerProcessor_ActiveFileAnalyzer,
+                    correlationId, workspace, reordered);
+            }
+            else
+            {
+                LogAnalyzersWorker(
+                    FunctionId.IncrementalAnalyzerProcessor_Analyzers, FunctionId.IncrementalAnalyzerProcessor_Analyzer,
+                    correlationId, workspace, reordered);
+            }
         }
 
         private static void LogAnalyzersWorker(
@@ -221,9 +230,8 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                         continue;
                     }
 
-                    if (kv.Key is ValueTuple<string, Guid>)
+                    if (kv.Key is ValueTuple<string, Guid> tuple)
                     {
-                        var tuple = (ValueTuple<string, Guid>)kv.Key;
                         var list = statMap.GetOrAdd(tuple.Item1, _ => new List<int>());
                         list.Add(kv.Value.GetCount());
                         continue;
@@ -239,9 +247,9 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
 
                     m[CreateProperty(key, Max)] = result.Maximum;
                     m[CreateProperty(key, Min)] = result.Minimum;
-                    m[CreateProperty(key, Median)] = result.Median;
+                    m[CreateProperty(key, Median)] = result.Median.Value;
                     m[CreateProperty(key, Mean)] = result.Mean;
-                    m[CreateProperty(key, Mode)] = result.Mode;
+                    m[CreateProperty(key, Mode)] = result.Mode.Value;
                     m[CreateProperty(key, Range)] = result.Range;
                     m[CreateProperty(key, Count)] = result.Count;
                 }
@@ -249,8 +257,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
 
             foreach (var analyzer in analyzers)
             {
-                var diagIncrementalAnalyzer = analyzer as BaseDiagnosticIncrementalAnalyzer;
-                if (diagIncrementalAnalyzer != null)
+                if (analyzer is DiagnosticIncrementalAnalyzer diagIncrementalAnalyzer)
                 {
                     diagIncrementalAnalyzer.LogAnalyzerCountSummary();
                     break;

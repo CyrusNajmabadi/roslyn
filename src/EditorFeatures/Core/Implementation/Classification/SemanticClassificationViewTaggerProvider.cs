@@ -1,11 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Classification;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.Shared.Options;
 using Microsoft.CodeAnalysis.Editor.Shared.Tagging;
@@ -13,6 +15,7 @@ using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Editor.Tagging;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
@@ -29,8 +32,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Classification
     /// </summary>
     [Export(typeof(IViewTaggerProvider))]
     [TagType(typeof(IClassificationTag))]
-    [ContentType(ContentTypeNames.CSharpContentType)]
-    [ContentType(ContentTypeNames.VisualBasicContentType)]
+    [ContentType(ContentTypeNames.RoslynContentType)]
     internal partial class SemanticClassificationViewTaggerProvider : AsynchronousViewTaggerProvider<IClassificationTag>
     {
         private readonly ISemanticChangeNotificationService _semanticChangeNotificationService;
@@ -41,15 +43,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Classification
         protected override TaggerTextChangeBehavior TextChangeBehavior => TaggerTextChangeBehavior.TrackTextChanges;
         protected override IEnumerable<Option<bool>> Options => SpecializedCollections.SingletonEnumerable(InternalFeatureOnOffOptions.SemanticColorizer);
 
-        private IEditorClassificationService _classificationService;
-
         [ImportingConstructor]
         public SemanticClassificationViewTaggerProvider(
+            IThreadingContext threadingContext,
             IForegroundNotificationService notificationService,
             ISemanticChangeNotificationService semanticChangeNotificationService,
             ClassificationTypeMap typeMap,
-            [ImportMany] IEnumerable<Lazy<IAsynchronousOperationListener, FeatureMetadata>> asyncListeners)
-            : base(new AggregateAsynchronousOperationListener(asyncListeners, FeatureAttribute.Classification), notificationService)
+            IAsynchronousOperationListenerProvider listenerProvider)
+            : base(threadingContext, listenerProvider.GetListener(FeatureAttribute.Classification), notificationService)
         {
             _semanticChangeNotificationService = semanticChangeNotificationService;
             _typeMap = typeMap;
@@ -66,7 +67,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Classification
             // Note: when the user scrolls, we will try to reclassify as soon as possible.  That way
             // we appear semantically unclassified for a very short amount of time.
             return TaggerEventSources.Compose(
-                TaggerEventSources.OnViewSpanChanged(textView, textChangeDelay: Delay, scrollChangeDelay: TaggerDelay.NearImmediate),
+                TaggerEventSources.OnViewSpanChanged(ThreadingContext, textView, textChangeDelay: Delay, scrollChangeDelay: TaggerDelay.NearImmediate),
                 TaggerEventSources.OnSemanticChanged(subjectBuffer, Delay, _semanticChangeNotificationService),
                 TaggerEventSources.OnDocumentActiveContextChanged(subjectBuffer, Delay));
         }
@@ -84,7 +85,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Classification
                 return base.GetSpansToTag(textView, subjectBuffer);
             }
 
-            return new[] { visibleSpanOpt.Value };
+            return SpecializedCollections.SingletonEnumerable(visibleSpanOpt.Value);
         }
 
         protected override Task ProduceTagsAsync(TaggerContext<IClassificationTag> context)
@@ -92,16 +93,19 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Classification
             Debug.Assert(context.SpansToTag.IsSingle());
 
             var spanToTag = context.SpansToTag.Single();
+
             var document = spanToTag.Document;
 
-            if (document == null)
+            // Attempt to get a classification service which will actually produce the results.
+            // If we can't (because we have no Document, or because the language doesn't support
+            // this service), then bail out immediately.
+            var classificationService = document?.GetLanguageService<IClassificationService>();
+            if (classificationService == null)
             {
-                return SpecializedTasks.EmptyTask;
+                return Task.CompletedTask;
             }
 
-            _classificationService = _classificationService ?? document.Project.LanguageServices.GetService<IEditorClassificationService>();
-
-            return SemanticClassificationUtilities.ProduceTagsAsync(context, spanToTag, _classificationService, _typeMap);
+            return SemanticClassificationUtilities.ProduceTagsAsync(context, spanToTag, classificationService, _typeMap);
         }
     }
 }

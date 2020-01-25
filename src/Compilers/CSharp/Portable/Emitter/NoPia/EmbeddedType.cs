@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -21,7 +23,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             Debug.Assert(!underlyingNamedType.IsGenericType);
         }
 
-        public void EmbedAllMembersOfImplementedInterface(CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        public void EmbedAllMembersOfImplementedInterface(SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             Debug.Assert(UnderlyingNamedType.IsInterfaceType());
 
@@ -65,7 +67,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             }
         }
 
-        protected override Cci.ITypeReference GetBaseClass(PEModuleBuilder moduleBuilder, CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        protected override Cci.ITypeReference GetBaseClass(PEModuleBuilder moduleBuilder, SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             NamedTypeSymbol baseType = UnderlyingNamedType.BaseTypeNoUseSiteDiagnostics;
             return (object)baseType != null ? moduleBuilder.Translate(baseType, syntaxNodeOpt, diagnostics) : null;
@@ -91,7 +93,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             return UnderlyingNamedType.GetPropertiesToEmit();
         }
 
-        protected override IEnumerable<Cci.ITypeReference> GetInterfaces(EmitContext context)
+        protected override IEnumerable<Cci.TypeReferenceWithAttributes> GetInterfaces(EmitContext context)
         {
             Debug.Assert((object)TypeManager.ModuleBeingBuilt == context.Module);
 
@@ -99,7 +101,16 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
 
             foreach (NamedTypeSymbol @interface in UnderlyingNamedType.GetInterfacesToEmit())
             {
-                yield return moduleBeingBuilt.Translate(@interface, (CSharpSyntaxNode)context.SyntaxNodeOpt, context.Diagnostics);
+                var typeRef = moduleBeingBuilt.Translate(
+                    @interface,
+                    (CSharpSyntaxNode)context.SyntaxNodeOpt,
+                    context.Diagnostics);
+
+                var type = TypeWithAnnotations.Create(@interface);
+                yield return type.GetTypeRefWithAttributes(
+                    moduleBeingBuilt,
+                    declaringSymbol: UnderlyingNamedType,
+                    typeRef);
             }
         }
 
@@ -142,6 +153,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             get
             {
                 return UnderlyingNamedType.IsInterfaceType();
+            }
+        }
+
+        protected override bool IsDelegate
+        {
+            get
+            {
+                return UnderlyingNamedType.IsDelegateType();
             }
         }
 
@@ -194,19 +213,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             }
         }
 
-        protected override IEnumerable<CSharpAttributeData> GetCustomAttributesToEmit(ModuleCompilationState compilationState)
+        protected override IEnumerable<CSharpAttributeData> GetCustomAttributesToEmit(PEModuleBuilder moduleBuilder)
         {
-            return UnderlyingNamedType.GetCustomAttributesToEmit(compilationState);
+            return UnderlyingNamedType.GetCustomAttributesToEmit(moduleBuilder);
         }
 
-        protected override CSharpAttributeData CreateCompilerGeneratedAttribute()
-        {
-            Debug.Assert(WellKnownMembers.IsSynthesizedAttributeOptional(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor));
-            var compilation = TypeManager.ModuleBeingBuilt.Compilation;
-            return compilation.TrySynthesizeAttribute(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor);
-        }
-
-        protected override CSharpAttributeData CreateTypeIdentifierAttribute(bool hasGuid, CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        protected override CSharpAttributeData CreateTypeIdentifierAttribute(bool hasGuid, SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             var member = hasGuid ?
                 WellKnownMember.System_Runtime_InteropServices_TypeIdentifierAttribute__ctor :
@@ -247,12 +259,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             return null;
         }
 
-        protected override void ReportMissingAttribute(AttributeDescription description, CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        protected override void ReportMissingAttribute(AttributeDescription description, SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             EmbeddedTypesManager.Error(diagnostics, ErrorCode.ERR_InteropTypeMissingAttribute, syntaxNodeOpt, UnderlyingNamedType, description.FullName);
         }
 
-        protected override void EmbedDefaultMembers(string defaultMember, CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        protected override void EmbedDefaultMembers(string defaultMember, SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             foreach (Symbol s in UnderlyingNamedType.GetMembers(defaultMember))
             {

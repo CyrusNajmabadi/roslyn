@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -61,6 +63,44 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
         End Function
 
         <Extension()>
+        Public Function IsNamespaceDeclarationNameContext(syntaxTree As SyntaxTree, position As Integer, cancellationToken As CancellationToken) As Boolean
+            If syntaxTree.IsScript() OrElse syntaxTree.IsInNonUserCode(position, cancellationToken) Then
+                Return False
+            End If
+
+            Dim token = syntaxTree.FindTokenOnLeftOfPosition(position, cancellationToken) _
+                                  .GetPreviousTokenIfTouchingWord(position)
+
+            Dim statement = token.GetAncestor(Of NamespaceStatementSyntax)()
+
+            Return statement IsNot Nothing AndAlso (statement.Name.Span.IntersectsWith(position) OrElse statement.NamespaceKeyword = token)
+        End Function
+
+        <Extension()>
+        Public Function IsPartialTypeDeclarationNameContext(tree As SyntaxTree, position As Integer, cancellationToken As CancellationToken, ByRef statementSyntax As TypeStatementSyntax) As Boolean
+            If tree.IsInNonUserCode(position, cancellationToken) OrElse tree.IsInSkippedText(position, cancellationToken) Then
+                Return False
+            End If
+
+            Dim token = tree.FindTokenOnLeftOfPosition(position, cancellationToken) _
+                            .GetPreviousTokenIfTouchingWord(position)
+
+            Select Case token.Kind()
+                Case SyntaxKind.ClassKeyword,
+                     SyntaxKind.StructureKeyword,
+                     SyntaxKind.InterfaceKeyword,
+                     SyntaxKind.ModuleKeyword
+
+                    statementSyntax = token.GetAncestor(Of TypeStatementSyntax)()
+                    Return statementSyntax IsNot Nothing AndAlso
+                           statementSyntax.DeclarationKeyword = token AndAlso
+                           statementSyntax.Modifiers.Any(SyntaxKind.PartialKeyword)
+            End Select
+
+            Return False
+        End Function
+
+        <Extension()>
         Public Function GetContainingTypeBlock(syntaxTree As SyntaxTree, position As Integer, cancellationToken As CancellationToken) As TypeBlockSyntax
             Dim token = syntaxTree.GetRoot(cancellationToken).FindToken(position)
             Return TryCast(token.GetInnermostDeclarationContext(), TypeBlockSyntax)
@@ -79,7 +119,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
         Friend Function IsDeclarationContextWithinTypeBlocks(
             syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, allowAfterModifiersOrDim As Boolean, cancellationToken As CancellationToken, ParamArray allowedParentBlocks As SyntaxKind()) As Boolean
 
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.Kind = SyntaxKind.None OrElse targetToken.Parent Is Nothing Then
                 ' We're at the root, so we're acceptable if we allow us to be in the root
                 Return allowedParentBlocks.Contains(SyntaxKind.CompilationUnit)
@@ -108,14 +148,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
                 Return False
             End If
 
-            Dim afterDimOrModifiers = allowAfterModifiersOrDim AndAlso (targetToken.IsModifier OrElse
-                                                                        targetToken.Kind = SyntaxKind.DimKeyword OrElse
-                                                                        targetToken.HasMatchingText(SyntaxKind.AsyncKeyword) OrElse
-                                                                        targetToken.HasMatchingText(SyntaxKind.IteratorKeyword))
+            Dim afterDimOrModifiers = allowAfterModifiersOrDim AndAlso IsDimOrModifierOrAttributeList(targetToken)
 
             ' We either must be on a separate line, or else after Dim or modifiers
             If targetToken.FollowsEndOfStatement(position) OrElse afterDimOrModifiers Then
                 Return targetToken.GetInnermostDeclarationContext().IsKind(allowedParentBlocks)
+            End If
+
+            Return False
+        End Function
+
+        Private Function IsDimOrModifierOrAttributeList(token As SyntaxToken) As Boolean
+            If token.IsModifier Then
+                Return True
+            End If
+
+            If token.Kind = SyntaxKind.DimKeyword Then
+                Return True
+            End If
+
+            If token.HasMatchingText(SyntaxKind.AsyncKeyword) OrElse token.HasMatchingText(SyntaxKind.IteratorKeyword) Then
+                Return True
+            End If
+
+            ' eg. <Extension> |
+            If token.Kind = SyntaxKind.GreaterThanToken AndAlso token.Parent.Kind = SyntaxKind.AttributeList Then
+                Return True
             End If
 
             Return False
@@ -150,7 +208,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension>
         Friend Function IsFieldNameDeclarationContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.FollowsEndOfStatement(position) Then
                 Return False
             End If
@@ -206,7 +264,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Friend Function IsLabelContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.FollowsEndOfStatement(position) Then
                 Return False
             End If
@@ -251,7 +309,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Public Function IsDelegateCreationContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, semanticModel As SemanticModel, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
 
             If targetToken.FollowsEndOfStatement(position) Then
                 Return False
@@ -283,7 +341,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
         Friend Function IsExpressionContext(
             syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken, Optional semanticModelOpt As SemanticModel = Nothing) As Boolean
 
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+
+            ' Tuple elements are in expression context if the tuple is in expression context
+            PositionOutsideTupleIfApplicable(syntaxTree, position, targetToken, cancellationToken)
 
             If targetToken.FollowsEndOfStatement(position) OrElse targetToken.Kind = SyntaxKind.None Then
                 Return False
@@ -386,8 +447,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Public Function IsAttributeNameContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
-            Contract.Requires(Not (targetToken.IntersectsWith(position) AndAlso IsWord(targetToken)))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(Not (targetToken.IntersectsWith(position) AndAlso IsWord(targetToken)))
 
             If targetToken.IsChildToken(Function(a As AttributeTargetSyntax) a.ColonToken) OrElse
                targetToken.IsChildToken(Function(a As AttributeListSyntax) a.LessThanToken) OrElse
@@ -415,7 +476,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
                 Return False
             End If
 
-            Contract.Requires(token = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(token = syntaxTree.GetTargetToken(position, cancellationToken))
+
+            ' Tuple elements are in type context if the tuple is in type context
+            PositionOutsideTupleIfApplicable(syntaxTree, position, token, cancellationToken)
 
             ' Types may start anywhere a full expression may be given
             If syntaxTree.IsExpressionContext(position, token, cancellationToken, semanticModelOpt) Then
@@ -468,6 +532,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
             Return token.IsChildToken(Of SimpleAsClauseSyntax)(Function(asClause) asClause.AsKeyword)
         End Function
 
+        Private Sub PositionOutsideTupleIfApplicable(syntaxTree As SyntaxTree, ByRef position As Integer,
+                                                     ByRef token As SyntaxToken, cancellationToken As CancellationToken)
+
+            While syntaxTree.IsPossibleTupleContext(token, position)
+                Dim possibleTuple = token.Parent
+                position = possibleTuple.FullSpan.Start
+                token = syntaxTree.GetTargetToken(position, cancellationToken)
+            End While
+        End Sub
+
         <Extension()>
         Public Function IsNameOfContext(syntaxTree As SyntaxTree, position As Integer, Optional cancellationToken As CancellationToken = Nothing) As Boolean
             ' first do quick exit check
@@ -502,7 +576,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
                 Return True
             End If
 
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.FollowsEndOfStatement(position) Then
                 Return False
             End If
@@ -550,7 +624,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
                 Return False
             End If
 
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.Kind = SyntaxKind.None Then
                 Return False
             End If
@@ -584,7 +658,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
         ''' </summary>
         <Extension()>
         Friend Function IsAfterStatementOfKind(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken, ParamArray kinds As SyntaxKind()) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.Kind = SyntaxKind.None OrElse targetToken.Parent Is Nothing Then
                 Return False
             End If
@@ -598,7 +672,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Friend Function IsInStatementBlockOfKind(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken, ParamArray kinds As SyntaxKind()) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             Dim ancestor = targetToken.Parent
 
             Do While ancestor IsNot Nothing
@@ -630,7 +704,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Public Function IsQueryIntoClauseContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             If targetToken.Kind = SyntaxKind.None Then
                 Return False
             End If
@@ -664,7 +738,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Public Function IsRaiseEventContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
             Return Not targetToken.FollowsEndOfStatement(position) AndAlso targetToken.Kind = SyntaxKind.RaiseEventKeyword
         End Function
 
@@ -676,7 +750,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension()>
         Public Function IsObjectCreationTypeContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
 
             If Not targetToken.FollowsEndOfStatement(position) AndAlso targetToken.Kind = SyntaxKind.NewKeyword Then
                 Return syntaxTree.IsTypeContext(position, targetToken, cancellationToken) OrElse
@@ -689,7 +763,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
         <Extension>
         Friend Function IsEnumTypeMemberAccessContext(syntaxTree As SyntaxTree, position As Integer, targetToken As SyntaxToken, semanticModel As SemanticModel, cancellationToken As CancellationToken) As Boolean
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
 
             If Not targetToken.IsKind(SyntaxKind.DotToken) OrElse
                Not targetToken.Parent.IsKind(SyntaxKind.SimpleMemberAccessExpression) Then
@@ -732,7 +806,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
             Optional allowImplicitLineContinuation As Boolean = True
         ) As Boolean
 
-            Contract.Requires(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
+            Debug.Assert(targetToken = syntaxTree.GetTargetToken(position, cancellationToken))
 
             ' Check if our position begins a new statement
             If targetToken.MustBeginNewStatement(position) OrElse
@@ -979,6 +1053,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
             Else
                 Return Nothing
             End If
+        End Function
+
+        ' Tuple literals aren't recognized by the parser until there is a comma
+        ' So a parenthesized expression is a possible tuple context too
+        <Extension>
+        Friend Function IsPossibleTupleContext(syntaxTree As SyntaxTree,
+                                               tokenOnLeftOfPosition As SyntaxToken,
+                                               position As Integer) As Boolean
+
+            tokenOnLeftOfPosition = tokenOnLeftOfPosition.GetPreviousTokenIfTouchingWord(position)
+
+            If tokenOnLeftOfPosition.IsKind(SyntaxKind.OpenParenToken) Then
+                Return tokenOnLeftOfPosition.Parent.IsKind(SyntaxKind.ParenthesizedExpression,
+                                                           SyntaxKind.TupleExpression, SyntaxKind.TupleType)
+            End If
+
+            Return tokenOnLeftOfPosition.IsKind(SyntaxKind.CommaToken) AndAlso
+                tokenOnLeftOfPosition.Parent.IsKind(SyntaxKind.TupleExpression, SyntaxKind.TupleType)
         End Function
 
     End Module

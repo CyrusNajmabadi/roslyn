@@ -1,87 +1,82 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
     internal static class BaseTypeAnalysis
     {
-        // let's keep up to 16 hashsets so that we do not need to allocate them over and over.
-        // we do not allocate hashsets recursively, so even for big hierarchies, one hashset is sufficient
-        // We may need more than one in a case of running this analysis concurrently, so we will keep up to 16
-        // which seems plenty for this scenario.
-        private static readonly ObjectPool<HashSet<Symbol>> s_hsPool =
-            new ObjectPool<HashSet<Symbol>>(() => new HashSet<Symbol>(ReferenceEqualityComparer.Instance), 16);
-
-        internal static bool ClassDependsOn(TypeSymbol depends, TypeSymbol on)
+        internal static bool TypeDependsOn(NamedTypeSymbol depends, NamedTypeSymbol on)
         {
-            if ((object)depends == null || (object)on == null)
-            {
-                return false;
-            }
+            Debug.Assert((object)depends != null);
+            Debug.Assert((object)on != null);
+            Debug.Assert(on.IsDefinition);
 
-            var hs = s_hsPool.Allocate();
-            ClassDependsClosure(depends, depends.DeclaringCompilation, hs);
+            var hs = PooledHashSet<Symbol>.GetInstance();
+            TypeDependsClosure(depends, depends.DeclaringCompilation, hs);
 
-            var result = hs.Contains(on.OriginalDefinition);
-            hs.Clear();
-            s_hsPool.Free(hs);
+            var result = hs.Contains(on);
+            hs.Free();
 
             return result;
         }
 
-        private static void ClassDependsClosure(TypeSymbol type, CSharpCompilation currentCompilation, HashSet<Symbol> partialClosure)
+        private static void TypeDependsClosure(NamedTypeSymbol type, CSharpCompilation currentCompilation, HashSet<Symbol> partialClosure)
         {
             if ((object)type == null)
             {
                 return;
             }
 
-            var namedType = type.OriginalDefinition as NamedTypeSymbol;
-            if ((object)namedType != null && partialClosure.Add(namedType))
+            type = type.OriginalDefinition;
+            if (partialClosure.Add(type))
             {
-                ClassDependsClosure(namedType.GetDeclaredBaseType(null), currentCompilation, partialClosure);
+                if (type.IsInterface)
+                {
+                    foreach (var bt in type.GetDeclaredInterfaces(null))
+                    {
+                        TypeDependsClosure(bt, currentCompilation, partialClosure);
+                    }
+                }
+                else
+                {
+                    TypeDependsClosure(type.GetDeclaredBaseType(null), currentCompilation, partialClosure);
+                }
 
                 // containment is interesting only for the current compilation
-                if (currentCompilation != null && namedType.IsFromCompilation(currentCompilation))
+                if (currentCompilation != null && type.IsFromCompilation(currentCompilation))
                 {
-                    ClassDependsClosure(namedType.ContainingType, currentCompilation, partialClosure);
+                    TypeDependsClosure(type.ContainingType, currentCompilation, partialClosure);
                 }
             }
         }
 
-        internal static bool StructDependsOn(TypeSymbol depends, NamedTypeSymbol on)
+        internal static bool StructDependsOn(NamedTypeSymbol depends, NamedTypeSymbol on)
         {
-            if ((object)depends == null || (object)on == null)
-            {
-                return false;
-            }
+            Debug.Assert((object)depends != null);
+            Debug.Assert((object)on != null);
+            Debug.Assert(on.IsDefinition);
 
-            var hs = s_hsPool.Allocate();
+            var hs = PooledHashSet<Symbol>.GetInstance();
             StructDependsClosure(depends, hs, on);
 
             var result = hs.Contains(on);
-            hs.Clear();
-            s_hsPool.Free(hs);
+            hs.Free();
 
             return result;
         }
 
-        private static void StructDependsClosure(TypeSymbol type, HashSet<Symbol> partialClosure, NamedTypeSymbol on)
+        private static void StructDependsClosure(NamedTypeSymbol type, HashSet<Symbol> partialClosure, NamedTypeSymbol on)
         {
-            if ((object)type == null)
-            {
-                return;
-            }
+            Debug.Assert((object)type != null);
 
-            var nt = type as NamedTypeSymbol;
-            if ((object)nt != null && ReferenceEquals(nt.OriginalDefinition, on))
+            if ((object)type.OriginalDefinition == on)
             {
                 // found a possibly expanding cycle, for example
                 //     struct X<T> { public T t; }
@@ -90,17 +85,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 partialClosure.Add(on);
                 return;
             }
-            if ((object)nt != null && partialClosure.Add(nt))
+
+            if (partialClosure.Add(type))
             {
                 foreach (var member in type.GetMembersUnordered())
                 {
                     var field = member as FieldSymbol;
-                    if ((object)field == null || field.Type.TypeKind != TypeKind.Struct || field.IsStatic)
+                    var fieldType = field?.NonPointerType();
+                    if (fieldType is null || fieldType.TypeKind != TypeKind.Struct || field.IsStatic)
                     {
                         continue;
                     }
 
-                    StructDependsClosure(field.Type, partialClosure, on);
+                    StructDependsClosure((NamedTypeSymbol)fieldType, partialClosure, on);
                 }
             }
         }
@@ -109,8 +106,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// IsManagedType is simple for most named types:
         ///     enums are not managed;
         ///     non-enum, non-struct named types are managed;
-        ///     generic types and their nested types are managed;
-        ///     type parameters are managed;
+        ///     type parameters are managed unless an 'unmanaged' constraint is present;
         ///     all special types have spec'd values (basically, (non-string) primitives) are not managed;
         /// 
         /// Only structs are complicated, because the definition is recursive.  A struct type is managed
@@ -122,53 +118,64 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// be managed even if it had no fields.  e.g. struct S { S s; } is not managed, but struct S { S s; object o; }
         /// is because we can point to object.
         /// </summary>
-        internal static bool IsManagedType(NamedTypeSymbol type)
+        internal static ManagedKind GetManagedKind(NamedTypeSymbol type)
         {
-            // If this is a type with an obvious answer, return quickly.
-            switch (IsManagedTypeHelper(type))
+            var (isManaged, hasGenerics) = IsManagedTypeHelper(type);
+            var definitelyManaged = isManaged == ThreeState.True;
+            if (isManaged == ThreeState.Unknown)
             {
-                case ThreeState.True:
-                    return true;
-                case ThreeState.False:
-                    return false;
+                // Otherwise, we have to build and inspect the closure of depended-upon types.
+                var hs = PooledHashSet<Symbol>.GetInstance();
+                var result = DependsOnDefinitelyManagedType(type, hs);
+                definitelyManaged = result.definitelyManaged;
+                hasGenerics = hasGenerics || result.hasGenerics;
+                hs.Free();
             }
 
-            // Otherwise, we have to build and inspect the closure of depended-upon types.
-            HashSet<Symbol> closure = s_hsPool.Allocate();
-            bool result = DependsOnDefinitelyManagedType(type, closure);
-            closure.Clear();
-            s_hsPool.Free(closure);
-            return result;
+
+            if (definitelyManaged)
+            {
+                return ManagedKind.Managed;
+            }
+            else if (hasGenerics)
+            {
+                return ManagedKind.UnmanagedWithGenerics;
+            }
+            else
+            {
+                return ManagedKind.Unmanaged;
+            }
         }
 
-        private static bool DependsOnDefinitelyManagedType(NamedTypeSymbol type, HashSet<Symbol> partialClosure)
-        {
-            Debug.Assert(!ReferenceEquals(type, null));
+        // NOTE: If we do not check HasPointerType, we will unconditionally
+        //       bind Type and that may cause infinite recursion.
+        //       HasPointerType can use syntax directly and break recursion.
+        internal static TypeSymbol NonPointerType(this FieldSymbol field) =>
+            field.HasPointerType ? null : field.Type;
 
-            // NOTE: unlike in StructDependsClosure, we don't have to check for expanding cycles,
-            // because as soon as we see something with non-zero arity we kick out (generic => managed).
+        private static (bool definitelyManaged, bool hasGenerics) DependsOnDefinitelyManagedType(NamedTypeSymbol type, HashSet<Symbol> partialClosure)
+        {
+            Debug.Assert((object)type != null);
+
+            var hasGenerics = false;
             if (partialClosure.Add(type))
             {
-                foreach (var member in type.GetMembersUnordered())
+                foreach (var member in type.GetInstanceFieldsAndEvents())
                 {
                     // Only instance fields (including field-like events) affect the outcome.
-                    if (member.IsStatic)
-                    {
-                        continue;
-                    }
-
-                    FieldSymbol field = null;
-
+                    FieldSymbol field;
                     switch (member.Kind)
                     {
                         case SymbolKind.Field:
                             field = (FieldSymbol)member;
-                            Debug.Assert(ReferenceEquals(field.AssociatedSymbol as EventSymbol, null),
+                            Debug.Assert((object)(field.AssociatedSymbol as EventSymbol) == null,
                                 "Didn't expect to find a field-like event backing field in the member list.");
                             break;
                         case SymbolKind.Event:
                             field = ((EventSymbol)member).AssociatedField;
                             break;
+                        default:
+                            throw ExceptionUtilities.UnexpectedValue(member.Kind);
                     }
 
                     if ((object)field == null)
@@ -176,38 +183,44 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                         continue;
                     }
 
-                    // pointers are unmanaged
-                    // NOTE: If we do not check HasPointerType, we will unconditionally
-                    //       bind Type and that may cause infinite recursion.
-                    //       HasPointerType can use syntax directly and break recursion.
-                    if (field.HasPointerType)
+                    TypeSymbol fieldType = field.NonPointerType();
+                    if (fieldType is null)
                     {
+                        // pointers are unmanaged
                         continue;
                     }
 
-                    TypeSymbol fieldType = field.Type;
                     NamedTypeSymbol fieldNamedType = fieldType as NamedTypeSymbol;
                     if ((object)fieldNamedType == null)
                     {
                         if (fieldType.IsManagedType)
                         {
-                            return true;
+                            return (true, hasGenerics);
                         }
                     }
                     else
                     {
-                        // NOTE: don't use IsManagedType on a NamedTypeSymbol - that could lead
+                        var result = IsManagedTypeHelper(fieldNamedType);
+                        hasGenerics = hasGenerics || result.hasGenerics;
+                        // NOTE: don't use ManagedKind.get on a NamedTypeSymbol - that could lead
                         // to infinite recursion.
-                        switch (IsManagedTypeHelper(fieldNamedType))
+                        switch (result.isManaged)
                         {
                             case ThreeState.True:
-                                return true;
+                                return (true, hasGenerics);
+
                             case ThreeState.False:
                                 continue;
+
                             case ThreeState.Unknown:
-                                if (DependsOnDefinitelyManagedType(fieldNamedType, partialClosure))
+                                if (!fieldNamedType.OriginalDefinition.KnownCircularStruct)
                                 {
-                                    return true;
+                                    var (definitelyManaged, childHasGenerics) = DependsOnDefinitelyManagedType(fieldNamedType, partialClosure);
+                                    hasGenerics = hasGenerics || childHasGenerics;
+                                    if (definitelyManaged)
+                                    {
+                                        return (true, hasGenerics);
+                                    }
                                 }
                                 continue;
                         }
@@ -215,14 +228,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
             }
 
-            return false;
+            return (false, hasGenerics);
         }
 
         /// <summary>
-        /// Returns a boolean value if we can determine whether the type is managed
-        /// without looking at its fields and Unset otherwise.
+        /// Returns True or False if we can determine whether the type is managed
+        /// without looking at its fields and Unknown otherwise.
+        /// Also returns whether or not the given type is generic.
         /// </summary>
-        private static ThreeState IsManagedTypeHelper(NamedTypeSymbol type)
+        private static (ThreeState isManaged, bool hasGenerics) IsManagedTypeHelper(NamedTypeSymbol type)
         {
             // To match dev10, we treat enums as their underlying types.
             if (type.IsEnumType())
@@ -252,56 +266,22 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 case SpecialType.System_TypedReference:
                 case SpecialType.System_ArgIterator:
                 case SpecialType.System_RuntimeArgumentHandle:
-                    return ThreeState.False;
+                    return (ThreeState.False, false);
                 case SpecialType.None:
                 default:
                     // CONSIDER: could provide cases for other common special types.
                     break; // Proceed with additional checks.
             }
 
-            if (type.AllTypeArgumentCount() > 0)
-            {
-                return ThreeState.True;
-            }
-
+            bool hasGenerics = type.IsGenericType;
             switch (type.TypeKind)
             {
                 case TypeKind.Enum:
-                    return ThreeState.False;
+                    return (ThreeState.False, hasGenerics);
                 case TypeKind.Struct:
-                    return ThreeState.Unknown;
+                    return (ThreeState.Unknown, hasGenerics);
                 default:
-                    return ThreeState.True;
-            }
-        }
-
-        internal static bool InterfaceDependsOn(TypeSymbol depends, TypeSymbol on)
-        {
-            if ((object)depends == null || (object)on == null)
-            {
-                return false;
-            }
-
-            var hs = s_hsPool.Allocate();
-            InterfaceDependsClosure(depends, hs);
-
-            var result = hs.Contains(on.OriginalDefinition);
-            hs.Clear();
-            s_hsPool.Free(hs);
-
-            return result;
-        }
-
-        private static void InterfaceDependsClosure(TypeSymbol type, HashSet<Symbol> partialClosure)
-        {
-            var nt = type.OriginalDefinition as NamedTypeSymbol;
-            if ((object)nt != null && partialClosure.Add(nt))
-            {
-                foreach (var bt in nt.GetDeclaredInterfaces(null))
-                {
-                    InterfaceDependsClosure(bt, partialClosure);
-                    // containment is not interesting for interfaces as they cannot nest in C#
-                }
+                    return (ThreeState.True, hasGenerics);
             }
         }
     }

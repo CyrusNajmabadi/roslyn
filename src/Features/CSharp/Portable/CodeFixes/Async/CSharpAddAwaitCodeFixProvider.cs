@@ -1,6 +1,7 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -12,14 +13,14 @@ using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.LanguageServices;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
 using Roslyn.Utilities;
-using Resources = Microsoft.CodeAnalysis.CSharp.CSharpFeaturesResources;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.Async
 {
     [ExportCodeFixProvider(LanguageNames.CSharp, Name = PredefinedCodeFixProviderNames.AddAwait), Shared]
-    internal class CSharpAddAwaitCodeFixProvider : AbstractAddAsyncAwaitCodeFixProvider
+    internal class CSharpAddAwaitCodeFixProvider : AbstractAddAwaitCodeFixProvider
     {
         /// <summary>
         /// Because this call is not awaited, execution of the current method continues before the call is completed.
@@ -36,12 +37,27 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.Async
         /// </summary>
         private const string CS0029 = nameof(CS0029);
 
+        [ImportingConstructor]
+        public CSharpAddAwaitCodeFixProvider()
+        {
+        }
+
         public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(CS0029, CS4014, CS4016);
 
+        protected override async Task<DescriptionAndNode> GetDescriptionAndNodeAsync(
+            SyntaxNode root, SyntaxNode oldNode, SemanticModel semanticModel, Diagnostic diagnostic, Document document, CancellationToken cancellationToken)
+        {
+            var newRoot = await GetNewRootAsync(
+                root, oldNode, semanticModel, diagnostic, document, cancellationToken).ConfigureAwait(false);
+            if (newRoot == null)
+            {
+                return default;
+            }
 
-        protected override string GetDescription(Diagnostic diagnostic, SyntaxNode node, SemanticModel semanticModel, CancellationToken cancellationToken) => Resources.InsertAwait;
+            return new DescriptionAndNode(CSharpFeaturesResources.Insert_await, newRoot);
+        }
 
-        protected override Task<SyntaxNode> GetNewRoot(
+        private Task<SyntaxNode> GetNewRootAsync(
             SyntaxNode root,
             SyntaxNode oldNode,
             SemanticModel semanticModel,
@@ -49,10 +65,9 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.Async
             Document document,
             CancellationToken cancellationToken)
         {
-            var expression = oldNode as ExpressionSyntax;
-            if (expression == null)
+            if (!(oldNode is ExpressionSyntax expression))
             {
-                return SpecializedTasks.Default<SyntaxNode>();
+                return SpecializedTasks.Null<SyntaxNode>();
             }
 
             switch (diagnostic.Id)
@@ -63,7 +78,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.Async
                 case CS4016:
                     if (!DoesExpressionReturnTask(expression, semanticModel))
                     {
-                        return SpecializedTasks.Default<SyntaxNode>();
+                        return SpecializedTasks.Null<SyntaxNode>();
                     }
 
                     return Task.FromResult(root.ReplaceNode(oldNode, ConvertToAwaitExpression(expression)));
@@ -71,26 +86,24 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.Async
                 case CS0029:
                     if (!DoesExpressionReturnGenericTaskWhoseArgumentsMatchLeftSide(expression, semanticModel, document.Project, cancellationToken))
                     {
-                        return SpecializedTasks.Default<SyntaxNode>();
+                        return SpecializedTasks.Null<SyntaxNode>();
                     }
 
                     return Task.FromResult(root.ReplaceNode(oldNode, ConvertToAwaitExpression(expression)));
 
                 default:
-                    return SpecializedTasks.Default<SyntaxNode>();
+                    return SpecializedTasks.Null<SyntaxNode>();
             }
         }
 
         private static bool DoesExpressionReturnTask(ExpressionSyntax expression, SemanticModel semanticModel)
         {
-            INamedTypeSymbol taskType = null;
-            if (!TryGetTaskType(semanticModel, out taskType))
+            if (!TryGetTaskType(semanticModel, out var taskType))
             {
                 return false;
             }
 
-            INamedTypeSymbol returnType = null;
-            return TryGetExpressionType(expression, semanticModel, out returnType) &&
+            return TryGetExpressionType(expression, semanticModel, out var returnType) &&
             semanticModel.Compilation.ClassifyConversion(taskType, returnType).Exists;
         }
 
@@ -101,10 +114,8 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeFixes.Async
                 return false;
             }
 
-            INamedTypeSymbol taskType = null;
-            INamedTypeSymbol rightSideType = null;
-            if (!TryGetTaskType(semanticModel, out taskType) ||
-                !TryGetExpressionType(expression, semanticModel, out rightSideType))
+            if (!TryGetTaskType(semanticModel, out var taskType) ||
+                !TryGetExpressionType(expression, semanticModel, out var rightSideType))
             {
                 return false;
             }

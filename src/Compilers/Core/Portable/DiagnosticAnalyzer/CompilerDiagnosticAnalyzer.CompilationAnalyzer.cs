@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -85,6 +87,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 #pragma warning disable RS0013 // we are delegating so it is okay here
                 public override DiagnosticDescriptor Descriptor => _original.Descriptor;
 #pragma warning restore RS0013 
+
+                internal override int Code => _original.Code;
+                internal override IReadOnlyList<object> Arguments => _original.Arguments;
 
                 public override string Id => _original.Id;
                 public override DiagnosticSeverity Severity => _original.Severity;

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -9,19 +11,19 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
-#pragma warning disable RS0010
+#pragma warning disable CA1200 // Avoid using cref tags with a prefix
     /// <summary>
     /// Represents a trivia in the syntax tree. This is the language agnostic equivalent of <see
     /// cref="T:Microsoft.CodeAnalysis.CSharp.SyntaxTrivia"/> and <see cref="T:Microsoft.CodeAnalysis.VisualBasic.SyntaxTrivia"/>.
     /// </summary>
-#pragma warning restore RS0010
+#pragma warning restore CA1200 // Avoid using cref tags with a prefix
     [DebuggerDisplay("{GetDebuggerDisplay(), nq}")]
     [StructLayout(LayoutKind.Auto)]
-    public struct SyntaxTrivia : IEquatable<SyntaxTrivia>
+    public readonly struct SyntaxTrivia : IEquatable<SyntaxTrivia>
     {
         internal static readonly Func<SyntaxTrivia, bool> Any = t => true;
 
-        internal SyntaxTrivia(SyntaxToken token, GreenNode triviaNode, int position, int index)
+        internal SyntaxTrivia(in SyntaxToken token, GreenNode triviaNode, int position, int index)
         {
             Token = token;
             UnderlyingNode = triviaNode;
@@ -183,6 +185,9 @@ namespace Microsoft.CodeAnalysis
         /// Determines whether this trivia represents a preprocessor directive.
         /// </summary>
         public bool IsDirective => UnderlyingNode?.IsDirective ?? false;
+
+        internal bool IsSkippedTokensTrivia => UnderlyingNode?.IsSkippedTokensTrivia ?? false;
+        internal bool IsDocumentationCommentTrivia => UnderlyingNode?.IsDocumentationCommentTrivia ?? false;
 
         /// <summary>
         /// Returns the child non-terminal node representing the syntax tree structure under this structured trivia.

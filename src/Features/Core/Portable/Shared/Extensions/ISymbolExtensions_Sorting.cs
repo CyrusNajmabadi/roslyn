@@ -1,8 +1,9 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
@@ -13,26 +14,28 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 {
     internal partial class ISymbolExtensions2
     {
-        public static IList<TSymbol> Sort<TSymbol>(
-            this IEnumerable<TSymbol> symbols,
+        public static ImmutableArray<TSymbol> Sort<TSymbol>(
+            this ImmutableArray<TSymbol> symbols,
             ISymbolDisplayService symbolDisplayService,
             SemanticModel semanticModel,
             int position)
             where TSymbol : ISymbol
         {
             var symbolToParameterTypeNames = new ConcurrentDictionary<TSymbol, string[]>();
-            Func<TSymbol, string[]> getParameterTypeNames = s => GetParameterTypeNames(s, symbolDisplayService, semanticModel, position);
+            string[] getParameterTypeNames(TSymbol s) => GetParameterTypeNames(s, symbolDisplayService, semanticModel, position);
 
-            return symbols.OrderBy((s1, s2) => Compare(s1, s2, symbolToParameterTypeNames, getParameterTypeNames)).ToList();
+            return symbols.OrderBy((s1, s2) => Compare(s1, s2, symbolToParameterTypeNames, getParameterTypeNames))
+                          .ToImmutableArray();
         }
 
         private static INamedTypeSymbol GetNamedType(ITypeSymbol type)
-        {
-            return type.TypeSwitch(
-                (INamedTypeSymbol namedType) => namedType,
-                (IArrayTypeSymbol arrayType) => GetNamedType(arrayType.ElementType),
-                (IPointerTypeSymbol pointerType) => GetNamedType(pointerType.PointedAtType));
-        }
+            => type switch
+            {
+                INamedTypeSymbol namedType => namedType,
+                IArrayTypeSymbol arrayType => GetNamedType(arrayType.ElementType),
+                IPointerTypeSymbol pointerType => GetNamedType(pointerType.PointedAtType),
+                _ => null,
+            };
 
         private static int CompareParameters(
             ImmutableArray<IParameterSymbol> xParameters, string[] xTypeNames,
@@ -55,8 +58,8 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
                 return diff;
             }
 
-            int paramCount = xParameters.Length;
-            for (int i = 0; i < paramCount; i++)
+            var paramCount = xParameters.Length;
+            for (var i = 0; i < paramCount; i++)
             {
                 var xParam = xParameters[i];
                 var yParam = yParameters[i];
@@ -130,9 +133,8 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
         private static ImmutableArray<IParameterSymbol> GetMethodOrIndexerOrEventParameters(ISymbol symbol)
         {
-            if (symbol is IEventSymbol)
+            if (symbol is IEventSymbol ev)
             {
-                var ev = (IEventSymbol)symbol;
                 var type = ev.Type as INamedTypeSymbol;
                 if (type.IsDelegateType())
                 {

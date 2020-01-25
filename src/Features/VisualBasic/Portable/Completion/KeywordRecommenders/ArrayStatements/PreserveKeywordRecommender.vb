@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -20,7 +22,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Arra
             Dim targetToken = context.TargetToken
             If targetToken.Kind = SyntaxKind.ReDimKeyword AndAlso targetToken.IsChildToken(Of ReDimStatementSyntax)(Function(statement) statement.ReDimKeyword) Then
                 Return SpecializedCollections.SingletonEnumerable(
-                    New RecommendedKeyword("Preserve", VBFeaturesResources.PreserveKeywordToolTip))
+                    New RecommendedKeyword("Preserve", VBFeaturesResources.Prevents_the_contents_of_an_array_from_being_cleared_when_the_dimensions_of_the_array_are_changed))
             End If
 
             Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -29,7 +33,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 AddConstraintClauses(clauses, typeParameter);
             }
 
-            return clauses.Count == 0 ? default(SyntaxList<TypeParameterConstraintClauseSyntax>) : clauses.ToSyntaxList();
+            return clauses.Count == 0 ? default : clauses.ToSyntaxList();
         }
 
         private static void AddConstraintClauses(
@@ -42,9 +46,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             {
                 constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
             }
+            else if (typeParameter.HasUnmanagedTypeConstraint)
+            {
+                constraints.Add(SyntaxFactory.TypeConstraint(SyntaxFactory.IdentifierName("unmanaged")));
+            }
             else if (typeParameter.HasValueTypeConstraint)
             {
                 constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
+            }
+            else if (typeParameter.HasNotNullConstraint)
+            {
+                constraints.Add(SyntaxFactory.TypeConstraint(SyntaxFactory.IdentifierName("notnull")));
             }
 
             var constraintTypes =

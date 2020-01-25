@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Composition
 Imports Microsoft.CodeAnalysis.Host
@@ -11,6 +13,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Implements ICompilationFactoryService
 
         Private Shared ReadOnly s_defaultOptions As New VisualBasicCompilationOptions(OutputKind.ConsoleApplication, concurrentBuild:=False)
+
+        <ImportingConstructor>
+        Public Sub New()
+        End Sub
 
         Public Overloads Function CreateCompilation(
             assemblyName As String,
@@ -25,10 +31,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             assemblyName As String,
             options As CompilationOptions,
             hostObjectType As Type) As Compilation Implements ICompilationFactoryService.CreateSubmissionCompilation
+
+#If TODO Then ' https://github.com/dotnet/roslyn/issues/9063
             Return VisualBasicCompilation.CreateScriptCompilation(
                 assemblyName,
                 options:=DirectCast(options, VisualBasicCompilationOptions),
                 globalsType:=hostObjectType)
+#Else
+            Throw New NotImplementedException()
+#End If
         End Function
 
         Private Function ICompilationFactoryService_GetCompilationFromCompilationReference(reference As MetadataReference) As Compilation Implements ICompilationFactoryService.GetCompilationFromCompilationReference

@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable enable
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
@@ -16,7 +19,7 @@ namespace Microsoft.CodeAnalysis
     {
         private readonly CommandLineSourceFile _sourceFile;
         private readonly CommonCompiler _compiler;
-        private SourceText _text;
+        private SourceText? _text;
         private IList<DiagnosticInfo> _diagnostics;
 
         private readonly object _lockObject = new object();
@@ -42,14 +45,14 @@ namespace Microsoft.CodeAnalysis
         /// Returns a <see cref="SourceText"/> with the contents of this file, or <c>null</c> if
         /// there were errors reading the file.
         /// </summary>
-        public override SourceText GetText(CancellationToken cancellationToken = default(CancellationToken))
+        public override SourceText GetText(CancellationToken cancellationToken = default)
         {
             lock (_lockObject)
             {
                 if (_text == null)
                 {
                     var diagnostics = new List<DiagnosticInfo>();
-                    _text = _compiler.ReadFileContent(_sourceFile, diagnostics);
+                    _text = _compiler.TryReadFileContent(_sourceFile, diagnostics);
                     _diagnostics = diagnostics;
                 }
             }

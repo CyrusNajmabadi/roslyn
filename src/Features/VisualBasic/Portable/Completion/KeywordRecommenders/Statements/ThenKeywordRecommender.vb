@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Completion.Providers
@@ -29,7 +31,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Stat
                     allowImplicitLineContinuation:=False)
 
             If isFollowingIfStatement OrElse isFollowingIfDirective Then
-                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Then", VBFeaturesResources.ThenKeywordToolTip))
+                Return SpecializedCollections.SingletonEnumerable(New RecommendedKeyword("Then", VBFeaturesResources.Introduces_a_statement_block_to_be_compiled_or_executed_if_a_tested_condition_is_true))
             End If
 
             Return SpecializedCollections.EmptyEnumerable(Of RecommendedKeyword)()

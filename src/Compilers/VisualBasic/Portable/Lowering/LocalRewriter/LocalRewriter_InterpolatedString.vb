@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -50,7 +53,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Private Function RewriteInterpolatedStringConversion(conversion As BoundConversion) As BoundExpression
 
-            Debug.Assert(conversion.ConversionKind = ConversionKind.InterpolatedString)
+            Debug.Assert((conversion.ConversionKind And ConversionKind.InterpolatedString) = ConversionKind.InterpolatedString)
 
             Dim targetType = conversion.Type
             Dim node = DirectCast(conversion.Operand, BoundInterpolatedStringExpression)
@@ -184,7 +187,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 ReturnBadExpression:
             ReportDiagnostic(node, ErrorFactory.ErrorInfo(ERRID.ERR_InterpolatedStringFactoryError, factoryType.Name, factoryMethodName), _diagnostics)
-            Return factory.Convert(targetType, factory.BadExpression(MyBase.VisitInterpolatedStringExpression(node)))
+            Return factory.Convert(targetType, factory.BadExpression(DirectCast(MyBase.VisitInterpolatedStringExpression(node), BoundExpression)))
 
         End Function
 

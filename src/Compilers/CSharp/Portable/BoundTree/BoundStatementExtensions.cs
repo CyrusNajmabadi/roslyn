@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -11,8 +13,15 @@ namespace Microsoft.CodeAnalysis.CSharp
         [Conditional("DEBUG")]
         internal static void AssertIsLabeledStatement(this BoundStatement node)
         {
-            Debug.Assert(node != null);
-            Debug.Assert(node.Kind == BoundKind.LabelStatement || node.Kind == BoundKind.LabeledStatement || node.Kind == BoundKind.SwitchSection);
+            switch (node.Kind)
+            {
+                case BoundKind.LabelStatement:
+                case BoundKind.LabeledStatement:
+                case BoundKind.SwitchSection:
+                    break;
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(node.Kind);
+            }
         }
 
 
@@ -32,7 +41,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     break;
 
                 case BoundKind.SwitchSection:
-                    foreach (var boundSwitchLabel in ((BoundSwitchSection)node).BoundSwitchLabels)
+                    foreach (var boundSwitchLabel in ((BoundSwitchSection)node).SwitchLabels)
                     {
                         if (boundSwitchLabel.Label == label)
                         {

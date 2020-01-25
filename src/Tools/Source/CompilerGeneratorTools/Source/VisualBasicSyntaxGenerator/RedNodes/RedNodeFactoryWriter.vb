@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 
@@ -254,7 +256,7 @@ Friend Class RedNodeFactoryWriter
 
         If nodeStructure.IsToken Then
             ' tokens have trivia
-            _writer.Write(", DirectCast(leadingTrivia.Node, InternalSyntax.VisualBasicSyntaxNode), DirectCast(trailingTrivia.Node, InternalSyntax.VisualBasicSyntaxNode)")
+            _writer.Write(", leadingTrivia.Node, trailingTrivia.Node")
         End If
 
         ' Generate parameters for each field and child
@@ -268,7 +270,7 @@ Friend Class RedNodeFactoryWriter
             Else
                 If child.IsList Then
                     If KindTypeStructure(child.ChildKind).IsToken Then
-                        _writer.Write(", DirectCast({0}.Node, Syntax.InternalSyntax.VisualBasicSyntaxNode)", ChildParamName(child, factoryFunctionName))
+                        _writer.Write(", {0}.Node", ChildParamName(child, factoryFunctionName))
                     Else
                         _writer.Write(", {0}.Node", ChildParamName(child, factoryFunctionName))
                     End If

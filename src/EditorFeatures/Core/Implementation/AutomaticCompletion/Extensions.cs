@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -20,7 +22,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion
         /// <summary>
         /// format span
         /// </summary>
-        public static void Format(this ITextBuffer buffer, TextSpan span, IEnumerable<IFormattingRule> rules)
+        public static void Format(this ITextBuffer buffer, TextSpan span, IEnumerable<AbstractFormattingRule> rules)
         {
             var snapshot = buffer.CurrentSnapshot;
             snapshot.FormatAndApplyToBuffer(span, rules, CancellationToken.None);
@@ -32,10 +34,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion
         public static CaretPreservingEditTransaction CreateEditTransaction(
             this ITextView view, string description, ITextUndoHistoryRegistry registry, IEditorOperationsFactoryService service)
         {
-            var transaction = new CaretPreservingEditTransaction(description, view, registry, service);
-            transaction.MergePolicy = AutomaticCodeChangeMergePolicy.Instance;
-
-            return transaction;
+            return new CaretPreservingEditTransaction(description, view, registry, service)
+            {
+                MergePolicy = AutomaticCodeChangeMergePolicy.Instance
+            };
         }
 
         public static SyntaxToken FindToken(this ITextSnapshot snapshot, int position, CancellationToken cancellationToken)
@@ -43,17 +45,17 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion
             var document = snapshot.GetOpenDocumentInCurrentContextWithChanges();
             if (document == null)
             {
-                return default(SyntaxToken);
+                return default;
             }
 
-            var root = document.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(CancellationToken.None);
+            var root = document.GetSyntaxRootSynchronously(cancellationToken);
             return root.FindToken(position, findInsideTrivia: true);
         }
 
         /// <summary>
         /// insert text to workspace and get updated version of the document
         /// </summary>
-        public static Document InsertText(this Document document, int position, string text, CancellationToken cancellationToken = default(CancellationToken))
+        public static Document InsertText(this Document document, int position, string text, CancellationToken cancellationToken = default)
         {
             return document.ReplaceText(new TextSpan(position, 0), text, cancellationToken);
         }
@@ -94,10 +96,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion
         /// <summary>
         /// Update the solution so that the document with the Id has the text changes
         /// </summary>
-        public static Solution UpdateDocument(this Solution solution, DocumentId id, IEnumerable<TextChange> textChanges, CancellationToken cancellationToken = default(CancellationToken))
+        public static Solution UpdateDocument(this Solution solution, DocumentId id, IEnumerable<TextChange> textChanges, CancellationToken cancellationToken = default)
         {
             var oldDocument = solution.GetDocument(id);
-            var newText = oldDocument.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken).WithChanges(textChanges);
+            var newText = oldDocument.GetTextSynchronously(cancellationToken).WithChanges(textChanges);
             return solution.WithDocumentText(id, newText);
         }
 

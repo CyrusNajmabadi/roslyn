@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -52,10 +54,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         private readonly HashSet<Symbol> _assignedInside = new HashSet<Symbol>();
 #endif
 
-        private new HashSet<Symbol> Analyze(ref bool badRegion)
+        private HashSet<Symbol> Analyze(ref bool badRegion)
         {
             base.Analyze(ref badRegion, null);
             return _dataFlowsOut;
+        }
+
+        protected override ImmutableArray<PendingBranch> Scan(ref bool badRegion)
+        {
+            _dataFlowsOut.Clear();
+            return base.Scan(ref badRegion);
         }
 
         protected override void EnterRegion()
@@ -63,12 +71,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             // to handle loops properly, we must assume that every variable that flows in is
             // assigned at the beginning of the loop.  If it isn't, then it must be in a loop
             // and flow out of the region in that loop (and into the region inside the loop).
-            foreach (Symbol variable in _dataFlowsIn)
+            foreach (ISymbol variable in _dataFlowsIn)
             {
-                int slot = this.GetOrCreateSlot(variable);
+                Symbol variableSymbol = variable.GetSymbol();
+                int slot = this.GetOrCreateSlot(variableSymbol);
                 if (slot > 0 && !this.State.IsAssigned(slot))
                 {
-                    _dataFlowsOut.Add(variable);
+                    _dataFlowsOut.Add(variableSymbol);
                 }
             }
 
@@ -104,6 +113,16 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 switch (node.Kind)
                 {
+                    case BoundKind.DeclarationPattern:
+                        {
+                            return ((BoundDeclarationPattern)node).Variable as LocalSymbol;
+                        }
+
+                    case BoundKind.RecursivePattern:
+                        {
+                            return ((BoundRecursivePattern)node).Variable as LocalSymbol;
+                        }
+
                     case BoundKind.FieldAccess:
                         {
                             var fieldAccess = (BoundFieldAccess)node;
@@ -138,14 +157,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     case BoundKind.CatchBlock:
                         {
-                            var local = ((BoundCatchBlock)node).LocalOpt;
-                            Debug.Assert((object)local == null || local.DeclarationKind == LocalDeclarationKind.CatchVariable);
-                            return (object)local != null ? local : null;
-                        }
-
-                    case BoundKind.ForEachStatement:
-                        {
-                            return ((BoundForEachStatement)node).IterationVariable;
+                            var local = ((BoundCatchBlock)node).Locals.FirstOrDefault();
+                            return local?.DeclarationKind == LocalDeclarationKind.CatchVariable ? local : null;
                         }
 
                     case BoundKind.RangeVariable:
@@ -168,6 +181,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                             return null;
                         }
 
+                    case BoundKind.LocalFunctionStatement:
+                        {
+                            return ((BoundLocalFunctionStatement)node).Symbol;
+                        }
+
                     default:
                         {
                             return null;
@@ -179,7 +197,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 #endif
 
-        protected override void AssignImpl(BoundNode node, BoundExpression value, RefKind refKind, bool written, bool read)
+        protected override void AssignImpl(BoundNode node, BoundExpression value, bool isRef, bool written, bool read)
         {
             if (IsInside)
             {
@@ -205,7 +223,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            base.AssignImpl(node, value, refKind, written, read);
+            base.AssignImpl(node, value, isRef, written, read);
         }
 
         private bool FlowsOut(ParameterSymbol param)
@@ -228,37 +246,25 @@ namespace Microsoft.CodeAnalysis.CSharp
             return base.VisitQueryClause(node);
         }
 
-        protected override void ReportUnassigned(Symbol symbol, CSharpSyntaxNode node)
+        protected override void ReportUnassigned(Symbol symbol, SyntaxNode node, int slot, bool skipIfUseBeforeDeclaration)
         {
-            if (!_dataFlowsOut.Contains(symbol) && !(symbol is FieldSymbol) && !IsInside)
+            if (!IsInside)
             {
-                _dataFlowsOut.Add(symbol);
+                // If the field access is reported as unassigned it should mean the original local
+                // or parameter flows out, so we should get the symbol associated with the expression
+                _dataFlowsOut.Add(symbol.Kind == SymbolKind.Field ? GetNonMemberSymbol(slot) : symbol);
             }
-            base.ReportUnassigned(symbol, node);
+
+            base.ReportUnassigned(symbol, node, slot, skipIfUseBeforeDeclaration);
         }
 
-        protected override void ReportUnassignedOutParameter(ParameterSymbol parameter, CSharpSyntaxNode node, Location location)
+        protected override void ReportUnassignedOutParameter(ParameterSymbol parameter, SyntaxNode node, Location location)
         {
             if (!_dataFlowsOut.Contains(parameter) && (node == null || node is ReturnStatementSyntax))
             {
                 _dataFlowsOut.Add(parameter);
             }
             base.ReportUnassignedOutParameter(parameter, node, location);
-        }
-
-        protected override void ReportUnassigned(FieldSymbol fieldSymbol, int unassignedSlot, CSharpSyntaxNode node)
-        {
-            if (!IsInside)
-            {
-                //  if the field access is reported as unassigned it should mean the original local 
-                //  or parameter flows out, so we should get the symbol associated with the expression
-                var symbol = GetNonFieldSymbol(unassignedSlot);
-                if (!_dataFlowsOut.Contains(symbol))
-                {
-                    _dataFlowsOut.Add(symbol);
-                }
-            }
-            base.ReportUnassigned(fieldSymbol, unassignedSlot, node);
         }
     }
 }

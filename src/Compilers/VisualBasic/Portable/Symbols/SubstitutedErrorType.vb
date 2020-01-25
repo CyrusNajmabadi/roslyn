@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Text
@@ -117,15 +119,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property TypeArgumentsCustomModifiers As ImmutableArray(Of ImmutableArray(Of CustomModifier))
-            Get
-                If IdentitySubstitutionOnMyTypeParameters Then
-                    Return CreateEmptyTypeArgumentsCustomModifiers()
-                End If
+        Public Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+            If IdentitySubstitutionOnMyTypeParameters Then
+                Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+            End If
 
-                Return _substitution.GetTypeArgumentsCustomModifiersFor(_fullInstanceType)
-            End Get
-        End Property
+            Return _substitution.GetTypeArgumentsCustomModifiersFor(_fullInstanceType.TypeParameters(ordinal))
+        End Function
 
         Friend Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
             Get
@@ -223,6 +223,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Public Overrides Function GetHashCode() As Integer
+            If Me._substitution.WasConstructedForModifiers() Then
+                Return OriginalDefinition.GetHashCode()
+            End If
+
             Dim _hash As Integer = _fullInstanceType.GetHashCode()
 
             _hash = Hash.Combine(ContainingType, _hash)
@@ -273,11 +277,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Next
 
             If hasTypeArgumentsCustomModifiers Then
-                Dim modifiers = TypeArgumentsCustomModifiers
-                Dim otherModifiers = other.TypeArgumentsCustomModifiers
-
                 For i As Integer = 0 To count - 1 Step 1
-                    If Not modifiers(i).SequenceEqual(otherModifiers(i)) Then
+                    If Not GetTypeArgumentCustomModifiers(i).SequenceEqual(other.GetTypeArgumentCustomModifiers(i)) Then
                         Return False
                     End If
                 Next

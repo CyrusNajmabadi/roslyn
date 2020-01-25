@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -7,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Utilities;
 
 namespace Roslyn.Utilities
 {
@@ -22,7 +25,7 @@ namespace Roslyn.Utilities
 
             // Instead of producing a char[] for each string we're building a node for, we instead 
             // have one long char[] with all the chracters of each string concatenated.  i.e.
-            // "foo" "bar" and "baz" becomes { f, o, o, b, a, r, b, a, z }.  Then in _wordSpans
+            // "goo" "bar" and "baz" becomes { f, o, o, b, a, r, b, a, z }.  Then in _wordSpans
             // we have the text spans for each of those words in this array.  This gives us only
             // two allocations instead of as many allocations as the number of strings we have.
             //
@@ -89,17 +92,17 @@ namespace Roslyn.Utilities
             private readonly Edge[] _compactEdges;
             private readonly BuilderNode[] _builderNodes;
 
-            public Builder(IEnumerable<string> values)
+            public Builder(IEnumerable<StringSlice> values)
             {
                 // TODO(cyrusn): Properly handle unicode normalization here.
-                var distinctValues = values.Where(v => v.Length > 0).Distinct(CaseInsensitiveComparison.Comparer).ToArray();
+                var distinctValues = values.Where(v => v.Length > 0).Distinct(StringSliceComparer.OrdinalIgnoreCase).ToArray();
                 var charCount = values.Sum(v => v.Length);
 
                 _concatenatedLowerCaseWords = new char[charCount];
                 _wordSpans = new TextSpan[distinctValues.Length];
 
                 var characterIndex = 0;
-                for (int i = 0; i < distinctValues.Length; i++)
+                for (var i = 0; i < distinctValues.Length; i++)
                 {
                     var value = distinctValues[i];
                     _wordSpans[i] = new TextSpan(characterIndex, value.Length);
@@ -191,8 +194,8 @@ namespace Roslyn.Utilities
                     // a threshold here as we need the actual edit distance so we can actually
                     // determine what edge to make or walk.
                     var editDistance = EditDistance.GetEditDistance(
-                        new ArraySlice<char>(_concatenatedLowerCaseWords, currentNode.CharacterSpan),
-                        new ArraySlice<char>(_concatenatedLowerCaseWords, characterSpan));
+                        _concatenatedLowerCaseWords.AsSpan(currentNode.CharacterSpan.Start, currentNode.CharacterSpan.Length),
+                        _concatenatedLowerCaseWords.AsSpan(characterSpan.Start, characterSpan.Length));
 
                     if (editDistance == 0)
                     {
@@ -201,8 +204,7 @@ namespace Roslyn.Utilities
                         throw new InvalidOperationException();
                     }
 
-                    int childNodeIndex;
-                    if (TryGetChildIndex(currentNode, currentNodeIndex, editDistance, out childNodeIndex))
+                    if (TryGetChildIndex(currentNode, currentNodeIndex, editDistance, out var childNodeIndex))
                     {
                         // Edit distances collide.  Move to this child and add this word to it.
                         currentNodeIndex = childNodeIndex;

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -88,7 +90,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public MustOverride Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
 
-        Friend MustOverride Overrides ReadOnly Property CountOfCustomModifiersPrecedingByRef As UShort
+        Public MustOverride Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
 
         Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
             Get
@@ -103,7 +105,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public NotOverridable Overrides ReadOnly Property IsImplicitlyDeclared As Boolean
             Get
-                Return (GetMatchingPropertyParameter() IsNot Nothing) OrElse (Me.ContainingSymbol.IsImplicitlyDeclared)
+                If Me.ContainingSymbol.IsImplicitlyDeclared Then
+
+                    If (TryCast(Me.ContainingSymbol, MethodSymbol)?.MethodKind = MethodKind.DelegateInvoke).GetValueOrDefault() AndAlso
+                       Not Me.ContainingType.AssociatedSymbol?.IsImplicitlyDeclared Then
+                        Return False
+                    End If
+
+                    Return True
+                End If
+
+                Return (GetMatchingPropertyParameter() IsNot Nothing)
             End Get
         End Property
 
@@ -290,6 +302,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             '  InAttribute, OutAttribute
             '     - metadata flag set, no diagnostics reported, don't influence language semantics
 
+            If attrData.IsTargetAttribute(Me, AttributeDescription.TupleElementNamesAttribute) Then
+                arguments.Diagnostics.Add(ERRID.ERR_ExplicitTupleElementNamesAttribute, arguments.AttributeSyntaxOpt.Location)
+            End If
+
             If attrData.IsTargetAttribute(Me, AttributeDescription.DefaultParameterValueAttribute) Then
                 ' Attribute decoded and constant value stored during EarlyDecodeWellKnownAttribute.
                 DecodeDefaultParameterValueAttribute(AttributeDescription.DefaultParameterValueAttribute, arguments)
@@ -332,8 +348,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim data = GetEarlyDecodedWellKnownAttributeData()
             If data IsNot Nothing Then
                 Dim attrValue = data.DefaultParameterValue
-                If Not attrValue.IsBad AndAlso
-                    attrValue <> ConstantValue.Unset AndAlso
+                If attrValue <> ConstantValue.Unset AndAlso
                     value <> attrValue Then
                     Binder.ReportDiagnostic(diagnostics, syntax, ERRID.ERR_ParamDefaultValueDiffersFromAttribute)
                 End If
@@ -360,13 +375,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim arg = attribute.CommonConstructorArguments(0)
 
             Dim specialType = If(arg.Kind = TypedConstantKind.Enum,
-                                 DirectCast(arg.Type, INamedTypeSymbol).EnumUnderlyingType.SpecialType,
-                                 arg.Type.SpecialType)
+                                 DirectCast(arg.TypeInternal, NamedTypeSymbol).EnumUnderlyingType.SpecialType,
+                                 arg.TypeInternal.SpecialType)
             Dim constantValueDiscriminator = ConstantValue.GetDiscriminator(specialType)
 
             If constantValueDiscriminator = ConstantValueTypeDiscriminator.Bad Then
                 If arg.Kind <> TypedConstantKind.Array AndAlso
-                    arg.Value Is Nothing AndAlso
+                    arg.ValueInternal Is Nothing AndAlso
                     Type.IsReferenceType Then
                     Return ConstantValue.Null
                 End If
@@ -374,7 +389,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return ConstantValue.Bad
             End If
 
-            Return ConstantValue.Create(arg.Value, constantValueDiscriminator)
+            Return ConstantValue.Create(arg.ValueInternal, constantValueDiscriminator)
         End Function
 
         Friend NotOverridable Overrides ReadOnly Property MarshallingInformation As MarshalPseudoCustomAttributeData
@@ -400,10 +415,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                                 Select Case pinvoke.CharacterSet
                                     Case Cci.Constants.CharSet_None, CharSet.Ansi
-                                        info.SetMarshalAsSimpleType(UnmanagedType.AnsiBStr)
+                                        info.SetMarshalAsSimpleType(Cci.Constants.UnmanagedType_AnsiBStr)
 
                                     Case Cci.Constants.CharSet_Auto
-                                        info.SetMarshalAsSimpleType(UnmanagedType.TBStr)
+                                        info.SetMarshalAsSimpleType(Cci.Constants.UnmanagedType_TBStr)
 
                                     Case CharSet.Unicode
                                         info.SetMarshalAsSimpleType(UnmanagedType.BStr)
@@ -412,7 +427,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                         Throw ExceptionUtilities.UnexpectedValue(pinvoke.CharacterSet)
                                 End Select
                             Else
-                                info.SetMarshalAsSimpleType(UnmanagedType.VBByRefStr)
+                                info.SetMarshalAsSimpleType(Cci.Constants.UnmanagedType_VBByRefStr)
                             End If
 
                             Return info

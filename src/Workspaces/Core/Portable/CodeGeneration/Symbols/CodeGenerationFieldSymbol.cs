@@ -1,22 +1,24 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editing;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CodeGeneration
 {
     internal class CodeGenerationFieldSymbol : CodeGenerationSymbol, IFieldSymbol
     {
         public ITypeSymbol Type { get; }
+        public NullableAnnotation NullableAnnotation => Type.NullableAnnotation;
         public object ConstantValue { get; }
         public bool HasConstantValue { get; }
 
         public CodeGenerationFieldSymbol(
             INamedTypeSymbol containingType,
-            IList<AttributeData> attributes,
+            ImmutableArray<AttributeData> attributes,
             Accessibility accessibility,
             DeclarationModifiers modifiers,
             ITypeSymbol type,
@@ -45,13 +47,9 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
             }
         }
 
-        public override SymbolKind Kind
-        {
-            get
-            {
-                return SymbolKind.Field;
-            }
-        }
+        public IFieldSymbol CorrespondingTupleField => null;
+
+        public override SymbolKind Kind => SymbolKind.Field;
 
         public override void Accept(SymbolVisitor visitor)
         {
@@ -79,13 +77,9 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
             }
         }
 
-        public bool IsVolatile
-        {
-            get
-            {
-                return false;
-            }
-        }
+        public bool IsVolatile => false;
+
+        public bool IsFixedSizeBuffer => false;
 
         public ImmutableArray<CustomModifier> CustomModifiers
         {
@@ -95,12 +89,6 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
             }
         }
 
-        public ISymbol AssociatedSymbol
-        {
-            get
-            {
-                return null;
-            }
-        }
+        public ISymbol AssociatedSymbol => null;
     }
 }

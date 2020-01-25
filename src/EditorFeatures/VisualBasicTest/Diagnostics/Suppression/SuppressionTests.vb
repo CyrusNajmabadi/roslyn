@@ -1,10 +1,11 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Option Strict Off
 Imports System.Collections.Immutable
-Imports System.Threading.Tasks
-Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis.CodeFixes.Suppression
+Imports Microsoft.CodeAnalysis.CodeActions
+Imports Microsoft.CodeAnalysis.CodeFixes
 Imports Microsoft.CodeAnalysis.Diagnostics
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
@@ -23,22 +24,15 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
             Return TestOptions.Script
         End Function
 
-        Protected Overrides Function CreateWorkspaceFromFileAsync(
-            definition As String,
-            parseOptions As ParseOptions,
-            compilationOptions As CompilationOptions
-        ) As Task(Of TestWorkspace)
-
-            Return TestWorkspace.CreateVisualBasicAsync(
-                definition,
-                DirectCast(parseOptions, ParseOptions),
-                If(DirectCast(compilationOptions, CompilationOptions), New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary)))
+        Protected Overrides Function MassageActions(ByVal actions As ImmutableArray(Of CodeAction)) As ImmutableArray(Of CodeAction)
+            Return actions(0).NestedCodeActions
         End Function
 
-        Friend Overloads Async Function TestAsync(initial As XElement, expected As XCData, Optional isLine As Boolean = True, Optional isAddedDocument As Boolean = False) As Task
-            Dim initialMarkup = initial.ToString()
-            Dim expectedMarkup = expected.Value
-            Await TestAsync(initialMarkup, expectedMarkup, isLine, isAddedDocument)
+        Protected Overrides Function CreateWorkspaceFromFile(initialMarkup As String, parameters As TestParameters) As TestWorkspace
+            Return TestWorkspace.CreateVisualBasic(
+                initialMarkup,
+                parameters.parseOptions,
+                If(parameters.compilationOptions, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary)))
         End Function
 
         Protected Overrides Function GetLanguage() As String
@@ -56,8 +50,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
 
             Public Class CompilerDiagnosticSuppressionTests
                 Inherits VisualBasicPragmaWarningDisableSuppressionTests
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return Tuple.Create(Of DiagnosticAnalyzer, ISuppressionFixProvider)(Nothing, New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return Tuple.Create(Of DiagnosticAnalyzer, IConfigurationFixProvider)(Nothing, New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <WorkItem(730770, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/730770")>
@@ -490,59 +484,60 @@ Class C
 
     End Sub
 End Class]]>
-                    Dim expected = <![CDATA[
+                    Dim expected = $"
 Class C
 
-#Disable Warning BC42309
-' Comment
-' Comment
-''' <summary><see cref="abc"/></summary>
+    ' Comment
+    ' Comment
+#Disable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
+    ''' <summary><see cref=""abc""/></summary>
     Sub M() ' Comment  
-#Enable Warning BC42309
+#Enable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
 
     End Sub
-End Class]]>
+End Class"
 
                     Dim enableDocCommentProcessing = VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose)
-                    Await TestAsync(source.Value, expected.Value, enableDocCommentProcessing)
+                    Await TestAsync(source.Value, expected, enableDocCommentProcessing)
 
                     ' Also verify that the added directive does indeed suppress the diagnostic.
-                    Dim fixedSource = <![CDATA[
+                    Dim fixedSource = $"
 Class C
 
-#Disable Warning BC42309
-' Comment
-' Comment
-''' <summary><see [|cref="abc"|]/></summary>
+    ' Comment
+    ' Comment
+#Disable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
+    ''' <summary><see [|cref=""abc""|]/></summary>
     Sub M() ' Comment  
-#Enable Warning BC42309
+#Enable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
 
     End Sub
-End Class]]>
+End Class"
 
-                    Await TestMissingAsync(fixedSource.Value, enableDocCommentProcessing)
+                    Await TestMissingAsync(fixedSource,
+                                           New TestParameters(enableDocCommentProcessing))
                 End Function
 
                 <WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")>
                 <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
                 Public Async Function TestPragmaWarningDirectiveAroundTrivia2() As Task
                     Dim source = <![CDATA['''[|<summary></summary>|]]]>
-                    Dim expected = <![CDATA[#Disable Warning BC42312
-  '''<summary></summary>
-#Enable Warning BC42312]]>
+                    Dim expected = $"#Disable Warning BC42312 ' {WRN_XMLDocWithoutLanguageElement_Title}
+'''<summary></summary>
+#Enable Warning BC42312 ' {WRN_XMLDocWithoutLanguageElement_Title}"
 
-                    Await TestAsync(source.Value, expected.Value, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
+                    Await TestAsync(source.Value, expected, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
                 End Function
 
                 <WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")>
                 <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
                 Public Async Function TestPragmaWarningDirectiveAroundTrivia3() As Task
                     Dim source = <![CDATA[   '''[|<summary></summary>|]   ]]>
-                    Dim expected = <![CDATA[#Disable Warning BC42312
-  '''<summary></summary>   
-#Enable Warning BC42312]]>
+                    Dim expected = $"#Disable Warning BC42312 ' {WRN_XMLDocWithoutLanguageElement_Title}
+'''<summary></summary>   
+#Enable Warning BC42312 ' {WRN_XMLDocWithoutLanguageElement_Title}"
 
-                    Await TestAsync(source.Value, expected.Value, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
+                    Await TestAsync(source.Value, expected, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
                 End Function
 
                 <WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")>
@@ -554,16 +549,16 @@ End Class]]>
 Class C : End Class
 
 ]]>
-                    Dim expected = <![CDATA[
+                    Dim expected = $"
 
-#Disable Warning BC42309
-'''<summary><see cref="abc"/></summary>
+#Disable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
+'''<summary><see cref=""abc""/></summary>
 Class C : End Class
-#Enable Warning BC42309
+#Enable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
 
-]]>
+"
 
-                    Await TestAsync(source.Value, expected.Value, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
+                    Await TestAsync(source.Value, expected, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
                 End Function
 
                 <WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")>
@@ -573,14 +568,14 @@ Class C : End Class
 '''<summary><see [|cref="abc"|]/></summary>
 Class C2 : End Class
 Class C3 : End Class]]>
-                    Dim expected = <![CDATA[class C1 : End Class
-#Disable Warning BC42309
-'''<summary><see cref="abc"/></summary>
+                    Dim expected = $"class C1 : End Class
+#Disable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
+'''<summary><see cref=""abc""/></summary>
 Class C2 : End Class
-#Enable Warning BC42309
-Class C3 : End Class]]>
+#Enable Warning BC42309 ' {WRN_XMLDocCrefAttributeNotFound1_Title}
+Class C3 : End Class"
 
-                    Await TestAsync(source.Value, expected.Value, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
+                    Await TestAsync(source.Value, expected, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
                 End Function
 
                 <WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")>
@@ -589,21 +584,21 @@ Class C3 : End Class]]>
                     Dim source = <![CDATA[class C1 : End Class
 Class C2 : End Class [|'''|]
 Class C3 : End Class]]>
-                    Dim expected = <![CDATA[class C1 : End Class
-#Disable Warning BC42309
+                    Dim expected = $"class C1 : End Class
+#Disable Warning BC42302 ' {WRN_XMLDocNotFirstOnLine_Title}
 Class C2 : End Class '''
-#Enable Warning BC42309
+#Enable Warning BC42302 ' {WRN_XMLDocNotFirstOnLine_Title}
 
-Class C3 : End Class]]>
+Class C3 : End Class"
 
-                    Await TestAsync(source.Value, expected.Value, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
+                    Await TestAsync(source.Value, expected, VisualBasicParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose))
                 End Function
             End Class
 
             Public Class UserHiddenDiagnosticSuppressionTests
                 Inherits VisualBasicPragmaWarningDisableSuppressionTests
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New VisualBasicSimplifyTypeNamesDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New VisualBasicSimplifyTypeNamesDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
@@ -645,8 +640,8 @@ End Class]]>
                     End Sub
                 End Class
 
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
 
@@ -719,8 +714,8 @@ End Class]]>
                     End Sub
                 End Class
 
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <WorkItem(730770, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/730770")>
@@ -763,8 +758,8 @@ End Class]]>
                     End Sub
                 End Class
 
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <WorkItem(730770, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/730770")>
@@ -827,8 +822,8 @@ End Class]]>
                     End Sub
                 End Class
 
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
@@ -882,8 +877,8 @@ End Class]]>
 
             Public Class CompilerDiagnosticSuppressionTests
                 Inherits VisualBasicGlobalSuppressMessageSuppressionTests
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return Tuple.Create(Of DiagnosticAnalyzer, ISuppressionFixProvider)(Nothing, New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return Tuple.Create(Of DiagnosticAnalyzer, IConfigurationFixProvider)(Nothing, New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
 
@@ -904,8 +899,8 @@ End Class]]>
 
             Public Class UserHiddenDiagnosticSuppressionTests
                 Inherits VisualBasicGlobalSuppressMessageSuppressionTests
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New VisualBasicSimplifyTypeNamesDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New VisualBasicSimplifyTypeNamesDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
@@ -974,8 +969,8 @@ End Class]]>
                     End Sub
                 End Class
 
-                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)
-                    Return New Tuple(Of DiagnosticAnalyzer, ISuppressionFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
                 End Function
 
                 <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
@@ -987,13 +982,13 @@ Imports System
         Dim x
     End Sub
 End Class]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:Class1"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:Class1"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1002,7 +997,7 @@ End Class]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:Class1"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:Class1"")>
 
 [|Class Class1|]
     Sub Method()
@@ -1025,22 +1020,22 @@ Imports System
         End Sub
     End Class
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""namespace"", Target:=""~N:N"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""namespace"", Target:=""~N:N"")>
 "
 
-                    Await TestAsync(source.Value, expected, index:=1)
+                    Await TestInRegularAndScriptAsync(source.Value, expected, index:=1)
 
                     ' Also verify that the added attribute does indeed suppress the diagnostic.
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""namespace"", Target:=""~N:N"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""namespace"", Target:=""~N:N"")>
 
 [|Namespace N|]
     Class Class1
@@ -1067,13 +1062,13 @@ Namespace N1
         End Class
     End Namespace
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:N1.N2.Class1"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:N1.N2.Class1"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1082,7 +1077,7 @@ End Namespace]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:N1.N2.Class1"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:N1.N2.Class1"")>
 
 Namespace N1
     Namespace N2
@@ -1111,13 +1106,13 @@ Namespace N
         End Class
     End Class
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:N.Generic`1.Class1"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:N.Generic`1.Class1"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1126,7 +1121,7 @@ End Namespace]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:N.Generic`1.Class1"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:N.Generic`1.Class1"")>
 
 Namespace N
     Class Generic(Of T)
@@ -1155,13 +1150,13 @@ Namespace N
         End Class
     End Class
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1170,7 +1165,7 @@ End Namespace]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method"")>
 
 Namespace N
     Class Generic(Of T)
@@ -1203,13 +1198,13 @@ Namespace N
         End Class
     End Class
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method(System.Int32,System.Int32@)"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method(System.Int32,System.Int32@)"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1218,7 +1213,7 @@ End Namespace]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method(System.Int32,System.Int32@)"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method(System.Int32,System.Int32@)"")>
 
 Namespace N
     Class Generic(Of T)
@@ -1255,13 +1250,13 @@ Namespace N
         End Class
     End Class
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method``1(``0,System.Int32@)"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method``1(``0,System.Int32@)"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1270,7 +1265,7 @@ End Namespace]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method``1(``0,System.Int32@)"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~M:N.Generic`1.Class1.Method``1(``0,System.Int32@)"")>
 
 Namespace N
     Class Generic(Of T)
@@ -1305,13 +1300,13 @@ Namespace N
         End Class
     End Class
 End Namespace]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~P:N.Generic.C.P"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~P:N.Generic.C.P"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1320,7 +1315,7 @@ End Namespace]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~P:N.Generic.C.P"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~P:N.Generic.C.P"")>
 
 Namespace N
 	Class Generic
@@ -1345,13 +1340,13 @@ Imports System
 Class C
 	[|Private ReadOnly F As Integer|]
 End Class]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~F:C.F"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~F:C.F"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1360,7 +1355,7 @@ End Class]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~F:C.F"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~F:C.F"")>
 
 Class C
 	[|Private ReadOnly F As Integer|]
@@ -1401,13 +1396,13 @@ Class C
 		End RemoveHandler
 	End Event
 End Class]]>
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~E:C.SampleEvent"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~E:C.SampleEvent"")>
 "
 
                     Await TestAsync(source.Value, expected)
@@ -1416,7 +1411,7 @@ End Class]]>
                     Dim fixedSource = $"
 Imports System
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""member"", Target:=""~E:C.SampleEvent"")>
+<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""member"", Target:=""~E:C.SampleEvent"")>
 
 Public Class SampleEventArgs
 	Public Sub New(s As String)
@@ -1463,10 +1458,9 @@ End Class
 [|Class Class2|]
 End Class]]>
                             </Document>
-                            <Document FilePath="GlobalSuppressions.vb"><![CDATA[
-' This file is used by Code Analysis to maintain SuppressMessage 
+                            <Document FilePath="GlobalSuppressions.vb"><![CDATA[' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
 <Assembly: Diagnostics.CodeAnalysis.SuppressMessage("InfoDiagnostic", "InfoDiagnostic:InfoDiagnostic", Justification:="<Pending>", Scope:="type", Target:="Class1")>
@@ -1475,14 +1469,14 @@ End Class]]>
                         </Project>
                     </Workspace>
 
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
 <Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""<Pending>"", Scope:=""type"", Target:=""Class1"")>
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:Class2"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:Class2"")>
 "
 
                     Await TestAsync(source.ToString(), expected)
@@ -1512,13 +1506,13 @@ End Class
                         </Project>
                     </Workspace>
 
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:Class2"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:Class2"")>
 "
 
                     Await TestAsync(source.ToString(), expected)
@@ -1545,10 +1539,9 @@ Class Class3
 End Class
 ]]>
                             </Document>
-                            <Document FilePath="GlobalSuppressions2.vb"><![CDATA[
-' This file is used by Code Analysis to maintain SuppressMessage 
+                            <Document FilePath="GlobalSuppressions2.vb"><![CDATA[' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
 <Assembly: Diagnostics.CodeAnalysis.SuppressMessage("InfoDiagnostic", "InfoDiagnostic:InfoDiagnostic", Justification:="<Pending>", Scope:="type", Target:="Class1")>
@@ -1557,20 +1550,369 @@ End Class
                         </Project>
                     </Workspace>
 
-                    Dim expected = $"
-' This file is used by Code Analysis to maintain SuppressMessage 
+                    Dim expected =
+$"' This file is used by Code Analysis to maintain SuppressMessage
 ' attributes that are applied to this project.
-' Project-level suppressions either have no target or are given 
+' Project-level suppressions either have no target or are given
 ' a specific target and scoped to a namespace, type, member, etc.
 
 <Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""<Pending>"", Scope:=""type"", Target:=""Class1"")>
-<Assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.SuppressionPendingJustification}"", Scope:=""type"", Target:=""~T:Class2"")>
+<Assembly: Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:Class2"")>
+"
+
+                    Await TestAsync(source.ToString(), expected)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionWithUsingDirectiveInExistingGlobalSuppressionsDocument() As Task
+                    Dim source =
+                    <Workspace>
+                        <Project Language="Visual Basic" CommonReferences="true">
+                            <Document FilePath="CurrentDocument.vb"><![CDATA[
+Imports System
+
+Class Class1
+End Class
+
+[|Class Class2|]
+End Class]]>
+                            </Document>
+                            <Document FilePath="GlobalSuppressions.vb"><![CDATA[
+Imports System.Diagnostics.CodeAnalysis
+
+<Assembly: SuppressMessage("InfoDiagnostic", "InfoDiagnostic:InfoDiagnostic", Justification:="<Pending>", Scope:="type", Target:="Class1")>
+]]>
+                            </Document>
+                        </Project>
+                    </Workspace>
+
+                    Dim expected = $"
+Imports System.Diagnostics.CodeAnalysis
+
+<Assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""<Pending>"", Scope:=""type"", Target:=""Class1"")>
+<Assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"", Scope:=""type"", Target:=""~T:Class2"")>
 "
 
                     Await TestAsync(source.ToString(), expected)
                 End Function
             End Class
         End Class
+
+        Public MustInherit Class VisualBasicLocalSuppressMessageSuppressionTests
+            Inherits VisualBasicSuppressionTests
+            Protected NotOverridable Overrides ReadOnly Property CodeActionIndex() As Integer
+                Get
+                    Return 2
+                End Get
+            End Property
+
+            Public Class UserInfoDiagnosticSuppressionTests
+                Inherits VisualBasicLocalSuppressMessageSuppressionTests
+                Private Class UserDiagnosticAnalyzer
+                    Inherits DiagnosticAnalyzer
+
+                    Private _descriptor As New DiagnosticDescriptor("InfoDiagnostic", "InfoDiagnostic", "InfoDiagnostic", "InfoDiagnostic", DiagnosticSeverity.Info, isEnabledByDefault:=True)
+
+                    Public Overrides ReadOnly Property SupportedDiagnostics() As ImmutableArray(Of DiagnosticDescriptor)
+                        Get
+                            Return ImmutableArray.Create(_descriptor)
+                        End Get
+                    End Property
+
+                    Public Overrides Sub Initialize(context As AnalysisContext)
+                        context.RegisterSyntaxNodeAction(AddressOf AnalyzeNode, SyntaxKind.ClassStatement, SyntaxKind.NamespaceStatement, SyntaxKind.SubStatement, SyntaxKind.FunctionStatement, SyntaxKind.PropertyStatement, SyntaxKind.FieldDeclaration, SyntaxKind.EventStatement)
+                    End Sub
+
+                    Private Sub AnalyzeNode(context As SyntaxNodeAnalysisContext)
+                        Select Case context.Node.Kind()
+                            Case SyntaxKind.ClassStatement
+                                Dim classDecl = DirectCast(context.Node, ClassStatementSyntax)
+                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, classDecl.Identifier.GetLocation()))
+                                Exit Select
+
+                            Case SyntaxKind.NamespaceStatement
+                                Dim ns = DirectCast(context.Node, NamespaceStatementSyntax)
+                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, ns.Name.GetLocation()))
+                                Exit Select
+
+                            Case SyntaxKind.SubStatement, SyntaxKind.FunctionStatement
+                                Dim method = DirectCast(context.Node, MethodStatementSyntax)
+                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, method.Identifier.GetLocation()))
+                                Exit Select
+
+                            Case SyntaxKind.PropertyStatement
+                                Dim p = DirectCast(context.Node, PropertyStatementSyntax)
+                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, p.Identifier.GetLocation()))
+                                Exit Select
+
+                            Case SyntaxKind.FieldDeclaration
+                                Dim f = DirectCast(context.Node, FieldDeclarationSyntax)
+                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, f.Declarators.First().Names.First.GetLocation()))
+                                Exit Select
+
+                            Case SyntaxKind.EventStatement
+                                Dim e = DirectCast(context.Node, EventStatementSyntax)
+                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, e.Identifier.GetLocation()))
+                                Exit Select
+                        End Select
+                    End Sub
+                End Class
+
+                Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)
+                    Return New Tuple(Of DiagnosticAnalyzer, IConfigurationFixProvider)(New UserDiagnosticAnalyzer(), New VisualBasicSuppressionCodeFixProvider())
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnSimpleType() As Task
+                    Dim source = <![CDATA[
+Imports System
+
+' Some Trivia
+[|Class C|]
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+]]>
+                    Dim expected = $"
+Imports System
+
+' Some Trivia
+<Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+Class C
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Class C", "[|Class C|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnSimpleType2() As Task
+                    ' Type already has attributes.
+                    Dim source = <![CDATA[
+Imports System
+
+' Some Trivia
+<Diagnostics.CodeAnalysis.SuppressMessage("SomeOtherDiagnostic", "SomeOtherDiagnostic:Title", Justification:="<Pending>")>
+[|Class C|]
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+]]>
+                    Dim expected = $"
+Imports System
+
+' Some Trivia
+<Diagnostics.CodeAnalysis.SuppressMessage(""SomeOtherDiagnostic"", ""SomeOtherDiagnostic:Title"", Justification:=""<Pending>"")>
+<Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+Class C
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Class C", "[|Class C|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnSimpleType3() As Task
+                    ' Type has structured trivia.
+                    Dim source = <![CDATA[
+Imports System
+
+' Some Trivia
+''' <summary>
+''' My custom type
+''' </summary>
+[|Class C|]
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+]]>
+                    Dim expected = $"
+Imports System
+
+' Some Trivia
+''' <summary>
+''' My custom type
+''' </summary>
+<Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+Class C
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Class C", "[|Class C|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnSimpleType4() As Task
+                    ' Type has structured trivia and attributes.
+                    Dim source = <![CDATA[
+Imports System
+
+' Some Trivia
+''' <summary>
+''' My custom type
+''' </summary>
+<Diagnostics.CodeAnalysis.SuppressMessage("SomeOtherDiagnostic", "SomeOtherDiagnostic:Title", Justification:="<Pending>")>
+[|Class C|]
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+]]>
+                    Dim expected = $"
+Imports System
+
+' Some Trivia
+''' <summary>
+''' My custom type
+''' </summary>
+<Diagnostics.CodeAnalysis.SuppressMessage(""SomeOtherDiagnostic"", ""SomeOtherDiagnostic:Title"", Justification:=""<Pending>"")>
+<Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+Class C
+    Sub Method()
+        Dim x
+    End Sub
+End Class
+"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Class C", "[|Class C|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnTypeInsideNamespace() As Task
+                    Dim source = <![CDATA[
+Imports System
+
+Namespace N
+    ' Some Trivia
+    [|Class C|]
+        Sub Method()
+            Dim x
+        End Sub
+    End Class
+End Namespace]]>
+                    Dim expected = $"
+Imports System
+
+Namespace N
+    ' Some Trivia
+    <Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+    Class C
+        Sub Method()
+            Dim x
+        End Sub
+    End Class
+End Namespace"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Class C", "[|Class C|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnNestedType() As Task
+                    Dim source = <![CDATA[
+Imports System
+
+Class Generic(Of T)
+    ' Some Trivia
+    [|Class C|]
+        Sub Method()
+            Dim x
+        End Sub
+    End Class
+End Class]]>
+                    Dim expected = $"
+Imports System
+
+Class Generic(Of T)
+    ' Some Trivia
+    <Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+    Class C
+        Sub Method()
+            Dim x
+        End Sub
+    End Class
+End Class"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Class C", "[|Class C|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+
+                <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
+                Public Async Function TestSuppressionOnMethod() As Task
+                    Dim source = <![CDATA[
+Imports System
+
+Class Generic(Of T)
+    Class C
+        ' Some Trivia
+        [|Sub Method()
+            Dim x
+        End Sub|]
+    End Class
+End Class]]>
+                    Dim expected = $"
+Imports System
+
+Class Generic(Of T)
+    Class C
+        ' Some Trivia
+        <Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification:=""{FeaturesResources.Pending}"")>
+        Sub Method()
+            Dim x
+        End Sub
+    End Class
+End Class"
+
+                    Await TestAsync(source.Value, expected)
+
+                    ' Also verify that the added attribute does indeed suppress the diagnostic.
+                    Dim fixedSource = expected.Replace("Sub Method()", "[|Sub Method()|]")
+
+                    Await TestMissingAsync(fixedSource)
+                End Function
+            End Class
+        End Class
+
 #End Region
     End Class
 End Namespace

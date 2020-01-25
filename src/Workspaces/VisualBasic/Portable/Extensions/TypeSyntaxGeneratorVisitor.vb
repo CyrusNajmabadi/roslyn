@@ -1,13 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System
-Imports System.Collections.Generic
-Imports System.Linq
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Simplification
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
@@ -17,9 +13,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
 
         Private ReadOnly _addGlobal As Boolean
 
-        Public Sub New(addGlobal As Boolean)
+        Private Shared ReadOnly AddGlobalInstance As TypeSyntaxGeneratorVisitor = New TypeSyntaxGeneratorVisitor(addGlobal:=True)
+        Private Shared ReadOnly NotAddGlobalInstance As TypeSyntaxGeneratorVisitor = New TypeSyntaxGeneratorVisitor(addGlobal:=False)
+
+        Private Sub New(addGlobal As Boolean)
             Me._addGlobal = addGlobal
         End Sub
+
+        Public Shared Function Create(addGlobal As Boolean) As TypeSyntaxGeneratorVisitor
+            Return If(addGlobal, AddGlobalInstance, NotAddGlobalInstance)
+        End Function
 
         Public Overrides Function DefaultVisit(node As ISymbol) As TypeSyntax
             Throw New NotImplementedException()
@@ -60,6 +63,35 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
         End Function
 
         Public Function CreateSimpleTypeSyntax(symbol As INamedTypeSymbol) As TypeSyntax
+            Dim syntax = TryCreateSpecializedNamedTypeSyntax(symbol)
+            If syntax IsNot Nothing Then
+                Return syntax
+            End If
+
+            If symbol.IsTupleType AndAlso
+               symbol.TupleUnderlyingType IsNot Nothing AndAlso
+               Not symbol.Equals(symbol.TupleUnderlyingType) Then
+                Return CreateSimpleTypeSyntax(symbol.TupleUnderlyingType)
+            End If
+
+            If symbol.Name = String.Empty OrElse symbol.IsAnonymousType Then
+                Return SyntaxFactory.QualifiedName(SyntaxFactory.IdentifierName("System"), SyntaxFactory.IdentifierName("Object"))
+            End If
+
+            If symbol.OriginalDefinition.SpecialType = SpecialType.System_Nullable_T Then
+                Return AddInformationTo(SyntaxFactory.NullableType(symbol.TypeArguments.First().Accept(Me)), symbol)
+            End If
+
+            If symbol.TypeParameters.Length = 0 Then
+                Return symbol.Name.ToIdentifierName
+            End If
+
+            Return SyntaxFactory.GenericName(
+                symbol.Name.ToIdentifierToken,
+                SyntaxFactory.TypeArgumentList(SyntaxFactory.SeparatedList(symbol.TypeArguments.[Select](Function(t) t.Accept(Me)))))
+        End Function
+
+        Private Function TryCreateSpecializedNamedTypeSyntax(symbol As INamedTypeSymbol) As TypeSyntax
             Select Case symbol.SpecialType
                 Case SpecialType.System_Object
                     Return SyntaxFactory.QualifiedName(SyntaxFactory.IdentifierName("System"), SyntaxFactory.IdentifierName("Object"))
@@ -95,21 +127,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Extensions
                     Return SyntaxFactory.QualifiedName(SyntaxFactory.IdentifierName("System"), SyntaxFactory.IdentifierName("DateTime"))
             End Select
 
-            If symbol.Name = String.Empty OrElse symbol.IsAnonymousType Then
-                Return SyntaxFactory.QualifiedName(SyntaxFactory.IdentifierName("System"), SyntaxFactory.IdentifierName("Object"))
+            If symbol.IsTupleType AndAlso symbol.TupleElements.Length >= 2 Then
+                Return CreateTupleTypeSyntax(symbol)
             End If
 
-            If symbol.OriginalDefinition.SpecialType = SpecialType.System_Nullable_T Then
-                Return AddInformationTo(SyntaxFactory.NullableType(symbol.TypeArguments.First().Accept(Me)), symbol)
-            End If
+            Return Nothing
+        End Function
 
-            If symbol.TypeParameters.Length = 0 Then
-                Return symbol.Name.ToIdentifierName
-            End If
+        Private Shared Function CreateTupleTypeSyntax(symbol As INamedTypeSymbol) As TypeSyntax
+            Dim elements = symbol.TupleElements
 
-            Return SyntaxFactory.GenericName(
-                symbol.Name.ToIdentifierToken,
-                SyntaxFactory.TypeArgumentList(SyntaxFactory.SeparatedList(symbol.TypeArguments.[Select](Function(t) t.Accept(Me)))))
+            Return SyntaxFactory.TupleType(SyntaxFactory.SeparatedList(
+                elements.Select(Function(element) If(Not element.IsImplicitlyDeclared,
+                                                        SyntaxFactory.NamedTupleElement(
+                                                                        SyntaxFactory.Identifier(element.Name),
+                                                                        SyntaxFactory.SimpleAsClause(
+                                                                                    SyntaxFactory.Token(SyntaxKind.AsKeyword),
+                                                                                    Nothing,
+                                                                                    element.Type.GenerateTypeSyntax())),
+                                                        DirectCast(SyntaxFactory.TypedTupleElement(
+                                                                        element.Type.GenerateTypeSyntax()), TupleElementSyntax)))))
         End Function
 
         Public Overrides Function VisitNamedType(symbol As INamedTypeSymbol) As TypeSyntax

@@ -7,7 +7,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
     xmlns:imagecatalog="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.ImageCatalog"
-    xmlns:vs="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.14.0"
+    xmlns:vs="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
     xmlns:imagingPlatformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Imaging"
     Height="420" Width="560"
     MinHeight="420" MinWidth="560"
@@ -49,6 +49,7 @@
         <KeyBinding Key="Up" Modifiers="Alt" Command="{StaticResource MoveUp}" />
         <KeyBinding Key="Down" Modifiers="Alt" Command="{StaticResource MoveDown}" />
         <KeyBinding Key="Delete" Command="{StaticResource ToggleRemovedState}" />
+        <KeyBinding Key="Return" Command="{StaticResource ClickOK}" />
     </Window.InputBindings>
     <Grid Name="ContentGrid" Margin="11,6,11,11">
         <Grid.RowDefinitions>
@@ -108,6 +109,7 @@
                 </DataGrid.InputBindings>
                 <DataGrid.CellStyle>
                     <Style TargetType="DataGridCell">
+                        <Setter Property="AutomationProperties.Name" Value="{Binding ParameterAutomationText}" />
                         <Setter Property="BorderThickness" Value="0" />
                         <Setter Property="Padding" Value="2" />
                         <Setter Property="KeyboardNavigation.IsTabStop" Value="False"/>
@@ -129,6 +131,7 @@
                 </DataGrid.CellStyle>
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow">
+                        <Setter Property="AutomationProperties.Name" Value="{Binding ParameterAutomationText}" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="{x:Type DataGridRow}">
@@ -210,12 +213,13 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <TextBlock Grid.Column="0" 
+            <Label x:Name="PreviewMethodSignatureLabel"
+                       Grid.Column="0" 
                        Margin="0, 9, 0, 0" 
                        Grid.Row="1" 
                        Height="Auto" 
                        Width="Auto" 
-                       Text="{Binding ElementName=dialog, Path=PreviewMethodSignature}"/>
+                       Content="{Binding ElementName=dialog, Path=PreviewMethodSignature}"/>
             <Border Grid.Column="0" 
                     Margin="0, 3, 0, 0" 
                     Grid.Row="2" 
@@ -224,6 +228,9 @@
                     BorderThickness="1" 
                     BorderBrush="LightGray">
                 <ScrollViewer Name="Scroller"
+                              AutomationProperties.Name="{Binding SignaturePreviewAutomationText}"
+                              AutomationProperties.LabeledBy="{Binding ElementName=PreviewMethodSignatureLabel}"
+                              IsTabStop="True"
                               Padding="8, 4, 4, 4" 
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" 
                               Content="{Binding SignatureDisplay}" 
@@ -232,9 +239,10 @@
             </Border>
             <StackPanel Name="ControlButtonsPanel" Grid.Column="1" Grid.Row="0" Height="Auto" Width="Auto" Margin="0, 3, 0, 0" >
                 <vs:DialogButton Name="UpButton" 
+                                 AutomationProperties.Name="{Binding MoveUpAutomationText}"
                                  Margin="9 0 0 0"
                                  IsEnabled="{Binding CanMoveUp, Mode=OneWay}" 
-                                 AutomationProperties.AutomationId="Up"
+                                 AutomationProperties.AutomationId="UpButton"
                                  Height="Auto" Width="Auto"
                                  Command="{StaticResource MoveUp}">
                     <imaging:CrispImage Name="UpArrowImage" 
@@ -244,9 +252,10 @@
                                         Grayscale="{Binding IsEnabled, ElementName=UpButton, Converter={StaticResource NegateBooleanConverter}}"/>
                 </vs:DialogButton>
                 <vs:DialogButton Name="DownButton" 
+                                 AutomationProperties.Name="{Binding MoveDownAutomationText}"
                                  Margin="9 9 0 0"
                                  IsEnabled="{Binding CanMoveDown, Mode=OneWay}" 
-                                 AutomationProperties.AutomationId="Down"
+                                 AutomationProperties.AutomationId="DownButton"
                                  Height="Auto" Width="Auto"
                                  Command="{StaticResource MoveDown}">
                     <imaging:CrispImage Name="DownArrowImage" 
@@ -257,19 +266,23 @@
 
                 </vs:DialogButton>
                 <vs:DialogButton
+                        Name="RemoveButton"
                         Margin="9 29 0 0"
                         IsEnabled="{Binding CanRemove, Mode=OneWay}" 
+                        AutomationProperties.Name="{Binding RemoveAutomationText}"
                         Click="Remove_Click" 
-                        AutomationProperties.AutomationId="Remove" 
+                        AutomationProperties.AutomationId="RemoveButton" 
                         Content="{Binding ElementName=dialog, Path=Remove}" 
                         Height="Auto" Width="Auto">
                 </vs:DialogButton>
 
                 <vs:DialogButton
+                        Name="RestoreButton"
                         Margin="9 9 0 0"
                         IsEnabled="{Binding CanRestore, Mode=OneWay}" 
                         Click="Restore_Click" 
-                        AutomationProperties.AutomationId="Restore" 
+                        AutomationProperties.AutomationId="RestoreButton" 
+                        AutomationProperties.Name="{Binding RestoreAutomationText}"
                         Content="{Binding ElementName=dialog, Path=Restore}" 
                         Height="Auto" Width="Auto"/>
             </StackPanel>
@@ -287,7 +300,8 @@
                     HorizontalAlignment="Right" 
                     Margin="0, 11, 0, 0"
                     Orientation="Horizontal" Width="153">
-            <vs:DialogButton x:Uid="OkButton" 
+            <vs:DialogButton x:Uid="OKButton" 
+                    Name="OKButton"
                     Content="{Binding ElementName=dialog, Path=OK}" 
                     Margin="0, 0, 0, 0" 
                     Padding="{StaticResource ResourceKey=okCancelButtonPadding}"
@@ -297,6 +311,7 @@
                     MinWidth="73"
                     MinHeight="21"/>
             <vs:DialogButton x:Uid="CancelButton" 
+                    Name="CancelButton"
                     Content="{Binding ElementName=dialog, Path=Cancel}" 
                     Margin="7, 0, 0, 0" 
                     Padding="{StaticResource ResourceKey=okCancelButtonPadding}"

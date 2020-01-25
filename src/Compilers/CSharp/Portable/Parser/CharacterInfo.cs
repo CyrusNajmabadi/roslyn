@@ -1,7 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
 using System.Globalization;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -23,6 +26,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         /// <summary>
+        /// Returns true if the Unicode character is a binary (0-1) digit.
+        /// </summary>
+        /// <param name="c">The Unicode character.</param>
+        /// <returns>true if the character is a binary digit.</returns>
+        internal static bool IsBinaryDigit(char c)
+        {
+            return c == '0' | c == '1';
+        }
+
+        /// <summary>
         /// Returns true if the Unicode character is a decimal digit.
         /// </summary>
         /// <param name="c">The Unicode character.</param>
@@ -40,6 +53,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             Debug.Assert(IsHexDigit(c));
             return (c >= '0' && c <= '9') ? c - '0' : (c & 0xdf) - 'A' + 10;
+        }
+
+        /// <summary>
+        /// Returns the value of a binary Unicode character.
+        /// </summary>
+        /// <param name="c">The Unicode character.</param>
+        internal static int BinaryValue(char c)
+        {
+            Debug.Assert(IsBinaryDigit(c));
+            return c - '0';
         }
 
         /// <summary>

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using System.Collections.Generic;
@@ -12,9 +14,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
         {
         }
 
-        protected override IEnumerable<CSharpAttributeData> GetCustomAttributesToEmit(ModuleCompilationState compilationState)
+        protected override IEnumerable<CSharpAttributeData> GetCustomAttributesToEmit(PEModuleBuilder moduleBuilder)
         {
-            return UnderlyingEvent.GetCustomAttributesToEmit(compilationState);
+            return UnderlyingEvent.GetCustomAttributesToEmit(moduleBuilder);
         }
 
         protected override bool IsRuntimeSpecial
@@ -33,7 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             }
         }
 
-        protected override Cci.ITypeReference GetType(PEModuleBuilder moduleBuilder, CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        protected override Cci.ITypeReference GetType(PEModuleBuilder moduleBuilder, SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             return moduleBuilder.Translate(UnderlyingEvent.Type, syntaxNodeOpt, diagnostics);
         }
@@ -59,7 +61,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             }
         }
 
-        protected override void EmbedCorrespondingComEventInterfaceMethodInternal(CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics, bool isUsedForComAwareEventBinding)
+        protected override void EmbedCorrespondingComEventInterfaceMethodInternal(SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics, bool isUsedForComAwareEventBinding)
         {
             // If the event happens to belong to a class with a ComEventInterfaceAttribute, there will also be
             // a paired method living on its source interface. The ComAwareEventInfo class expects to find this 
@@ -76,7 +78,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
 
                     if (attrData.CommonConstructorArguments.Length == 2)
                     {
-                        sourceInterface = attrData.CommonConstructorArguments[0].Value as NamedTypeSymbol;
+                        sourceInterface = attrData.CommonConstructorArguments[0].ValueInternal as NamedTypeSymbol;
 
                         if ((object)sourceInterface != null)
                         {
@@ -115,7 +117,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit.NoPia
             }
         }
 
-        private bool EmbedMatchingInterfaceMethods(NamedTypeSymbol sourceInterface, CSharpSyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
+        private bool EmbedMatchingInterfaceMethods(NamedTypeSymbol sourceInterface, SyntaxNode syntaxNodeOpt, DiagnosticBag diagnostics)
         {
             bool foundMatch = false;
             foreach (Symbol m in sourceInterface.GetMembers(UnderlyingEvent.MetadataName))

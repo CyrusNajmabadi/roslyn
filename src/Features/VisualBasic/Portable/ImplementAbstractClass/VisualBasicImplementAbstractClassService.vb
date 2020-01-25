@@ -1,8 +1,9 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.ImplementAbstractClass
-Imports Microsoft.CodeAnalysis.Host
 Imports Microsoft.CodeAnalysis.Host.Mef
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports System.Composition
@@ -10,34 +11,21 @@ Imports System.Composition
 Namespace Microsoft.CodeAnalysis.VisualBasic.ImplementAbstractClass
     <ExportLanguageService(GetType(IImplementAbstractClassService), LanguageNames.VisualBasic), [Shared]>
     Partial Friend Class VisualBasicImplementAbstractClassService
-        Inherits AbstractImplementAbstractClassService
+        Inherits AbstractImplementAbstractClassService(Of ClassBlockSyntax)
+
+        <ImportingConstructor>
+        Public Sub New()
+        End Sub
 
         Protected Overrides Function TryInitializeState(
-                document As Document, model As SemanticModel, node As SyntaxNode, cancellationToken As CancellationToken,
+                document As Document, model As SemanticModel, classBlock As ClassBlockSyntax, cancellationToken As CancellationToken,
                 ByRef classType As INamedTypeSymbol, ByRef abstractClassType As INamedTypeSymbol) As Boolean
-            If cancellationToken.IsCancellationRequested Then
-                Return False
-            End If
+            classType = model.GetDeclaredSymbol(classBlock.BlockStatement)
+            abstractClassType = classType?.BaseType
 
-            Dim baseClassNode = TryCast(node, TypeSyntax)
-            If baseClassNode.IsParentKind(SyntaxKind.InheritsStatement) Then
-                If baseClassNode.Parent.IsParentKind(SyntaxKind.ClassBlock) Then
-                    abstractClassType = TryCast(model.GetTypeInfo(baseClassNode, cancellationToken).Type, INamedTypeSymbol)
-                    cancellationToken.ThrowIfCancellationRequested()
-
-                    If abstractClassType.IsAbstractClass() Then
-                        Dim classDecl = TryCast(baseClassNode.Parent.Parent, ClassBlockSyntax)
-                        classType = model.GetDeclaredSymbol(classDecl.BlockStatement, cancellationToken)
-                        cancellationToken.ThrowIfCancellationRequested()
-
-                        Return abstractClassType IsNot Nothing AndAlso classType IsNot Nothing
-                    End If
-                End If
-            End If
-
-            classType = Nothing
-            abstractClassType = Nothing
-            Return False
+            Return classType IsNot Nothing AndAlso
+                   abstractClassType IsNot Nothing AndAlso
+                   abstractClassType.IsAbstractClass()
         End Function
     End Class
 End Namespace

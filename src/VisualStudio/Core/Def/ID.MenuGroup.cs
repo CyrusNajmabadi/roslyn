@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.VisualStudio.LanguageServices
 {
@@ -17,8 +19,6 @@ namespace Microsoft.VisualStudio.LanguageServices
             public const int ContextCodeGen = 0x3614;            // IDG_CSHARP_CTX_CODEGEN
             public const int ImplementInterface = 0x3615;        // IDG_CSHARP_IMPLEMENT_INTERFACE
             public const int ContextImplementInterface = 0x3616; // IDG_CSHARP_CTX_IMPLEMENT_INTERFACE
-            public const int Organize = 0x3617;                  // IDG_CSHARP_ORGANIZE
-            public const int ContextOrganize = 0x3618;           // IDG_CSHARP_CTX_ORGANIZE
             public const int SmartTagGenerate = 0x3619;          // IDG_CSHARP_SMART_TAG_GENERATE
             public const int ContextGenerate = 0x3620;           // IDG_CSHARP_CTX_GENERATE
             public const int Generate = 0x3621;                  // IDG_CSHARP_MENU_GENERATE

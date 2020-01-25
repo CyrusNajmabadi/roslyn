@@ -1,14 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
-Imports Microsoft.CodeAnalysis.FindSymbols
 Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Rename
-Imports Microsoft.CodeAnalysis.Shared.TestHooks
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
+    <[UseExportProvider]>
     Public Class DashboardTests
         <WpfFact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
@@ -26,7 +27,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
 
                                 class Program
                                 {
-                                    public void $$foo()
+                                    public void $$goo()
                                     {
                                     }
                                 }
@@ -34,7 +35,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
                          </Project>
                      </Workspace>),
                     newName:="",
-                    searchResultText:=EditorFeaturesResources.RenameWillUpdateReferenceInFile,
+                    searchResultText:=EditorFeaturesResources.Rename_will_update_1_reference_in_1_file,
                     changedOptionSet:=changingOptions)
         End Function
 
@@ -54,11 +55,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
 
                                 class Program
                                 {
-                                    public void $$foo()
+                                    public void $$goo()
                                     {
                                     }
 
-                                    public void foo(int i)
+                                    public void goo(int i)
                                     {
                                     }
                                 }
@@ -66,7 +67,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename
                          </Project>
                      </Workspace>),
                     newName:="",
-                    searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 2),
+                    searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 2),
                     hasRenameOverload:=True,
                     changedOptionSet:=changingOptions)
         End Function
@@ -95,10 +96,10 @@ class Program
                     </Project>
                 </Workspace>,
                 newName:="Bar",
-                searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 2),
+                searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 2),
                 changedOptionSet:=changingOptions,
                 hasRenameOverload:=True,
-                unresolvableConflictText:=String.Format(EditorFeaturesResources.UnresolvableConflicts, 1),
+                unresolvableConflictText:=String.Format(EditorFeaturesResources._0_unresolvable_conflict_s, 1),
                 severity:=DashboardSeverity.Error)
         End Function
 
@@ -117,8 +118,8 @@ class AttributeAttribute : System.Attribute { }
                          </Project>
                      </Workspace>),
                     newName:="AttributeAttributeAttribute",
-                    searchResultText:=EditorFeaturesResources.RenameWillUpdateReferenceInFile,
-                    resolvableConflictText:=String.Format(EditorFeaturesResources.ConflictsWillBeResolved, 1),
+                    searchResultText:=EditorFeaturesResources.Rename_will_update_1_reference_in_1_file,
+                    resolvableConflictText:=String.Format(EditorFeaturesResources._0_conflict_s_will_be_resolved, 1),
                     severity:=DashboardSeverity.Info)
         End Function
 
@@ -141,22 +142,22 @@ class AttributeAttribute : System.Attribute { }
 
                                 class Program
                                 {
-                                    public void $$foo()
+                                    public void $$goo()
                                     {
                                     }
 
-                                    /// foo
-                                    public void foo(int i)
+                                    /// goo
+                                    public void goo(int i)
                                     {
-                                        // foo
-                                        var a = "foo";
+                                        // goo
+                                        var a = "goo";
                                     }
                                 }
                             </Document>
                          </Project>
                      </Workspace>),
                     newName:="",
-                    searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 5),
+                    searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 5),
                     hasRenameOverload:=True,
                     changedOptionSet:=changingOptions)
         End Function
@@ -197,7 +198,7 @@ class $$Program
                          </Project>
                      </Workspace>),
                     newName:="P",
-                    searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 6),
+                    searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 6),
                     changedOptionSet:=changingOptions)
         End Function
 
@@ -237,7 +238,7 @@ class $$Program
                          </Project>
                      </Workspace>),
                     newName:="P",
-                    searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 2),
+                    searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 2),
                     changedOptionSet:=changingOptions)
         End Function
 
@@ -278,7 +279,7 @@ class $$Program
                          </Project>
                      </Workspace>),
                     newName:="P",
-                    searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 7),
+                    searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 7),
                     changedOptionSet:=changingOptions)
         End Function
 
@@ -289,18 +290,18 @@ class $$Program
                     (<Workspace>
                          <Project Language="C#" CommonReferences="true">
                              <Document>
-                                class $$Foo
+                                class $$Goo
                                 {
                                     void Blah()
                                     {
-                                        Foo f = new Foo();
+                                        Goo f = new Goo();
                                     }
                                 }
                             </Document>
                          </Project>
                      </Workspace>),
                     newName:="",
-                    searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 3))
+                    searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 3))
         End Function
 
         <WpfFact>
@@ -314,14 +315,14 @@ class $$Program
                                 {
                                     void Blah()
                                     {
-                                        Foo f = new Foo();
+                                        Goo f = new Goo();
                                     }
                                 }
                             </Document>
                          </Project>
                      </Workspace>),
                     newName:="",
-                    searchResultText:=EditorFeaturesResources.RenameWillUpdateReferenceInFile)
+                    searchResultText:=EditorFeaturesResources.Rename_will_update_1_reference_in_1_file)
         End Function
 
         <WpfFact>
@@ -331,20 +332,20 @@ class $$Program
                 (<Workspace>
                      <Project Language="C#">
                          <Document>
-                               class Foo
+                               class Goo
                                {
-                                   int foo;
+                                   int goo;
                                    void Blah(int [|$$bar|])
                                    {
-                                       foo = [|bar|];
+                                       goo = [|bar|];
                                    }
                                }
                            </Document>
                      </Project>
                  </Workspace>),
-                newName:="foo",
-                searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 2),
-                resolvableConflictText:=String.Format(EditorFeaturesResources.ConflictsWillBeResolved, 1),
+                newName:="goo",
+                searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 2),
+                resolvableConflictText:=String.Format(EditorFeaturesResources._0_conflict_s_will_be_resolved, 1),
                 severity:=DashboardSeverity.Info)
         End Function
 
@@ -356,20 +357,20 @@ class $$Program
                 (<Workspace>
                      <Project Language="C#">
                          <Document>
-                               class Foo
+                               class Goo
                                {
-                                   int foo;
+                                   int goo;
                                    void Blah(int [|$$bar|])
                                    {
-                                       foo = foo + [|bar|];
+                                       goo = goo + [|bar|];
                                    }
                                }
                            </Document>
                      </Project>
                  </Workspace>),
-                newName:="foo",
-                searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 2),
-                resolvableConflictText:=String.Format(EditorFeaturesResources.ConflictsWillBeResolved, 2),
+                newName:="goo",
+                searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 2),
+                resolvableConflictText:=String.Format(EditorFeaturesResources._0_conflict_s_will_be_resolved, 2),
                 severity:=DashboardSeverity.Info)
         End Function
 
@@ -380,19 +381,19 @@ class $$Program
                 (<Workspace>
                      <Project Language="C#">
                          <Document>
-                               class Foo
+                               class Goo
                                {
                                    void Blah(int [|$$bar|])
                                    {
-                                       int foo;
+                                       int goo;
                                    }
                                }
                            </Document>
                      </Project>
                  </Workspace>),
-                newName:="foo",
-                searchResultText:=EditorFeaturesResources.RenameWillUpdateReferenceInFile,
-                unresolvableConflictText:=String.Format(EditorFeaturesResources.UnresolvableConflicts, 1),
+                newName:="goo",
+                searchResultText:=EditorFeaturesResources.Rename_will_update_1_reference_in_1_file,
+                unresolvableConflictText:=String.Format(EditorFeaturesResources._0_unresolvable_conflict_s, 1),
                 severity:=DashboardSeverity.Error)
         End Function
 
@@ -403,21 +404,21 @@ class $$Program
                 (<Workspace>
                      <Project Language="C#">
                          <Document>
-                               class Foo
+                               class Goo
                                {
                                    void Blah(int [|$$bar|])
                                    {
-                                       int foo;
-                                       foo = [|bar|];
-                                       foo = [|bar|];
+                                       int goo;
+                                       goo = [|bar|];
+                                       goo = [|bar|];
                                    }
                                }
                            </Document>
                      </Project>
                  </Workspace>),
-                newName:="foo",
-                searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 3),
-                unresolvableConflictText:=String.Format(EditorFeaturesResources.UnresolvableConflicts, 3),
+                newName:="goo",
+                searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 3),
+                unresolvableConflictText:=String.Format(EditorFeaturesResources._0_unresolvable_conflict_s, 3),
                 severity:=DashboardSeverity.Error)
         End Function
 
@@ -430,11 +431,11 @@ class $$Program
                          <Document>
                                namespace N
                                {
-                                    public class [|$$Foo|]
+                                    public class [|$$Goo|]
                                     {
                                         void Blah()
                                         {
-                                            [|Foo|] f = new [|Foo|]();
+                                            [|Goo|] f = new [|Goo|]();
                                         }
                                     }
                                }
@@ -446,15 +447,15 @@ class $$Program
                                Imports N
                                Class Bar
                                    Sub Blah()
-                                      Dim f = new {|N.Foo:Foo|}()
+                                      Dim f = new {|N.Goo:Goo|}()
                                    End Sub
                                End Class
                            </Document>
                      </Project>
                  </Workspace>),
                    newName:="Bar",
-                   searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInMultipleFiles, 4, 2),
-                   resolvableConflictText:=String.Format(EditorFeaturesResources.ConflictsWillBeResolved, 1),
+                   searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_files, 4, 2),
+                   resolvableConflictText:=String.Format(EditorFeaturesResources._0_conflict_s_will_be_resolved, 1),
                    severity:=DashboardSeverity.Info)
         End Function
 
@@ -477,7 +478,7 @@ class C
                      </Project>
                  </Workspace>),
                    newName:="Mo",
-                   searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferenceInFile),
+                   searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_1_reference_in_1_file),
                    hasRenameOverload:=True,
                    isRenameOverloadsEditable:=True)
         End Function
@@ -501,7 +502,7 @@ class C
                      </Project>
                  </Workspace>),
                    newName:="Mo",
-                   searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 3),
+                   searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 3),
                    hasRenameOverload:=True,
                    isRenameOverloadsEditable:=False)
         End Function
@@ -538,7 +539,7 @@ class D : B
                      </Project>
                  </Workspace>),
                    newName:="Mo",
-                   searchResultText:=String.Format(EditorFeaturesResources.RenameWillUpdateReferencesInFile, 5),
+                   searchResultText:=String.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, 5),
                    changedOptionSet:=changingOptions,
                    hasRenameOverload:=True)
         End Function
@@ -579,21 +580,22 @@ class D : B
                     Next
                 End If
 
-                workspace.Services.GetService(Of IOptionService)().SetOptions(optionSet)
+                workspace.TryApplyChanges(workspace.CurrentSolution.WithOptions(optionSet))
 
                 Dim sessionInfo = renameService.StartInlineSession(
                     document, document.GetSyntaxTreeAsync().Result.GetRoot().FindToken(cursorPosition).Span, CancellationToken.None)
 
                 ' Perform the edit in the buffer
-                Using edit = cursorDocument.TextBuffer.CreateEdit()
+                Using edit = cursorDocument.GetTextBuffer().CreateEdit()
                     edit.Replace(token.SpanStart, token.Span.Length, newName)
                     edit.Apply()
                 End Using
 
-                Dim listeners = DirectCast(workspace.ExportProvider.GetExports(Of IAsynchronousOperationListener, FeatureMetadata)(), IEnumerable(Of Lazy(Of IAsynchronousOperationListener, FeatureMetadata)))
-                Dim renameListener = New AggregateAsynchronousOperationListener(listeners, FeatureAttribute.Rename)
+                Using dashboard = New Dashboard(
+                    New DashboardViewModel(DirectCast(sessionInfo.Session, InlineRenameSession)),
+                    editorFormatMapService:=Nothing,
+                    textView:=cursorDocument.GetTextView())
 
-                Using dashboard = New Dashboard(New DashboardViewModel(DirectCast(sessionInfo.Session, InlineRenameSession)), cursorDocument.GetTextView())
                     Await WaitForRename(workspace)
 
                     Dim model = DirectCast(dashboard.DataContext, DashboardViewModel)

@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.CodeGen
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -289,23 +292,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                          hasLambdas:=hasLambdas,
                                          symbolsCapturedWithoutCopyCtor:=symbolsCapturedWithoutCtor,
                                          flags:=rewritingFlags,
+                                         instrumenterOpt:=Nothing, ' Do not instrument anything during this rewrite 
                                          currentMethod:=currentMethod)
         End Function
 
+        ''' <returns>
+        ''' Returns true if any members that we need are missing or have use-site errors.
+        ''' </returns>
         Friend Overrides Function EnsureAllSymbolsAndSignature() As Boolean
-            Dim hasErrors As Boolean = MyBase.EnsureAllSymbolsAndSignature
+            If MyBase.EnsureAllSymbolsAndSignature Then
+                Return True
+            End If
 
-            ' NOTE: in current implementation these attributes must exist
-            ' TODO: change to "don't use if not found"
-            EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Runtime_CompilerServices_CompilerGeneratedAttribute__ctor, hasErrors)
-            EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Diagnostics_DebuggerHiddenAttribute__ctor, hasErrors)
+            Dim bag = DiagnosticBag.GetInstance()
 
-            EnsureSpecialType(SpecialType.System_Object, hasErrors)
-            EnsureSpecialType(SpecialType.System_Void, hasErrors)
-            EnsureSpecialType(SpecialType.System_ValueType, hasErrors)
+            EnsureSpecialType(SpecialType.System_Object, bag)
+            EnsureSpecialType(SpecialType.System_Void, bag)
+            EnsureSpecialType(SpecialType.System_ValueType, bag)
 
-            EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_IAsyncStateMachine, hasErrors)
-            EnsureWellKnownMember(Of MethodSymbol)(WellKnownMember.System_Runtime_CompilerServices_IAsyncStateMachine_MoveNext, hasErrors)
+            EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_IAsyncStateMachine, bag)
+            EnsureWellKnownMember(WellKnownMember.System_Runtime_CompilerServices_IAsyncStateMachine_MoveNext, bag)
+            EnsureWellKnownMember(WellKnownMember.System_Runtime_CompilerServices_IAsyncStateMachine_SetStateMachine, bag)
 
             ' We don't ensure those types because we don't know if they will be actually used, 
             ' use-site errors will be reported later if any of those types is actually requested
@@ -319,15 +326,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Select Case Me._asyncMethodKind
                 Case AsyncMethodKind.GenericTaskFunction
-                    EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_AsyncTaskMethodBuilder_T, hasErrors)
+                    EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_AsyncTaskMethodBuilder_T, bag)
                 Case AsyncMethodKind.TaskFunction
-                    EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_AsyncTaskMethodBuilder, hasErrors)
+                    EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_AsyncTaskMethodBuilder, bag)
                 Case AsyncMethodKind.[Sub]
-                    EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_AsyncVoidMethodBuilder, hasErrors)
+                    EnsureWellKnownType(WellKnownType.System_Runtime_CompilerServices_AsyncVoidMethodBuilder, bag)
                 Case Else
                     Throw ExceptionUtilities.UnexpectedValue(Me._asyncMethodKind)
             End Select
 
+            Dim hasErrors As Boolean = bag.HasAnyErrors
+            If hasErrors Then
+                Me.Diagnostics.AddRange(bag)
+            End If
+
+            bag.Free()
             Return hasErrors
         End Function
 
@@ -360,12 +373,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Debug.Assert(compilation IsNot Nothing)
 
             Dim returnType As TypeSymbol = method.ReturnType
-            If returnType = compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task) Then
+            If TypeSymbol.Equals(returnType, compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task), TypeCompareKind.ConsiderEverything) Then
                 Return AsyncMethodKind.TaskFunction
             End If
 
             If returnType.Kind = SymbolKind.NamedType AndAlso
-                    returnType.OriginalDefinition = compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task_T) Then
+                    TypeSymbol.Equals(returnType.OriginalDefinition, compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task_T), TypeCompareKind.ConsiderEverything) Then
                 Return AsyncMethodKind.GenericTaskFunction
             End If
 

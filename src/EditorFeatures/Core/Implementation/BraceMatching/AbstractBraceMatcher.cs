@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Linq;
 using System.Threading;
@@ -46,7 +48,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.BraceMatching
                 }
             }
 
-            match = default(SyntaxToken);
+            match = default;
             return false;
         }
 
@@ -64,17 +66,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.BraceMatching
                 if (token.RawKind == _openBrace.Kind && AllowedForToken(token))
                 {
                     var leftToken = token;
-                    SyntaxToken rightToken;
-                    if (TryFindMatchingToken(leftToken, out rightToken))
+                    if (TryFindMatchingToken(leftToken, out var rightToken))
                     {
                         return new BraceMatchingResult(leftToken.Span, rightToken.Span);
                     }
                 }
                 else if (token.RawKind == _closeBrace.Kind && AllowedForToken(token))
                 {
-                    SyntaxToken leftToken;
                     var rightToken = token;
-                    if (TryFindMatchingToken(rightToken, out leftToken))
+                    if (TryFindMatchingToken(rightToken, out var leftToken))
                     {
                         return new BraceMatchingResult(leftToken.Span, rightToken.Span);
                     }

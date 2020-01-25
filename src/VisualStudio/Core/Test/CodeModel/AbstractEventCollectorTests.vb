@@ -1,10 +1,16 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
+    <[UseExportProvider]>
     Public MustInherit Class AbstractEventCollectorTests
 
         Protected MustOverride ReadOnly Property LanguageName As String
@@ -85,7 +91,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             End If
         End Sub
 
-        Friend Async Function TestAsync(code As XElement, change As XElement, ParamArray expectedEvents As Action(Of CodeModelEvent, ICodeModelService)()) As Threading.Tasks.Task
+        Friend Async Function TestAsync(code As XElement, change As XElement, ParamArray expectedEvents As Action(Of CodeModelEvent, ICodeModelService)()) As Task
             Dim definition =
 <Workspace>
     <Project Language=<%= LanguageName %> CommonReferences="true">
@@ -94,7 +100,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     </Project>
 </Workspace>
 
-            Using workspace = Await TestWorkspace.CreateAsync(definition, exportProvider:=VisualStudioTestExportProvider.ExportProvider)
+            Using workspace = TestWorkspace.Create(definition, exportProvider:=VisualStudioTestExportProvider.Factory.CreateExportProvider())
                 Dim project = workspace.CurrentSolution.Projects.First()
                 Dim codeModelService = project.LanguageServices.GetService(Of ICodeModelService)()
                 Assert.NotNull(codeModelService)

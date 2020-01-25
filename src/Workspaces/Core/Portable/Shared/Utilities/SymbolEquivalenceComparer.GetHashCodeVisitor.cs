@@ -1,11 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Shared.Utilities
@@ -169,11 +170,29 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
 
             private int CombineHashCodes(INamedTypeSymbol x, int currentHash)
             {
-                return Unwrap(x).Aggregate(currentHash, (a, n) => CombineNamedTypeHashCode(n, a));
+                currentHash = CombineNamedTypeHashCode(x, currentHash);
+
+                if (x is IErrorTypeSymbol errorType)
+                {
+                    foreach (var candidate in errorType.CandidateSymbols)
+                    {
+                        if (candidate is INamedTypeSymbol candidateNamedType)
+                        {
+                            currentHash = CombineNamedTypeHashCode(candidateNamedType, currentHash);
+                        }
+                    }
+                }
+
+                return currentHash;
             }
 
             private int CombineNamedTypeHashCode(INamedTypeSymbol x, int currentHash)
             {
+                if (x.IsTupleType)
+                {
+                    return Hash.Combine(currentHash, Hash.CombineValues(x.TupleElements));
+                }
+
                 // If we want object and dynamic to be the same, and this is 'object', then return
                 // the same hash we do for 'dynamic'.
                 currentHash =
@@ -265,7 +284,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
 
             public int CombineHashCodes(ITypeParameterSymbol x, int currentHash)
             {
-                Contract.Requires(
+                Debug.Assert(
                     (x.TypeParameterKind == TypeParameterKind.Method && IsConstructedFromSelf(x.DeclaringMethod)) ||
                     (x.TypeParameterKind == TypeParameterKind.Type && IsConstructedFromSelf(x.ContainingType)) ||
                     x.TypeParameterKind == TypeParameterKind.Cref);

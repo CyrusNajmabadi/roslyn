@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Globalization
@@ -291,6 +293,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public MustOverride Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
 
+        Public NotOverridable Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return OriginalDefinition.ReturnsByRef
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property ReturnType As TypeSymbol
             Get
                 Return OriginalDefinition.ReturnType.InternalSubstituteTypeParameters(Me.TypeSubstitution).Type
@@ -300,6 +308,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overrides ReadOnly Property ReturnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 Return Me.TypeSubstitution.SubstituteCustomModifiers(OriginalDefinition.ReturnType, OriginalDefinition.ReturnTypeCustomModifiers)
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return Me.TypeSubstitution.SubstituteCustomModifiers(OriginalDefinition.RefCustomModifiers)
             End Get
         End Property
 
@@ -421,7 +435,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend Function SetAssociatedPropertyOrEvent(propertyOrEventSymbol As Symbol) As Boolean
             If _propertyOrEventSymbolOpt Is Nothing Then
-                Debug.Assert(propertyOrEventSymbol.ContainingType = Me.ContainingType)
+                Debug.Assert(TypeSymbol.Equals(propertyOrEventSymbol.ContainingType, Me.ContainingType, TypeCompareKind.ConsiderEverything))
 
                 ' No locking required since SetAssociatedProperty will only be called by the
                 ' thread that created the method symbol (and will be called before the method
@@ -433,7 +447,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return False
         End Function
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
             Get
                 Return Nothing
             End Get

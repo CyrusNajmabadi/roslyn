@@ -1,5 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable enable
+
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Roslyn.Utilities;
 
@@ -10,11 +15,11 @@ namespace Microsoft.CodeAnalysis
     /// </summary>
     public sealed class DllImportData : Cci.IPlatformInvokeInformation
     {
-        private readonly string _moduleName;
-        private readonly string _entryPointName;            // null if unspecified, the name of the target method should be used
-        private readonly Cci.PInvokeAttributes _flags;
+        private readonly string? _moduleName;
+        private readonly string? _entryPointName;            // null if unspecified, the name of the target method should be used
+        private readonly MethodImportAttributes _flags;
 
-        internal DllImportData(string moduleName, string entryPointName, Cci.PInvokeAttributes flags)
+        internal DllImportData(string? moduleName, string? entryPointName, MethodImportAttributes flags)
         {
             _moduleName = moduleName;
             _entryPointName = entryPointName;
@@ -24,7 +29,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Module name. Null if value specified in the attribute is not valid.
         /// </summary>
-        public string ModuleName
+        public string? ModuleName
         {
             get { return _moduleName; }
         }
@@ -32,12 +37,12 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Name of the native entry point or null if not specified (the effective name is the same as the name of the target method).
         /// </summary>
-        public string EntryPointName
+        public string? EntryPointName
         {
             get { return _entryPointName; }
         }
 
-        Cci.PInvokeAttributes Cci.IPlatformInvokeInformation.Flags
+        MethodImportAttributes Cci.IPlatformInvokeInformation.Flags
         {
             get { return _flags; }
         }
@@ -50,7 +55,7 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                return (_flags & Cci.PInvokeAttributes.NoMangle) != 0;
+                return (_flags & MethodImportAttributes.ExactSpelling) != 0;
             }
         }
 
@@ -61,15 +66,15 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                switch (_flags & Cci.PInvokeAttributes.CharSetMask)
+                switch (_flags & MethodImportAttributes.CharSetMask)
                 {
-                    case Cci.PInvokeAttributes.CharSetAnsi:
+                    case MethodImportAttributes.CharSetAnsi:
                         return CharSet.Ansi;
 
-                    case Cci.PInvokeAttributes.CharSetUnicode:
+                    case MethodImportAttributes.CharSetUnicode:
                         return CharSet.Unicode;
 
-                    case Cci.PInvokeAttributes.CharSetAuto:
+                    case MethodImportAttributes.CharSetAuto:
                         return Cci.Constants.CharSet_Auto;
 
                     case 0:
@@ -87,7 +92,7 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                return (_flags & Cci.PInvokeAttributes.SupportsLastError) != 0;
+                return (_flags & MethodImportAttributes.SetLastError) != 0;
             }
         }
 
@@ -98,21 +103,21 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                switch (_flags & Cci.PInvokeAttributes.CallConvMask)
+                switch (_flags & MethodImportAttributes.CallingConventionMask)
                 {
                     default:
                         return CallingConvention.Winapi;
 
-                    case Cci.PInvokeAttributes.CallConvCdecl:
+                    case MethodImportAttributes.CallingConventionCDecl:
                         return CallingConvention.Cdecl;
 
-                    case Cci.PInvokeAttributes.CallConvStdcall:
+                    case MethodImportAttributes.CallingConventionStdCall:
                         return CallingConvention.StdCall;
 
-                    case Cci.PInvokeAttributes.CallConvThiscall:
+                    case MethodImportAttributes.CallingConventionThisCall:
                         return CallingConvention.ThisCall;
 
-                    case Cci.PInvokeAttributes.CallConvFastcall:
+                    case MethodImportAttributes.CallingConventionFastCall:
                         return Cci.Constants.CallingConvention_FastCall;
                 }
             }
@@ -126,12 +131,12 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                switch (_flags & Cci.PInvokeAttributes.BestFitMask)
+                switch (_flags & MethodImportAttributes.BestFitMappingMask)
                 {
-                    case Cci.PInvokeAttributes.BestFitEnabled:
+                    case MethodImportAttributes.BestFitMappingEnable:
                         return true;
 
-                    case Cci.PInvokeAttributes.BestFitDisabled:
+                    case MethodImportAttributes.BestFitMappingDisable:
                         return false;
 
                     default:
@@ -148,12 +153,12 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                switch (_flags & Cci.PInvokeAttributes.ThrowOnUnmappableCharMask)
+                switch (_flags & MethodImportAttributes.ThrowOnUnmappableCharMask)
                 {
-                    case Cci.PInvokeAttributes.ThrowOnUnmappableCharEnabled:
+                    case MethodImportAttributes.ThrowOnUnmappableCharEnable:
                         return true;
 
-                    case Cci.PInvokeAttributes.ThrowOnUnmappableCharDisabled:
+                    case MethodImportAttributes.ThrowOnUnmappableCharDisable:
                         return false;
 
                     default:
@@ -162,26 +167,26 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        internal static Cci.PInvokeAttributes MakeFlags(bool noMangle, CharSet charSet, bool setLastError, CallingConvention callingConvention, bool? useBestFit, bool? throwOnUnmappable)
+        internal static MethodImportAttributes MakeFlags(bool exactSpelling, CharSet charSet, bool setLastError, CallingConvention callingConvention, bool? useBestFit, bool? throwOnUnmappable)
         {
-            Cci.PInvokeAttributes result = 0;
-            if (noMangle)
+            MethodImportAttributes result = 0;
+            if (exactSpelling)
             {
-                result |= Cci.PInvokeAttributes.NoMangle;
+                result |= MethodImportAttributes.ExactSpelling;
             }
 
             switch (charSet)
             {
                 case CharSet.Ansi:
-                    result |= Cci.PInvokeAttributes.CharSetAnsi;
+                    result |= MethodImportAttributes.CharSetAnsi;
                     break;
 
                 case CharSet.Unicode:
-                    result |= Cci.PInvokeAttributes.CharSetUnicode;
+                    result |= MethodImportAttributes.CharSetUnicode;
                     break;
 
                 case Cci.Constants.CharSet_Auto:
-                    result |= Cci.PInvokeAttributes.CharSetAuto;
+                    result |= MethodImportAttributes.CharSetAuto;
                     break;
 
                     // Dev10: use default without reporting an error
@@ -189,29 +194,29 @@ namespace Microsoft.CodeAnalysis
 
             if (setLastError)
             {
-                result |= Cci.PInvokeAttributes.SupportsLastError;
+                result |= MethodImportAttributes.SetLastError;
             }
 
             switch (callingConvention)
             {
                 default: // Dev10: uses default without reporting an error
-                    result |= Cci.PInvokeAttributes.CallConvWinapi;
+                    result |= MethodImportAttributes.CallingConventionWinApi;
                     break;
 
                 case CallingConvention.Cdecl:
-                    result |= Cci.PInvokeAttributes.CallConvCdecl;
+                    result |= MethodImportAttributes.CallingConventionCDecl;
                     break;
 
                 case CallingConvention.StdCall:
-                    result |= Cci.PInvokeAttributes.CallConvStdcall;
+                    result |= MethodImportAttributes.CallingConventionStdCall;
                     break;
 
                 case CallingConvention.ThisCall:
-                    result |= Cci.PInvokeAttributes.CallConvThiscall;
+                    result |= MethodImportAttributes.CallingConventionThisCall;
                     break;
 
                 case Cci.Constants.CallingConvention_FastCall:
-                    result |= Cci.PInvokeAttributes.CallConvFastcall;
+                    result |= MethodImportAttributes.CallingConventionFastCall;
                     break;
             }
 
@@ -219,11 +224,11 @@ namespace Microsoft.CodeAnalysis
             {
                 if (throwOnUnmappable.Value)
                 {
-                    result |= Cci.PInvokeAttributes.ThrowOnUnmappableCharEnabled;
+                    result |= MethodImportAttributes.ThrowOnUnmappableCharEnable;
                 }
                 else
                 {
-                    result |= Cci.PInvokeAttributes.ThrowOnUnmappableCharDisabled;
+                    result |= MethodImportAttributes.ThrowOnUnmappableCharDisable;
                 }
             }
 
@@ -231,11 +236,11 @@ namespace Microsoft.CodeAnalysis
             {
                 if (useBestFit.Value)
                 {
-                    result |= Cci.PInvokeAttributes.BestFitEnabled;
+                    result |= MethodImportAttributes.BestFitMappingEnable;
                 }
                 else
                 {
-                    result |= Cci.PInvokeAttributes.BestFitDisabled;
+                    result |= MethodImportAttributes.BestFitMappingDisable;
                 }
             }
 

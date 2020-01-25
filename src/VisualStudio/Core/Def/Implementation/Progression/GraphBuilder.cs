@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -115,8 +117,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
                 _nodeToContextProjectMap.Add(inputNode, project);
 
                 var compilation = await project.GetCompilationAsync(_cancellationToken).ConfigureAwait(false);
-                var symbolId = inputNode[RoslynGraphProperties.SymbolId] as SymbolKey;
-                var symbol = symbolId.Resolve(compilation).Symbol;
+                var symbolId = (SymbolKey?)inputNode[RoslynGraphProperties.SymbolId];
+                var symbol = symbolId.Value.Resolve(compilation).Symbol;
                 if (symbol != null)
                 {
                     _nodeToSymbolMap.Add(inputNode, symbol);
@@ -138,8 +140,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
         {
             using (_gate.DisposableWait())
             {
-                Project project;
-                _nodeToContextProjectMap.TryGetValue(node, out project);
+                _nodeToContextProjectMap.TryGetValue(node, out var project);
                 return project;
             }
         }
@@ -154,8 +155,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
         {
             using (_gate.DisposableWait())
             {
-                Document document;
-                _nodeToContextDocumentMap.TryGetValue(node, out document);
+                _nodeToContextDocumentMap.TryGetValue(node, out var document);
                 return document;
             }
         }
@@ -164,8 +164,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
         {
             using (_gate.DisposableWait())
             {
-                ISymbol symbol;
-                _nodeToSymbolMap.TryGetValue(node, out symbol);
+                _nodeToSymbolMap.TryGetValue(node, out var symbol);
                 return symbol;
             }
         }
@@ -203,9 +202,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
 
             using (_gate.DisposableWait())
             {
-                GraphNode node = await GetOrCreateNodeAsync(_graph, symbol, _solution, _cancellationToken).ConfigureAwait(false);
+                var node = await GetOrCreateNodeAsync(_graph, symbol, _solution, _cancellationToken).ConfigureAwait(false);
 
-                node[RoslynGraphProperties.SymbolId] = symbol.GetSymbolKey();
+                node[RoslynGraphProperties.SymbolId] = (SymbolKey?)symbol.GetSymbolKey();
                 node[RoslynGraphProperties.ContextProjectId] = GetContextProjectId(contextProject, symbol);
                 node[RoslynGraphProperties.ExplicitInterfaceImplementations] = symbol.ExplicitInterfaceImplementations().Select(s => s.GetSymbolKey()).ToList();
                 node[RoslynGraphProperties.DeclaredAccessibility] = symbol.DeclaredAccessibility;
@@ -342,14 +341,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
             {
                 case SymbolKind.NamedType:
                     var typeSymbol = (INamedTypeSymbol)symbol;
-                    if (typeSymbol != null && typeSymbol.IsGenericType)
+                    if (typeSymbol.IsGenericType)
                     {
                         // Symbol.name does not contain type params for generic types, so we populate them here for some requiring cases like VS properties panel.
                         node.Label = (string)node[RoslynGraphProperties.FormattedLabelWithoutContainingSymbol];
 
                         // Some consumers like CodeMap want to show types in an unified way for both C# and VB.
                         // Therefore, populate a common label property using only name and its type parameters.
-                        // For example, VB's "Foo(Of T)" or C#'s "Foo<T>(): T" will be shown as "Foo<T>".
+                        // For example, VB's "Goo(Of T)" or C#'s "Goo<T>(): T" will be shown as "Goo<T>".
                         // This property will be used for drag-and-drop case.
                         var commonLabel = new System.Text.StringBuilder();
                         commonLabel.Append(typeSymbol.Name);
@@ -391,8 +390,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
                 case SymbolKind.Property:
                     node.Label = symbol.MetadataName;
 
-                    var propertySymbol = symbol as IPropertySymbol;
-                    if (propertySymbol != null && propertySymbol.IsIndexer && LanguageNames.CSharp == propertySymbol.Language)
+                    var propertySymbol = (IPropertySymbol)symbol;
+                    if (propertySymbol.IsIndexer && LanguageNames.CSharp == propertySymbol.Language)
                     {
                         // For C# indexer, we will strip off the "[]"
                         node.Label = symbol.Name.Replace("[]", string.Empty);
@@ -481,14 +480,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
             }
 
             // Set type-specific properties
-            var typeSymbol = symbol as ITypeSymbol;
-            if (typeSymbol != null && typeSymbol.IsAnonymousType)
+            if (symbol is ITypeSymbol typeSymbol && typeSymbol.IsAnonymousType)
             {
                 node[Properties.IsAnonymous] = true;
             }
-            else if (symbol is IMethodSymbol)
+            else if (symbol is IMethodSymbol methodSymbol)
             {
-                UpdateMethodPropertiesForNode((IMethodSymbol)symbol, node);
+                UpdateMethodPropertiesForNode(methodSymbol, node);
             }
         }
 
@@ -592,7 +590,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
                     break;
 
                 default:
-                    throw ExceptionUtilities.Unreachable;
+                    throw ExceptionUtilities.UnexpectedValue(namedType.TypeKind);
             }
 
             node[DgmlNodeProperties.Icon] = IconHelper.GetIconName(iconGroupName, namedType.DeclaredAccessibility);
@@ -693,18 +691,16 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Progression
         {
             using (_gate.DisposableWait())
             {
-                using (var graphTransaction = new GraphTransactionScope())
+                using var graphTransaction = new GraphTransactionScope();
+                graph.Merge(this.Graph);
+
+                foreach (var deferredProperty in _deferredPropertySets)
                 {
-                    graph.Merge(this.Graph);
-
-                    foreach (var deferredProperty in _deferredPropertySets)
-                    {
-                        var nodeToSet = graph.Nodes.Get(deferredProperty.Item1.Id);
-                        nodeToSet.SetValue(deferredProperty.Item2, deferredProperty.Item3);
-                    }
-
-                    graphTransaction.Complete();
+                    var nodeToSet = graph.Nodes.Get(deferredProperty.Item1.Id);
+                    nodeToSet.SetValue(deferredProperty.Item2, deferredProperty.Item3);
                 }
+
+                graphTransaction.Complete();
             }
         }
 

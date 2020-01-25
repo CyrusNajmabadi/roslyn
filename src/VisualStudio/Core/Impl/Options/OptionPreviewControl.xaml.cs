@@ -1,10 +1,16 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Linq;
+using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.CodeAnalysis.Options;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.Options
 {
@@ -12,12 +18,28 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Options
     {
         internal AbstractOptionPreviewViewModel ViewModel;
         private readonly IServiceProvider _serviceProvider;
-        private readonly Func<OptionSet, IServiceProvider, AbstractOptionPreviewViewModel> _createViewModel;
+        private readonly Func<OptionStore, IServiceProvider, AbstractOptionPreviewViewModel> _createViewModel;
 
 
-        internal OptionPreviewControl(IServiceProvider serviceProvider, Func<OptionSet, IServiceProvider, AbstractOptionPreviewViewModel> createViewModel) : base(serviceProvider)
+        internal OptionPreviewControl(IServiceProvider serviceProvider, OptionStore optionStore, Func<OptionStore, IServiceProvider, AbstractOptionPreviewViewModel> createViewModel) : base(optionStore)
         {
             InitializeComponent();
+
+            // AutomationDelegatingListView is defined in ServicesVisualStudio, which has
+            // InternalsVisibleTo this project. But, the markup compiler doesn't consider the IVT 
+            // relationship, so declaring the AutomationDelegatingListView in XAML would require 
+            // duplicating that type in this project. Declaring and setting it here avoids the 
+            // markup compiler completely, allowing us to reference the internal 
+            // AutomationDelegatingListView without issue.
+            var listview = new AutomationDelegatingListView();
+            listview.Name = "Options";
+            listview.SelectionMode = SelectionMode.Single;
+            listview.PreviewKeyDown += Options_PreviewKeyDown;
+            listview.SelectionChanged += Options_SelectionChanged;
+            listview.SetBinding(ItemsControl.ItemsSourceProperty, new Binding { Path = new PropertyPath(nameof(ViewModel.Items)) });
+            AutomationProperties.SetName(listview, ServicesVSResources.Options);
+
+            listViewContentControl.Content = listview;
 
             _serviceProvider = serviceProvider;
             _createViewModel = createViewModel;
@@ -25,17 +47,20 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Options
 
         private void Options_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var listView = (ListView)sender;
-            var checkbox = listView.SelectedItem as CheckBoxOptionViewModel;
-            if (checkbox != null)
+            var listView = (AutomationDelegatingListView)sender;
+            if (listView.SelectedItem is CheckBoxOptionViewModel checkbox)
             {
                 ViewModel.UpdatePreview(checkbox.GetPreview());
             }
 
-            var radioButton = listView.SelectedItem as AbstractRadioButtonViewModel;
-            if (radioButton != null)
+            if (listView.SelectedItem is AbstractRadioButtonViewModel radioButton)
             {
                 ViewModel.UpdatePreview(radioButton.Preview);
+            }
+
+            if (listView.SelectedItem is CheckBoxWithComboOptionViewModel checkBoxWithCombo)
+            {
+                ViewModel.UpdatePreview(checkBoxWithCombo.GetPreview());
             }
         }
 
@@ -43,35 +68,30 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Options
         {
             if (e.Key == Key.Space && e.KeyboardDevice.Modifiers == ModifierKeys.None)
             {
-                var listView = (ListView)sender;
-                var checkBox = listView.SelectedItem as CheckBoxOptionViewModel;
-                if (checkBox != null)
+                var listView = (AutomationDelegatingListView)sender;
+                if (listView.SelectedItem is CheckBoxOptionViewModel checkBox)
                 {
                     checkBox.IsChecked = !checkBox.IsChecked;
                     e.Handled = true;
                 }
 
-                var radioButton = listView.SelectedItem as AbstractRadioButtonViewModel;
-                if (radioButton != null)
+                if (listView.SelectedItem is AbstractRadioButtonViewModel radioButton)
                 {
                     radioButton.IsChecked = true;
+                    e.Handled = true;
+                }
+
+                if (listView.SelectedItem is CheckBoxWithComboOptionViewModel checkBoxWithCombo)
+                {
+                    checkBoxWithCombo.IsChecked = !checkBoxWithCombo.IsChecked;
                     e.Handled = true;
                 }
             }
         }
 
-        internal override void SaveSettings()
+        internal override void OnLoad()
         {
-            var optionSet = this.OptionService.GetOptions();
-            var changedOptions = this.ViewModel.ApplyChangedOptions(optionSet);
-
-            this.OptionService.SetOptions(changedOptions);
-            OptionLogger.Log(optionSet, changedOptions);
-        }
-
-        internal override void LoadSettings()
-        {
-            this.ViewModel = _createViewModel(this.OptionService.GetOptions(), _serviceProvider);
+            this.ViewModel = _createViewModel(this.OptionStore, _serviceProvider);
 
             // Use the first item's preview.
             var firstItem = this.ViewModel.Items.OfType<CheckBoxOptionViewModel>().First();

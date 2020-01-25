@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Linq;
@@ -15,166 +17,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
 {
     internal static class TypeDeclarationSyntaxExtensions
     {
-        public static TypeDeclarationSyntax AddMembers(
-            this TypeDeclarationSyntax node, params MemberDeclarationSyntax[] members)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).AddMembers(members);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).AddMembers(members);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).AddMembers(members);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithMembers(
-            this TypeDeclarationSyntax node, SyntaxList<MemberDeclarationSyntax> members)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithMembers(members);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithMembers(members);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithMembers(members);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithAttributeLists(
-            this TypeDeclarationSyntax node, SyntaxList<AttributeListSyntax> attributes)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithAttributeLists(attributes);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithAttributeLists(attributes);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithAttributeLists(attributes);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithIdentifier(
-            this TypeDeclarationSyntax node, SyntaxToken identifier)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithIdentifier(identifier);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithIdentifier(identifier);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithIdentifier(identifier);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithModifiers(
-            this TypeDeclarationSyntax node, SyntaxTokenList modifiers)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithModifiers(modifiers);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithModifiers(modifiers);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithModifiers(modifiers);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithTypeParameterList(
-            this TypeDeclarationSyntax node, TypeParameterListSyntax list)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithTypeParameterList(list);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithTypeParameterList(list);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithTypeParameterList(list);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithBaseList(
-            this TypeDeclarationSyntax node, BaseListSyntax list)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithBaseList(list);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithBaseList(list);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithBaseList(list);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithConstraintClauses(
-            this TypeDeclarationSyntax node, SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithConstraintClauses(constraintClauses);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithConstraintClauses(constraintClauses);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithConstraintClauses(constraintClauses);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithOpenBraceToken(
-            this TypeDeclarationSyntax node, SyntaxToken openBrace)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithOpenBraceToken(openBrace);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithOpenBraceToken(openBrace);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithOpenBraceToken(openBrace);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
-        public static TypeDeclarationSyntax WithCloseBraceToken(
-            this TypeDeclarationSyntax node, SyntaxToken closeBrace)
-        {
-            switch (node.Kind())
-            {
-                case SyntaxKind.ClassDeclaration:
-                    return ((ClassDeclarationSyntax)node).WithCloseBraceToken(closeBrace);
-                case SyntaxKind.InterfaceDeclaration:
-                    return ((InterfaceDeclarationSyntax)node).WithCloseBraceToken(closeBrace);
-                case SyntaxKind.StructDeclaration:
-                    return ((StructDeclarationSyntax)node).WithCloseBraceToken(closeBrace);
-            }
-
-            throw ExceptionUtilities.Unreachable;
-        }
-
         public static IList<bool> GetInsertionIndices(this TypeDeclarationSyntax destination, CancellationToken cancellationToken)
         {
             var members = destination.Members;
@@ -193,7 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 var end = destination.Members.First().SpanStart;
                 indices.Add(!destination.OverlapsHiddenPosition(TextSpan.FromBounds(start, end), cancellationToken));
 
-                for (int i = 0; i < members.Count - 1; i++)
+                for (var i = 0; i < members.Count - 1; i++)
                 {
                     var member1 = members[i];
                     var member2 = members[i + 1];
@@ -229,7 +71,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         {
             Contract.ThrowIfNull(typeNode);
 
-            IEnumerable<BaseTypeSyntax> baseListTypes = SpecializedCollections.EmptyEnumerable<BaseTypeSyntax>();
+            var baseListTypes = SpecializedCollections.EmptyEnumerable<BaseTypeSyntax>();
 
             var isPartialType = typeNode.Modifiers.Any(m => m.Kind() == SyntaxKind.PartialKeyword);
             if (isPartialType)
@@ -239,8 +81,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
                 {
                     foreach (var syntaxRef in typeSymbol.DeclaringSyntaxReferences)
                     {
-                        var typeDecl = syntaxRef.GetSyntax(cancellationToken) as TypeDeclarationSyntax;
-                        if (typeDecl != null && typeDecl.BaseList != null)
+                        if (syntaxRef.GetSyntax(cancellationToken) is TypeDeclarationSyntax typeDecl && typeDecl.BaseList != null)
                         {
                             baseListTypes = baseListTypes.Concat(typeDecl.BaseList.Types);
                         }
@@ -259,8 +100,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         {
             if (token.IsMissing)
             {
-                var leadingTrivia = prependNewLineIfMissing ? token.LeadingTrivia.Insert(0, SyntaxFactory.CarriageReturnLineFeed) : token.LeadingTrivia;
-                var trailingTrivia = appendNewLineIfMissing ? token.TrailingTrivia.Insert(0, SyntaxFactory.CarriageReturnLineFeed) : token.TrailingTrivia;
+                var leadingTrivia = prependNewLineIfMissing ? token.LeadingTrivia.Insert(0, SyntaxFactory.ElasticCarriageReturnLineFeed) : token.LeadingTrivia;
+                var trailingTrivia = appendNewLineIfMissing ? token.TrailingTrivia.Insert(0, SyntaxFactory.ElasticCarriageReturnLineFeed) : token.TrailingTrivia;
                 return SyntaxFactory.Token(leadingTrivia, token.Kind(), trailingTrivia).WithAdditionalAnnotations(Formatter.Annotation);
             }
 
@@ -280,9 +121,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             {
                 // Bug 539673: If there are no members, take any trivia that
                 // belongs to the end brace and attach it to the opening brace.
-                int index = -1;
+                var index = -1;
                 var leadingTrivia = closeBrace.LeadingTrivia;
-                for (int i = leadingTrivia.Count - 1; i >= 0; i--)
+                for (var i = leadingTrivia.Count - 1; i >= 0; i--)
                 {
                     if (!leadingTrivia[i].IsWhitespaceOrEndOfLine())
                     {
@@ -304,16 +145,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         public static TypeDeclarationSyntax EnsureOpenAndCloseBraceTokens(
             this TypeDeclarationSyntax typeDeclaration)
         {
-            SyntaxToken openBrace, closeBrace;
-            EnsureAndGetBraceTokens(typeDeclaration, typeDeclaration.Members.Count > 0, out openBrace, out closeBrace);
+            EnsureAndGetBraceTokens(typeDeclaration, typeDeclaration.Members.Count > 0, out var openBrace, out var closeBrace);
             return typeDeclaration.WithOpenBraceToken(openBrace).WithCloseBraceToken(closeBrace);
         }
 
         public static EnumDeclarationSyntax EnsureOpenAndCloseBraceTokens(
             this EnumDeclarationSyntax typeDeclaration)
         {
-            SyntaxToken openBrace, closeBrace;
-            EnsureAndGetBraceTokens(typeDeclaration, typeDeclaration.Members.Count > 0, out openBrace, out closeBrace);
+            EnsureAndGetBraceTokens(typeDeclaration, typeDeclaration.Members.Count > 0, out var openBrace, out var closeBrace);
             return typeDeclaration.WithOpenBraceToken(openBrace).WithCloseBraceToken(closeBrace);
         }
     }

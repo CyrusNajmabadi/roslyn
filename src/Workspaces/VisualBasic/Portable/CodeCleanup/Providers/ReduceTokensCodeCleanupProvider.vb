@@ -1,5 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Composition
 Imports System.Globalization
 Imports System.Runtime.InteropServices
@@ -16,20 +19,24 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
     Friend Class ReduceTokensCodeCleanupProvider
         Inherits AbstractTokensCodeCleanupProvider
 
+        <ImportingConstructor>
+        Public Sub New()
+        End Sub
+
         Public Overrides ReadOnly Property Name As String
             Get
                 Return PredefinedCodeCleanupProviderNames.ReduceTokens
             End Get
         End Property
 
-        Protected Overrides Function GetRewriterAsync(document As Document, root As SyntaxNode, spans As IEnumerable(Of TextSpan), workspace As Workspace, cancellationToken As CancellationToken) As Task(Of Rewriter)
+        Protected Overrides Function GetRewriterAsync(document As Document, root As SyntaxNode, spans As ImmutableArray(Of TextSpan), workspace As Workspace, cancellationToken As CancellationToken) As Task(Of Rewriter)
             Return Task.FromResult(Of Rewriter)(New ReduceTokensRewriter(spans, cancellationToken))
         End Function
 
         Private Class ReduceTokensRewriter
             Inherits AbstractTokensCodeCleanupProvider.Rewriter
 
-            Public Sub New(spans As IEnumerable(Of TextSpan), cancellationToken As CancellationToken)
+            Public Sub New(spans As ImmutableArray(Of TextSpan), cancellationToken As CancellationToken)
                 MyBase.New(spans, cancellationToken)
             End Sub
 
@@ -88,7 +95,8 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
 
                         Dim base = literal.GetBase()
 
-                        If Not base.HasValue Then
+                        Const digitSeparator = "_"c
+                        If Not base.HasValue OrElse idText.Contains(digitSeparator) Then
                             Return newNode
                         End If
 
@@ -273,8 +281,11 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
                     Case LiteralBase.Octal
                         Dim val1 As ULong = ConvertToULong(value)
                         Return "&O" + ConvertToOctalString(val1)
+                    Case LiteralBase.Binary
+                        Dim asLong = CType(ConvertToULong(value), Long)
+                        Return "&B" + Convert.ToString(asLong, 2)
                     Case Else
-                        Throw ExceptionUtilities.Unreachable
+                        Throw ExceptionUtilities.UnexpectedValue(base)
                 End Select
             End Function
 
@@ -292,7 +303,7 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
                     Case SyntaxKind.IntegerLiteralToken
                         Return token.CopyAnnotationsTo(SyntaxFactory.IntegerLiteralToken(leading, newValueString, token.GetBase().Value, token.GetTypeCharacter(), DirectCast(newValue, ULong), trailing))
                     Case Else
-                        Throw ExceptionUtilities.Unreachable
+                        Throw ExceptionUtilities.UnexpectedValue(token.Kind)
                 End Select
             End Function
 
