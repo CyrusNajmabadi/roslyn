@@ -102,8 +102,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.FindUsages
             }
         }
 
-        public override async IAsyncEnumerable<DefinitionItem> FindImplementationsByMoniker(
-            SymbolMoniker moniker, IStreamingProgressTracker progress, [EnumeratorCancellation] CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<ExternalReferenceItem> FindImplementationsByMoniker(
+            DefinitionItem definition, SymbolMoniker moniker, IStreamingProgressTracker progress, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             if (_codeIndexProvider == null)
                 yield break;
@@ -114,14 +114,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.FindUsages
             // Only grab the first 500 results.  This keeps server load lower and is acceptable for // build demo purposes.
             while (currentPage < 5)
             {
-                var definitionItems = await FindImplementationsByMonikerAsync(
-                    _codeIndexProvider, convertedMoniker, progress, currentPage, cancellationToken).ConfigureAwait(false);
+                var referenceItems = await FindImplementationsByMonikerAsync(
+                    _codeIndexProvider, definition, convertedMoniker, progress, currentPage, cancellationToken).ConfigureAwait(false);
 
                 // If we got no items, we're done.
-                if (definitionItems.Length == 0)
+                if (referenceItems.Length == 0)
                     break;
 
-                foreach (var item in definitionItems)
+                foreach (var item in referenceItems)
                     yield return item;
 
                 // Otherwise, we got some items.  Return them to our caller and attempt to retrieve
@@ -130,8 +130,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.FindUsages
             }
         }
 
-        private async Task<ImmutableArray<DefinitionItem>> FindImplementationsByMonikerAsync(
-            ICodeIndexProvider codeIndexProvider, ISymbolMoniker moniker,
+        private async Task<ImmutableArray<ExternalReferenceItem>> FindImplementationsByMonikerAsync(
+            ICodeIndexProvider codeIndexProvider, DefinitionItem definition, ISymbolMoniker moniker,
             IStreamingProgressTracker progress, int pageIndex, CancellationToken cancellationToken)
         {
             // Let the find-refs window know we have outstanding work
@@ -140,12 +140,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.FindUsages
             var results = await FindImplementationsByMonikerAsync(
                 codeIndexProvider, moniker, pageIndex, cancellationToken).ConfigureAwait(false);
 
-            using var _2 = ArrayBuilder<DefinitionItem>.GetInstance(out var definitionItems);
+            using var _2 = ArrayBuilder<ExternalReferenceItem>.GetInstance(out var referenceItems);
 
             foreach (var result in results)
-                definitionItems.Add(ConvertResult(result));
+                referenceItems.Add(ConvertResult(definition, result));
 
-            return definitionItems.ToImmutable();
+            return referenceItems.ToImmutable();
         }
 
         private DefinitionItem ConvertResult(JObject result)
@@ -158,8 +158,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.FindUsages
         {
             try
             {
-                return await codeIndexProvider.FindImplementationsByMonikerAsync(
-                    moniker, pageIndex: pageIndex, cancellationToken: cancellationToken).ConfigureAwait(false);
+                return await codeIndexProvider.FindReferencesByMonikerAsync(
+                    ImmutableArray.Create(moniker), includeDeclaration: false, pageIndex: pageIndex, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+                //return await codeIndexProvider.FindImplementationsByMonikerAsync(
+                //    moniker, pageIndex: pageIndex, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e) when (FatalError.ReportWithoutCrashUnlessCanceled(e))
             {

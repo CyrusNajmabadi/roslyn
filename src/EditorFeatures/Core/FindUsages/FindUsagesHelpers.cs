@@ -167,9 +167,31 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             // Let the find-refs window know we have outstanding work
             await using var _1 = await context.ProgressTracker.AddSingleItemAsync().ConfigureAwait(false);
 
+            var displayParts = GetDisplayParts(definition).AddRange(new[]
+            {
+                new TaggedText(TextTags.Space, " "),
+                new TaggedText(TextTags.Text, EditorFeaturesResources.external_implementations),
+            });
+
+            var definitionItem = DefinitionItem.CreateNonNavigableItem(
+                tags: GlyphTags.GetTags(definition.GetGlyph()),
+                displayParts,
+                originationParts: DefinitionItem.GetOriginationParts(definition));
+
             using var _2 = ArrayBuilder<DefinitionItem>.GetInstance(out var definitions);
-            await foreach (var item in monikerUsagesService.FindImplementationsByMoniker(moniker, context.ProgressTracker, cancellationToken))
-                definitions.Add(item);
+
+            var first = true;
+            await foreach (var referenceItem in monikerUsagesService.FindImplementationsByMoniker(definitionItem, moniker, context.ProgressTracker, cancellationToken))
+            {
+                if (first)
+                {
+                    // found some results.  Add the definition item to the context.
+                    first = false;
+                    await context.OnDefinitionFoundAsync(definitionItem).ConfigureAwait(false);
+                }
+
+                await context.OnExternalReferenceFoundAsync(referenceItem).ConfigureAwait(false);
+            }
 
             return definitions.ToImmutable();
         }

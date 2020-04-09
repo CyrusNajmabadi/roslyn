@@ -23,9 +23,9 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
     /// </summary>
     internal interface IFindSymbolMonikerUsagesService : IWorkspaceService
     {
-        IAsyncEnumerable<ExternalReferenceItem> FindReferencesByMoniker(DefinitionItem definition, ImmutableArray<SymbolMoniker> monikers, IStreamingProgressTracker progress, CancellationToken cancellationToken);
         IAsyncEnumerable<DefinitionItem> FindDefinitionsByMoniker(SymbolMoniker moniker, IStreamingProgressTracker progress, CancellationToken cancellationToken);
-        IAsyncEnumerable<DefinitionItem> FindImplementationsByMoniker(SymbolMoniker moniker, IStreamingProgressTracker progress, CancellationToken cancellationToken);
+        IAsyncEnumerable<ExternalReferenceItem> FindReferencesByMoniker(DefinitionItem definition, ImmutableArray<SymbolMoniker> monikers, IStreamingProgressTracker progress, CancellationToken cancellationToken);
+        IAsyncEnumerable<ExternalReferenceItem> FindImplementationsByMoniker(DefinitionItem definition, SymbolMoniker moniker, IStreamingProgressTracker progress, CancellationToken cancellationToken);
     }
 
     internal abstract class AbstractFindSymbolMonikerUsagesService : IFindSymbolMonikerUsagesService
@@ -33,10 +33,10 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
         public virtual IAsyncEnumerable<DefinitionItem> FindDefinitionsByMoniker(SymbolMoniker moniker, IStreamingProgressTracker progress, CancellationToken cancellationToken)
             => EmptyAsyncEnumerable<DefinitionItem>.Instance;
 
-        public virtual IAsyncEnumerable<DefinitionItem> FindImplementationsByMoniker(SymbolMoniker moniker, IStreamingProgressTracker progress, CancellationToken cancellationToken)
-            => EmptyAsyncEnumerable<DefinitionItem>.Instance;
-
         public virtual IAsyncEnumerable<ExternalReferenceItem> FindReferencesByMoniker(DefinitionItem definition, ImmutableArray<SymbolMoniker> monikers, IStreamingProgressTracker progress, CancellationToken cancellationToken)
+            => EmptyAsyncEnumerable<ExternalReferenceItem>.Instance;
+
+        public virtual IAsyncEnumerable<ExternalReferenceItem> FindImplementationsByMoniker(DefinitionItem definition, SymbolMoniker moniker, IStreamingProgressTracker progress, CancellationToken cancellationToken)
             => EmptyAsyncEnumerable<ExternalReferenceItem>.Instance;
     }
 

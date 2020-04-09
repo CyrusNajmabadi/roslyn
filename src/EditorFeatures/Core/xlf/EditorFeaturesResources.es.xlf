@@ -657,6 +657,11 @@
         <target state="new">(external)</target>
         <note />
       </trans-unit>
+      <trans-unit id="external_implementations">
+        <source>(external implementations)</source>
+        <target state="new">(external implementations)</target>
+        <note />
+      </trans-unit>
       <trans-unit id="from_metadata">
         <source>from metadata</source>
         <target state="translated">de metadatos</target>
