@@ -102,6 +102,71 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.FindUsages
             }
         }
 
+        public override async IAsyncEnumerable<DefinitionItem> FindImplementationsByMoniker(
+            SymbolMoniker moniker, IStreamingProgressTracker progress, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            if (_codeIndexProvider == null)
+                yield break;
+
+            var convertedMoniker = ConvertMoniker(moniker);
+            var currentPage = 0;
+
+            // Only grab the first 500 results.  This keeps server load lower and is acceptable for // build demo purposes.
+            while (currentPage < 5)
+            {
+                var definitionItems = await FindImplementationsByMonikerAsync(
+                    _codeIndexProvider, convertedMoniker, progress, currentPage, cancellationToken).ConfigureAwait(false);
+
+                // If we got no items, we're done.
+                if (definitionItems.Length == 0)
+                    break;
+
+                foreach (var item in definitionItems)
+                    yield return item;
+
+                // Otherwise, we got some items.  Return them to our caller and attempt to retrieve
+                // another page.
+                currentPage++;
+            }
+        }
+
+        private async Task<ImmutableArray<DefinitionItem>> FindImplementationsByMonikerAsync(
+            ICodeIndexProvider codeIndexProvider, ISymbolMoniker moniker,
+            IStreamingProgressTracker progress, int pageIndex, CancellationToken cancellationToken)
+        {
+            // Let the find-refs window know we have outstanding work
+            await using var _1 = await progress.AddSingleItemAsync().ConfigureAwait(false);
+
+            var results = await FindImplementationsByMonikerAsync(
+                codeIndexProvider, moniker, pageIndex, cancellationToken).ConfigureAwait(false);
+
+            using var _2 = ArrayBuilder<DefinitionItem>.GetInstance(out var definitionItems);
+
+            foreach (var result in results)
+                definitionItems.Add(ConvertResult(result));
+
+            return definitionItems.ToImmutable();
+        }
+
+        private DefinitionItem ConvertResult(JObject result)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static async Task<ICollection<JObject>> FindImplementationsByMonikerAsync(
+            ICodeIndexProvider codeIndexProvider, ISymbolMoniker moniker, int pageIndex, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await codeIndexProvider.FindImplementationsByMonikerAsync(
+                    moniker, pageIndex: pageIndex, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e) when (FatalError.ReportWithoutCrashUnlessCanceled(e))
+            {
+                return SpecializedCollections.EmptyCollection<JObject>();
+            }
+        }
+
         private ExternalReferenceItem ConvertResult(DefinitionItem definition, JObject obj)
         {
             var projectName = obj.Value<string>("projectName");

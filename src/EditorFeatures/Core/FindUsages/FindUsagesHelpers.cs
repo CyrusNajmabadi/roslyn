@@ -7,8 +7,12 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Editor.LanguageServiceIndexFormat;
 using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.FindUsages;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Shared.Utilities;
 using Microsoft.CodeAnalysis.SymbolMapping;
 using Roslyn.Utilities;
 
@@ -54,31 +58,42 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             return (mapping.Symbol, mapping.Project);
         }
 
-        public static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, string message)?> FindImplementationsAsync(Document document, int position, CancellationToken cancellationToken)
+        public static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, ImmutableArray<DefinitionItem> codeIndexDefinitions, string message)?>
+            FindImplementationsAsync(Document document, int position, IFindUsagesContext context, CancellationToken cancellationToken)
         {
             var symbolAndProject = await GetRelevantSymbolAndProjectAtPositionAsync(
                 document, position, cancellationToken).ConfigureAwait(false);
             if (symbolAndProject == null)
-            {
                 return null;
-            }
 
             return await FindImplementationsAsync(
-                symbolAndProject?.symbol, symbolAndProject?.project, cancellationToken).ConfigureAwait(false);
+                symbolAndProject?.symbol, symbolAndProject?.project, context, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, string message)?> FindImplementationsAsync(
-            ISymbol symbol, Project project, CancellationToken cancellationToken)
+        private static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, ImmutableArray<DefinitionItem> codeIndexDefinitions, string message)?>
+            FindImplementationsAsync(ISymbol symbol, Project project, IFindUsagesContext context, CancellationToken cancellationToken)
         {
-            var implementations = await FindImplementationsWorkerAsync(
-                symbol, project, cancellationToken).ConfigureAwait(false);
+            var ourImplementationsTask = FindImplementationsWorkerAsync(
+                symbol, project, cancellationToken);
 
-            var filteredSymbols = implementations.WhereAsArray(
-                s => s.Locations.Any(l => l.IsInSource));
+            // Kick off work to search the online code index system in parallel
+            var monikerUsagesService = project.Solution.Workspace.Services.GetRequiredService<IFindSymbolMonikerUsagesService>();
+            var codeIndexImplementationsTask = FindSymbolMonikerImplementationsAsync(
+                monikerUsagesService,
+                symbol,
+                context,
+                cancellationToken);
 
-            return filteredSymbols.Length == 0
-                ? (symbol, project, filteredSymbols, EditorFeaturesResources.The_symbol_has_no_implementations)
-                : (symbol, project, filteredSymbols, null);
+            await Task.WhenAll(ourImplementationsTask, codeIndexImplementationsTask).ConfigureAwait(false);
+
+            var implementations = await ourImplementationsTask.ConfigureAwait(false);
+            var filteredSymbols = implementations.WhereAsArray(s => s.Locations.Any(l => l.IsInSource));
+
+            var codeIndexDefinitions = await codeIndexImplementationsTask.ConfigureAwait(false);
+
+            return filteredSymbols.Length == 0 && codeIndexDefinitions.Length == 0
+                ? (symbol, project, filteredSymbols, codeIndexDefinitions, EditorFeaturesResources.The_symbol_has_no_implementations)
+                : (symbol, project, filteredSymbols, codeIndexDefinitions, null);
         }
 
         private static async Task<ImmutableArray<ISymbol>> FindImplementationsWorkerAsync(
@@ -137,6 +152,26 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
                 // This is something boring like a regular method or type, so we'll just go there directly
                 return ImmutableArray.Create(symbol);
             }
+        }
+
+        private static async Task<ImmutableArray<DefinitionItem>> FindSymbolMonikerImplementationsAsync(
+            IFindSymbolMonikerUsagesService monikerUsagesService,
+            ISymbol definition,
+            IFindUsagesContext context,
+            CancellationToken cancellationToken)
+        {
+            var moniker = SymbolMoniker.TryCreate(definition);
+            if (moniker == null)
+                return ImmutableArray<DefinitionItem>.Empty;
+
+            // Let the find-refs window know we have outstanding work
+            await using var _1 = await context.ProgressTracker.AddSingleItemAsync().ConfigureAwait(false);
+
+            using var _2 = ArrayBuilder<DefinitionItem>.GetInstance(out var definitions);
+            await foreach (var item in monikerUsagesService.FindImplementationsByMoniker(moniker, context.ProgressTracker, cancellationToken))
+                definitions.Add(item);
+
+            return definitions.ToImmutable();
         }
 
         private static SymbolDisplayFormat GetFormat(ISymbol definition)

@@ -30,7 +30,7 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
         {
             var cancellationToken = context.CancellationToken;
             var tuple = await FindUsagesHelpers.FindImplementationsAsync(
-                document, position, cancellationToken).ConfigureAwait(false);
+                document, position, context, cancellationToken).ConfigureAwait(false);
             if (tuple == null)
             {
                 await context.ReportMessageAsync(
@@ -38,7 +38,7 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
                 return;
             }
 
-            var message = tuple.Value.message;
+            var (symbol, project, implementations, codeIndexDefinitions, message) = tuple.Value;
 
             if (message != null)
             {
@@ -48,16 +48,18 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
 
             await context.SetSearchTitleAsync(
                 string.Format(EditorFeaturesResources._0_implementations,
-                FindUsagesHelpers.GetDisplayName(tuple.Value.symbol))).ConfigureAwait(false);
+                FindUsagesHelpers.GetDisplayName(symbol))).ConfigureAwait(false);
 
-            var project = tuple.Value.project;
-            foreach (var implementation in tuple.Value.implementations)
+            foreach (var implementation in implementations)
             {
                 var definitionItem = await implementation.ToClassifiedDefinitionItemAsync(
                     project, includeHiddenLocations: false,
                     FindReferencesSearchOptions.Default, cancellationToken: cancellationToken).ConfigureAwait(false);
                 await context.OnDefinitionFoundAsync(definitionItem).ConfigureAwait(false);
             }
+
+            foreach (var definitionItem in codeIndexDefinitions)
+                await context.OnDefinitionFoundAsync(definitionItem).ConfigureAwait(false);
         }
 
         async Task IFindUsagesService.FindReferencesAsync(
