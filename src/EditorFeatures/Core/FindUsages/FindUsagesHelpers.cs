@@ -58,8 +58,8 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             return (mapping.Symbol, mapping.Project);
         }
 
-        public static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, ImmutableArray<DefinitionItem> codeIndexDefinitions, string message)?>
-            FindImplementationsAsync(Document document, int position, IFindUsagesContext context, CancellationToken cancellationToken)
+        public static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, ImmutableArray<ExternalReferenceItem> codeIndexImplementations, string message)?>
+            FindImplementationsAsync(Document document, int position, IStreamingProgressTracker progressTracker, CancellationToken cancellationToken)
         {
             var symbolAndProject = await GetRelevantSymbolAndProjectAtPositionAsync(
                 document, position, cancellationToken).ConfigureAwait(false);
@@ -67,11 +67,11 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
                 return null;
 
             return await FindImplementationsAsync(
-                symbolAndProject?.symbol, symbolAndProject?.project, context, cancellationToken).ConfigureAwait(false);
+                symbolAndProject?.symbol, symbolAndProject?.project, progressTracker, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, ImmutableArray<DefinitionItem> codeIndexDefinitions, string message)?>
-            FindImplementationsAsync(ISymbol symbol, Project project, IFindUsagesContext context, CancellationToken cancellationToken)
+        private static async Task<(ISymbol symbol, Project project, ImmutableArray<ISymbol> implementations, ImmutableArray<ExternalReferenceItem> codeIndexImplementations, string message)?>
+            FindImplementationsAsync(ISymbol symbol, Project project, IStreamingProgressTracker progressTracker, CancellationToken cancellationToken)
         {
             var ourImplementationsTask = FindImplementationsWorkerAsync(
                 symbol, project, cancellationToken);
@@ -81,7 +81,7 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             var codeIndexImplementationsTask = FindSymbolMonikerImplementationsAsync(
                 monikerUsagesService,
                 symbol,
-                context,
+                progressTracker,
                 cancellationToken);
 
             await Task.WhenAll(ourImplementationsTask, codeIndexImplementationsTask).ConfigureAwait(false);
@@ -89,11 +89,12 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             var implementations = await ourImplementationsTask.ConfigureAwait(false);
             var filteredSymbols = implementations.WhereAsArray(s => s.Locations.Any(l => l.IsInSource));
 
-            var codeIndexDefinitions = await codeIndexImplementationsTask.ConfigureAwait(false);
+            var codeIndexImplementations = await codeIndexImplementationsTask.ConfigureAwait(false);
 
-            return filteredSymbols.Length == 0 && codeIndexDefinitions.Length == 0
-                ? (symbol, project, filteredSymbols, codeIndexDefinitions, EditorFeaturesResources.The_symbol_has_no_implementations)
-                : (symbol, project, filteredSymbols, codeIndexDefinitions, null);
+            if (filteredSymbols.Length == 0 && codeIndexImplementations.Length == 0)
+                return (symbol, project, filteredSymbols, codeIndexImplementations, EditorFeaturesResources.The_symbol_has_no_implementations);
+
+            return (symbol, project, filteredSymbols, codeIndexImplementations, null);
         }
 
         private static async Task<ImmutableArray<ISymbol>> FindImplementationsWorkerAsync(
@@ -154,20 +155,21 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             }
         }
 
-        private static async Task<ImmutableArray<DefinitionItem>> FindSymbolMonikerImplementationsAsync(
+        private static async Task<ImmutableArray<ExternalReferenceItem>> FindSymbolMonikerImplementationsAsync(
             IFindSymbolMonikerUsagesService monikerUsagesService,
             ISymbol definition,
-            IFindUsagesContext context,
+            IStreamingProgressTracker progressTracker,
             CancellationToken cancellationToken)
         {
             var moniker = SymbolMoniker.TryCreate(definition);
             if (moniker == null)
-                return ImmutableArray<DefinitionItem>.Empty;
+                return ImmutableArray<ExternalReferenceItem>.Empty;
 
             // Let the find-refs window know we have outstanding work
-            await using var _1 = await context.ProgressTracker.AddSingleItemAsync().ConfigureAwait(false);
+            await using var _1 = await progressTracker.AddSingleItemAsync().ConfigureAwait(false);
+            using var _2 = ArrayBuilder<ExternalReferenceItem>.GetInstance(out var result);
 
-            var displayParts = GetDisplayParts(definition).AddRange(new[]
+            var displayParts = GetDisplayParts(definition.OriginalDefinition).AddRange(new[]
             {
                 new TaggedText(TextTags.Space, " "),
                 new TaggedText(TextTags.Text, EditorFeaturesResources.external_implementations),
@@ -178,22 +180,10 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
                 displayParts,
                 originationParts: DefinitionItem.GetOriginationParts(definition));
 
-            using var _2 = ArrayBuilder<DefinitionItem>.GetInstance(out var definitions);
+            await foreach (var referenceItem in monikerUsagesService.FindImplementationsByMoniker(definitionItem, moniker, progressTracker, cancellationToken))
+                result.Add(referenceItem);
 
-            var first = true;
-            await foreach (var referenceItem in monikerUsagesService.FindImplementationsByMoniker(definitionItem, moniker, context.ProgressTracker, cancellationToken))
-            {
-                if (first)
-                {
-                    // found some results.  Add the definition item to the context.
-                    first = false;
-                    await context.OnDefinitionFoundAsync(definitionItem).ConfigureAwait(false);
-                }
-
-                await context.OnExternalReferenceFoundAsync(referenceItem).ConfigureAwait(false);
-            }
-
-            return definitions.ToImmutable();
+            return result.ToImmutable();
         }
 
         private static SymbolDisplayFormat GetFormat(ISymbol definition)

@@ -17,11 +17,15 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
     internal class SimpleFindUsagesContext : FindUsagesContext
     {
         private readonly object _gate = new object();
+
         private readonly ImmutableArray<DefinitionItem>.Builder _definitionItems =
             ImmutableArray.CreateBuilder<DefinitionItem>();
 
         private readonly ImmutableArray<SourceReferenceItem>.Builder _referenceItems =
             ImmutableArray.CreateBuilder<SourceReferenceItem>();
+
+        private readonly ImmutableArray<ExternalReferenceItem>.Builder _externalReferenceItems =
+            ImmutableArray.CreateBuilder<ExternalReferenceItem>();
 
         public override CancellationToken CancellationToken { get; }
 
@@ -59,6 +63,14 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             }
         }
 
+        public ImmutableArray<ExternalReferenceItem> GetExternalReferences()
+        {
+            lock (_gate)
+            {
+                return _externalReferenceItems.ToImmutable();
+            }
+        }
+
         public override Task OnDefinitionFoundAsync(DefinitionItem definition)
         {
             lock (_gate)
@@ -74,6 +86,16 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
             lock (_gate)
             {
                 _referenceItems.Add(reference);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public override Task OnExternalReferenceFoundAsync(ExternalReferenceItem reference)
+        {
+            lock (_gate)
+            {
+                _externalReferenceItems.Add(reference);
             }
 
             return Task.CompletedTask;

@@ -30,7 +30,7 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
         {
             var cancellationToken = context.CancellationToken;
             var tuple = await FindUsagesHelpers.FindImplementationsAsync(
-                document, position, context, cancellationToken).ConfigureAwait(false);
+                document, position, context.ProgressTracker, cancellationToken).ConfigureAwait(false);
             if (tuple == null)
             {
                 await context.ReportMessageAsync(
@@ -38,7 +38,7 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
                 return;
             }
 
-            var (symbol, project, implementations, codeIndexDefinitions, message) = tuple.Value;
+            var (symbol, project, implementations, codeIndexImplementations, message) = tuple.Value;
 
             if (message != null)
             {
@@ -58,8 +58,8 @@ namespace Microsoft.CodeAnalysis.Editor.FindUsages
                 await context.OnDefinitionFoundAsync(definitionItem).ConfigureAwait(false);
             }
 
-            foreach (var definitionItem in codeIndexDefinitions)
-                await context.OnDefinitionFoundAsync(definitionItem).ConfigureAwait(false);
+            foreach (var item in codeIndexImplementations)
+                await context.OnExternalReferenceFoundAsync(item).ConfigureAwait(false);
         }
 
         async Task IFindUsagesService.FindReferencesAsync(

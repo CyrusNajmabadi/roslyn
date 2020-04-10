@@ -2,7 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.FindUsages;
 
@@ -52,12 +54,34 @@ namespace Microsoft.CodeAnalysis.Editor.Host
         /// If there's only a single item, navigates to it.  Otherwise, presents all the
         /// items to the user.
         /// </summary>
+        public static Task<bool> TryNavigateToOrPresentItemsAsync(
+            this IStreamingFindUsagesPresenter presenter,
+            Workspace workspace, string title,
+            ImmutableArray<DefinitionItem> items)
+        {
+            return TryNavigateToOrPresentItemsAsync(
+                presenter, workspace, title, items,
+                ImmutableArray<SourceReferenceItem>.Empty,
+                ImmutableArray<ExternalReferenceItem>.Empty);
+        }
+
+        /// <summary>
+        /// If there's only a single item, navigates to it.  Otherwise, presents all the
+        /// items to the user.
+        /// </summary>
         public static async Task<bool> TryNavigateToOrPresentItemsAsync(
             this IStreamingFindUsagesPresenter presenter,
-            Workspace workspace, string title, ImmutableArray<DefinitionItem> items)
+            Workspace workspace, string title,
+            ImmutableArray<DefinitionItem> items,
+            ImmutableArray<SourceReferenceItem> references,
+            ImmutableArray<ExternalReferenceItem> externalReferences)
         {
             // Ignore any definitions that we can't navigate to.
-            var definitions = items.WhereAsArray(d => d.CanNavigateTo(workspace));
+            var definitions = items.Where(d => d.CanNavigateTo(workspace))
+                                   .Concat(references.Select(r => r.Definition))
+                                   .Concat(externalReferences.Select(r => r.Definition))
+                                   .Distinct()
+                                   .ToImmutableArray();
 
             // See if there's a third party external item we can navigate to.  If so, defer 
             // to that item and finish.
@@ -77,7 +101,7 @@ namespace Microsoft.CodeAnalysis.Editor.Host
             }
 
             if (nonExternalItems.Length == 1 &&
-                nonExternalItems[0].SourceSpans.Length <= 1)
+                nonExternalItems[0].SourceSpans.Length == 1)
             {
                 // There was only one location to navigate to.  Just directly go to that location.
                 return nonExternalItems[0].TryNavigateTo(workspace, isPreview: true);
@@ -89,9 +113,13 @@ namespace Microsoft.CodeAnalysis.Editor.Host
                 // Present this to the user so they can decide where they want to go to.
                 var context = presenter.StartSearch(title, supportsReferences: false);
                 foreach (var definition in nonExternalItems)
-                {
                     await context.OnDefinitionFoundAsync(definition).ConfigureAwait(false);
-                }
+
+                foreach (var reference in references)
+                    await context.OnReferenceFoundAsync(reference).ConfigureAwait(false);
+
+                foreach (var externalReference in externalReferences)
+                    await context.OnExternalReferenceFoundAsync(externalReference).ConfigureAwait(false);
 
                 // Note: we don't need to put this in a finally.  The only time we might not hit
                 // this is if cancellation or another error gets thrown.  In the former case,

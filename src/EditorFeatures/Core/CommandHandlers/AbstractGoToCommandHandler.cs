@@ -140,9 +140,12 @@ namespace Microsoft.CodeAnalysis.Editor.CommandHandlers
 
             var definitionItems = context.GetDefinitions();
             var references = context.GetReferences();
+            var externalReferences = context.GetExternalReferences();
 
-            streamingPresenter.TryNavigateToOrPresentItemsAsync(
-                document.Project.Solution.Workspace, context.SearchTitle, definitionItems).Wait(cancellationToken);
+            _threadingContext.JoinableTaskFactory.Run(() =>
+                streamingPresenter.TryNavigateToOrPresentItemsAsync(
+                    document.Project.Solution.Workspace, context.SearchTitle,
+                    definitionItems, references, externalReferences));
         }
     }
 }

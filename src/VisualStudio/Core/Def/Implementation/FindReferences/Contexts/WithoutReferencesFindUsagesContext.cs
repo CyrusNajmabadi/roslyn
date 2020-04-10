@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.DocumentHighlighting;
@@ -37,9 +38,50 @@ namespace Microsoft.VisualStudio.LanguageServices.FindUsages
             protected override Task OnReferenceFoundWorkerAsync(SourceReferenceItem reference)
                 => throw new InvalidOperationException();
 
-            // We should never be called in a context where we get references.
             protected override Task OnExternalReferenceFoundWorkerAsync(ExternalReferenceItem reference)
-                => throw new InvalidOperationException();
+            {
+                // Called when finding implementations in CodeIndex scenarios.
+
+                // External references go into both sets of entries.  We ensure an entry for the definition, and an
+                // entry for the reference itself.
+                return OnEntryFoundAsync(
+                    reference.Definition,
+                    bucket => Task.FromResult<Entry>(new ExternalReferenceItemEntry(bucket, reference)),
+                    addToEntriesWhenGroupingByDefinition: true,
+                    addToEntriesWhenNotGroupingByDefinition: true);
+            }
+
+            protected async Task OnEntryFoundAsync(
+                DefinitionItem definition,
+                Func<RoslynDefinitionBucket, Task<Entry>> createEntryAsync,
+                bool addToEntriesWhenGroupingByDefinition,
+                bool addToEntriesWhenNotGroupingByDefinition)
+            {
+                Debug.Assert(addToEntriesWhenGroupingByDefinition || addToEntriesWhenNotGroupingByDefinition);
+                CancellationToken.ThrowIfCancellationRequested();
+
+                // First find the bucket corresponding to our definition.
+                var definitionBucket = GetOrCreateDefinitionBucket(definition);
+                var entry = await createEntryAsync(definitionBucket).ConfigureAwait(false);
+                if (entry == null)
+                    return;
+
+                lock (Gate)
+                {
+                    // Once we can make the new entry, add it to the appropriate list.
+                    if (addToEntriesWhenGroupingByDefinition)
+                        EntriesWhenGroupingByDefinition = EntriesWhenGroupingByDefinition.Add(entry);
+
+                    if (addToEntriesWhenNotGroupingByDefinition)
+                        EntriesWhenNotGroupingByDefinition = EntriesWhenNotGroupingByDefinition.Add(entry);
+
+                    CurrentVersionNumber++;
+                }
+
+                // Let all our subscriptions know that we've updated.
+                NotifyChange();
+            }
+
 
             // Nothing to do on completion.
             protected override Task OnCompletedAsyncWorkerAsync()
