@@ -16,6 +16,7 @@ using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Text.Editor.Commanding;
+using Microsoft.VisualStudio.Threading;
 
 namespace Microsoft.CodeAnalysis.Editor.CommandHandlers
 {
@@ -127,7 +128,7 @@ namespace Microsoft.CodeAnalysis.Editor.CommandHandlers
             // what to do with them.  If we get only a single result back, then we'll just go 
             // directly to it.  Otherwise, we'll present the results in the IStreamingFindUsagesPresenter.
             var context = new SimpleFindUsagesContext(cancellationToken);
-            FindActionAsync(service, document, caretPosition, context).Wait(cancellationToken);
+            _threadingContext.JoinableTaskFactory.Run(() => FindActionAsync(service, document, caretPosition, context), JoinableTaskCreationOptions.LongRunning);
 
             // If FindAction reported a message, then just stop and show that 
             // message to the user.
@@ -138,6 +139,7 @@ namespace Microsoft.CodeAnalysis.Editor.CommandHandlers
             }
 
             var definitionItems = context.GetDefinitions();
+            var references = context.GetReferences();
 
             streamingPresenter.TryNavigateToOrPresentItemsAsync(
                 document.Project.Solution.Workspace, context.SearchTitle, definitionItems).Wait(cancellationToken);
