@@ -2,12 +2,14 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 #if DEBUG
 using System.Diagnostics;
 #endif
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
@@ -95,8 +97,11 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
             if (!subjectBuffer.GetFeatureOnOffOption(EditorComponentOnOffOptions.Tagger))
                 return null;
 
-            var tagSource = GetOrCreateTagSource(textViewOpt, subjectBuffer);
-            var tagger = new Tagger(ThreadingContext, AsyncListener, tagSource, subjectBuffer) as ITagger<T>;
+            if (subjectBuffer is ITextBuffer2 subjectBuffer2)
+                throw new ArgumentException($"{nameof(subjectBuffer)} was not an {nameof(ITextBuffer2}");
+
+            var tagSource = GetOrCreateTagSource(textViewOpt, subjectBuffer2);
+            var tagger = new Tagger(ThreadingContext, AsyncListener, tagSource, subjectBuffer2) as ITagger<T>;
             if (tagger == null)
             {
                 // If we couldn't actually create the tagger then dispose the tag source so its
@@ -108,7 +113,7 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
             return tagger;
         }
 
-        private TagSource GetOrCreateTagSource(ITextView textViewOpt, ITextBuffer subjectBuffer)
+        private TagSource GetOrCreateTagSource(ITextView textViewOpt, ITextBuffer2 subjectBuffer)
         {
             this.AssertIsForeground();
             if (!this.TryRetrieveTagSource(textViewOpt, subjectBuffer, out var tagSource))
@@ -264,9 +269,9 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
 
         internal readonly struct TestAccessor
         {
-            private readonly AbstractAsynchronousTaggerProvider<TTag> _provider;
+            private readonly AbstractAsynchronousTaggerProvider2<TTag> _provider;
 
-            public TestAccessor(AbstractAsynchronousTaggerProvider<TTag> provider)
+            public TestAccessor(AbstractAsynchronousTaggerProvider2<TTag> provider)
                 => _provider = provider;
 
             internal Task ProduceTagsAsync(TaggerContext<TTag> context)
@@ -282,9 +287,12 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
             private readonly ITaggerEventSource _eventSource;
 
             private readonly AsyncBatchingWorkQueue<ITextSnapshot> _changeQueue;
-            private readonly AsyncBatchingWorkQueue<NormalizedSnapshotSpanCollection> _notificationQueue;
+            private readonly AsyncBatchingWorkQueue<NormalizedSnapshotSpanCollection> _tagsRemovedNotificationQueue;
+            private readonly AsyncBatchingWorkQueue<NormalizedSnapshotSpanCollection> _tagsAddedNotificationQueue;
 
-            private readonly CancellationTokenSource _disposeCancellationSource = new();
+            private readonly CancellationTokenSource _backgroundWorkCancellationSource = new();
+
+            public event EventHandler<SnapshotSpanEventArgs> TagsChanged;
 
             public TagSource(AbstractAsynchronousTaggerProvider2<TTag> provider, ITextView textViewOpt, ITextBuffer2 subjectBuffer)
             {
@@ -295,20 +303,67 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
 
                 this.CachedTagTrees = ImmutableDictionary.Create<ITextBuffer, TagSpanIntervalTree<TTag>>();
 
+                _eventSource = this.CreateEventSource();
+
                 _changeQueue = new AsyncBatchingWorkQueue<ITextSnapshot>(
                     TaggerDelay.Short.ComputeTimeDelay(),
                     ProcessChangesAsync,
                     EqualityComparer<ITextSnapshot>.Default,
                     provider.AsyncListener,
-                    _disposeCancellationSource.Token);
+                    _backgroundWorkCancellationSource.Token);
 
-                _eventSource = provider.CreateEventSource(_textViewOpt, _subjectBuffer);
+                // Notify the editor of removed tags immediately.  We always want those to dissapear
+                // as soon as possible.
+                _tagsRemovedNotificationQueue = new AsyncBatchingWorkQueue<NormalizedSnapshotSpanCollection>(
+                    TaggerDelay.NearImmediate.ComputeTimeDelay(),
+                    ProcessNotificationsAsync,
+                    equalityComparer: null,
+                    provider.AsyncListener,
+                    _backgroundWorkCancellationSource.Token);
+
+                // For added tags, update the editor at whatever pace this feature wants.
+                _tagsAddedNotificationQueue = new AsyncBatchingWorkQueue<NormalizedSnapshotSpanCollection>(
+                    provider.TagsTagsAddedNotificationDelay.ComputeTimeDelay(),
+                    ProcessNotificationsAsync,
+                    equalityComparer: null,
+                    provider.AsyncListener,
+                    _backgroundWorkCancellationSource.Token);
 
                 Connect();
 
                 // Start computing the initial set of tags immediately.  We want to get the UI
                 // to a complete state as soon as possible.
                 _changeQueue.AddWork(_subjectBuffer.CurrentSnapshot);
+            }
+
+            private ITaggerEventSource CreateEventSource()
+            {
+                var eventSource = _provider.CreateEventSource(_textViewOpt, _subjectBuffer);
+
+                // If there are any options specified for this tagger, then also hook up event
+                // notifications for when those options change.
+                var optionChangedEventSources =
+                    _provider.Options.Concat<IOption>(_provider.PerLanguageOptions)
+                        .SelectAsArray(o => TaggerEventSources.OnOptionChanged(_subjectBuffer, o, TaggerDelay.NearImmediate));
+
+                // If no options specified for this tagger, ust keep the event source as is.
+                if (optionChangedEventSources.IsEmpty)
+                    return eventSource;
+
+                optionChangedEventSources.Add(eventSource);
+                return TaggerEventSources.Compose(optionChangedEventSources);
+            }
+
+            private Task ProcessNotificationsAsync(
+                ImmutableArray<NormalizedSnapshotSpanCollection> array, CancellationToken cancellationToken)
+            {
+                foreach (var collection in array)
+                {
+                    foreach (var span in collection)
+                        this.TagsChanged?.Invoke(this, new SnapshotSpanEventArgs(span));
+                }
+
+                return Task.CompletedTask;
             }
 
             private void Connect()
@@ -333,32 +388,28 @@ namespace Microsoft.CodeAnalysis.Editor.Tagging
                 _eventSource.Connect();
             }
 
-            public void Disconnect()
+            private void Disconnect()
             {
                 _provider.AssertIsForeground();
-                _workQueue.AssertIsForeground();
-                _workQueue.CancelCurrentWork(remainCancelled: true);
+                _backgroundWorkCancellationSource.Cancel();
 
                 // Tell the interaction object to stop issuing events.
                 _eventSource.Disconnect();
 
-                if (_dataSource.CaretChangeBehavior.HasFlag(TaggerCaretChangeBehavior.RemoveAllTagsOnCaretMoveOutsideOfTag))
-                {
-                    _textViewOpt.Caret.PositionChanged -= OnCaretPositionChanged;
-                }
+                //if (_dataSource.CaretChangeBehavior.HasFlag(TaggerCaretChangeBehavior.RemoveAllTagsOnCaretMoveOutsideOfTag))
+                //{
+                //    _textViewOpt.Caret.PositionChanged -= OnCaretPositionChanged;
+                //}
 
-                if (_dataSource.TextChangeBehavior.HasFlag(TaggerTextChangeBehavior.TrackTextChanges))
-                {
-                    _subjectBuffer.Changed -= OnSubjectBufferChanged;
-                }
-
+                _subjectBuffer.ChangedOnBackground -= OnSubjectBufferChangedOnBackground;
                 _eventSource.Changed -= OnEventSourceChanged;
             }
+
+            private void OnEventSourceChanged(object? sender, TaggerEventArgs e)
+                => _changeQueue.AddWork(_subjectBuffer.CurrentSnapshot);
+
+            private void OnSubjectBufferChangedOnBackground(object? sender, TextContentChangedEventArgs e)
+                => _changeQueue.AddWork(_subjectBuffer.CurrentSnapshot);
         }
     }
-
-    internal abstract class AbstractBufferTaggerProvider<TTag> : AbstractAsynchronousTaggerProvider2<TTag>
-        where TTag : ITag
-    {
-
-    }
+}
