@@ -6,6 +6,7 @@
 
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.CodeFixes.GenerateMethod;
 using Microsoft.CodeAnalysis.CSharp.CodeStyle;
@@ -9129,6 +9130,35 @@ public partial class ClassWithGeneratedPartial
     }
 }
                         ");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateMethod)]
+        public async Task TestNamedTypesPreferredOverPredefinedTypes()
+        {
+            await TestInRegularAndScriptAsync(
+@"using System;
+
+class Class
+{
+    void Method()
+    {
+        System.String s = [|NewMethod()|];
+    }
+}",
+@"using System;
+
+class Class
+{
+    void Method()
+    {
+        System.String s = NewMethod();
+    }
+
+    private String NewMethod()
+    {
+        throw new NotImplementedException();
+    }
+}", options: Option(CodeStyleOptions2.PreferIntrinsicPredefinedTypeKeywordInDeclaration, CodeStyleOptions2.FalseWithSilentEnforcement));
         }
     }
 }
