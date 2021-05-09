@@ -18,23 +18,23 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
     using RegexTrivia = EmbeddedSyntaxTrivia<RegexKind>;
 
     /// <summary>
-    /// Produces tokens from the sequence of <see cref="VirtualChar"/> characters.  Unlike the
-    /// native C# and VB lexer, this lexer is much more tightly controlled by the parser.  For
-    /// example, while C# can have trivia on virtual every token, the same is not true for
-    /// RegexTokens.  As such, instead of automatically lexing out tokens to make them available for
-    /// the parser, the parser asks for each token as necessary passing the right information to
+    /// Produces tokens from the sequence of <see cref="VirtualChar"/> characters.  Unlike the native C# and VB lexer,
+    /// this lexer is much more tightly controlled by the parser.  For example, while C# can have trivia on virtual
+    /// every token, the same is not true for RegexTokens.  As such, instead of automatically lexing out tokens to make
+    /// them available for the parser, the parser asks for each token as necessary passing the right information to
     /// indicate which types and shapes of tokens are allowed.
-    ///
-    /// The tight coupling means that the parser is allowed direct control of the position of the
-    /// lexer.
-    ///
-    /// Note: most of the time, tokens returned are just a single character long, including for long
-    /// sequences of text characters (like ```"goo"```).  This is just three <see
-    /// cref="RegexTextNode"/>s in a row (each containing a <see cref="RegexKind.TextToken"/> a
-    /// single character long).
-    ///
-    /// There are multi-character tokens though.  For example ```10``` in ```a{10,}``` or ```name```
-    /// in ```\k'name'```
+    /// <para>
+    /// The tight coupling means that the parser is allowed direct control of the position of the lexer.
+    /// </para>
+    /// <para>
+    /// Note: most of the time, tokens returned are just a single character long, including for long sequences of text
+    /// characters (like <c>"goo"</c>).  This is just three <see cref="RegexTextNode"/>s in a row (each containing a
+    /// <see cref="RegexKind.TextToken"/> a single character long).
+    /// </para>
+    /// <para>
+    /// There are multi-character tokens though.  For example <c>10</c> in <c>a{10,}</c> or <c>name</c> in
+    /// <c>\k'name'</c>
+    /// </para>
     /// </summary>
     internal struct RegexLexer
     {
