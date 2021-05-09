@@ -2,14 +2,12 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable disable
-
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis.EmbeddedLanguages.Common;
 using Microsoft.CodeAnalysis.EmbeddedLanguages.VirtualChars;
-using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
@@ -103,7 +101,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
                 return ImmutableArray<RegexTrivia>.Empty;
             }
 
-            using var _ = ArrayBuilder<RegexTrivia>.GetInstance(out var result);
+            using var result = TemporaryArray<RegexTrivia>.Empty;
 
             while (Position < Text.Length)
             {
@@ -124,7 +122,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
                 break;
             }
 
-            return result.ToImmutable();
+            return result.ToImmutableAndClear();
         }
 
         public RegexTrivia? ScanComment(RegexOptions options)
@@ -142,7 +140,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
 
                     // Note: \n is the only newline the native regex parser looks for.
                     while (Position < Text.Length &&
-                            Text[Position] != '\n')
+                           Text[Position] != '\n')
                     {
                         Position++;
                     }
@@ -214,21 +212,9 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
             return null;
         }
 
+        // List taken from the native regex parser.
         private static bool IsBlank(VirtualChar ch)
-        {
-            // List taken from the native regex parser.
-            switch (ch.Value)
-            {
-                case '\u0009':
-                case '\u000A':
-                case '\u000C':
-                case '\u000D':
-                case ' ':
-                    return true;
-                default:
-                    return false;
-            }
-        }
+            => ch.Value is '\u0009' or '\u000A' or '\u000C' or '\u000D' or ' ';
 
         public RegexToken? TryScanEscapeCategory()
         {
@@ -313,20 +299,14 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
         public RegexToken? TryScanCaptureName()
         {
             if (Position == Text.Length)
-            {
                 return null;
-            }
 
             var start = Position;
             while (Position < Text.Length && RegexCharClass.IsWordChar(this.CurrentChar))
-            {
                 Position++;
-            }
 
             if (Position == start)
-            {
                 return null;
-            }
 
             var token = CreateToken(RegexKind.CaptureNameToken, ImmutableArray<RegexTrivia>.Empty, GetSubPatternToCurrentPos(start));
             token = token.With(value: token.VirtualChars.CreateString());
@@ -340,36 +320,20 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
         {
             var start = Position;
             while (Position < Text.Length && IsOptionChar(this.CurrentChar))
-            {
                 Position++;
-            }
 
             return start == Position
-                ? (RegexToken?)null
+                ? null
                 : CreateToken(RegexKind.OptionsToken, ImmutableArray<RegexTrivia>.Empty, GetSubPatternToCurrentPos(start));
         }
 
         private static bool IsOptionChar(VirtualChar ch)
-        {
-            switch (ch.Value)
-            {
-                case '+':
-                case '-':
-                case 'i':
-                case 'I':
-                case 'm':
-                case 'M':
-                case 'n':
-                case 'N':
-                case 's':
-                case 'S':
-                case 'x':
-                case 'X':
-                    return true;
-                default:
-                    return false;
-            }
-        }
+            => ch.Value is '+' or '-' or
+                           'i' or 'I' or
+                           'm' or 'M' or
+                           'n' or 'N' or
+                           's' or 'S' or
+                           'x' or 'X';
 
         public RegexToken ScanHexCharacters(int count)
         {
@@ -404,8 +368,8 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
 
         public static bool IsHexChar(VirtualChar ch)
             => IsDecimalDigit(ch) ||
-               (ch >= 'a' && ch <= 'f') ||
-               (ch >= 'A' && ch <= 'F');
+               ch.Value is (>= 'a' and <= 'f') or
+                           (>= 'A' and <= 'F');
 
         private static bool IsDecimalDigit(VirtualChar ch)
             => ch.Value is >= '0' and <= '9';

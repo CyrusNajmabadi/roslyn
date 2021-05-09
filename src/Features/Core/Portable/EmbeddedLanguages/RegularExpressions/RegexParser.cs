@@ -544,33 +544,20 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
         }
 
         private RegexPrimaryExpressionNode ParsePrimaryExpression(RegexExpressionNode lastExpression)
-        {
-            switch (_currentToken.Kind)
+            => _currentToken.Kind switch
             {
-                case RegexKind.DotToken:
-                    return ParseWildcard();
-                case RegexKind.CaretToken:
-                    return ParseStartAnchor();
-                case RegexKind.DollarToken:
-                    return ParseEndAnchor();
-                case RegexKind.BackslashToken:
-                    return ParseEscape(_currentToken, allowTriviaAfterEnd: true);
-                case RegexKind.OpenBracketToken:
-                    return ParseCharacterClass();
-                case RegexKind.OpenParenToken:
-                    return ParseGrouping();
-                case RegexKind.CloseParenToken:
-                    return ParseUnexpectedCloseParenToken();
-                case RegexKind.OpenBraceToken:
-                    return ParsePossibleUnexpectedNumericQuantifier(lastExpression);
-                case RegexKind.AsteriskToken:
-                case RegexKind.PlusToken:
-                case RegexKind.QuestionToken:
-                    return ParseUnexpectedQuantifier(lastExpression);
-                default:
-                    return ParseText();
-            }
-        }
+                RegexKind.DotToken => ParseWildcard(),
+                RegexKind.CaretToken => ParseStartAnchor(),
+                RegexKind.DollarToken => ParseEndAnchor(),
+                RegexKind.BackslashToken => ParseEscape(_currentToken, allowTriviaAfterEnd: true),
+                RegexKind.OpenBracketToken => ParseCharacterClass(),
+                RegexKind.OpenParenToken => ParseGrouping(),
+                RegexKind.CloseParenToken => ParseUnexpectedCloseParenToken(),
+                RegexKind.OpenBraceToken => ParsePossibleUnexpectedNumericQuantifier(lastExpression),
+                RegexKind.AsteriskToken or RegexKind.PlusToken or RegexKind.QuestionToken
+                    => ParseUnexpectedQuantifier(lastExpression),
+                _ => ParseText(),
+            };
 
         private RegexPrimaryExpressionNode ParsePossibleUnexpectedNumericQuantifier(RegexExpressionNode lastExpression)
         {
@@ -1206,18 +1193,15 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
         }
 
         private static RegexOptions OptionFromCode(VirtualChar ch)
-        {
-            switch (ch.Value)
+            => ch.Value switch
             {
-                case 'i': case 'I': return RegexOptions.IgnoreCase;
-                case 'm': case 'M': return RegexOptions.Multiline;
-                case 'n': case 'N': return RegexOptions.ExplicitCapture;
-                case 's': case 'S': return RegexOptions.Singleline;
-                case 'x': case 'X': return RegexOptions.IgnorePatternWhitespace;
-                default:
-                    throw new InvalidOperationException();
-            }
-        }
+                'i' or 'I' => RegexOptions.IgnoreCase,
+                'm' or 'M' => RegexOptions.Multiline,
+                'n' or 'N' => RegexOptions.ExplicitCapture,
+                's' or 'S' => RegexOptions.Singleline,
+                'x' or 'X' => RegexOptions.IgnorePatternWhitespace,
+                _ => throw new InvalidOperationException(),
+            };
 
         private RegexBaseCharacterClassNode ParseCharacterClass()
         {
