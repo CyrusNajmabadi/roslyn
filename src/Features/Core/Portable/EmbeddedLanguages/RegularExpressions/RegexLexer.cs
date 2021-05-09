@@ -251,9 +251,7 @@ namespace Microsoft.CodeAnalysis.EmbeddedLanguages.RegularExpressions
         public RegexToken? TryScanNumber()
         {
             if (Position == Text.Length)
-            {
                 return null;
-            }
 
             const int MaxValueDiv10 = int.MaxValue / 10;
             const int MaxValueMod10 = int.MaxValue % 10;
