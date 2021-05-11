@@ -3,25 +3,30 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Generic;
-using System.Composition;
-using System.Linq;
-using System.Text;
+using System.ComponentModel.Composition;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
     [Export(typeof(IDynamicSyntaxTreeProvider))]
     internal sealed class DynamicSyntaxTreeProvider : IDynamicSyntaxTreeProvider
     {
+        [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public DynamicSyntaxTreeProvider()
+        {
+        }
+
         #region Public Methods
         public IDynamicSyntaxTree CreateDynamicSyntaxTree(IParsingService parsingService)
         {
-            ArgumentValidation.NotNull(parsingService, "parsingService");
+            Contract.ThrowIfNull(parsingService);
 
             return new DynamicSyntaxTree(parsingService);
         }
@@ -31,19 +36,17 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         // NOTE: This DymamicSyntaxTree implementation is *not* thread-safe
         private sealed class DynamicSyntaxTree : IDynamicSyntaxTree
         {
-            private const string OnTextChangedMeasurementBlockName = "DYNAMIC_SYNTAX_TREE_ONTEXTCHANGED";
-
             private readonly IParsingService parsingService;
-            private SyntaxTree currentSyntaxTree;
+            private SyntaxTree? currentSyntaxTree;
 
             public DynamicSyntaxTree(IParsingService parsingService)
             {
-                ArgumentValidation.NotNull(parsingService, "parsingService");
+                Contract.ThrowIfNull(parsingService);
 
                 this.parsingService = parsingService;
             }
 
-            public SyntaxTree CurrentSyntaxTree
+            public SyntaxTree? CurrentSyntaxTree
             {
                 get
                 {
@@ -51,7 +54,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
                 }
             }
 
-            public async Task UpdateAsync(ITextSnapshot textSnapshot, CancellationToken cancellationToken = default(CancellationToken))
+            public async Task UpdateAsync(ITextSnapshot textSnapshot, CancellationToken cancellationToken)
             {
                 // If possible, we want to get the syntax tree through the Roslyn Document for this snapshot.
                 // That way the syntax tree will take into account the current compiler options (such as the
@@ -62,10 +65,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
                 var document = textSnapshot.GetOpenDocumentInCurrentContextWithChanges();
                 if (document != null)
                 {
-                    this.currentSyntaxTree = await document.GetSyntaxTreeAsync().ConfigureAwait(false);
+                    this.currentSyntaxTree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
 
                     // verify that the tree and parsing service are still in sync, if not, reparse.
-                    // this check is required because if a content type change occured
+                    // this check is required because if a content type change occurred
                     // codelens switches the parsing service and GetRelatedDocumentsWithChanges()
                     // could return an out of date document if workspace didn't observe that change yet.
                     if (!this.parsingService.IsValidSyntaxTree(this.currentSyntaxTree))

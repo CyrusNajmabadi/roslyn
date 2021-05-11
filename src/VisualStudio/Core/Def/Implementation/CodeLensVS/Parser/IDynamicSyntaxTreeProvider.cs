@@ -23,11 +23,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
 
     internal interface IDynamicSyntaxTree
     {
-        SyntaxTree CurrentSyntaxTree { get; }
+        SyntaxTree? CurrentSyntaxTree { get; }
 
         /// <summary>
         /// Updates the syntax tree to the state of the text buffer.
         /// </summary>
-        Task UpdateAsync(ITextSnapshot snapshot, CancellationToken cancellationToken = default(CancellationToken));
+        Task UpdateAsync(ITextSnapshot snapshot, CancellationToken cancellationToken);
     }
 }

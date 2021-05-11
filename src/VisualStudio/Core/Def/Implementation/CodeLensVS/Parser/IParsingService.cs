@@ -30,6 +30,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// Called to determine if current ParsingService understands the current SyntaxTree. If it doesn't, we reparse.
         /// </summary>
         /// <param name="tree">The syntax tree</param>
-        bool IsValidSyntaxTree(SyntaxTree tree);
+        bool IsValidSyntaxTree(SyntaxTree? tree);
     }
 }
