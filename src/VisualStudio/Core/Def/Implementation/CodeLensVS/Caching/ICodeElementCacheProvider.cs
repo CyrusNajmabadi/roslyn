@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
@@ -26,7 +27,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Cach
     {
         IEnumerable<int> LineNumbers { get; }
 
-        bool TryGetAt(int lineNumber, out ICacheEntry cacheEntry);
+        bool TryGetAt(int lineNumber, [NotNullWhen(true)] out ICacheEntry? cacheEntry);
 
         Task RebuildAsync(ITextSnapshot snapshot, bool clean, CancellationToken cancellationToken);
     }

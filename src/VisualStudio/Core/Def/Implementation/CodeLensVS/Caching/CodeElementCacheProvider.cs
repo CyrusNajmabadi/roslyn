@@ -6,8 +6,10 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
 using Microsoft.VisualStudio.Utilities;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Caching
 {
@@ -21,11 +23,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Cach
 
         #region Constructors
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public CodeElementCacheProvider(
             [ImportMany] IEnumerable<Lazy<IParsingService, IContentTypeMetadata>> parsingServices,
             IDynamicSyntaxTreeProvider dynamicSyntaxTreeProvider)
         {
-            ArgumentValidation.NotNull(parsingServices, "parsingServices");
+            Contract.ThrowIfNull(parsingServices);
 
             this.parsingServices = parsingServices.ToArray();
             this.dynamicSyntaxTreeProvider = dynamicSyntaxTreeProvider;

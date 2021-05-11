@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.Language.CodeLens;
+using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Extensions;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
@@ -55,7 +56,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
 
                 if (document != null)
                 {
-                    var currentSyntaxNode = await this.descriptor.SyntaxNode.GetCurrentSyntaxNodeAsync(document).ConfigureAwait(false);
+                    var currentSyntaxNode = await this.descriptor.SyntaxNode.GetCurrentSyntaxNodeAsync(document, CancellationToken.None).ConfigureAwait(false);
                     if (currentSyntaxNode != null)
                     {
                         var fullyQualifiedName = await currentSyntaxNode.GetFullyQualifiedNameAsync(document).ConfigureAwait(false);

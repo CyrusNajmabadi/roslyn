@@ -4,13 +4,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Utilities;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Caching
 {
@@ -29,17 +30,17 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Cach
         /// <summary>
         /// The parsing service used to walk the current syntax tree and populate the cache.
         /// </summary>
-        private IParsingService currentParsingService;
+        private IParsingService? currentParsingService;
 
         /// <summary>
         /// The syntax tree which is updated from the source code before rebuilding the cache.
         /// </summary>
-        private IDynamicSyntaxTree currentSyntaxTree;
+        private IDynamicSyntaxTree? currentSyntaxTree;
 
         /// <summary>
         /// A dictionary lookup of line numbers to cache data.
         /// </summary>
-        private volatile Dictionary<int, ICacheEntry> cacheData;
+        private volatile Dictionary<int, ICacheEntry>? cacheData;
 
         /// <summary>
         /// Creates the cache.
@@ -63,7 +64,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Cach
             {
                 if (this.cacheData == null)
                 {
-                    return Enumerable.Empty<int>();
+                    return SpecializedCollections.EmptyEnumerable<int>();
                 }
 
                 return this.cacheData.Keys;
@@ -76,29 +77,23 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Cach
         /// <param name="lineNumber">The line number to lookup</param>
         /// <param name="cacheEntry">The cache entry at this line number</param>
         /// <returns>True if there is an entry at this line, otherwise, false.</returns>
-        public bool TryGetAt(int lineNumber, out ICacheEntry cacheEntry)
+        public bool TryGetAt(int lineNumber, [NotNullWhen(true)] out ICacheEntry? cacheEntry)
         {
             cacheEntry = null;
-            if (this.cacheData != null && this.cacheData.TryGetValue(lineNumber, out cacheEntry))
-            {
-                return true;
-            }
-
-            return false;
+            return this.cacheData != null && this.cacheData.TryGetValue(lineNumber, out cacheEntry);
         }
 
         /// <summary>
         /// Rebuilds the cache based on a syntax tree snapshot.
         /// </summary>
         /// <param name="snapshot">The specific snapshot to rebuild from</param>
-        /// <param name="parseOptionsOpt">The parse options to use. Can be null to use language default options.</param>
         /// <param name="clean">If true, the cache is completely rebuilt.</param>        
         /// <param name="cancellationToken">The cancellation token to cancel the rebuilding.</param>
         public async Task RebuildAsync(ITextSnapshot snapshot, bool clean, CancellationToken cancellationToken)
         {
-            ArgumentValidation.NotNull(snapshot, "snapshot");
+            Contract.ThrowIfNull(snapshot);
 
-            ITextBuffer textBuffer = snapshot.TextBuffer;
+            var textBuffer = snapshot.TextBuffer;
 
             if (this.currentParsingService == null || clean)
             {
@@ -123,14 +118,17 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Cach
                 this.currentSyntaxTree = this.dynamicSyntaxTreeProvider.CreateDynamicSyntaxTree(this.currentParsingService);
             }
 
-            await this.currentSyntaxTree.UpdateAsync(snapshot, cancellationToken);
+            await this.currentSyntaxTree.UpdateAsync(snapshot, cancellationToken).ConfigureAwait(true);
 
             cancellationToken.ThrowIfCancellationRequested();
 
+            var currentTree = this.currentSyntaxTree.CurrentSyntaxTree;
+            Contract.ThrowIfNull(currentTree);
+
             var cache = new Dictionary<int, ICacheEntry>();
-            this.currentParsingService.VisitSyntaxTree(this.currentSyntaxTree.CurrentSyntaxTree, nodeInfo =>
+            this.currentParsingService.VisitSyntaxTree(currentTree, nodeInfo =>
             {
-                TextLine line = currentSyntaxTree.CurrentSyntaxTree.GetText().Lines.GetLineFromPosition(nodeInfo.Start);
+                var line = currentTree.GetText().Lines.GetLineFromPosition(nodeInfo.Start);
                 if (!cache.ContainsKey(line.LineNumber))
                 {
                     cache[line.LineNumber] = new CacheEntry(nodeInfo.CreateSyntaxNodeInfo(snapshot), nodeInfo.Start - line.Start);
