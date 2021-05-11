@@ -30,7 +30,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Quer
         /// <summary>
         /// Description of the element, returns the file path.
         /// </summary>
-        public virtual string ElementDescription => this.FilePath;
+        public virtual string? ElementDescription => this.FilePath;
 
         public virtual Span? ApplicableSpan { get; }
 

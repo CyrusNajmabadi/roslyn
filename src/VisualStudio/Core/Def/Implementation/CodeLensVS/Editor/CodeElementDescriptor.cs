@@ -73,7 +73,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             /// <summary>
             /// A short description of the code element.  The description is the name of the identifier prepended by its parent name if available. 
             /// </summary>
-            public override string ElementDescription
+            public override string? ElementDescription
             {
                 get
                 {
@@ -86,11 +86,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                         }
                         else
                         {
-                            this.elementDescription = this.SyntaxNode.GetIdentifierName();
-                            SyntaxNode parentNode = this.SyntaxNode.GetNextParent();
+                            this.elementDescription = this.syntaxNodeInfo.GetIdentifierName();
+                            var parentNode = this.syntaxNodeInfo.GetNextParent();
                             if (parentNode != null)
                             {
-                                string parentName = parentNode.GetIdentifierName();
+                                var parentName = parentNode.GetIdentifierName();
 
                                 if (!string.IsNullOrEmpty(this.elementDescription) && !string.IsNullOrEmpty(parentName))
                                 {
@@ -154,7 +154,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             /// <returns>A new NodeEquivalentCheckCache</returns>
             IReusableDescriptorComparisonCache IReusableDescriptor.CreateCache()
             {
-                return new NodeEquivalentCheckCache();
+                return this.syntaxNodeInfo.CreateCache();
             }
 
             /// <summary>

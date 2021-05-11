@@ -145,8 +145,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                 return null;
             }
 
-            ICacheEntry cacheEntry;
-            if (this.cache.TryGetAt(lineNumber, out cacheEntry))
+            if (this.cache.TryGetAt(lineNumber, out var cacheEntry))
             {
                 Contract.ThrowIfNull(this.filePath);
                 Contract.ThrowIfNull(this.documentId);

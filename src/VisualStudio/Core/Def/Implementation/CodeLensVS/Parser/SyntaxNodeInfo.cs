@@ -5,6 +5,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
+using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
@@ -55,9 +56,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         }
 
         protected abstract bool AreEquivalent(SyntaxNode oldNode, SyntaxNode newNode);
+        public abstract string? GetIdentifierName();
+        public abstract SyntaxNodeInfo? GetNextParent();
+        public abstract IReusableDescriptorComparisonCache CreateCache();
 
         /// <summary>
-        /// Returns true if two syntaxnodeinfo objects are equivalent (but not neccessarily
+        /// Returns true if two syntaxnodeinfo objects are equivalent (but not necessarily
         /// referentially equal).
         /// </summary>
         /// <param name="other">The other syntax node info object</param>
