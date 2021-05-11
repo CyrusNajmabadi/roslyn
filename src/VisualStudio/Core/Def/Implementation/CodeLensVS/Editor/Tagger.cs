@@ -185,12 +185,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                                             // Find the line number in the new snapshot:
                                             if (oldLineNumber >= this.previousSnapshot.LineCount)
                                             {
-                                                // Something went very wrong and we cannot find the position of
-                                                // existing tag on the previous snapshot.
-                                                // Instead of crashing (see https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1080056)
-                                                // we are going to log a fault and skip this tag
-                                                TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/incorrectlinenumber",
-                                                    $"oldLineNumber={oldLineNumber},  this.previousSnapshot.LineCount={this.previousSnapshot.LineCount}");
                                                 continue;
                                             }
 
@@ -198,26 +192,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                                             var existingTagOffset = existingTag.Item2;
                                             var newSnapshotPoint = previousSnapshotLine.Start;
 
-                                            if (existingTagOffset > previousSnapshotLine.Length)
-                                            {
-                                                // This is not expected, but won't crash immediately, log it
-                                                TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/offsetoutoflinebounds",
-                                                    $"previousSnapshotLine.Length={previousSnapshotLine.Length}, existingTagOffset={existingTagOffset}");
-                                            }
-
                                             if (newSnapshotPoint.Position + existingTagOffset < newSnapshotPoint.Snapshot.Length)
                                             {
                                                 newSnapshotPoint += existingTagOffset;
-                                            }
-                                            else
-                                            {
-                                                // Something went very wrong and we cannot find the position of
-                                                // existing tag on the previous snapshot.
-                                                // Instead of crashing (see https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1080056)
-                                                // we are going to log a fault and proceed even if CodeLens tag will be
-                                                // incorrectly positioned.
-                                                TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/offsetoutofsnapshotbounds",
-                                                    $"newSnapshotPoint={newSnapshotPoint.Position}, newSnapshotLength={newSnapshotPoint.Snapshot.Length}, existingTagOffset={existingTagOffset}");
                                             }
 
                                             newSnapshotPoint = newSnapshotPoint.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
