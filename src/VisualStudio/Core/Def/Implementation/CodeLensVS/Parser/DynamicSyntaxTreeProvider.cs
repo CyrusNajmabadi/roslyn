@@ -53,40 +53,37 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
 
             public async Task UpdateAsync(ITextSnapshot textSnapshot, CancellationToken cancellationToken = default(CancellationToken))
             {
-                using (MeasurementBlock.BeginNew(1, OnTextChangedMeasurementBlockName))
+                // If possible, we want to get the syntax tree through the Roslyn Document for this snapshot.
+                // That way the syntax tree will take into account the current compiler options (such as the
+                // preprocessor symbols), and we're not reparsing the text if some other component has already
+                // obtained the syntax tree.
+                // It is also possible that the snapshot has no related Document. In that case, we still need
+                // to do the parsing ourselves.
+                var document = textSnapshot.GetOpenDocumentInCurrentContextWithChanges();
+                if (document != null)
                 {
-                    // If possible, we want to get the syntax tree through the Roslyn Document for this snapshot.
-                    // That way the syntax tree will take into account the current compiler options (such as the
-                    // preprocessor symbols), and we're not reparsing the text if some other component has already
-                    // obtained the syntax tree.
-                    // It is also possible that the snapshot has no related Document. In that case, we still need
-                    // to do the parsing ourselves.
-                    CodeAnalysis.Document document = textSnapshot.GetOpenDocumentInCurrentContextWithChanges();
-                    if (document != null)
-                    {
-                        this.currentSyntaxTree = await document.GetSyntaxTreeAsync().ConfigureAwait(false);
+                    this.currentSyntaxTree = await document.GetSyntaxTreeAsync().ConfigureAwait(false);
 
-                        // verify that the tree and parsing service are still in sync, if not, reparse.
-                        // this check is required because if a content type change occured
-                        // codelens switches the parsing service and GetRelatedDocumentsWithChanges()
-                        // could return an out of date document if workspace didn't observe that change yet.
-                        if (!this.parsingService.IsValidSyntaxTree(this.currentSyntaxTree))
-                        {
-                            this.currentSyntaxTree = this.parsingService.Parse(textSnapshot.AsText());
-                        }
+                    // verify that the tree and parsing service are still in sync, if not, reparse.
+                    // this check is required because if a content type change occured
+                    // codelens switches the parsing service and GetRelatedDocumentsWithChanges()
+                    // could return an out of date document if workspace didn't observe that change yet.
+                    if (!this.parsingService.IsValidSyntaxTree(this.currentSyntaxTree))
+                    {
+                        this.currentSyntaxTree = this.parsingService.Parse(textSnapshot.AsText());
+                    }
+                }
+                else
+                {
+                    var sourceText = textSnapshot.AsText();
+
+                    if (this.currentSyntaxTree == null)
+                    {
+                        this.currentSyntaxTree = this.parsingService.Parse(sourceText);
                     }
                     else
                     {
-                        SourceText sourceText = textSnapshot.AsText();
-
-                        if (this.currentSyntaxTree == null)
-                        {
-                            this.currentSyntaxTree = this.parsingService.Parse(sourceText);
-                        }
-                        else
-                        {
-                            this.currentSyntaxTree = this.currentSyntaxTree.WithChangedText(sourceText);
-                        }
+                        this.currentSyntaxTree = this.currentSyntaxTree.WithChangedText(sourceText);
                     }
                 }
             }

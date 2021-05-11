@@ -22,7 +22,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <summary>
         /// Returns a syntax node info object for this found node.
         /// </summary>
-        /// <param name="textSnapshot">A text snapshot that the locator uses to translate paths between snapshots</param>
+        /// <param name="textSnapshot">A text snapshot that the locater uses to translate paths between snapshots</param>
         SyntaxNodeInfo CreateSyntaxNodeInfo(ITextSnapshot textSnapshot);
     }
 }

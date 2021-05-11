@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
@@ -32,7 +33,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         }
 
         /// <summary>
-        /// Returns true if two nodes are equivelant.
+        /// Returns true if two nodes are equivalent.
         /// </summary>
         /// <param name="oldNode">The old node</param>
         /// <param name="newNode">The new node</param>

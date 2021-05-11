@@ -14,7 +14,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Exte
         /// <summary>
         /// Get the name of the identifier for the node.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1800:DoNotCastUnnecessarily", Justification = "Too much memory to create all types of objects")]
         public static string GetIdentifierName(SyntaxNode node)
         {
             if (node is NamespaceDeclarationSyntax)

@@ -5,6 +5,7 @@
 using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
+using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Queries;
 using Microsoft.VisualStudio.Text;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
