@@ -13,20 +13,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Exte
         /// </summary>
         /// <param name="textBuffer">Text buffer</param>
         /// <returns>Document moniker</returns>
-        public static string GetDocumentMoniker(this ITextBuffer textBuffer)
+        public static string? GetDocumentMoniker(this ITextBuffer textBuffer)
         {
-            ITextDocument document;
-            if ((textBuffer == null) || (!textBuffer.Properties.TryGetProperty(typeof(ITextDocument), out document)))
-            {
+            if (textBuffer == null || !textBuffer.Properties.TryGetProperty(typeof(ITextDocument), out ITextDocument document))
                 return null;
-            }
 
-            if (document == null)
-            {
-                return null;
-            }
-
-            return document.FilePath;
+            return document?.FilePath;
         }
     }
 }

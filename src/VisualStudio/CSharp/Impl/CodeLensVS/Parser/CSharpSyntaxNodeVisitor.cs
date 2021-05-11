@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
@@ -34,7 +35,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="cancellationToken">A cancellation token that can stop the walk before it finishes</param>
         public CSharpSyntaxNodeVisitor(Action<INodeInfo> onNodeFound, CancellationToken cancellationToken)
         {
-            ArgumentValidation.NotNull(onNodeFound, "onNodeFound");
+            Contract.ThrowIfNull(onNodeFound);
 
             this.onNodeFound = onNodeFound;
             this.cancellationToken = cancellationToken;
@@ -46,7 +47,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The complication (root) node</param>
         public override void VisitCompilationUnit(CompilationUnitSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
 
             foreach (var child in node.Members)
             {
@@ -60,7 +61,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The namespace declaration node</param>
         public override void VisitNamespaceDeclaration(NamespaceDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
 
             foreach (var child in node.Members)
             {
@@ -70,7 +71,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
 
         private void VisitTypeDeclaration(TypeDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
 
             this.FireOnNodeFound(node, SyntaxNodeKind.Type, node.Identifier);
             foreach (var child in node.Members)
@@ -93,7 +94,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
 
         public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Type, node.Identifier);
         }
 
@@ -103,7 +104,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The method declaration</param>
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Method, node.Identifier);
         }
 
@@ -113,7 +114,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The constructor declaration</param>
         public override void VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Method, node.Identifier);
         }
 
@@ -123,7 +124,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The descructor declaration</param>
         public override void VisitDestructorDeclaration(DestructorDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Method, node.TildeToken);
         }
 
@@ -133,7 +134,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The operator declaration</param>
         public override void VisitOperatorDeclaration(OperatorDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Method, node.OperatorKeyword);
         }
 
@@ -143,7 +144,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="node">The property declaration</param>
         public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Property, node.Identifier);
         }
 
@@ -152,7 +153,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// </summary>
         public override void VisitIndexerDeclaration(IndexerDeclarationSyntax node)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.FireOnNodeFound(node, SyntaxNodeKind.Property, node.ThisKeyword);
         }
 
@@ -160,7 +161,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// Override the default visit method to throw if we're cancelled.
         /// </summary>
         /// <param name="node">The syntax node</param>
-        public override void Visit(SyntaxNode node)
+        public override void Visit(SyntaxNode? node)
         {
             this.cancellationToken.ThrowIfCancellationRequested();
             base.Visit(node);
@@ -187,7 +188,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         {
             private readonly SyntaxNode node;
             private readonly SyntaxNodeKind kind;
-            private int startPosition = 0;
+            private readonly int startPosition = 0;
 
             /// <summary>
             /// Creates the CSharp node found info object.
@@ -206,7 +207,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
                 }
                 else
                 {
-                    var lines = identifier.SyntaxTree.GetText().Lines;
+                    var lines = identifier.SyntaxTree!.GetText().Lines;
                     var line = lines.GetLineFromPosition(identifier.Span.Start);
 
                     // check if start of line is within current node

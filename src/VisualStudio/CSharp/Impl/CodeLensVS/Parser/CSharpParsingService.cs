@@ -7,8 +7,10 @@ using System.ComponentModel.Composition;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Utilities;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
@@ -19,9 +21,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
     [Export(typeof(IParsingService))]
     internal sealed class CSharpParsingService : IParsingService
     {
+        [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public CSharpParsingService()
+        {
+        }
+
         public SyntaxTree Parse(SourceText text)
         {
-            ArgumentValidation.NotNull(text, "text");
+            Contract.ThrowIfNull(text);
 
             return CSharpSyntaxTree.ParseText(text);
         }
@@ -34,13 +42,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="cancellationToken">A cancellation token that can stop the walk before it finishes</param>
         public void VisitSyntaxTree(SyntaxTree tree, Action<INodeInfo> onNodeFound, CancellationToken cancellationToken)
         {
-            ArgumentValidation.NotNull(tree, "tree");
+            Contract.ThrowIfNull(tree);
 
-            CSharpSyntaxNodeVisitor visitor = new CSharpSyntaxNodeVisitor(onNodeFound, cancellationToken);
-            visitor.Visit(tree.GetRoot());
+            var visitor = new CSharpSyntaxNodeVisitor(onNodeFound, cancellationToken);
+            visitor.Visit(tree.GetRoot(cancellationToken));
         }
 
-        public bool IsValidSyntaxTree(SyntaxTree tree)
+        public bool IsValidSyntaxTree(SyntaxTree? tree)
         {
             return tree is CSharpSyntaxTree;
         }
