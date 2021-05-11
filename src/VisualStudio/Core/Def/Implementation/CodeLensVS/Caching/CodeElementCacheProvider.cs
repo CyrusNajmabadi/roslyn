@@ -4,13 +4,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.Composition;
+using System.ComponentModel.Composition;
 using System.Linq;
 using Microsoft.VisualStudio.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Caching
 {
-    [Export(typeof(ICodeElementCacheProvider)), Shared]
+    [Export(typeof(ICodeElementCacheProvider))]
     internal class CodeElementCacheProvider : ICodeElementCacheProvider
     {
         #region Fields
