@@ -3,10 +3,13 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Queries;
 using Microsoft.VisualStudio.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
 {
@@ -22,7 +25,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
         {
             private readonly SyntaxNodeInfo syntaxNodeInfo;
 
-            private string elementDescription = null;
+            private string? elementDescription = null;
 
             /// <summary>
             /// Instantiates a new method descriptor
@@ -34,7 +37,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             public CodeElementDescriptor(SyntaxNodeInfo syntaxNodeInfo, string filePath, DocumentId documentId, Workspace workspace, Guid projectGuid)
                 : base(filePath, projectGuid)
             {
-                ArgumentValidation.NotNull(syntaxNodeInfo, "syntaxNodeInfo");
+                Contract.ThrowIfNull(syntaxNodeInfo);
 
                 this.syntaxNodeInfo = syntaxNodeInfo;
                 this.DocumentId = documentId;
@@ -139,7 +142,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             /// <returns>True if the two descriptors are equivelant</returns>
             bool IReusableDescriptor.IsEquivalentTo(IReusableDescriptor other)
             {
-                CodeElementDescriptor descriptor = other as CodeElementDescriptor;
+                var descriptor = other as CodeElementDescriptor;
                 return descriptor != null
                     ? this.syntaxNodeInfo.IsEquivalentTo(descriptor.syntaxNodeInfo)
                     : false;
@@ -162,11 +165,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             /// <returns>True if the descriptor updates</returns>
             bool IReusableDescriptor.CompareToAndUpdate(IReusableDescriptor other, IReusableDescriptorComparisonCache cache)
             {
-                CodeElementDescriptor otherDescriptor = ((object)other) as CodeElementDescriptor;
-                NodeEquivalentCheckCache equivalenceCache = cache as NodeEquivalentCheckCache;
+                var otherDescriptor = other as CodeElementDescriptor;
+                var equivalenceCache = cache as NodeEquivalentCheckCache;
                 if (otherDescriptor != null && equivalenceCache != null)
                 {
-                    bool updated = this.syntaxNodeInfo.CompareToAndUpdateIfNeccessary(otherDescriptor.syntaxNodeInfo, equivalenceCache);
+                    var updated = this.syntaxNodeInfo.CompareToAndUpdateIfNeccessary(otherDescriptor.syntaxNodeInfo, equivalenceCache);
 
                     // if the node updated itself, clear any saved description
                     if (updated)

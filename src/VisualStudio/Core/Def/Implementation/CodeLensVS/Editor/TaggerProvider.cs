@@ -33,6 +33,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             return null;
         }
 
-        protected abstract Tagger<TTag> CreateTagger(ITextView textView);
+        protected abstract Tagger<TTag>? CreateTagger(ITextView textView);
     }
 }

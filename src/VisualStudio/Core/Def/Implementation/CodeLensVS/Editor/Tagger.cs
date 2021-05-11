@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Tagging;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
 {
@@ -24,8 +25,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
         // Using the same delay as the squiggle provider:
         protected const int DefaultUpdateDelayInMS = 1500;
         private readonly ITextView textView;
-        private readonly Dictionary<int, Tuple<TTag, int>> tagCache;
-        private ITextSnapshot previousSnapshot;
+        private readonly Dictionary<int, Tuple<TTag, int>?> tagCache;
+        private ITextSnapshot? previousSnapshot;
 
         /// <summary>
         /// Note - this is a task of int to help make sure the compiler catches errors. If this is a regular task,
@@ -42,16 +43,16 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
         private bool disposed;
         private bool isEnabled;
         private bool hasBeenAskedForTags = false;
-        private object updateTaskSyncRoot = new object();
+        private readonly object updateTaskSyncRoot = new object();
         #endregion
 
         #region Constructors
         protected Tagger(ITextView textView)
         {
-            ArgumentValidation.NotNull(textView, "textView");
+            Contract.ThrowIfNull(textView);
 
             this.textView = textView;
-            this.tagCache = new Dictionary<int, Tuple<TTag, int>>();
+            this.tagCache = new Dictionary<int, Tuple<TTag, int>?>();
             this.previousUpdate = Task.FromResult(0);
             this.previousUpdateCancellationToken = new CancellationTokenSource();
 
@@ -70,7 +71,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
         #endregion
 
         #region Protected Fields
-        protected Dictionary<int, Tuple<TTag, int>> TagCache
+        protected Dictionary<int, Tuple<TTag, int>?> TagCache
         {
             get
             {
@@ -109,7 +110,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             }
             else
             {
-                return Enumerable.Empty<ITagSpan<TTag>>();
+                return SpecializedCollections.EmptyEnumerable<ITagSpan<TTag>>();
             }
         }
 
@@ -137,11 +138,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                 if (this.IsEnabled)
                 {
                     // Get the current snapshot
-                    ITextSnapshot currentSnapshot = this.textView.TextBuffer.CurrentSnapshot;
+                    var currentSnapshot = this.textView.TextBuffer.CurrentSnapshot;
 
                     this.previousUpdateCancellationToken.Cancel();
                     this.previousUpdateCancellationToken = new CancellationTokenSource();
-                    CancellationToken cancellationToken = this.previousUpdateCancellationToken.Token;
+                    var cancellationToken = this.previousUpdateCancellationToken.Token;
 
                     this.previousUpdate = this.previousUpdate.ContinueWith(async task =>
                     {
@@ -152,138 +153,135 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                             // typing before we try and update the cache.
                             if (!clean)
                             {
-                                await Task.Delay(delayInMS, cancellationToken);
+                                await Task.Delay(delayInMS, cancellationToken).ConfigureAwait(true);
                             }
 
-                            using (MeasurementBlock.BeginNew(0, "ROSLYN_UPDATE_SNAPSHOT"))
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var invalidatedLines = new HashSet<int>();
+
+                            // Inform the tagger that it should update the snapshot it's working against
+                            var newlyTaggedLines = await this.UpdateSnapshotAsync(currentSnapshot, clean, cancellationToken).ConfigureAwait(true);
+                            invalidatedLines.UnionWith(newlyTaggedLines);
+
+                            IReusableDescriptorComparisonCache? cache = null;
+
+                            // See which lines in our cache need to be updated:                    
+                            lock (this.tagCache)
                             {
-                                cancellationToken.ThrowIfCancellationRequested();
-                                HashSet<int> invalidatedLines = new HashSet<int>();
-
-                                // Inform the tagger that it should update the snapshot it's working against
-                                IEnumerable<int> newlyTaggedLines = await this.UpdateSnapshotAsync(currentSnapshot, clean, cancellationToken);
-                                invalidatedLines.UnionWith(newlyTaggedLines);
-
-                                IReusableDescriptorComparisonCache cache = null;
-
-                                // See which lines in our cache need to be updated:                    
-                                lock (this.tagCache)
+                                // this.previousSnapshot is null on the very first update, which is equivalent
+                                // to an empty cache
+                                if (this.previousSnapshot != null)
                                 {
-                                    // this.previousSnapshot is null on the very first update, which is equivalent
-                                    // to an empty cache
-                                    if (this.previousSnapshot != null)
+                                    var keyPairs = this.tagCache.ToArray();
+                                    this.tagCache.Clear();
+
+                                    foreach (var keyPair in keyPairs)
                                     {
-                                        var keyPairs = this.tagCache.ToArray();
-                                        this.tagCache.Clear();
+                                        var oldLineNumber = keyPair.Key;
+                                        var existingTag = keyPair.Value;
 
-                                        foreach (var keyPair in keyPairs)
+                                        if (existingTag != null)
                                         {
-                                            int oldLineNumber = keyPair.Key;
-                                            Tuple<TTag, int> existingTag = keyPair.Value;
-
-                                            if (existingTag != null)
+                                            // Find the line number in the new snapshot:
+                                            if (oldLineNumber >= this.previousSnapshot.LineCount)
                                             {
-                                                // Find the line number in the new snapshot:
-                                                if (oldLineNumber >= this.previousSnapshot.LineCount)
-                                                {
-                                                    // Something went very wrong and we cannot find the position of
-                                                    // existing tag on the previous snapshot.
-                                                    // Instead of crashing (see https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1080056)
-                                                    // we are going to log a fault and skip this tag
-                                                    TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/incorrectlinenumber",
-                                                        $"oldLineNumber={oldLineNumber},  this.previousSnapshot.LineCount={this.previousSnapshot.LineCount}");
-                                                    continue;
-                                                }
+                                                // Something went very wrong and we cannot find the position of
+                                                // existing tag on the previous snapshot.
+                                                // Instead of crashing (see https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1080056)
+                                                // we are going to log a fault and skip this tag
+                                                TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/incorrectlinenumber",
+                                                    $"oldLineNumber={oldLineNumber},  this.previousSnapshot.LineCount={this.previousSnapshot.LineCount}");
+                                                continue;
+                                            }
 
-                                                ITextSnapshotLine previousSnapshotLine = this.previousSnapshot.GetLineFromLineNumber(oldLineNumber);
-                                                int existingTagOffset = existingTag.Item2;
-                                                SnapshotPoint newSnapshotPoint = previousSnapshotLine.Start;
+                                            var previousSnapshotLine = this.previousSnapshot.GetLineFromLineNumber(oldLineNumber);
+                                            var existingTagOffset = existingTag.Item2;
+                                            var newSnapshotPoint = previousSnapshotLine.Start;
 
-                                                if (existingTagOffset > previousSnapshotLine.Length)
-                                                {
-                                                    // This is not expected, but won't crash immediately, log it
-                                                    TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/offsetoutoflinebounds",
-                                                        $"previousSnapshotLine.Length={previousSnapshotLine.Length}, existingTagOffset={existingTagOffset}");
-                                                }
+                                            if (existingTagOffset > previousSnapshotLine.Length)
+                                            {
+                                                // This is not expected, but won't crash immediately, log it
+                                                TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/offsetoutoflinebounds",
+                                                    $"previousSnapshotLine.Length={previousSnapshotLine.Length}, existingTagOffset={existingTagOffset}");
+                                            }
 
-                                                if (newSnapshotPoint.Position + existingTagOffset < newSnapshotPoint.Snapshot.Length)
+                                            if (newSnapshotPoint.Position + existingTagOffset < newSnapshotPoint.Snapshot.Length)
+                                            {
+                                                newSnapshotPoint += existingTagOffset;
+                                            }
+                                            else
+                                            {
+                                                // Something went very wrong and we cannot find the position of
+                                                // existing tag on the previous snapshot.
+                                                // Instead of crashing (see https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1080056)
+                                                // we are going to log a fault and proceed even if CodeLens tag will be
+                                                // incorrectly positioned.
+                                                TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/offsetoutofsnapshotbounds",
+                                                    $"newSnapshotPoint={newSnapshotPoint.Position}, newSnapshotLength={newSnapshotPoint.Snapshot.Length}, existingTagOffset={existingTagOffset}");
+                                            }
+
+                                            newSnapshotPoint = newSnapshotPoint.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
+                                            var newSnapshotLine = newSnapshotPoint.GetContainingLine();
+                                            var newLineNumber = newSnapshotLine.LineNumber;
+
+                                            // Do we still have a tag at this line? If so, compare it to the one we currently have 
+                                            // and see if it's changed:
+                                            var newTag = this.GetTag(newLineNumber);
+
+                                            // Note: if this is a clean build, we can't re-use old tags. The reason why is because 
+                                            // the tag is created out of a certain file path and in a rename scenario, all of the indicators
+                                            // would need to update their file path / document ids. They can do this but it can become tricky,
+                                            // so the easiest solution is just to blow away the old tags and add new ones. Note that we still 
+                                            // need to invalidate the old line because the old tags might need to be invalidated as well.
+                                            if (newTag != null && !clean)
+                                            {
+                                                var updateableDescriptor1 = existingTag.Item1.Descriptor as IReusableDescriptor;
+                                                var updateableDescriptor2 = newTag.Item1.Descriptor as IReusableDescriptor;
+
+                                                if (updateableDescriptor1 != null && updateableDescriptor2 != null && updateableDescriptor1.IsEquivalentTo(updateableDescriptor2))
                                                 {
-                                                    newSnapshotPoint += existingTagOffset;
+                                                    // If the cache hasn't been created yet, make it now:
+                                                    if (cache == null)
+                                                    {
+                                                        cache = updateableDescriptor1.CreateCache();
+                                                    }
+
+                                                    // Re-use existing tags. Important! We need to make sure that we translate 
+                                                    // the offset while we are rebuilding the cache if we are reusing the same tag.
+                                                    var newOffset = newSnapshotPoint - newSnapshotLine.Start;
+                                                    this.tagCache[newLineNumber] = new Tuple<TTag, int>(existingTag.Item1, newOffset);
+                                                    updateableDescriptor1.CompareToAndUpdate(updateableDescriptor2, cache);
                                                 }
                                                 else
                                                 {
-                                                    // Something went very wrong and we cannot find the position of
-                                                    // existing tag on the previous snapshot.
-                                                    // Instead of crashing (see https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1080056)
-                                                    // we are going to log a fault and proceed even if CodeLens tag will be
-                                                    // incorrectly positioned.
-                                                    TelemetryService.DefaultSession.PostFault("vs/platform/codelens/tagger/updatesnapshoterror/offsetoutofsnapshotbounds",
-                                                        $"newSnapshotPoint={newSnapshotPoint.Position}, newSnapshotLength={newSnapshotPoint.Snapshot.Length}, existingTagOffset={existingTagOffset}");
-                                                }
-
-                                                newSnapshotPoint = newSnapshotPoint.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
-                                                ITextSnapshotLine newSnapshotLine = newSnapshotPoint.GetContainingLine();
-                                                int newLineNumber = newSnapshotLine.LineNumber;
-
-                                                // Do we still have a tag at this line? If so, compare it to the one we currently have 
-                                                // and see if it's changed:
-                                                Tuple<TTag, int> newTag = this.GetTag(newLineNumber);
-
-                                                // Note: if this is a clean build, we can't re-use old tags. The reason why is because 
-                                                // the tag is created out of a certain file path and in a rename scenario, all of the indicators
-                                                // would need to update their file path / document ids. They can do this but it can become tricky,
-                                                // so the easiest solution is just to blow away the old tags and add new ones. Note that we still 
-                                                // need to invalidate the old line because the old tags might need to be invalidated as well.
-                                                if (newTag != null && !clean)
-                                                {
-                                                    IReusableDescriptor updateableDescriptor1 = existingTag.Item1.Descriptor as IReusableDescriptor;
-                                                    IReusableDescriptor updateableDescriptor2 = newTag.Item1.Descriptor as IReusableDescriptor;
-
-                                                    if (updateableDescriptor1 != null && updateableDescriptor2 != null && updateableDescriptor1.IsEquivalentTo(updateableDescriptor2))
-                                                    {
-                                                        // If the cache hasn't been created yet, make it now:
-                                                        if (cache == null)
-                                                        {
-                                                            cache = updateableDescriptor1.CreateCache();
-                                                        }
-
-                                                        // Re-use existing tags. Important! We need to make sure that we translate 
-                                                        // the offset while we are rebuilding the cache if we are reusing the same tag.
-                                                        int newOffset = newSnapshotPoint - newSnapshotLine.Start;
-                                                        this.tagCache[newLineNumber] = new Tuple<TTag, int>(existingTag.Item1, newOffset);
-                                                        updateableDescriptor1.CompareToAndUpdate(updateableDescriptor2, cache);
-                                                    }
-                                                    else
-                                                    {
-                                                        // The tag is not updatable, so this means we have no 
-                                                        // choice but to invalidate it.
-                                                        invalidatedLines.Add(newLineNumber);
-                                                        this.CleanupTag(existingTag.Item1);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    // We don't have a tag on this line any more. Let's make sure it gets invalidated so that it's removed
-                                                    // from the editor:
+                                                    // The tag is not updatable, so this means we have no 
+                                                    // choice but to invalidate it.
                                                     invalidatedLines.Add(newLineNumber);
                                                     this.CleanupTag(existingTag.Item1);
                                                 }
                                             }
+                                            else
+                                            {
+                                                // We don't have a tag on this line any more. Let's make sure it gets invalidated so that it's removed
+                                                // from the editor:
+                                                invalidatedLines.Add(newLineNumber);
+                                                this.CleanupTag(existingTag.Item1);
+                                            }
                                         }
                                     }
-
-                                    // Now that our cache is rebuilt, let's swap the old snapshot with the new one:
-                                    this.previousSnapshot = currentSnapshot;
                                 }
 
-                                if (this.hasBeenAskedForTags)
+                                // Now that our cache is rebuilt, let's swap the old snapshot with the new one:
+                                this.previousSnapshot = currentSnapshot;
+                            }
+
+                            if (this.hasBeenAskedForTags)
+                            {
+                                // Raise tags changed for each invalidated lines. Line numbers are 0-indexed.
+                                foreach (var lineNumber in invalidatedLines)
                                 {
-                                    // Raise tags changed for each invalidated lines. Line numbers are 0-indexed.
-                                    foreach (int lineNumber in invalidatedLines)
-                                    {
-                                        ITextSnapshotLine line = currentSnapshot.GetLineFromLineNumber(lineNumber);
-                                        this.TagsChanged(this, new SnapshotSpanEventArgs(line.Extent));
-                                    }
+                                    var line = currentSnapshot.GetLineFromLineNumber(lineNumber);
+                                    this.TagsChanged(this, new SnapshotSpanEventArgs(line.Extent));
                                 }
                             }
                         }
@@ -337,7 +335,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
         /// </summary>
         /// <param name="lineNumber">The line number of the ITextSnapshot that was most recently passed to UpdateSnapshotAsync.</param>
         /// <returns>A tag and a line offset relative to the ITextSnapshot that was most recently passed to UpdateSnapshotAsync.</returns>
-        protected abstract Tuple<TTag, int> GetTag(int lineNumber);
+        protected abstract Tuple<TTag, int>? GetTag(int lineNumber);
 
         /// <summary>
         /// Updates to the specified ITextSnapshot. All calls to GetTag should be evaluated against this ITextSnapshot.
@@ -365,11 +363,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             // Therefore, we only ever return a tag for the first span we find so that we can handle cases where 
             // word wrap or hidden text causes multiple tags to appear on the same line.
             // int startLine = 0;
-            foreach (SnapshotSpan span in spans)
+            foreach (var span in spans)
             {
                 // Get the line number (only one tag per line is supported)
                 ITextSnapshotLine line;
-                Tuple<TTag, int> tagAndOffset;
+                Tuple<TTag, int>? tagAndOffset;
 
                 lock (this.tagCache)
                 {
@@ -379,7 +377,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                     }
 
                     // Translate the span to the previous snapshot
-                    SnapshotSpan previousSpan = span.TranslateTo(this.previousSnapshot, SpanTrackingMode.EdgeInclusive);
+                    var previousSpan = span.TranslateTo(this.previousSnapshot, SpanTrackingMode.EdgeInclusive);
                     line = previousSpan.Start.GetContainingLine();
 
                     if (!this.tagCache.TryGetValue(line.LineNumber, out tagAndOffset))
@@ -403,7 +401,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                 if (tagAndOffset != null && line.Start.Position + tagAndOffset.Item2 < line.Snapshot.Length)
                 {
                     // The tagger will translate this for us to the latest snapshot:
-                    SnapshotPoint tagPosition = line.Start + tagAndOffset.Item2;
+                    var tagPosition = line.Start + tagAndOffset.Item2;
 
                     // Return the current tag span
                     yield return new TagSpan<TTag>(new SnapshotSpan(tagPosition, 0), tagAndOffset.Item1);
@@ -415,7 +413,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
         private void OnTextBufferChangedOnBackground(object sender, TextContentChangedEventArgs e)
         {
             // This event is raised on a background thread, but synchronized and in order edits were applied
-            int delay = DefaultUpdateDelayInMS;
+            var delay = DefaultUpdateDelayInMS;
 
             // If we have a text changed event that spans one or more lines, then
             // we should update the snapshot immediately - no delay.
@@ -424,12 +422,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                 delay = 0;
             }
 
-            this.UpdateSnapshotAsync(false, delay).FireAndForget();
+            // fire and forget
+            _ = this.UpdateSnapshotAsync(false, delay);
         }
 
         private void OnContentTypeChanged(object sender, ContentTypeChangedEventArgs e)
         {
-            this.UpdateSnapshotAsync(true).FireAndForget();
+            // fire and forget
+            _ = this.UpdateSnapshotAsync(true);
         }
 
         private void OnEditorOptionsChanged(object sender, EditorOptionChangedEventArgs e)
@@ -445,7 +445,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             this.SubscribeTextViewEvents();
             if (update)
             {
-                this.UpdateSnapshotAsync(clean: true).FireAndForget();
+                // fire and forget
+                _ = this.UpdateSnapshotAsync(clean: true);
             }
         }
 
@@ -458,7 +459,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             this.previousUpdateCancellationToken.Cancel();
             this.previousUpdate = this.previousUpdate.ContinueWith(task =>
             {
-                Tuple<TTag, int>[] tagsToCleanup;
+                Tuple<TTag, int>?[] tagsToCleanup;
                 lock (this.tagCache)
                 {
                     tagsToCleanup = this.tagCache.Values.ToArray();
@@ -475,7 +476,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
 
                 this.previousSnapshot = null;
                 return 0;
-            });
+            }, TaskScheduler.Current);
         }
 
         private void SubscribeTextViewEvents()

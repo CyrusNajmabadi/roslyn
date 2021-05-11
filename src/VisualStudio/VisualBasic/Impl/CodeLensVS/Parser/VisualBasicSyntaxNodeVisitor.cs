@@ -8,6 +8,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
@@ -261,15 +263,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
                 this.kind = kind;
                 this.startPosition = node.Span.Start;
 
-                TextLineCollection lines = identifier.SyntaxTree.GetText().Lines;
-                TextLine taggedLine = lines.GetLineFromPosition(identifier.Span.Start);
+                var lines = identifier.SyntaxTree.GetText().Lines;
+                var taggedLine = lines.GetLineFromPosition(identifier.Span.Start);
 
                 // If the tagged line start is within node.FullSpan, start looking for tokens from start of tagged line
                 // If tagged line start is not part of the current node, there maybe another node that precedes this node at
                 // start of this line. In that scenario, return node.Span.Start for the tag position
                 if (node.FullSpan.Contains(taggedLine.Start))
                 {
-                    SyntaxToken nextToken = node.FindToken(taggedLine.Start);
+                    var nextToken = node.FindToken(taggedLine.Start);
 
                     // Find first token on the tagged line
                     while (nextToken.Span.End <= node.Span.End)

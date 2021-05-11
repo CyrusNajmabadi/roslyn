@@ -5,45 +5,43 @@
 using System;
 using System.ComponentModel.Composition;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Caching;
+using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Extensions;
+using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Tagging;
 using Microsoft.VisualStudio.Utilities;
+using Roslyn.Utilities;
+using Microsoft.VisualStudio.Language.CodeLens;
+using Microsoft.CodeAnalysis.Host.Mef;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
 {
     [Export(typeof(IViewTaggerProvider))]
-    [TagType(typeof(Microsoft.VisualStudio.Language.CodeLens.ICodeLensTag))]
+    [TagType(typeof(ICodeLensTag))]
     [ContentType("CSharp")]
     [ContentType("Basic")]
-    public sealed class CodeElementTaggerProvider : TaggerProvider<CodeElementTag>, IDisposable
+    internal sealed class CodeElementTaggerProvider : TaggerProvider<CodeElementTag>, IDisposable
     {
         private readonly ICodeElementCacheProvider codeElementCacheProvider;
-        private readonly MeasurementBlock measurementBlock;
-        private readonly string createTaggerMeasurementBlockName = "CODE_ELEMENT_TAGGER_PROVIDER_CREATE_TAGGER";
 
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public CodeElementTaggerProvider(
             ICodeElementCacheProvider codeElementCacheProvider)
         {
-            ArgumentValidation.NotNull(codeElementCacheProvider, "codeElementCacheProvider");
+            Contract.ThrowIfNull(codeElementCacheProvider);
 
             this.codeElementCacheProvider = codeElementCacheProvider;
-            this.measurementBlock = new MeasurementBlock();
         }
 
         public void Dispose()
         {
-            if (this.measurementBlock != null)
-            {
-                this.measurementBlock.Dispose();
-            }
         }
 
-        protected override Tagger<CodeElementTag> CreateTagger(ITextView textView)
+        protected override Tagger<CodeElementTag>? CreateTagger(ITextView textView)
         {
-            ArgumentValidation.NotNull(textView, "textView");
-            Contract.Assert(!textView.IsClosed, "CreateTagger called for a closed textview!");
+            Contract.ThrowIfNull(textView);
+            Contract.ThrowIfTrue(textView.IsClosed, "CreateTagger called for a closed textview!");
 
-            this.measurementBlock.Begin(1, this.createTaggerMeasurementBlockName);
             var documentFileName = textView.TextBuffer.GetDocumentMoniker();
             if (string.IsNullOrEmpty(documentFileName))
             {
@@ -53,9 +51,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             var codeElementTagger = new CodeElementTagger(
                 textView,
                 this.codeElementCacheProvider.CreateCache());
-
-            this.measurementBlock.End();
-            this.measurementBlock.Reset();
 
             return codeElementTagger;
         }

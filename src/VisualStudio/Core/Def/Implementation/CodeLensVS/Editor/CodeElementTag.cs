@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.Language.CodeLens;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
+using Microsoft.VisualStudio.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
 {
@@ -20,13 +22,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
 
         public CodeElementTag(SyntaxNodeInfo syntaxNodeInfo, string filePath, DocumentId documentId, Workspace workspace, Guid projectGuid)
         {
-            ArgumentValidation.NotNull(syntaxNodeInfo, "syntaxNodeInfo");
-            ArgumentValidation.NotNull(filePath, "filePath");
+            Contract.ThrowIfNull(syntaxNodeInfo);
+            Contract.ThrowIfNull(filePath);
 
             this.descriptor = new CodeElementDescriptor(syntaxNodeInfo, filePath, documentId, workspace, projectGuid);
         }
 
-        public event EventHandler Disconnected;
+        public event EventHandler? Disconnected;
 
         public ICodeLensDescriptor Descriptor => this.descriptor;
 
@@ -43,7 +45,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
 
         #region ICodeLensDescriptorContextProvider
 
-        public async Task<CodeLensDescriptorContext> GetCurrentContextAsync()
+        public async Task<CodeLensDescriptorContext?> GetCurrentContextAsync()
         {
             if (this.descriptor.SyntaxNode != null)
             {
@@ -61,7 +63,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
 
                         return new CodeLensDescriptorContext(
                             applicableSpan: Span.FromBounds(currentSyntaxNode.Span.Start, currentSyntaxNode.Span.End),
-                            properties: new Dictionary<object, object>()
+                            properties: new Dictionary<object, object?>()
                             {
                                 { "VisualStudioProcessId", VisualStudioProcessId },
                                 { "OutputFilePath", document.Project.OutputFilePath },
@@ -75,7 +77,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                 }
             }
 
-            return default(CodeLensDescriptorContext);
+            return null;
         }
 
         private static readonly int VisualStudioProcessId = Process.GetCurrentProcess().Id;

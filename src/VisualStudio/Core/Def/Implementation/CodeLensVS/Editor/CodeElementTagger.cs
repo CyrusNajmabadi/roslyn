@@ -11,8 +11,11 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Caching;
+using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
+using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
 {
@@ -46,8 +49,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                                  ICodeElementCache cache)
             : base(textView)
         {
-            ArgumentValidation.NotNull(textView, "textView");
-            ArgumentValidation.NotNull(cache, "cache");
+            Contract.ThrowIfNull(textView);
+            Contract.ThrowIfNull(cache);
 
             this.textBuffer = textView.TextBuffer;
             this.sourceTextContainer = textView.TextBuffer.AsTextContainer();
@@ -108,12 +111,16 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
                 newDocument = null;
             }
 
-            string? newFilePath = newDocument?.FilePath;
-            Guid newProjectGuid = Guid.Empty;
+            var newFilePath = newDocument?.FilePath;
+            var newProjectGuid = Guid.Empty;
 
             if (newDocument != null)
             {
-                newProjectGuid = this.workspace!.GetHierarchy(newDocument.Id.ProjectId)?.GetProjectGuid() ?? Guid.Empty;
+                var hierarchy = this.workspace!.GetHierarchy(newDocument.Id.ProjectId);
+                if (hierarchy != null && hierarchy.TryGetGuidProperty(__VSHPROPID.VSHPROPID_ProjectIDGuid, out var guid))
+                {
+                    newProjectGuid = guid;
+                }
             }
 
             if (this.documentId != newDocument?.Id ||
@@ -141,6 +148,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
             ICacheEntry cacheEntry;
             if (this.cache.TryGetAt(lineNumber, out cacheEntry))
             {
+                Contract.ThrowIfNull(this.filePath);
+                Contract.ThrowIfNull(this.documentId);
                 return Tuple.Create(new CodeElementTag(cacheEntry.SyntaxNodeInfo, this.filePath, this.documentId, this.workspace, this.projectGuid), cacheEntry.LineOffset);
             }
 
@@ -160,7 +169,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Edit
 
         protected override async Task<IEnumerable<int>> UpdateSnapshotAsync(ITextSnapshot snapshot, bool clean, CancellationToken cancellationToken)
         {
-            await this.cache.RebuildAsync(snapshot, clean, cancellationToken);
+            await this.cache.RebuildAsync(snapshot, clean, cancellationToken).ConfigureAwait(true);
 
             return this.cache.LineNumbers;
         }
