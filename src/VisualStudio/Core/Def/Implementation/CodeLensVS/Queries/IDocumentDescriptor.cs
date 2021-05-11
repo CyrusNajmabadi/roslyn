@@ -2,15 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.VisualStudio.Language.CodeLens;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Queries
 {
-    internal interface IDocumentDescriptor : Microsoft.VisualStudio.Language.CodeLens.ICodeLensDescriptor
+    internal interface IDocumentDescriptor : ICodeLensDescriptor
     {
     }
 }
