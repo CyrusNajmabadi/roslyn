@@ -26,10 +26,26 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         Property,
     }
 
-    internal sealed class SyntaxNodeInfo
+    internal abstract class SyntaxNodeInfo
     {
         private SyntaxNodeTracker syntaxNodeTracker;
         private SyntaxNode node;
+
+        /// <summary>
+        /// This event is fired whenever the node changes.
+        /// </summary>
+        public event EventHandler? NodeChanged;
+
+        /// <summary>
+        /// This event is fired whenever the node contents changes.
+        /// </summary>
+        public event EventHandler? NodeContentsChanged;
+
+        public SyntaxNodeKind Kind { get; private set; }
+
+        public SyntaxNodeTracker Tracker => this.syntaxNodeTracker;
+
+        public SyntaxNode Node => this.node;
 
         internal SyntaxNodeInfo(SyntaxNode node, SyntaxNodeKind syntaxNodeKind, SyntaxNodeTracker syntaxNodeTracker)
         {
@@ -38,21 +54,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
             this.syntaxNodeTracker = syntaxNodeTracker;
         }
 
-        /// <summary>
-        /// This event is fired whenever the node changes.
-        /// </summary>
-        public event EventHandler NodeChanged;
-
-        /// <summary>
-        /// This event is fired whenever the node contents changes.
-        /// </summary>
-        public event EventHandler NodeContentsChanged;
-
-        public SyntaxNodeKind Kind { get; private set; }
-
-        public SyntaxNodeTracker Tracker => this.syntaxNodeTracker;
-
-        public SyntaxNode Node => this.node;
+        protected abstract bool AreEquivalent(SyntaxNode oldNode, SyntaxNode newNode);
 
         /// <summary>
         /// Returns true if two syntaxnodeinfo objects are equivalent (but not neccessarily
@@ -67,7 +69,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
                 return true;
             }
 
-            if (this.Tracker == null ^ other.Tracker == null)
+            if (this.Tracker == null || other.Tracker == null)
             {
                 return false;
             }
@@ -77,7 +79,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
                 return true;
             }
 
-            if (this.node == null ^ other.node == null)
+            if (this.node == null || other.node == null)
             {
                 return false;
             }
@@ -133,39 +135,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
             var nodeContentsChanged = this.NodeContentsChanged;
             if (nodeContentsChanged != null)
             {
-                if (string.Equals(oldNode.Language, LanguageNames.CSharp) && string.Equals(newNode.Language, LanguageNames.CSharp))
-                {
-                    this.FireNodeContentsChangedAsNeededForCSharp(oldNode, newNode, nodeContentsChanged);
-                }
-
-                if (string.Equals(oldNode.Language, LanguageNames.VisualBasic) && string.Equals(newNode.Language, LanguageNames.VisualBasic))
-                {
-                    this.FireNodeContentsChangedAsNeededForVisualBasic(oldNode, newNode, nodeContentsChanged);
-                }
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void FireNodeContentsChangedAsNeededForVisualBasic(SyntaxNode oldNode, SyntaxNode newNode, EventHandler nodeContentsChanged)
-        {
-            var vbasicNode1 = (VB.VisualBasicSyntaxNode)oldNode;
-            var vbasicNode2 = (VB.VisualBasicSyntaxNode)newNode;
-
-            if (!VB.SyntaxFactory.AreEquivalent(vbasicNode1, vbasicNode2, false))
-            {
-                nodeContentsChanged(this, EventArgs.Empty);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void FireNodeContentsChangedAsNeededForCSharp(SyntaxNode oldNode, SyntaxNode newNode, EventHandler nodeContentsChanged)
-        {
-            var csharpNode1 = oldNode;
-            var csharpNode2 = newNode;
-
-            if (!CS.SyntaxFactory.AreEquivalent(csharpNode1, csharpNode2, false))
-            {
-                nodeContentsChanged(this, EventArgs.Empty);
+                if (!this.AreEquivalent(oldNode, newNode))
+                    nodeContentsChanged(this, EventArgs.Empty);
             }
         }
     }
