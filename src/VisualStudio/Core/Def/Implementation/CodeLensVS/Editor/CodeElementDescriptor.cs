@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser;
 using Microsoft.VisualStudio.Text;
 
-namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Queries
+namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Editor
 {
     internal partial class CodeElementTag
     {
