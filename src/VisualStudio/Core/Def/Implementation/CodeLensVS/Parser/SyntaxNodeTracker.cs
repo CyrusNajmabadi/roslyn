@@ -5,14 +5,15 @@
 using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Parser
 {
     internal sealed class SyntaxNodeTracker : IEquatable<SyntaxNodeTracker>
     {
-        private readonly ITextSnapshot snapshot;
+        private readonly ITextSnapshot? snapshot;
 
-        private readonly ITrackingPoint trackingPoint;
+        private readonly ITrackingPoint? trackingPoint;
 
         /// <summary>
         /// This is the position of the node in the path.
@@ -32,7 +33,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         public SyntaxNodeTracker(SyntaxNode node, ITextSnapshot snapshot)
             : this(node,
                    snapshot,
-                   ArgumentValidation.NotNullPassThrough(node, "node", (SyntaxNode n) => n.Span.Start))
+                   node.SpanStart)
         {
         }
 
@@ -44,7 +45,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         /// <param name="position">Tag position within the node</param>
         public SyntaxNodeTracker(SyntaxNode node, ITextSnapshot snapshot, int position)
         {
-            ArgumentValidation.NotNull(node, "node");
+            Contract.ThrowIfNull(node);
             this.snapshot = snapshot;
             this.position = position;
 
@@ -70,7 +71,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Pars
         {
             get
             {
-                int currentPosition = this.position;
+                var currentPosition = this.position;
                 if (this.snapshot != null && this.trackingPoint != null)
                 {
                     currentPosition = this.trackingPoint.GetPosition(this.snapshot.TextBuffer.CurrentSnapshot);
