@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Extensions
 {
@@ -23,7 +24,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Exte
             Document document,
             CancellationToken cancellationToken = default)
         {
-            var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             var symbol = semanticModel.GetDeclaredSymbol(syntaxNode, cancellationToken);
 
             if (symbol == null)
@@ -96,7 +97,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeLensVS.Exte
         /// <summary>
         /// Get the next parent that is not associated with this node
         /// </summary>
-        public static SyntaxNode GetNextParent(this SyntaxNode node)
+        public static SyntaxNode? GetNextParent(this SyntaxNode node)
         {
             if (node != null)
             {
