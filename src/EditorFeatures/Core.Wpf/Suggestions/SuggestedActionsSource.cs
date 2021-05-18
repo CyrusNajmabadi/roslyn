@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
 {
     internal partial class SuggestedActionsSourceProvider
     {
-        private partial class SuggestedActionsSource : ForegroundThreadAffinitizedObject, ISuggestedActionsSource4
+        private partial class SuggestedActionsSource : ForegroundThreadAffinitizedObject, ISuggestedActionsSourceExperimental
         {
             private readonly ISuggestedActionCategoryRegistryService _suggestedActionCategoryRegistry;
 
