@@ -20,7 +20,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TaskList
     [Export(typeof(IOptionPersisterProvider))]
     internal sealed class CommentTaskTokenSerializerProvider : IOptionPersisterProvider
     {
-        private readonly IThreadingContext _threadingContext;
         private readonly IAsyncServiceProvider _serviceProvider;
         private readonly IGlobalOptionService _optionService;
         private CommentTaskTokenSerializer? _lazyPersister;
@@ -28,11 +27,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TaskList
         [ImportingConstructor]
         [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public CommentTaskTokenSerializerProvider(
-            IThreadingContext threadingContext,
             [Import(typeof(SAsyncServiceProvider))] IAsyncServiceProvider serviceProvider,
             IGlobalOptionService optionService)
         {
-            _threadingContext = threadingContext;
             _serviceProvider = serviceProvider;
             _optionService = optionService;
         }
