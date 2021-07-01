@@ -1445,11 +1445,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
                 return false;
 
             var castTypeInfo = semanticModel.GetTypeInfo(cast, cancellationToken);
-            if (HasNullOrErrorType(castTypeInfo))
+            if (HasErrorType(castTypeInfo))
                 return false;
 
             var castedExpressionTypeInfo = semanticModel.GetTypeInfo(cast.Expression, cancellationToken);
-            if (HasNullOrErrorType(castedExpressionTypeInfo))
+            if (HasErrorType(castedExpressionTypeInfo))
                 return false;
 
             var expressionConversion = semanticModel.ClassifyConversion(cast.SpanStart, cast.Expression, castTypeInfo.Type!, isExplicitInSource: true);
@@ -1467,7 +1467,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
 
             var speculativeExpression = replacedRoot.GetAnnotatedNodes(s_annotation).Single();
             var speculativeExpressionTypeInfo = speculativeModel.GetTypeInfo(speculativeExpression, cancellationToken);
-            if (HasNullOrErrorType(speculativeExpressionTypeInfo))
+            if (HasErrorType(speculativeExpressionTypeInfo))
                 return false;
 
             if (!castTypeInfo.ConvertedType!.Equals(speculativeExpressionTypeInfo.ConvertedType))
@@ -1477,11 +1477,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
                 return false;
 
             return true;
-        }
-
-        private static bool IsNotImplicit(Conversion expressionConversion)
-        {
-            throw new System.NotImplementedException();
         }
 
         private static bool ValidateParentChain(
@@ -1545,10 +1540,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
 
         private static readonly SyntaxAnnotation s_annotation = new();
 
-        private static bool HasNullOrErrorType(TypeInfo typeInfo)
+        private static bool HasErrorType(TypeInfo typeInfo)
         {
-            return typeInfo.Type is null or IErrorTypeSymbol ||
-                   typeInfo.ConvertedType is null or IErrorTypeSymbol;
+            return typeInfo.Type is IErrorTypeSymbol ||
+                   typeInfo.ConvertedType is IErrorTypeSymbol;
         }
 
         private static SyntaxNode? GetSpeculativeReplacementRoot(CastExpressionSyntax cast)
