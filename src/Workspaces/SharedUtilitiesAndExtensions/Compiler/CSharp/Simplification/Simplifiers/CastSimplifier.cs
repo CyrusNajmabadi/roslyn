@@ -1494,17 +1494,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
         {
             while (parent1 != analyzeRoot)
             {
-                var symbolInfo1 = semanticModel1.GetSymbolInfo(parent1, cancellationToken);
-                var symbolInfo2 = semanticModel2.GetSymbolInfo(parent2, cancellationToken);
-
-                if (symbolInfo1.CandidateReason != CandidateReason.None ||
-                    symbolInfo2.CandidateReason != CandidateReason.None)
+                if (parent1 is InvocationExpressionSyntax || parent1 is BaseObjectCreationExpressionSyntax || parent2 is ElementAccessExpressionSyntax)
                 {
-                    return false;
-                }
+                    var symbolInfo1 = semanticModel1.GetSymbolInfo(parent1, cancellationToken);
+                    var symbolInfo2 = semanticModel2.GetSymbolInfo(parent2, cancellationToken);
 
-                if (!Equals(symbolInfo1.Symbol, symbolInfo2.Symbol))
-                    return false;
+                    if (symbolInfo1.CandidateReason != CandidateReason.None ||
+                        symbolInfo2.CandidateReason != CandidateReason.None)
+                    {
+                        return false;
+                    }
+
+                    if (!Equals(symbolInfo1.Symbol, symbolInfo2.Symbol))
+                        return false;
+                }
 
                 parent1 = parent1.GetRequiredParent();
                 parent2 = parent2.GetRequiredParent();
