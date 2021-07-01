@@ -1475,6 +1475,38 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
             if (!castTypeInfo.ConvertedType!.Equals(speculativeExpressionTypeInfo.ConvertedType))
                 return false;
 
+            if (!ValidateParentChain(cast.GetRequiredParent(), speculativeExpression.GetRequiredParent(), speculativeRoot, semanticModel, speculativeModel, cancellationToken))
+                return false;
+
+            return true;
+        }
+
+        private static bool ValidateParentChain(
+            SyntaxNode parent1,
+            SyntaxNode parent2,
+            SyntaxNode analyzeRoot,
+            SemanticModel semanticModel1,
+            SemanticModel semanticModel2,
+            CancellationToken cancellationToken)
+        {
+            while (parent1 != analyzeRoot)
+            {
+                var symbolInfo1 = semanticModel1.GetSymbolInfo(parent1, cancellationToken);
+                var symbolInfo2 = semanticModel2.GetSymbolInfo(parent2, cancellationToken);
+
+                if (symbolInfo1.CandidateReason != CandidateReason.None ||
+                    symbolInfo2.CandidateReason != CandidateReason.None)
+                {
+                    return false;
+                }
+
+                if (!Equals(symbolInfo1.Symbol, symbolInfo2.Symbol))
+                    return false;
+
+                parent1 = parent1.GetRequiredParent();
+                parent2 = parent2.GetRequiredParent();
+            }
+
             return true;
         }
 
@@ -1518,11 +1550,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
             for (SyntaxNode? current = cast; current != null; current = current.Parent)
             {
                 if (current is StatementSyntax
-                            or EqualsValueClauseSyntax
                             or ArrowExpressionClauseSyntax
                             or ConstructorInitializerSyntax
                             or PrimaryConstructorBaseTypeSyntax
                             or AttributeSyntax)
+                {
+                    return current;
+                }
+            }
+
+
+            for (SyntaxNode? current = cast; current != null; current = current.Parent)
+            {
+                if (current is EqualsValueClauseSyntax)
                 {
                     return current;
                 }
