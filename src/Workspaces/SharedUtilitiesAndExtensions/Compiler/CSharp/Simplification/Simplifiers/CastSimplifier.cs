@@ -1452,14 +1452,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
             if (HasNullOrErrorType(castedExpressionTypeInfo))
                 return false;
 
-            var conversion = semanticModel.ClassifyConversion(cast.SpanStart, cast.Expression, castTypeInfo.Type!, isExplicitInSource: true);
-            if (!conversion.Exists)
+            var expressionConversion = semanticModel.ClassifyConversion(cast.SpanStart, cast.Expression, castTypeInfo.Type!, isExplicitInSource: true);
+            if (!expressionConversion.IsImplicit)
                 return false;
 
-            if (conversion.IsExplicit)
-                return false;
-
-            if (!conversion.IsImplicit)
+            var typeConversion = semanticModel.Compilation.ClassifyConversion(castedExpressionTypeInfo.Type!, castTypeInfo.Type!);
+            if (!typeConversion.IsImplicit)
                 return false;
 
             var replacedRoot = speculativeRoot.ReplaceNode(cast, cast.Expression.WithAdditionalAnnotations(s_annotation));
@@ -1479,6 +1477,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
                 return false;
 
             return true;
+        }
+
+        private static bool IsNotImplicit(Conversion expressionConversion)
+        {
+            throw new System.NotImplementedException();
         }
 
         private static bool ValidateParentChain(
@@ -1558,7 +1561,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
                     return current;
                 }
             }
-
 
             for (SyntaxNode? current = cast; current != null; current = current.Parent)
             {
