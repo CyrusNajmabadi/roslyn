@@ -5,6 +5,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -26,7 +27,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
                cast is BinaryExpressionSyntax binaryExpression ? IsUnnecessaryAsCast(binaryExpression, semanticModel, cancellationToken) : false;
 
         public static bool IsUnnecessaryCast(CastExpressionSyntax cast, SemanticModel semanticModel, CancellationToken cancellationToken)
-            => IsCastSafeToRemove(cast, cast.Expression, semanticModel, cancellationToken);
+        {
+            return IsUnnecessaryCastNew(cast, semanticModel, cancellationToken);
+            // IsCastSafeToRemove(cast, cast.Expression, semanticModel, cancellationToken);
+        }
 
         public static bool IsUnnecessaryAsCast(BinaryExpressionSyntax cast, SemanticModel semanticModel, CancellationToken cancellationToken)
             => cast.Kind() == SyntaxKind.AsExpression &&
@@ -1426,6 +1430,102 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification.Simplifiers
                 // Regardless of the cast to 'x', being in an interpolation automatically casts the result to object
                 // since this becomes a call to: FormattableStringFactory.Create(string, params object[]).
                 return semanticModel.Compilation.ObjectType;
+            }
+
+            return null;
+        }
+
+        private static bool IsUnnecessaryCastNew(CastExpressionSyntax cast, SemanticModel semanticModel, CancellationToken cancellationToken)
+        {
+            var speculativeRoot = GetSpeculativeReplacementRoot(cast);
+            if (speculativeRoot == null)
+                return false;
+
+            if (speculativeRoot.ContainsDiagnostics)
+                return false;
+
+            var castTypeInfo = semanticModel.GetTypeInfo(cast, cancellationToken);
+            if (HasNullOrErrorType(castTypeInfo))
+                return false;
+
+            var castedExpressionTypeInfo = semanticModel.GetTypeInfo(cast.Expression, cancellationToken);
+            if (HasNullOrErrorType(castedExpressionTypeInfo))
+                return false;
+
+            var conversion = semanticModel.ClassifyConversion(cast.SpanStart, cast.Expression, castTypeInfo.Type!, isExplicitInSource: true);
+            if (!conversion.Exists)
+                return false;
+
+            if (conversion.IsExplicit)
+                return false;
+
+            if (!conversion.IsImplicit)
+                return false;
+
+            var replacedRoot = speculativeRoot.ReplaceNode(cast, cast.Expression.WithAdditionalAnnotations(s_annotation));
+            var speculativeModel = TryCreateSpeculativeModel(semanticModel, speculativeRoot.SpanStart, replacedRoot);
+            if (speculativeModel == null)
+                return false;
+
+            var speculativeExpression = replacedRoot.GetAnnotatedNodes(s_annotation).Single();
+            var speculativeExpressionTypeInfo = speculativeModel.GetTypeInfo(speculativeExpression, cancellationToken);
+            if (HasNullOrErrorType(speculativeExpressionTypeInfo))
+                return false;
+
+            if (!castTypeInfo.ConvertedType!.Equals(speculativeExpressionTypeInfo.ConvertedType))
+                return false;
+
+            return true;
+        }
+
+        private static SemanticModel? TryCreateSpeculativeModel(
+            SemanticModel semanticModel, int position, SyntaxNode speculativeRoot)
+        {
+            if (semanticModel.IsSpeculativeSemanticModel)
+            {
+                // Chaining speculative model not supported, speculate off the original model.
+                RoslynDebug.Assert(semanticModel.ParentModel != null);
+                RoslynDebug.Assert(!semanticModel.ParentModel.IsSpeculativeSemanticModel);
+                position = semanticModel.OriginalPositionForSpeculation;
+                semanticModel = semanticModel.ParentModel;
+            }
+
+            SemanticModel? speculativeModel;
+            _ = speculativeRoot switch
+            {
+                StatementSyntax statement => semanticModel.TryGetSpeculativeSemanticModel(position, statement, out speculativeModel),
+                EqualsValueClauseSyntax equalsValueClause => semanticModel.TryGetSpeculativeSemanticModel(position, equalsValueClause, out speculativeModel),
+                ArrowExpressionClauseSyntax arrowExpressionClause => semanticModel.TryGetSpeculativeSemanticModel(position, arrowExpressionClause, out speculativeModel),
+                ConstructorInitializerSyntax constructorInitializer => semanticModel.TryGetSpeculativeSemanticModel(position, constructorInitializer, out speculativeModel),
+                PrimaryConstructorBaseTypeSyntax primaryConstructorBaseType => semanticModel.TryGetSpeculativeSemanticModel(position, primaryConstructorBaseType, out speculativeModel),
+                AttributeSyntax attribute => semanticModel.TryGetSpeculativeSemanticModel(position, attribute, out speculativeModel),
+                _ => throw ExceptionUtilities.UnexpectedValue(speculativeRoot.Kind()),
+            };
+
+            return speculativeModel;
+        }
+
+        private static readonly SyntaxAnnotation s_annotation = new();
+
+        private static bool HasNullOrErrorType(TypeInfo typeInfo)
+        {
+            return typeInfo.Type is null or IErrorTypeSymbol ||
+                   typeInfo.ConvertedType is null or IErrorTypeSymbol;
+        }
+
+        private static SyntaxNode? GetSpeculativeReplacementRoot(CastExpressionSyntax cast)
+        {
+            for (SyntaxNode? current = cast; current != null; current = current.Parent)
+            {
+                if (current is StatementSyntax
+                            or EqualsValueClauseSyntax
+                            or ArrowExpressionClauseSyntax
+                            or ConstructorInitializerSyntax
+                            or PrimaryConstructorBaseTypeSyntax
+                            or AttributeSyntax)
+                {
+                    return current;
+                }
             }
 
             return null;
