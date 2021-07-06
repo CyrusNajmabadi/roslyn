@@ -59,8 +59,8 @@ namespace Microsoft.CodeAnalysis.FindSymbols
                     {
                         var references = await finder.FindReferencesInDocumentAsync(
                             symbol, document, semanticModel, _options, cancellationToken).ConfigureAwait(false);
-                        foreach (var (_, location) in references)
-                            await HandleLocationAsync(symbol, location, cancellationToken).ConfigureAwait(false);
+                        foreach (var (_, definition, location) in references)
+                            await HandleLocationAsync(definition, location, cancellationToken).ConfigureAwait(false);
                     }
                 }
                 finally

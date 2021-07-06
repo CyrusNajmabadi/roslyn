@@ -13,6 +13,8 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
         /// </summary>
         public readonly SyntaxNode Node;
 
+        public readonly ISymbol Definition;
+
         /// <summary>
         /// The location we want want to return through the FindRefs API.  The location contains
         /// additional information (like if this was a Write, or if it was Implicit).  This value
@@ -26,15 +28,17 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
         /// </summary>
         public readonly ReferenceLocation Location;
 
-        public FinderLocation(SyntaxNode node, ReferenceLocation location)
+        public FinderLocation(SyntaxNode node, ISymbol definition, ReferenceLocation location)
         {
             Node = node;
+            Definition = definition;
             Location = location;
         }
 
-        public void Deconstruct(out SyntaxNode node, out ReferenceLocation location)
+        public void Deconstruct(out SyntaxNode node, out ISymbol definition, out ReferenceLocation location)
         {
             node = Node;
+            definition = Definition;
             location = Location;
         }
     }

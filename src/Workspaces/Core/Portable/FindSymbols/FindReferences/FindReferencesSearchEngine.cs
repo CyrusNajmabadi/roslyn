@@ -125,10 +125,10 @@ namespace Microsoft.CodeAnalysis.FindSymbols
             }
         }
 
-        private async ValueTask HandleLocationAsync(ISymbol symbol, ReferenceLocation location, CancellationToken cancellationToken)
+        private async ValueTask HandleLocationAsync(ISymbol definition, ReferenceLocation location, CancellationToken cancellationToken)
         {
-            var group = await GetOrCreateSymbolGroupAsync(symbol, cancellationToken).ConfigureAwait(false);
-            await _progress.OnReferenceFoundAsync(group, symbol, location, cancellationToken).ConfigureAwait(false);
+            var group = await GetOrCreateSymbolGroupAsync(definition, cancellationToken).ConfigureAwait(false);
+            await _progress.OnReferenceFoundAsync(group, definition, location, cancellationToken).ConfigureAwait(false);
         }
 
         private async ValueTask<SymbolGroup> GetOrCreateSymbolGroupAsync(ISymbol symbol, CancellationToken cancellationToken)
