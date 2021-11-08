@@ -37,7 +37,7 @@ internal partial class SolutionState
     /// different semantics) will not leak backward to a prior <see cref="ProjectState"/>, causing it to see a view of the world
     /// inapplicable to its current snapshot.
     /// </summary>
-    internal class CachedSkeletonReferences
+    private class CachedSkeletonReferences
     {
         /// <summary>
         /// Mapping from compilation instance to metadata-references for it.  This allows us to associate the same
@@ -93,7 +93,7 @@ internal partial class SolutionState
         }
 
         public MetadataReference GetOrBuildReference(
-            Workspace workspace,
+            ICompilationTracker compilationTracker,
             MetadataReferenceProperties properties,
             Compilation finalCompilation,
             VersionStamp version,
@@ -105,7 +105,7 @@ internal partial class SolutionState
                 return referenceSet.GetMetadataReference(properties);
 
             // Didn't have a direct mapping to a reference set.  Compute one for ourselves.
-            referenceSet = GetOrBuildReferenceSet(workspace, version, finalCompilation, cancellationToken);
+            referenceSet = GetOrBuildReferenceSet(compilationTracker, version, finalCompilation, cancellationToken);
 
             // another thread may have come in and beaten us to computing this.  So attempt to actually cache this
             // in the global map.  if it succeeds, use our computed version.  If it fails, use the one the other
@@ -123,11 +123,13 @@ internal partial class SolutionState
         }
 
         private SkeletonReferenceSet GetOrBuildReferenceSet(
-            Workspace workspace,
+            ICompilationTracker compilationTracker,
             VersionStamp version,
             Compilation finalCompilation,
             CancellationToken cancellationToken)
         {
+            var workspace = compilationTracker.ProjectState.LanguageServices.WorkspaceServices.Workspace;
+
             // First see if we already have a reference set for this version.  if so, we're done and can return that.
             var referenceSet = TryGetReferenceSet(version);
             if (referenceSet != null)

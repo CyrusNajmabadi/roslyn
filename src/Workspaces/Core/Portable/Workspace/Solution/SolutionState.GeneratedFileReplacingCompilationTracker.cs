@@ -127,7 +127,7 @@ namespace Microsoft.CodeAnalysis
                 // one, or create a new one when we can't.
                 var version = await GetDependentSemanticVersionAsync(solution, cancellationToken).ConfigureAwait(false);
                 var properties = new MetadataReferenceProperties(MetadataImageKind.Assembly, projectReference.Aliases, projectReference.EmbedInteropTypes);
-                return this.CachedSkeletonReferences.GetOrBuildReference(solution.Workspace, properties, compilation, version, cancellationToken);
+                return this.CachedSkeletonReferences.GetOrBuildReference(this, properties, compilation, version, cancellationToken);
             }
 
             public CompilationReference? GetPartialMetadataReference(ProjectState fromProject, ProjectReference projectReference)

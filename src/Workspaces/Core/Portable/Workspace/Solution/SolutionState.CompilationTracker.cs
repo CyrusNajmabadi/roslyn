@@ -1026,7 +1026,7 @@ namespace Microsoft.CodeAnalysis
                             // okay, we still don't have one. bring the compilation to final state since we are going to use it to create skeleton assembly
                             var compilationInfo = await this.GetOrBuildCompilationInfoAsync(solution, lockGate: false, cancellationToken: cancellationToken).ConfigureAwait(false);
                             return this.CachedSkeletonReferences.GetOrBuildReference(
-                                workspace, properties, compilationInfo.Compilation, version, cancellationToken);
+                                this, properties, compilationInfo.Compilation, version, cancellationToken);
                         }
                     }
                 }
