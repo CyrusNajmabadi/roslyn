@@ -5,9 +5,17 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.Storage;
+using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.ErrorReporting;
+using System.IO;
 
 namespace Microsoft.CodeAnalysis;
 
@@ -47,6 +55,11 @@ internal partial class SolutionState
         /// compilations were thrown away.
         /// </summary>
         private static readonly ConditionalWeakTable<Compilation, SkeletonReferenceSet> s_compilationToReferenceMap = new();
+
+        private const string s_metadataPersistenceStreamKey = "<MetadataOnlyImageStream>";
+        private const string s_metadataPersistenceAssemblyInfoKey = "<MetadataOnlyImageAssemblyNameAndIsEmpty>";
+        private const string s_metadataPersistenceVersion = "1";
+        private static readonly EmitOptions s_metadataOnlyEmitOptions = new(metadataOnly: true);
 
         private readonly object _gate = new();
 
@@ -92,8 +105,30 @@ internal partial class SolutionState
             }
         }
 
-        public MetadataReference GetOrBuildReference(
+        /// <summary>
+        /// Return a metadata reference if we already have a reference-set computed for this particular <paramref name="version"/>.
+        /// If a reference already exists for the provided <paramref name="properties"/>, the same instance will be returned.  Otherwise,
+        /// a fresh instance will be returned.
+        /// </summary>
+        public MetadataReference? TryGetReference(
             ICompilationTracker compilationTracker,
+            SolutionState solutionState,
+            VersionStamp version,
+            MetadataReferenceProperties properties)
+        {
+            SkeletonReferenceSet? skeletonReferenceSet = null;
+            lock (_gate)
+            {
+                if (version == _version)
+                    skeletonReferenceSet = _skeletonReferenceSet;
+            }
+
+            TryGetReferenceSet(version)?.GetMetadataReference(properties);
+        }
+
+        public async Task<MetadataReference> GetOrBuildReferenceAsync(
+            ICompilationTracker compilationTracker,
+            SolutionState solutionState,
             MetadataReferenceProperties properties,
             Compilation finalCompilation,
             VersionStamp version,
@@ -105,7 +140,8 @@ internal partial class SolutionState
                 return referenceSet.GetMetadataReference(properties);
 
             // Didn't have a direct mapping to a reference set.  Compute one for ourselves.
-            referenceSet = GetOrBuildReferenceSet(compilationTracker, version, finalCompilation, cancellationToken);
+            referenceSet = await GetOrBuildReferenceSetAsync(
+                compilationTracker, solutionState, version, finalCompilation, cancellationToken).ConfigureAwait(false);
 
             // another thread may have come in and beaten us to computing this.  So attempt to actually cache this
             // in the global map.  if it succeeds, use our computed version.  If it fails, use the one the other
@@ -122,8 +158,9 @@ internal partial class SolutionState
             return referenceSet.GetMetadataReference(properties);
         }
 
-        private SkeletonReferenceSet GetOrBuildReferenceSet(
+        private async Task<SkeletonReferenceSet> GetOrBuildReferenceSetAsync(
             ICompilationTracker compilationTracker,
+            SolutionState solutionState,
             VersionStamp version,
             Compilation finalCompilation,
             CancellationToken cancellationToken)
@@ -140,10 +177,8 @@ internal partial class SolutionState
 
             // okay, we don't have one. so create one now.
 
-            // first, prepare image
-            // * NOTE * image is cancellable, do not create it inside of conditional weak table.
-            var service = workspace.Services.GetService<ITemporaryStorageService>();
-            var image = MetadataOnlyImage.Create(workspace, service, finalCompilation, cancellationToken);
+            var image = await GetOrCreateImageAsync(
+                compilationTracker, solutionState, finalCompilation, cancellationToken).ConfigureAwait(false);
 
             if (image.IsEmpty)
             {
@@ -160,6 +195,193 @@ internal partial class SolutionState
             return new SkeletonReferenceSet(image, new DeferredDocumentationProvider(finalCompilation));
         }
 
+        private static async Task<MetadataOnlyImage> GetOrCreateImageAsync(
+            ICompilationTracker compilationTracker,
+            SolutionState solutionState,
+            Compilation finalCompilation,
+            CancellationToken cancellationToken)
+        {
+            var services = compilationTracker.ProjectState.LanguageServices.WorkspaceServices;
+            var workspace = services.Workspace;
+            var database = workspace.Options.GetOption(StorageOptions.Database);
+
+            // First, compute the checksum for the project we're creating a metadata reference for.  We'll attempt to
+            // persist this so we can avoid expensive regeneration in future host sessions if possible.
+            var dependentChecksum = await compilationTracker.GetDependentChecksumAsync(solutionState, cancellationToken).ConfigureAwait(false);
+            var totalChecksum = Checksum.Create(Checksum.Create(s_metadataPersistenceVersion), dependentChecksum);
+
+            var temporaryStorageService = workspace.Services.GetRequiredService<ITemporaryStorageService>();
+            var persistentStorageService = services.GetPersistentStorageService(database);
+
+            var persistentStorage = await persistentStorageService.GetStorageAsync(SolutionKey.ToSolutionKey(solutionState), cancellationToken).ConfigureAwait(false);
+            await using var _ = persistentStorage.ConfigureAwait(false);
+
+            var projectKey = ProjectKey.ToProjectKey(solutionState, compilationTracker.ProjectState);
+            var image = await TryReadImageAsync(
+                projectKey, temporaryStorageService, persistentStorage, totalChecksum, cancellationToken).ConfigureAwait(false);
+            if (image != null)
+                return image;
+
+            // Weren't able to successfully read this from the persistence service.  Compute the image from the compilation
+            // and store there for future sessions.
+            using var imageStream = SerializableBytes.CreateWritableStream();
+            image = await GetOrCreateImageAsync(
+                compilationTracker, solutionState, finalCompilation, cancellationToken).ConfigureAwait(false);
+            Contract.ThrowIfNull(image);
+
+            await WriteImageAsync(
+                projectKey, persistentStorage, totalChecksum, imageStream, image, cancellationToken).ConfigureAwait(false);
+
+            return image;
+        }
+
+        private static async Task<MetadataOnlyImage?> TryReadImageAsync(
+            ProjectKey projectKey,
+            ITemporaryStorageService temporaryStorageService,
+            IChecksummedPersistentStorage persistentStorage,
+            Checksum totalChecksum,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var assemblyInfoStream = await persistentStorage.ReadStreamAsync(
+                    projectKey,
+                    s_metadataPersistenceAssemblyInfoKey,
+                    totalChecksum,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (assemblyInfoStream != null)
+                {
+                    using var assemblyInfoReader = ObjectReader.TryGetReader(assemblyInfoStream, leaveOpen: false, cancellationToken);
+                    if (assemblyInfoReader != null)
+                    {
+                        var assemblyName = assemblyInfoReader.ReadString();
+                        var isEmpty = assemblyInfoReader.ReadBoolean();
+
+                        if (isEmpty)
+                            return MetadataOnlyImage.Empty;
+
+                        using var imageStream = await persistentStorage.ReadStreamAsync(
+                            projectKey,
+                            s_metadataPersistenceStreamKey,
+                            totalChecksum,
+                            cancellationToken).ConfigureAwait(false);
+                        if (imageStream != null)
+                        {
+                            var temporaryStorage = temporaryStorageService.CreateTemporaryStreamStorage(cancellationToken);
+                            imageStream.Position = 0;
+                            temporaryStorage.WriteStream(imageStream, cancellationToken);
+
+                            return new MetadataOnlyImage(temporaryStorage, assemblyName);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (FatalError.ReportAndCatchUnlessCanceled(ex, cancellationToken))
+            {
+            }
+
+            return null;
+        }
+
+        private static async Task WriteImageAsync(
+            ProjectKey projectKey,
+            IChecksummedPersistentStorage persistentStorage,
+            Checksum totalChecksum,
+            Stream imageStream,
+            MetadataOnlyImage image,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var infoStream = SerializableBytes.CreateWritableStream();
+                using (var assemblyInfoWriter = new ObjectWriter(infoStream, leaveOpen: true, cancellationToken))
+                {
+                    assemblyInfoWriter.WriteString(image.AssemblyName);
+                    assemblyInfoWriter.WriteBoolean(image.IsEmpty);
+                }
+
+                infoStream.Position = 0;
+                await persistentStorage.WriteStreamAsync(
+                    projectKey,
+                    s_metadataPersistenceAssemblyInfoKey,
+                    infoStream,
+                    totalChecksum,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (image.IsEmpty)
+                    return;
+
+                imageStream.Position = 0;
+                await persistentStorage.WriteStreamAsync(
+                    projectKey,
+                    s_metadataPersistenceStreamKey,
+                    imageStream,
+                    totalChecksum,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (FatalError.ReportAndCatchUnlessCanceled(ex, cancellationToken))
+            {
+            }
+        }
+
+        public static MetadataOnlyImage CreateMetadataOnlyImage(
+            Workspace workspace,
+            ITemporaryStorageService service,
+            Compilation compilation,
+            Stream stream,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                workspace.LogTestMessage($"Beginning to create a skeleton assembly for {compilation.AssemblyName}...");
+
+                using (Logger.LogBlock(FunctionId.Workspace_SkeletonAssembly_EmitMetadataOnlyImage, cancellationToken))
+                {
+                    // note: cloning compilation so we don't retain all the generated symbols after its emitted.
+                    // * REVIEW * is cloning clone p2p reference compilation as well?
+                    var emitResult = compilation.Clone().Emit(stream, options: s_metadataOnlyEmitOptions, cancellationToken: cancellationToken);
+
+                    if (emitResult.Success)
+                    {
+                        workspace.LogTestMessage($"Successfully emitted a skeleton assembly for {compilation.AssemblyName}");
+                        var storage = service.CreateTemporaryStreamStorage(cancellationToken);
+
+                        stream.Position = 0;
+                        storage.WriteStream(stream, cancellationToken);
+
+                        return new MetadataOnlyImage(storage, compilation.AssemblyName);
+                    }
+                    else
+                    {
+                        workspace.LogTestMessage($"Failed to create a skeleton assembly for {compilation.AssemblyName}:");
+
+                        foreach (var diagnostic in emitResult.Diagnostics)
+                        {
+                            workspace.LogTestMessage("  " + diagnostic.GetMessage());
+                        }
+
+                        // log emit failures so that we can improve most common cases
+                        Logger.Log(FunctionId.MetadataOnlyImage_EmitFailure, KeyValueLogMessage.Create(m =>
+                        {
+                            // log errors in the format of
+                            // CS0001:1;CS002:10;...
+                            var groups = emitResult.Diagnostics.GroupBy(d => d.Id).Select(g => $"{g.Key}:{g.Count()}");
+                            m["Errors"] = string.Join(";", groups);
+                        }));
+
+                        return MetadataOnlyImage.Empty;
+                    }
+                }
+            }
+            finally
+            {
+                workspace.LogTestMessage($"Done trying to create a skeleton assembly for {compilation.AssemblyName}");
+            }
+        }
+
         /// <summary>
         /// Tries to get the <see cref="SkeletonReferenceSet"/> for this project matching <paramref name="version"/>.
         /// if <paramref name="version"/> is <see langword="null"/>, any cached <see cref="SkeletonReferenceSet"/> 
@@ -173,25 +395,13 @@ internal partial class SolutionState
             // applicable to this project semantic version.
             lock (_gate)
             {
-                // if we don't have a skeleton cached, then we have nothing to return.
-                if (_skeletonReferenceSet == null)
-                    return null;
-
                 // if the caller is requiring a particular semantic version, it much match what we have cached.
-                if (version != null && version != _version)
-                    return null;
-
-                return _skeletonReferenceSet;
+                if (version == null || version == _version)
+                    return _skeletonReferenceSet;
             }
-        }
 
-        /// <summary>
-        /// Return a metadata reference if we already have a reference-set computed for this particular <paramref name="version"/>.
-        /// If a reference already exists for the provided <paramref name="properties"/>, the same instance will be returned.  Otherwise,
-        /// a fresh instance will be returned.
-        /// </summary>
-        public MetadataReference? TryGetReference(VersionStamp version, MetadataReferenceProperties properties)
-            => TryGetReferenceSet(version)?.GetMetadataReference(properties);
+            return null;
+        }
 
         private sealed class SkeletonReferenceSet
         {
