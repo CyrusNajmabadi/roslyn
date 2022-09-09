@@ -326,6 +326,7 @@ namespace Microsoft.CodeAnalysis.LanguageService
         bool IsAttributeName(SyntaxNode node);
         // Violation.  Doesn't correspond to any shared structure for vb/c#
         SyntaxList<SyntaxNode> GetAttributeLists(SyntaxNode? node);
+        SeparatedSyntaxList<SyntaxNode> GetAttributesOfAttributeList(SyntaxNode node);
 
         bool IsAttributeNamedArgumentIdentifier([NotNullWhen(true)] SyntaxNode? node);
         bool IsMemberInitializerNamedAssignmentIdentifier([NotNullWhen(true)] SyntaxNode? node, [NotNullWhen(true)] out SyntaxNode? initializedInstance);

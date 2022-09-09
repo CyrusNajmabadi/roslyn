@@ -252,6 +252,12 @@ namespace Microsoft.CodeAnalysis.CodeStyle
                     v => GetAccessibilityModifiersRequiredEditorConfigString(v, IdeCodeStyleOptions.CommonOptions.Default.AccessibilityModifiersRequired)),
                 new RoamingProfileStorageLocation("TextEditor.%LANGUAGE%.Specific.RequireAccessibilityModifiers"));
 
+        internal static readonly PerLanguageOption2<bool> RepeatedTraits =
+            CreateOption(
+                CodeStyleOptionGroups.Modifier, "RepeatedTraits",
+                defaultValue: true,
+                new RoamingProfileStorageLocation("TextEditor.%LANGUAGE%.Specific.RepeatedTraits"));
+
         internal static readonly PerLanguageOption2<CodeStyleOption2<bool>> PreferReadonly = CreateOption(
             CodeStyleOptionGroups.Field, nameof(PreferReadonly),
             IdeCodeStyleOptions.CommonOptions.Default.PreferReadonly,

@@ -1547,6 +1547,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.LanguageService
             Return node.GetAttributeLists()
         End Function
 
+        Public Function GetAttributesOfAttributeList(node As SyntaxNode) As SeparatedSyntaxList(Of SyntaxNode) Implements ISyntaxFacts.GetAttributesOfAttributeList
+            Return DirectCast(node, AttributeListSyntax).Attributes
+        End Function
+
         Public Function IsUsingAliasDirective(node As SyntaxNode) As Boolean Implements ISyntaxFacts.IsUsingAliasDirective
             Dim importStatement = TryCast(node, ImportsStatementSyntax)
 

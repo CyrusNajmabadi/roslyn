@@ -1410,6 +1410,9 @@ namespace Microsoft.CodeAnalysis.CSharp.LanguageService
         public SyntaxList<SyntaxNode> GetAttributeLists(SyntaxNode? node)
             => node.GetAttributeLists();
 
+        public SeparatedSyntaxList<SyntaxNode> GetAttributesOfAttributeList(SyntaxNode node)
+            => ((AttributeListSyntax)node).Attributes;
+
         public bool IsParameterNameXmlElementSyntax([NotNullWhen(true)] SyntaxNode? node)
             => node.IsKind(SyntaxKind.XmlElement, out XmlElementSyntax? xmlElement) &&
             xmlElement.StartTag.Name.LocalName.ValueText == DocumentationCommentXmlNames.ParameterElementName;
