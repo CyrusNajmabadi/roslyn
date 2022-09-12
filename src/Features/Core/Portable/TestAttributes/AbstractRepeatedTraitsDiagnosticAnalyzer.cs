@@ -87,6 +87,9 @@ namespace Microsoft.CodeAnalysis.TestAttributes
         private void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
         {
             var classDeclaration = (TClassDeclarationSyntax)context.Node;
+            if (classDeclaration.Language != LanguageNames.VisualBasic)
+                return;
+
             var members = SyntaxFacts.GetMembersOfTypeDeclaration(classDeclaration);
 
             string? traitName = null, traitValue = null;
@@ -121,7 +124,7 @@ namespace Microsoft.CodeAnalysis.TestAttributes
 
             context.ReportDiagnostic(DiagnosticHelper.Create(
                 Descriptor,
-                SyntaxFacts.GetIdentifierOfTypeDeclaration(classDeclaration).GetLocation(),
+                classDeclaration.GetFirstToken().GetLocation(),
                 ReportDiagnostic.Warn,
                 additionalLocations: ImmutableArray.Create(classDeclaration.GetLocation()),
                 properties: null));
