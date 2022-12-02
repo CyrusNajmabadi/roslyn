@@ -1025,7 +1025,7 @@ tryAgain:
             return argList;
         }
 
-        private PostSkipAction SkipBadAttributeArgumentTokens(ref SyntaxToken openParen, SeparatedSyntaxListBuilder<AttributeArgumentSyntax> list, SyntaxKind expected)
+        private PostSkipAction SkipBadAttributeArgumentTokens(ref SyntaxToken? openParen, SeparatedSyntaxListBuilder<AttributeArgumentSyntax> list, SyntaxKind expected)
         {
             return this.SkipBadSeparatedListTokensWithExpectedKind(ref openParen, list,
                 p => p.CurrentToken.Kind != SyntaxKind.CommaToken && !p.IsPossibleAttributeArgument(),
@@ -1923,7 +1923,7 @@ tryAgain:
             return _syntaxFactory.BaseList(colon, _pool.ToListAndFree(list));
         }
 
-        private PostSkipAction SkipBadBaseListTokens(ref SyntaxToken colon, SeparatedSyntaxListBuilder<BaseTypeSyntax> list, SyntaxKind expected)
+        private PostSkipAction SkipBadBaseListTokens(ref SyntaxToken? colon, SeparatedSyntaxListBuilder<BaseTypeSyntax> list, SyntaxKind expected)
         {
             return this.SkipBadSeparatedListTokensWithExpectedKind(ref colon, list,
                 p => p.CurrentToken.Kind != SyntaxKind.CommaToken && !p.IsPossibleAttribute(),
@@ -4626,7 +4626,7 @@ tryAgain:
         /// <remarks>
         /// IsFabricatedToken should be updated for tokens whose SyntaxKind is <paramref name="kind"/>.
         /// </remarks>
-        private SyntaxToken? MergeAdjacent(SyntaxToken t1, SyntaxToken t2, SyntaxKind kind)
+        private SyntaxToken MergeAdjacent(SyntaxToken t1, SyntaxToken t2, SyntaxKind kind)
         {
             // Make sure we don't reuse the merged token for incremental parsing.
             // "=>" wasn't proven to be a source of issues. See https://github.com/dotnet/roslyn/issues/60002
@@ -11370,7 +11370,7 @@ tryAgain:
             var expr = tk switch
             {
                 SyntaxKind.DotToken => _syntaxFactory.MemberBindingExpression(this.EatToken(), this.ParseSimpleName(NameOptions.InExpression)),
-                SyntaxKind.OpenBracketToken => _syntaxFactory.ElementBindingExpression(this.ParseBracketedArgumentList()),
+                SyntaxKind.OpenBracketToken => (ExpressionSyntax)_syntaxFactory.ElementBindingExpression(this.ParseBracketedArgumentList()),
                 _ => null,
             };
             Debug.Assert(expr != null);
@@ -12725,7 +12725,10 @@ tryAgain:
                 closeBrace);
         }
 
-        private void ParseExpressionsForComplexElementInitializer(ref SyntaxToken openBrace, SeparatedSyntaxListBuilder<ExpressionSyntax> list, out DiagnosticInfo closeBraceError)
+        private void ParseExpressionsForComplexElementInitializer(
+            ref SyntaxToken openBrace,
+            SeparatedSyntaxListBuilder<ExpressionSyntax> list,
+            out DiagnosticInfo? closeBraceError)
         {
             closeBraceError = null;
 
@@ -12878,7 +12881,7 @@ tryAgain:
                 closeBrace);
         }
 
-        private PostSkipAction SkipBadArrayInitializerTokens(ref SyntaxToken openBrace, SeparatedSyntaxListBuilder<ExpressionSyntax> list, SyntaxKind expected)
+        private PostSkipAction SkipBadArrayInitializerTokens(ref SyntaxToken? openBrace, SeparatedSyntaxListBuilder<ExpressionSyntax> list, SyntaxKind expected)
         {
             return this.SkipBadSeparatedListTokensWithExpectedKind(ref openBrace, list,
                 p => p.CurrentToken.Kind != SyntaxKind.CommaToken && !p.IsPossibleVariableInitializer(),
@@ -13040,7 +13043,7 @@ tryAgain:
         /// expression rather than a lambda expression with an explicit return type and
         /// return null in that case only.
         /// </summary>
-        private LambdaExpressionSyntax TryParseLambdaExpression()
+        private LambdaExpressionSyntax? TryParseLambdaExpression()
         {
             var resetPoint = this.GetResetPoint();
             try
@@ -13078,7 +13081,7 @@ tryAgain:
                     this.IsInAsync = true;
                 }
 
-                TypeSyntax returnType;
+                TypeSyntax? returnType;
                 var resetPoint = this.GetResetPoint();
                 try
                 {
@@ -13139,7 +13142,7 @@ tryAgain:
             }
         }
 
-        private (BlockSyntax, ExpressionSyntax) ParseLambdaBody()
+        private (BlockSyntax?, ExpressionSyntax?) ParseLambdaBody()
             => CurrentToken.Kind == SyntaxKind.OpenBraceToken
                 ? (ParseBlock(attributes: default), null)
                 : (null, ParsePossibleRefExpression());
@@ -13221,7 +13224,7 @@ tryAgain:
             }
         }
 
-        private PostSkipAction SkipBadLambdaParameterListTokens(ref SyntaxToken openParen, SeparatedSyntaxListBuilder<ParameterSyntax> list, SyntaxKind expected, SyntaxKind closeKind)
+        private PostSkipAction SkipBadLambdaParameterListTokens(ref SyntaxToken? openParen, SeparatedSyntaxListBuilder<ParameterSyntax> list, SyntaxKind expected, SyntaxKind closeKind)
         {
             return this.SkipBadSeparatedListTokensWithExpectedKind(ref openParen, list,
                 p => p.CurrentToken.Kind != SyntaxKind.CommaToken && !p.IsPossibleLambdaParameter(),
@@ -13518,29 +13521,22 @@ tryAgain:
         private JoinClauseSyntax ParseJoinClause()
         {
             Debug.Assert(this.CurrentToken.ContextualKind == SyntaxKind.JoinKeyword);
-            var @join = this.EatContextualToken(SyntaxKind.JoinKeyword);
-            TypeSyntax type = null;
-            if (this.PeekToken(1).Kind != SyntaxKind.InKeyword)
-            {
-                type = this.ParseType();
-            }
 
-            var name = this.ParseIdentifierToken();
-            var @in = this.EatToken(SyntaxKind.InKeyword);
-            var inExpression = this.ParseExpressionCore();
-            var @on = this.EatContextualToken(SyntaxKind.OnKeyword, ErrorCode.ERR_ExpectedContextualKeywordOn);
-            var leftExpression = this.ParseExpressionCore();
-            var @equals = this.EatContextualToken(SyntaxKind.EqualsKeyword, ErrorCode.ERR_ExpectedContextualKeywordEquals);
-            var rightExpression = this.ParseExpressionCore();
-            JoinIntoClauseSyntax joinInto = null;
-            if (this.CurrentToken.ContextualKind == SyntaxKind.IntoKeyword)
-            {
-                var @into = ConvertToKeyword(this.EatToken());
-                var intoId = this.ParseIdentifierToken();
-                joinInto = _syntaxFactory.JoinIntoClause(@into, intoId);
-            }
-
-            return _syntaxFactory.JoinClause(@join, type, name, @in, inExpression, @on, leftExpression, @equals, rightExpression, joinInto);
+            return _syntaxFactory.JoinClause(
+                this.EatContextualToken(SyntaxKind.JoinKeyword),
+                this.PeekToken(1).Kind != SyntaxKind.InKeyword
+                    ? this.ParseType()
+                    : null,
+                this.ParseIdentifierToken(),
+                this.EatToken(SyntaxKind.InKeyword),
+                this.ParseExpressionCore(),
+                this.EatContextualToken(SyntaxKind.OnKeyword, ErrorCode.ERR_ExpectedContextualKeywordOn),
+                this.ParseExpressionCore(),
+                this.EatContextualToken(SyntaxKind.EqualsKeyword, ErrorCode.ERR_ExpectedContextualKeywordEquals),
+                this.ParseExpressionCore(),
+                this.CurrentToken.ContextualKind == SyntaxKind.IntoKeyword
+                    ? _syntaxFactory.JoinIntoClause(ConvertToKeyword(this.EatToken()), this.ParseIdentifierToken())
+                    : null);
         }
 
         private LetClauseSyntax ParseLetClause()

@@ -617,7 +617,7 @@ tryAgain:
         }
 
         private PostSkipAction SkipBadPatternListTokens<T>(
-            ref SyntaxToken open,
+            [NotNullIfNotNull(nameof(open))] ref SyntaxToken? open,
             SeparatedSyntaxListBuilder<T> list,
             SyntaxKind expected,
             SyntaxKind closeKind)
