@@ -11364,9 +11364,9 @@ tryAgain:
 
         internal ExpressionSyntax ParseConsequenceSyntax()
         {
-            Debug.Assert(CanStartConsequenceExpression());
-
             SyntaxKind tk = this.CurrentToken.Kind;
+            Debug.Assert(CanStartConsequenceExpression(tk));
+
             var expr = tk switch
             {
                 SyntaxKind.DotToken => _syntaxFactory.MemberBindingExpression(this.EatToken(), this.ParseSimpleName(NameOptions.InExpression)),
