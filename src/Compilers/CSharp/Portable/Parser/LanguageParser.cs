@@ -1148,8 +1148,7 @@ tryAgain:
                 {
                     if (!forAccessors)
                     {
-                        SyntaxToken scopedKeyword = ParsePossibleScopedKeyword(isFunctionPointerParameter: false);
-
+                        var scopedKeyword = ParsePossibleScopedKeyword(isFunctionPointerParameter: false);
                         if (scopedKeyword != null)
                         {
                             isPossibleTypeDeclaration = false;
@@ -1689,9 +1688,21 @@ tryAgain:
                 return false;
             }
 
-            static TypeDeclarationSyntax constructTypeDeclaration(ContextAwareSyntax syntaxFactory, SyntaxList<AttributeListSyntax> attributes, SyntaxListBuilder modifiers, SyntaxToken keyword, SyntaxToken? recordModifier,
-                SyntaxToken name, TypeParameterListSyntax typeParameters, ParameterListSyntax? paramList, BaseListSyntax baseList, SyntaxListBuilder<TypeParameterConstraintClauseSyntax> constraints,
-                SyntaxToken? openBrace, SyntaxListBuilder<MemberDeclarationSyntax> members, SyntaxToken? closeBrace, SyntaxToken semicolon)
+            static TypeDeclarationSyntax constructTypeDeclaration(
+                ContextAwareSyntax syntaxFactory,
+                SyntaxList<AttributeListSyntax> attributes,
+                SyntaxListBuilder modifiers,
+                SyntaxToken keyword,
+                SyntaxToken? recordModifier,
+                SyntaxToken name,
+                TypeParameterListSyntax typeParameters,
+                ParameterListSyntax? paramList,
+                BaseListSyntax? baseList,
+                SyntaxListBuilder<TypeParameterConstraintClauseSyntax> constraints,
+                SyntaxToken? openBrace,
+                SyntaxListBuilder<MemberDeclarationSyntax> members,
+                SyntaxToken? closeBrace,
+                SyntaxToken semicolon)
             {
                 var modifiersList = (SyntaxList<SyntaxToken>)modifiers.ToList();
                 var membersList = (SyntaxList<MemberDeclarationSyntax>)members;
@@ -1781,6 +1792,7 @@ tryAgain:
             if (members.Count > 0)
             {
                 var tmp = members[^1];
+                Debug.Assert(tmp != null);
                 this.SkipBadMemberListTokens(ref tmp);
                 members[^1] = tmp;
             }
@@ -1885,7 +1897,7 @@ tryAgain:
                 ? this.ParseParenthesizedArgumentList()
                 : null;
 
-            list.Add(argumentList is not object ? _syntaxFactory.PrimaryConstructorBaseType(firstType, argumentList) : _syntaxFactory.SimpleBaseType(firstType));
+            list.Add(argumentList is not null ? _syntaxFactory.PrimaryConstructorBaseType(firstType, argumentList) : _syntaxFactory.SimpleBaseType(firstType));
 
             // any additional types
             while (true)
@@ -2318,7 +2330,7 @@ tryAgain:
                 bool isPossibleTypeDeclaration;
                 this.ParseModifiers(modifiers, forAccessors: false, forTopLevelStatements: true, out isPossibleTypeDeclaration);
                 bool haveModifiers = (modifiers.Count > 0);
-                MemberDeclarationSyntax result;
+                MemberDeclarationSyntax? result;
 
                 // Check for constructor form
                 if (this.CurrentToken.Kind == SyntaxKind.IdentifierToken && this.PeekToken(1).Kind == SyntaxKind.OpenParenToken)
@@ -2648,7 +2660,7 @@ parse_member_name:;
                 }
             }
 
-            static bool isAcceptableNonDeclarationStatement(StatementSyntax statement, bool isScript)
+            static bool isAcceptableNonDeclarationStatement(StatementSyntax? statement, bool isScript)
             {
                 switch (statement?.Kind)
                 {
@@ -2699,7 +2711,11 @@ parse_member_name:;
             }
         }
 
-        private bool IsMisplacedModifier(SyntaxListBuilder modifiers, SyntaxList<AttributeListSyntax> attributes, TypeSyntax type, out MemberDeclarationSyntax result)
+        private bool IsMisplacedModifier(
+            SyntaxListBuilder modifiers,
+            SyntaxList<AttributeListSyntax> attributes,
+            TypeSyntax type,
+            [NotNullWhen(true)] out MemberDeclarationSyntax? result)
         {
             if (GetModifierExcludingScoped(this.CurrentToken) != DeclarationModifiers.None &&
                 this.CurrentToken.ContextualKind is not (SyntaxKind.PartialKeyword or SyntaxKind.AsyncKeyword or SyntaxKind.RequiredKeyword or SyntaxKind.FileKeyword) &&
@@ -3175,7 +3191,7 @@ parse_member_name:;
         private void ParseBlockAndExpressionBodiesWithSemicolon(
             out BlockSyntax blockBody,
             out ArrowExpressionClauseSyntax expressionBody,
-            out SyntaxToken semicolon,
+            out SyntaxToken? semicolon,
             bool parseSemicolonAfterBlock = true)
         {
             // Check for 'forward' declarations with no block of any kind
@@ -3460,7 +3476,7 @@ parse_member_name:;
                     style = this.EatToken(SyntaxKind.ExplicitKeyword);
                 }
 
-                ExplicitInterfaceSpecifierSyntax explicitInterfaceOpt = tryParseExplicitInterfaceSpecifier();
+                var explicitInterfaceOpt = tryParseExplicitInterfaceSpecifier();
                 Debug.Assert(!style.IsMissing || haveExplicitInterfaceName == explicitInterfaceOpt is not null);
 
                 SyntaxToken opKeyword;
@@ -3550,7 +3566,7 @@ parse_member_name:;
                     return null;
                 }
 
-                NameSyntax explicitInterfaceName = null;
+                NameSyntax? explicitInterfaceName = null;
                 SyntaxToken separator = null;
 
                 while (true)
@@ -3854,11 +3870,9 @@ parse_member_name:;
             // We know we are parsing a property because we have seen either an open brace or an arrow token
             Debug.Assert(IsStartOfPropertyBody(this.CurrentToken.Kind));
 
-            AccessorListSyntax accessorList = null;
-            if (this.CurrentToken.Kind == SyntaxKind.OpenBraceToken)
-            {
-                accessorList = this.ParseAccessorList(isEvent: false);
-            }
+            var accessorList = this.CurrentToken.Kind == SyntaxKind.OpenBraceToken
+                ? this.ParseAccessorList(isEvent: false)
+                : null;
 
             ArrowExpressionClauseSyntax expressionBody = null;
             EqualsValueClauseSyntax initializer = null;
@@ -4028,7 +4042,7 @@ parse_member_name:;
         }
 
         private PostSkipAction SkipBadSeparatedListTokensWithExpectedKind<T, TNode>(
-            ref T startToken,
+            ref T? startToken,
             SeparatedSyntaxListBuilder<TNode> list,
             Func<LanguageParser, bool> isNotExpectedFunction,
             Func<LanguageParser, bool> abortFunction,
@@ -4953,7 +4967,7 @@ tryAgain:
             bool allowLocalFunctions,
             SyntaxList<AttributeListSyntax> attributes,
             SyntaxList<SyntaxToken> mods,
-            out LocalFunctionStatementSyntax localFunction)
+            out LocalFunctionStatementSyntax? localFunction)
         {
             variables.Add(
                 this.ParseVariableDeclarator(
@@ -5213,8 +5227,8 @@ tryAgain:
             // specifically treats it as a variable name, even if it could be interpreted as a
             // keyword.
             var name = this.ParseIdentifierToken();
-            BracketedArgumentListSyntax argumentList = null;
-            EqualsValueClauseSyntax initializer = null;
+            BracketedArgumentListSyntax? argumentList = null;
+            EqualsValueClauseSyntax? initializer = null;
             TerminatorState saveTerm = _termState;
             bool isFixed = (flags & VariableFlags.Fixed) != 0;
             bool isConst = (flags & VariableFlags.Const) != 0;
@@ -6287,9 +6301,9 @@ tryAgain:
         }
 
         private void ParseMemberName(
-            out ExplicitInterfaceSpecifierSyntax explicitInterfaceOpt,
-            out SyntaxToken identifierOrThisOpt,
-            out TypeParameterListSyntax typeParameterListOpt,
+            out ExplicitInterfaceSpecifierSyntax? explicitInterfaceOpt,
+            out SyntaxToken? identifierOrThisOpt,
+            out TypeParameterListSyntax? typeParameterListOpt,
             bool isEvent)
         {
             identifierOrThisOpt = null;
@@ -8780,7 +8794,7 @@ done:;
 
             var @catch = this.EatToken();
 
-            CatchDeclarationSyntax decl = null;
+            CatchDeclarationSyntax? decl = null;
             var saveTerm = _termState;
 
             if (this.CurrentToken.Kind == SyntaxKind.OpenParenToken)
@@ -8789,11 +8803,9 @@ done:;
 
                 _termState |= TerminatorState.IsEndOfCatchClause;
                 var type = this.ParseType();
-                SyntaxToken name = null;
-                if (this.IsTrueIdentifier())
-                {
-                    name = this.ParseIdentifierToken();
-                }
+                var name = this.IsTrueIdentifier()
+                    ? this.ParseIdentifierToken()
+                    : null;
 
                 _termState = saveTerm;
 
@@ -9019,11 +9031,9 @@ done:;
                 }
 
                 var semi = this.EatToken(SyntaxKind.SemicolonToken);
-                ExpressionSyntax condition = null;
-                if (this.CurrentToken.Kind != SyntaxKind.SemicolonToken)
-                {
-                    condition = this.ParseExpressionCore();
-                }
+                var condition = this.CurrentToken.Kind != SyntaxKind.SemicolonToken
+                    ? this.ParseExpressionCore()
+                    : null;
 
                 var semi2 = this.EatToken(SyntaxKind.SemicolonToken);
                 if (this.CurrentToken.Kind != SyntaxKind.CloseParenToken)
@@ -9465,8 +9475,8 @@ tryAgain:
             Debug.Assert(this.CurrentToken.Kind == SyntaxKind.SwitchKeyword);
             var @switch = this.EatToken(SyntaxKind.SwitchKeyword);
             var expression = this.ParseExpressionCore();
-            SyntaxToken openParen;
-            SyntaxToken closeParen;
+            SyntaxToken? openParen;
+            SyntaxToken? closeParen;
             if (expression.Kind == SyntaxKind.ParenthesizedExpression)
             {
                 var parenExpression = (ParenthesizedExpressionSyntax)expression;
@@ -11354,19 +11364,15 @@ tryAgain:
 
         internal ExpressionSyntax ParseConsequenceSyntax()
         {
+            Debug.Assert(CanStartConsequenceExpression());
+
             SyntaxKind tk = this.CurrentToken.Kind;
-            ExpressionSyntax expr = null;
-            switch (tk)
+            var expr = tk switch
             {
-                case SyntaxKind.DotToken:
-                    expr = _syntaxFactory.MemberBindingExpression(this.EatToken(), this.ParseSimpleName(NameOptions.InExpression));
-                    break;
-
-                case SyntaxKind.OpenBracketToken:
-                    expr = _syntaxFactory.ElementBindingExpression(this.ParseBracketedArgumentList());
-                    break;
-            }
-
+                SyntaxKind.DotToken => _syntaxFactory.MemberBindingExpression(this.EatToken(), this.ParseSimpleName(NameOptions.InExpression)),
+                SyntaxKind.OpenBracketToken => _syntaxFactory.ElementBindingExpression(this.ParseBracketedArgumentList()),
+                _ => null,
+            };
             Debug.Assert(expr != null);
 
             while (true)
@@ -11605,7 +11611,7 @@ tryAgain:
                 nameColon = _syntaxFactory.NameColon(name, colon);
             }
 
-            SyntaxToken refKindKeyword = null;
+            SyntaxToken? refKindKeyword = null;
             if (IsValidArgumentRefKindKeyword(this.CurrentToken.Kind) &&
                 // check for lambda expression with explicit ref return type: `ref int () => { ... }`
                 !(this.CurrentToken.Kind == SyntaxKind.RefKeyword &&
@@ -13481,11 +13487,9 @@ tryAgain:
             Debug.Assert(this.CurrentToken.ContextualKind == SyntaxKind.FromKeyword);
             var @from = this.EatContextualToken(SyntaxKind.FromKeyword);
 
-            TypeSyntax type = null;
-            if (this.PeekToken(1).Kind != SyntaxKind.InKeyword)
-            {
-                type = this.ParseType();
-            }
+            var type = this.PeekToken(1).Kind != SyntaxKind.InKeyword
+                ? this.ParseType()
+                : null;
 
             SyntaxToken name;
             if (this.PeekToken(1).ContextualKind == SyntaxKind.InKeyword &&
