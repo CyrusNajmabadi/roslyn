@@ -38,6 +38,12 @@
     <Compile Include="$(MSBuildThisFileDirectory)ForEachCast\AbstractForEachCastCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Formatting\FormattingCodeFixHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Formatting\FormattingCodeFixProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateEnumMember\AbstractGenerateEnumMemberService.CodeAction.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateEnumMember\AbstractGenerateEnumMemberService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateEnumMember\AbstractGenerateEnumMemberService.State.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateEnumMember\IGenerateEnumMemberService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateMember\AbstractGenerateMemberCodeFixProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateMember\AbstractGenerateMemberService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Iterator\AbstractIteratorCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeFieldReadonly\AbstractMakeFieldReadonlyCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeMemberStatic\AbstractMakeMemberStaticCodeFixProvider.cs" />

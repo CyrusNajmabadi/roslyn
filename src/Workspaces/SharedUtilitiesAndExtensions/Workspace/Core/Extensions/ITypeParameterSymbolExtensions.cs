@@ -13,12 +13,11 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             => typeParameter.ConstraintTypes.Select(GetNamedTypeSymbol).WhereNotNull().FirstOrDefault();
 
         private static INamedTypeSymbol? GetNamedTypeSymbol(ITypeSymbol type)
-        {
-            return type is INamedTypeSymbol
-                ? (INamedTypeSymbol)type
-                : type is ITypeParameterSymbol
-                    ? GetNamedTypeSymbolConstraint((ITypeParameterSymbol)type)
-                    : null;
-        }
+            => type switch
+            {
+                INamedTypeSymbol namedType => namedType,
+                ITypeParameterSymbol typeParameter => GetNamedTypeSymbolConstraint(typeParameter),
+                _ => null,
+            };
     }
 }

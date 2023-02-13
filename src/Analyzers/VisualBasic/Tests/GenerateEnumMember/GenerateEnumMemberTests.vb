@@ -3,10 +3,11 @@
 ' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.CodeFixes
-Imports Microsoft.CodeAnalysis.VisualBasic.CodeFixes.GenerateEnumMember
 Imports Microsoft.CodeAnalysis.Diagnostics
+Imports Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics
+Imports Microsoft.CodeAnalysis.VisualBasic.GenerateEnumMember
 
-Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.GenerateEnumMember
+Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.GenerateEnumMember
     <Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)>
     Public Class GenerateEnumMemberTests
         Inherits AbstractVisualBasicDiagnosticProviderBasedUserDiagnosticTest

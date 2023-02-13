@@ -81,9 +81,9 @@ namespace Microsoft.CodeAnalysis.CodeActions
         CodeCleanupOptionsProvider,
         CodeGenerationOptionsProvider,
         CleanCodeGenerationOptionsProvider,
-        CodeAndImportGenerationOptionsProvider,
         OrganizeImportsOptionsProvider,
 #endif
+        CodeAndImportGenerationOptionsProvider,
         SyntaxFormattingOptionsProvider,
         SimplifierOptionsProvider,
         AddImportPlacementOptionsProvider

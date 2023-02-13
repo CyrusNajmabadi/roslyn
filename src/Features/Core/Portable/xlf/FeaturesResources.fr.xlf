@@ -810,11 +810,6 @@ Veillez à utiliser le spécificateur "tt" pour les langues où il est nécessai
         <target state="translated">Générer le constructeur dans '{0}' (avec les propriétés)</target>
         <note />
       </trans-unit>
-      <trans-unit id="Generate_enum_member_0">
-        <source>Generate enum member '{0}'</source>
-        <target state="translated">Générer le membre enum '{0}'</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Generate_field_0">
         <source>Generate field '{0}'</source>
         <target state="translated">Générer le champ '{0}'</target>

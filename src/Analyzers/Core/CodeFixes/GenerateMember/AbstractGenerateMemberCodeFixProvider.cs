@@ -8,13 +8,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeGeneration;
 using Microsoft.CodeAnalysis.LanguageService;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
-namespace Microsoft.CodeAnalysis.CodeFixes.GenerateMember
+namespace Microsoft.CodeAnalysis.GenerateMember
 {
     internal abstract class AbstractGenerateMemberCodeFixProvider : CodeFixProvider
     {
@@ -24,7 +25,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes.GenerateMember
             return null;
         }
 
-        protected abstract Task<ImmutableArray<CodeAction>> GetCodeActionsAsync(Document document, SyntaxNode node, CleanCodeGenerationOptionsProvider fallbackOptions, CancellationToken cancellationToken);
+        protected abstract Task<ImmutableArray<CodeAction>> GetCodeActionsAsync(Document document, SyntaxNode node, CodeActionOptionsProvider fallbackOptions, CancellationToken cancellationToken);
         protected abstract bool IsCandidate(SyntaxNode node, SyntaxToken token, Diagnostic diagnostic);
 
         public sealed override async Task RegisterCodeFixesAsync(CodeFixContext context)
@@ -32,9 +33,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes.GenerateMember
             // TODO: https://github.com/dotnet/roslyn/issues/5777
             // Not supported in REPL for now.
             if (context.Document.Project.IsSubmission)
-            {
                 return;
-            }
 
             var diagnostic = context.Diagnostics.First();
             var document = context.Document;
@@ -44,11 +43,9 @@ namespace Microsoft.CodeAnalysis.CodeFixes.GenerateMember
             var names = GetTargetNodes(syntaxFacts, root, context.Span, diagnostic);
             foreach (var name in names)
             {
-                var codeActions = await GetCodeActionsAsync(context.Document, name, context.Options, context.CancellationToken).ConfigureAwait(false);
+                var codeActions = await GetCodeActionsAsync(context.Document, name, context.GetOptionsProvider(), context.CancellationToken).ConfigureAwait(false);
                 if (codeActions.IsDefaultOrEmpty)
-                {
                     continue;
-                }
 
                 context.RegisterFixes(codeActions, context.Diagnostics);
                 return;
@@ -82,16 +79,11 @@ namespace Microsoft.CodeAnalysis.CodeFixes.GenerateMember
                     }
 
                     if (!IsCandidate(ancestor, token, diagnostic))
-                    {
                         continue;
-                    }
 
                     var name = GetTargetNode(ancestor);
-
                     if (name != null)
-                    {
                         yield return name;
-                    }
                 }
             }
         }

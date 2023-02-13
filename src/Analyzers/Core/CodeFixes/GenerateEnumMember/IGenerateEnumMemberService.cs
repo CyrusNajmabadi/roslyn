@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeGeneration;
 using Microsoft.CodeAnalysis.Host;
 
-namespace Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember
+namespace Microsoft.CodeAnalysis.GenerateEnumMember
 {
     internal interface IGenerateEnumMemberService : ILanguageService
     {

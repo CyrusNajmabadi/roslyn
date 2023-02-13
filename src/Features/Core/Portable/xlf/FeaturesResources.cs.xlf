@@ -810,11 +810,6 @@ Ujistěte se, že specifikátor tt použijete pro jazyky, pro které je nezbytn�
         <target state="translated">Vygenerovat konstruktor v {0} (s vlastnostmi)</target>
         <note />
       </trans-unit>
-      <trans-unit id="Generate_enum_member_0">
-        <source>Generate enum member '{0}'</source>
-        <target state="translated">Generovat člena výčtu {0}</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Generate_field_0">
         <source>Generate field '{0}'</source>
         <target state="translated">Generovat pole {0}</target>

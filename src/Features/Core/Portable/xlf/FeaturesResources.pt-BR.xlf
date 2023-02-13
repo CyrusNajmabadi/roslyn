@@ -810,11 +810,6 @@ Verifique se o especificador "tt" foi usado para idiomas para os quais é necess
         <target state="translated">Gerar o construtor em '{0}' (com propriedades)</target>
         <note />
       </trans-unit>
-      <trans-unit id="Generate_enum_member_0">
-        <source>Generate enum member '{0}'</source>
-        <target state="translated">Gerar o membro de enumeração '{0}'</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Generate_field_0">
         <source>Generate field '{0}'</source>
         <target state="translated">Gerar campo '{0}'</target>

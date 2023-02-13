@@ -4,12 +4,12 @@
 
 Imports System.Composition
 Imports System.Threading
-Imports Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember
+Imports Microsoft.CodeAnalysis.GenerateEnumMember
 Imports Microsoft.CodeAnalysis.Host.Mef
 Imports Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.GenerateMember.GenerateEnumMember
+Namespace Microsoft.CodeAnalysis.VisualBasic.GenerateEnumMember
     <ExportLanguageService(GetType(IGenerateEnumMemberService), LanguageNames.VisualBasic), [Shared]>
     Partial Friend Class VisualBasicGenerateEnumMemberService
         Inherits AbstractGenerateEnumMemberService(Of VisualBasicGenerateEnumMemberService, SimpleNameSyntax, ExpressionSyntax)

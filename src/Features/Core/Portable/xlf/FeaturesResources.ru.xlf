@@ -810,11 +810,6 @@ Make sure to use the "tt" specifier for languages for which it's necessary to ma
         <target state="translated">Создать конструктор в "{0}" (со свойствами)</target>
         <note />
       </trans-unit>
-      <trans-unit id="Generate_enum_member_0">
-        <source>Generate enum member '{0}'</source>
-        <target state="translated">Создать элемент перечисления "{0}"</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Generate_field_0">
         <source>Generate field '{0}'</source>
         <target state="translated">Создать поле "{0}"</target>

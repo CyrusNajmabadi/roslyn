@@ -8,12 +8,12 @@ Imports System.Diagnostics.CodeAnalysis
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.CodeActions
 Imports Microsoft.CodeAnalysis.CodeFixes
-Imports Microsoft.CodeAnalysis.CodeFixes.GenerateMember
 Imports Microsoft.CodeAnalysis.CodeGeneration
-Imports Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember
+Imports Microsoft.CodeAnalysis.GenerateEnumMember
+Imports Microsoft.CodeAnalysis.GenerateMember
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.CodeFixes.GenerateEnumMember
+Namespace Microsoft.CodeAnalysis.VisualBasic.GenerateEnumMember
     <ExportCodeFixProvider(LanguageNames.VisualBasic, Name:=PredefinedCodeFixProviderNames.GenerateEnumMember), [Shared]>
     <ExtensionOrder(After:=PredefinedCodeFixProviderNames.GenerateConstructor)>
     Friend Class GenerateEnumMemberCodeFixProvider
@@ -32,7 +32,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeFixes.GenerateEnumMember
             End Get
         End Property
 
-        Protected Overrides Function GetCodeActionsAsync(document As Document, node As SyntaxNode, fallbackOptions As CleanCodeGenerationOptionsProvider, cancellationToken As CancellationToken) As Task(Of ImmutableArray(Of CodeAction))
+        Protected Overrides Function GetCodeActionsAsync(document As Document, node As SyntaxNode, fallbackOptions As CodeActionOptionsProvider, cancellationToken As CancellationToken) As Task(Of ImmutableArray(Of CodeAction))
             Dim service = document.GetLanguageService(Of IGenerateEnumMemberService)()
             Return service.GenerateEnumMemberAsync(document, node, fallbackOptions, cancellationToken)
         End Function

@@ -9,10 +9,10 @@ using System.Composition;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember;
+using Microsoft.CodeAnalysis.GenerateEnumMember;
 using Microsoft.CodeAnalysis.Host.Mef;
 
-namespace Microsoft.CodeAnalysis.CSharp.GenerateMember.GenerateEnumMember
+namespace Microsoft.CodeAnalysis.CSharp.GenerateEnumMember
 {
     [ExportLanguageService(typeof(IGenerateEnumMemberService), LanguageNames.CSharp), Shared]
     internal partial class CSharpGenerateEnumMemberService :

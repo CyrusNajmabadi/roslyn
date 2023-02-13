@@ -9,9 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeGeneration;
+using Microsoft.CodeAnalysis.GenerateMember;
 using Microsoft.CodeAnalysis.Internal.Log;
 
-namespace Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember
+namespace Microsoft.CodeAnalysis.GenerateEnumMember
 {
     internal abstract partial class AbstractGenerateEnumMemberService<TService, TSimpleNameSyntax, TExpressionSyntax> :
         AbstractGenerateMemberService<TSimpleNameSyntax, TExpressionSyntax>, IGenerateEnumMemberService
@@ -19,10 +20,6 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember
         where TSimpleNameSyntax : TExpressionSyntax
         where TExpressionSyntax : SyntaxNode
     {
-        protected AbstractGenerateEnumMemberService()
-        {
-        }
-
         protected abstract bool IsIdentifierNameGeneration(SyntaxNode node);
         protected abstract bool TryInitializeIdentifierNameState(SemanticDocument document, TSimpleNameSyntax identifierName, CancellationToken cancellationToken, out SyntaxToken identifierToken, out TExpressionSyntax simpleNameOrMemberAccessExpression);
 
@@ -33,9 +30,7 @@ namespace Microsoft.CodeAnalysis.GenerateMember.GenerateEnumMember
                 var semanticDocument = await SemanticDocument.CreateAsync(document, cancellationToken).ConfigureAwait(false);
                 var state = await State.GenerateAsync((TService)this, semanticDocument, node, cancellationToken).ConfigureAwait(false);
                 if (state == null)
-                {
                     return ImmutableArray<CodeAction>.Empty;
-                }
 
                 return ImmutableArray.Create<CodeAction>(new GenerateEnumMemberCodeAction(document, state, fallbackOptions));
             }
