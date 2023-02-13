@@ -210,27 +210,5 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
         {
             return type?.Accept(new UnnamedErrorTypeRemover(compilation));
         }
-
-        [return: NotNullIfNotNull(parameterName: nameof(type))]
-        public static ITypeSymbol? SubstituteTypes<TType1, TType2>(
-            this ITypeSymbol? type,
-            IDictionary<TType1, TType2> mapping,
-            Compilation compilation)
-            where TType1 : ITypeSymbol
-            where TType2 : ITypeSymbol
-        {
-            return type.SubstituteTypes(mapping, new CompilationTypeGenerator(compilation));
-        }
-
-        [return: NotNullIfNotNull(parameterName: nameof(type))]
-        public static ITypeSymbol? SubstituteTypes<TType1, TType2>(
-            this ITypeSymbol? type,
-            IDictionary<TType1, TType2> mapping,
-            ITypeGenerator typeGenerator)
-            where TType1 : ITypeSymbol
-            where TType2 : ITypeSymbol
-        {
-            return type?.Accept(new SubstituteTypesVisitor<TType1, TType2>(mapping, typeGenerator));
-        }
     }
 }

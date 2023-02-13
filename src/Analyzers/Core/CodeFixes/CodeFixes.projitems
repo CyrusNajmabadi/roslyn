@@ -35,6 +35,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)ForEachCast\AbstractForEachCastCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Formatting\FormattingCodeFixHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Formatting\FormattingCodeFixProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ImplementAbstractClass\AbstractImplementAbstractClassCodeFixProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ImplementAbstractClass\ImplementAbstractClassData.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Iterator\AbstractIteratorCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeFieldReadonly\AbstractMakeFieldReadonlyCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeMemberStatic\AbstractMakeMemberStaticCodeFixProvider.cs" />

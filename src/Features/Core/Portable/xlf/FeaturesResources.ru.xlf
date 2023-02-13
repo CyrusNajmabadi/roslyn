@@ -335,11 +335,6 @@ Make sure to use the "tt" specifier for languages for which it's necessary to ma
         <target state="translated">Ожидаемая задача не возвращает значение.</target>
         <note />
       </trans-unit>
-      <trans-unit id="Base_classes_contain_inaccessible_unimplemented_members">
-        <source>Base classes contain inaccessible unimplemented members</source>
-        <target state="translated">Базовые классы содержат недоступные нереализованные члены</target>
-        <note />
-      </trans-unit>
       <trans-unit id="CSharp_VisualBasic_References">
         <source>C# and Visual Basic References</source>
         <target state="new">C# and Visual Basic References</target>

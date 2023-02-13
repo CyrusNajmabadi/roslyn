@@ -12,12 +12,17 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.ImplementType;
 using Microsoft.CodeAnalysis.LanguageService;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
 using Roslyn.Utilities;
+
+#if CODE_STYLE
+using Microsoft.CodeAnalysis.Internal.Editing;
+#else
+using Microsoft.CodeAnalysis.Editing;
+#endif
 
 namespace Microsoft.CodeAnalysis.ImplementAbstractClass
 {
@@ -45,6 +50,8 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
             AbstractClassType = abstractClassType;
             _unimplementedMembers = unimplementedMembers;
         }
+
+        protected abstract Task<CodeGenerationContextInfo> GetCodeGenerationInfoAsync(Document document, CodeGenerationContext context, CleanCodeGenerationOptionsProvider fallbackOptions, CancellationToken cancellationToken);
 
         public static async Task<ImplementAbstractClassData?> TryGetDataAsync(
             Document document, SyntaxNode classNode, SyntaxToken classIdentifier, ImplementTypeGenerationOptions options, CancellationToken cancellationToken)
@@ -102,7 +109,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
                 classNodeToAddMembersTo = _classNode.ReplaceToken(
                     _classIdentifier,
                     _classIdentifier.WithAdditionalAnnotations(ConflictAnnotation.Create(
-                        FeaturesResources.Base_classes_contain_inaccessible_unimplemented_members)));
+                        CodeFixesResources.Base_classes_contain_inaccessible_unimplemented_members)));
             }
 
             var context = new CodeGenerationContext(
@@ -110,7 +117,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
                 autoInsertionLocation: groupMembers,
                 sortMembers: groupMembers);
 
-            var info = await _document.GetCodeGenerationInfoAsync(context, _options.FallbackOptions, cancellationToken).ConfigureAwait(false);
+            var info = await GetCodeGenerationInfoAsync(_document, context, _options.FallbackOptions, cancellationToken).ConfigureAwait(false);
 
             var updatedClassNode = info.Service.AddMembers(
                 classNodeToAddMembersTo,
@@ -179,7 +186,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
             DeclarationModifiers modifiers, Accessibility accessibility)
         {
             var syntaxFacts = _document.GetRequiredLanguageService<ISyntaxFactsService>();
-            var generator = _document.GetRequiredLanguageService<SyntaxGenerator>();
+            var generator = _document.GetRequiredLanguageService<Editing.SyntaxGenerator>();
             var body = throughMember == null
                 ? generator.CreateThrowNotImplementedStatement(compilation)
                 : generator.GenerateDelegateThroughMemberStatement(method, throughMember);
@@ -207,7 +214,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
                 propertyGenerationBehavior = ImplementTypePropertyGenerationBehavior.PreferThrowingProperties;
             }
 
-            var generator = _document.GetRequiredLanguageService<SyntaxGenerator>();
+            var generator = _document.GetRequiredLanguageService<Editing.SyntaxGenerator>();
             var preferAutoProperties = propertyGenerationBehavior == ImplementTypePropertyGenerationBehavior.PreferAutoProperties;
 
             var getMethod = ShouldGenerateAccessor(property.GetMethod)
@@ -239,7 +246,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
         private IEventSymbol GenerateEvent(
             IEventSymbol @event, ISymbol? throughMember, Accessibility accessibility, DeclarationModifiers modifiers)
         {
-            var generator = _document.GetRequiredLanguageService<SyntaxGenerator>();
+            var generator = _document.GetRequiredLanguageService<Editing.SyntaxGenerator>();
             return CodeGenerationSymbolFactory.CreateEventSymbol(
                 @event, accessibility: accessibility, modifiers: modifiers,
                 addMethod: GetEventAddOrRemoveMethod(@event, @event.AddMethod, throughMember, generator.AddEventHandler),
@@ -253,7 +260,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
             if (accessor == null || throughMember == null)
                 return null;
 
-            var generator = _document.GetRequiredLanguageService<SyntaxGenerator>();
+            var generator = _document.GetRequiredLanguageService<Editing.SyntaxGenerator>();
             var throughExpression = generator.CreateDelegateThroughExpression(@event, throughMember);
             var statement = generator.ExpressionStatement(createAddOrRemoveHandler(
                 generator.MemberAccessExpression(throughExpression, @event.Name),

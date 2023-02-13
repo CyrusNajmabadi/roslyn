@@ -335,11 +335,6 @@ Verifique se o especificador "tt" foi usado para idiomas para os quais é necess
         <target state="translated">A tarefa esperada não retorna nenhum valor</target>
         <note />
       </trans-unit>
-      <trans-unit id="Base_classes_contain_inaccessible_unimplemented_members">
-        <source>Base classes contain inaccessible unimplemented members</source>
-        <target state="translated">As classes base contêm membros não implementados inacessíveis</target>
-        <note />
-      </trans-unit>
       <trans-unit id="CSharp_VisualBasic_References">
         <source>C# and Visual Basic References</source>
         <target state="new">C# and Visual Basic References</target>
