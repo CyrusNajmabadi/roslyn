@@ -57,7 +57,8 @@ namespace Microsoft.CodeAnalysis.Remote
         {
             return RunServiceAsync(solutionChecksum, async solution =>
             {
-                var document = solution.GetRequiredDocument(documentId);
+                var document = await solution.GetRequiredDocumentAsync(
+                    documentId, includeSourceGenerated: true, cancellationToken).ConfigureAwait(false);
                 var callback = GetCallback(callbackId, cancellationToken);
 
                 await AbstractNavigateToSearchService.SearchDocumentInCurrentProcessAsync(
