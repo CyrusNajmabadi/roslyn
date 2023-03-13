@@ -31,8 +31,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.NavigateTo
         protected override TestWorkspace CreateWorkspace(string content, TestComposition composition)
             => TestWorkspace.CreateCSharp(content, composition: composition);
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NoItemsForEmptyFile(TestHost testHost, Composition composition)
         {
             await TestAsync(testHost, composition, "", async w =>
@@ -41,8 +40,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.NavigateTo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindClass(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -55,8 +53,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindRecord(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -69,8 +66,7 @@ testHost, composition, @"record Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindRecordClass(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -83,8 +79,7 @@ testHost, composition, @"record class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindRecordStruct(TestHost testHost, Composition composition)
         {
             var content = XElement.Parse(@"
@@ -105,8 +100,7 @@ record struct Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindClassInFileScopedNamespace(TestHost testHost, Composition composition)
         {
             var content = XElement.Parse(@"
@@ -126,8 +120,7 @@ class Goo { }
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindVerbatimClass(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -144,8 +137,7 @@ testHost, composition, @"class @static
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindNestedClass(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -164,8 +156,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindMemberInANestedClass(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -187,8 +178,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindGenericClassWithConstraints(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -203,8 +193,7 @@ class Goo<T> where T : IEnumerable
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindGenericMethodWithConstraints(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -222,8 +211,7 @@ class Goo<U>
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindPartialClass(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -246,8 +234,7 @@ partial class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindTypesInMetadata(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -260,8 +247,7 @@ Class Program { FileStyleUriParser f; }", async w =>
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindClassInNamespace(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -277,8 +263,7 @@ testHost, composition, @"namespace Bar
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindStruct(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -291,8 +276,7 @@ testHost, composition, @"struct Bar
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindEnum(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -308,8 +292,7 @@ testHost, composition, @"enum Colors
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindEnumMember(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -325,8 +308,7 @@ testHost, composition, @"enum Colors
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindField1(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -340,8 +322,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindField2(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -355,8 +336,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindField3(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -369,8 +349,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindVerbatimField(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -388,8 +367,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindPtrField1(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -402,8 +380,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindPtrField2(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -417,8 +394,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindConstField(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -432,8 +408,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindIndexer(TestHost testHost, Composition composition)
         {
             var program = @"class Goo { int[] arr; public int this[int i] { get { return arr[i]; } set { arr[i] = value; } } }";
@@ -444,8 +419,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindEvent(TestHost testHost, Composition composition)
         {
             var program = "class Goo { public event EventHandler ChangedEventHandler; }";
@@ -456,8 +430,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindAutoProperty(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -471,8 +444,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindMethod(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -486,8 +458,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindVerbatimMethod(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -505,8 +476,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindParameterizedMethod(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -522,8 +492,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindConstructor(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -539,8 +508,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindParameterizedConstructor(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -556,8 +524,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindStaticConstructor(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -573,8 +540,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindPartialMethods(TestHost testHost, Composition composition)
         {
             await TestAsync(testHost, composition, "partial class Goo { partial void Bar(); } partial class Goo { partial void Bar() { Console.Write(\"hello\"); } }", async w =>
@@ -588,8 +554,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindPartialMethodDefinitionOnly(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -603,8 +568,7 @@ testHost, composition, @"partial class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindPartialMethodImplementationOnly(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -620,8 +584,7 @@ testHost, composition, @"partial class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindOverriddenMembers(TestHost testHost, Composition composition)
         {
             var program = "class Goo { public virtual string Name { get; set; } } class DogBed : Goo { public override string Name { get { return base.Name; } set {} } }";
@@ -650,8 +613,7 @@ testHost, composition, @"partial class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindInterface(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -664,8 +626,7 @@ testHost, composition, @"public interface IGoo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindTopLevelLocalFunction(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -678,8 +639,7 @@ testHost, composition, @"void Goo()
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindTopLevelLocalFunction_WithParameters(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -692,8 +652,7 @@ testHost, composition, @"void Goo(int i)
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindTopLevelLocalFunction_WithTypeArgumentsAndParameters(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -706,8 +665,7 @@ testHost, composition, @"void Goo<T>(int i)
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindNestedLocalFunctionTopLevelStatements(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -723,8 +681,7 @@ testHost, composition, @"void Goo()
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindLocalFunctionInMethod(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -747,8 +704,7 @@ class C
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindNestedLocalFunctionInMethod(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -771,8 +727,7 @@ class C
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindDelegateInNamespace(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -786,8 +741,7 @@ testHost, composition, @"namespace Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindLambdaExpression(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -803,8 +757,7 @@ class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindArray(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -818,8 +771,7 @@ testHost, composition, @"class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindClassAndMethodWithSameName(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -844,8 +796,7 @@ class Test
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task FindMethodNestedInGenericTypes(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -867,8 +818,7 @@ testHost, composition, @"class A<T>
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task OrderingOfConstructorsAndTypes(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -904,8 +854,7 @@ class C2
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NavigateToMethodWithNullableParameter(TestHost testHost, Composition composition)
         {
             await TestAsync(
@@ -921,8 +870,7 @@ testHost, composition, @"class C
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task StartStopSanity(TestHost testHost, Composition composition)
         {
             // Verify that multiple calls to start/stop and dispose don't blow up
@@ -944,8 +892,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DescriptionItems(TestHost testHost, Composition composition)
         {
             await TestAsync(testHost, composition, "public\r\nclass\r\nGoo\r\n{ }", async w =>
@@ -967,8 +914,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest1(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -987,8 +933,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest2(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -1004,8 +949,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest3(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -1021,8 +965,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest4(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -1033,8 +976,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest5(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -1045,8 +987,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest6(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -1066,8 +1007,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TermSplittingTest7(TestHost testHost, Composition composition)
         {
             var source = "class SyllableBreaking {int GetKeyWord; int get_key_word; string get_keyword; int getkeyword; int wake;}";
@@ -1078,8 +1018,7 @@ testHost, composition, @"public class Goo
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task TestIndexer1(TestHost testHost, Composition composition)
         {
             var source =
@@ -1109,8 +1048,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DottedPattern1(TestHost testHost, Composition composition)
         {
             var source = "namespace Goo { namespace Bar { class Baz { void Quux() { } } } }";
@@ -1127,8 +1065,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DottedPattern2(TestHost testHost, Composition composition)
         {
             var source = "namespace Goo { namespace Bar { class Baz { void Quux() { } } } }";
@@ -1144,8 +1081,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DottedPattern3(TestHost testHost, Composition composition)
         {
             var source = "namespace Goo { namespace Bar { class Baz { void Quux() { } } } }";
@@ -1162,8 +1098,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DottedPattern4(TestHost testHost, Composition composition)
         {
             var source = "namespace Goo { namespace Bar { class Baz { void Quux() { } } } }";
@@ -1180,8 +1115,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DottedPattern5(TestHost testHost, Composition composition)
         {
             var source = "namespace Goo { namespace Bar { class Baz { void Quux() { } } } }";
@@ -1198,8 +1132,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task DottedPattern6(TestHost testHost, Composition composition)
         {
             var source = "namespace Goo { namespace Bar { class Baz { void Quux() { } } } }";
@@ -1215,8 +1148,7 @@ class D
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/Roslyn/issues/7855")]
         public async Task DottedPattern7(TestHost testHost, Composition composition)
         {
@@ -1625,8 +1557,7 @@ testHost, composition, @"class Goo
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/roslyn/issues/57873")]
         public async Task FindRecordMember1(TestHost testHost, Composition composition)
         {
@@ -1640,8 +1571,7 @@ testHost, composition, @"record Goo(int Member)
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/roslyn/issues/57873")]
         public async Task FindRecordMember2(TestHost testHost, Composition composition)
         {
@@ -1656,8 +1586,7 @@ testHost, composition, @"record Goo(int Member)
 });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/roslyn/issues/57873")]
         public async Task FindRecordMember3(TestHost testHost, Composition composition)
         {
@@ -1677,8 +1606,7 @@ testHost, composition, @"record Goo(int Member)
             return ((CodeAnalysis.NavigateTo.INavigateToSearchResult)item.Tag).NavigableItem.Document.Name == fileName;
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NavigateToPrioritizeResultInCurrentDocument1(TestHost testHost)
         {
             await TestAsync(testHost, Composition.FirstActiveAndVisible, XElement.Parse(@"
@@ -1723,8 +1651,7 @@ testHost, composition, @"record Goo(int Member)
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NavigateToPrioritizeResultInCurrentDocument2(TestHost testHost)
         {
             await TestAsync(testHost, Composition.FirstActiveAndVisible, XElement.Parse(@"
@@ -1769,8 +1696,7 @@ testHost, composition, @"record Goo(int Member)
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NavigateToPrioritizeResultInCurrentDocument3(TestHost testHost)
         {
             await TestAsync(testHost, Composition.FirstActiveAndVisible, XElement.Parse(@"
@@ -1815,8 +1741,7 @@ testHost, composition, @"record Goo(int Member)
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NavigateToPrioritizeResultInCurrentDocument4(TestHost testHost)
         {
             await TestAsync(testHost, Composition.FirstActiveAndVisible, XElement.Parse(@"
@@ -1861,8 +1786,7 @@ testHost, composition, @"record Goo(int Member)
             });
         }
 
-        [Theory]
-        [CombinatorialData]
+        [Theory, CombinatorialData]
         public async Task NavigateToPrioritizeResultInCurrentDocument5(TestHost testHost)
         {
             await TestAsync(testHost, Composition.FirstActiveAndVisible, XElement.Parse(@"
