@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Editor.Shared;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Host;
@@ -22,22 +23,16 @@ using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.UnifiedSuggestions;
 using Microsoft.VisualStudio.Language.Intellisense;
+using Microsoft.VisualStudio.Telemetry;
 using Microsoft.VisualStudio.Telemetry.Metrics;
+using Microsoft.VisualStudio.Telemetry.Metrics.Events;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Telemetry
 {
-    /// <summary>
-    /// Threadsafe.
-    /// </summary>
-    internal interface ITimeBasedHistogram
-    {
-
-    }
-
-    internal sealed class TimeBasedHistogramFactory
+    internal sealed class TimeBasedHistogramFactory : ITimeBasedHistogramFactory
     {
         /// <summary>
         /// Defaults that go from 50ms to about 10minutes.  
@@ -72,46 +67,117 @@ namespace Microsoft.CodeAnalysis.Telemetry
 
         private static readonly HistogramConfiguration s_histogramConfiguration = new(s_defaultHistogramBuckets, recordMinMax: true);
 
-        private static readonly VSTelemetryMeterProvider s_meterProvider = new();
+        private readonly VSTelemetryMeterProvider _meterProvider = new();
+        private readonly TelemetrySession _session;
+        private readonly IMeter _meter;
+        private readonly TelemetryEvent _event;
 
-        private readonly ConcurrentDictionary<(string name, string description), ITimeBasedHistogram> _histogramMap = new();
+        private readonly ConcurrentDictionary<(string name, string description), TimeBasedHistogram> _histogramMap = new();
 
         private readonly AsyncBatchingWorkQueue<TimeBasedHistogram> _postDataQueue;
 
-        public TimeBasedHistogramFactory(
+        private TimeBasedHistogramFactory(
+            TelemetrySession session,
             IThreadingContext threadingContext,
             IAsynchronousOperationListener asyncListener)
         {
+            _session = session;
+            _meter = _meterProvider.CreateMeter("Microsoft.VisualStudio.Roslyn");
+            _event = new TelemetryEvent("Microsoft.VisualStudio.Roslyn");
+
             _postDataQueue = new AsyncBatchingWorkQueue<TimeBasedHistogram>(
                 TimeSpan.FromMinutes(10),
                 PostHistogramsAsync,
+                EqualityComparer<TimeBasedHistogram>.Default,
                 asyncListener,
                 threadingContext.DisposalToken);
         }
 
-        private ITimeBasedHistogram GetDisposableHistogram(string name, string description)
+        public static async Task<TimeBasedHistogramFactory> CreateAsync(
+            IThreadingContext threadingContext,
+            IAsynchronousOperationListener asyncListener)
         {
-            return _histogramMap.GetOrAdd((name, description), static tuple =>
-            {
-                var (name, description) = tuple;
-                using (var meter = s_meterProvider.CreateMeter("Microsoft.VisualStudio.Roslyn"))
-                {
-                    var underlyingHistogram = meter.CreateHistogram<double>(
-                        name, s_histogramConfiguration, unit: "ms", description);
-                    return new TimeBasedHistogram(underlyingHistogram);
-                }
-            });
+            // Create services that are bound to the UI thread
+            await threadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(threadingContext.DisposalToken);
+
+            // Fetch the session synchronously on the UI thread; if this doesn't happen before we try using this on
+            // the background thread then we will experience hangs like we see in this bug:
+            // https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?_a=edit&id=190808 or
+            // https://devdiv.visualstudio.com/DevDiv/_workitems?id=296981&_a=edit
+            var session = TelemetryService.DefaultSession;
+            return new TimeBasedHistogramFactory(session, threadingContext, asyncListener);
         }
 
-
-
-        private sealed class TimeBasedHistogram : ITimeBasedHistogram, IDisposable
+        public ITimeBasedHistogram GetHistogram(string name, string description)
         {
-            private readonly IHistogram<double> _underlyingHistogram;
-
-            public TimeBasedHistogram(IHistogram<double> underlyingHistogram)
+            var histogram = _histogramMap.GetOrAdd((name, description), static (tuple, @this) =>
             {
-                _underlyingHistogram = underlyingHistogram;
+                var (name, description) = tuple;
+
+                // histogram can live longer than the meter used to create it.
+                var underlyingHistogram = @this._meter.CreateHistogram<double>(
+                    name, s_histogramConfiguration, unit: "ms", description);
+                return new TimeBasedHistogram(underlyingHistogram, @this._postDataQueue);
+            }, this);
+
+            return histogram;
+        }
+
+        private ValueTask PostHistogramsAsync(ImmutableSegmentedList<TimeBasedHistogram> list, CancellationToken cancellationToken)
+        {
+            foreach (var histogram in list)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _session.PostMetricEvent(new TelemetryHistogramEvent<double>(_event, histogram.UnderlyingHistogram));
+            }
+
+            return ValueTaskFactory.CompletedTask;
+        }
+
+        private sealed class TimeBasedHistogram : ITimeBasedHistogram
+        {
+            public readonly IHistogram<double> UnderlyingHistogram;
+            private readonly AsyncBatchingWorkQueue<TimeBasedHistogram> _workQueue;
+
+            public TimeBasedHistogram(
+                IHistogram<double> underlyingHistogram,
+                AsyncBatchingWorkQueue<TimeBasedHistogram> workQueue)
+            {
+                UnderlyingHistogram = underlyingHistogram;
+                _workQueue = workQueue;
+            }
+
+            public void Record(TimeSpan value)
+                => RecordAndAddWork(value, static (histogram, value) => histogram.Record(value.TotalMilliseconds));
+
+            public void Record(TimeSpan value, KeyValuePair<string, object?> tag)
+                => RecordAndAddWork((value, tag), static (histogram, tuple) => histogram.Record(tuple.value.TotalMilliseconds, tuple.tag));
+
+            public void Record(TimeSpan value, KeyValuePair<string, object?> tag1, KeyValuePair<string, object?> tag2)
+                => RecordAndAddWork((value, tag1, tag2), static (histogram, tuple) => histogram.Record(tuple.value.TotalMilliseconds, tuple.tag1, tuple.tag2));
+
+            public void Record(TimeSpan value, KeyValuePair<string, object?> tag1, KeyValuePair<string, object?> tag2, KeyValuePair<string, object?> tag3)
+                => RecordAndAddWork((value, tag1, tag2, tag3), static (histogram, tuple) => histogram.Record(tuple.value.TotalMilliseconds, tuple.tag1, tuple.tag2, tuple.tag3));
+
+            public void Record(TimeSpan value, params KeyValuePair<string, object>[] tags)
+                => RecordAndAddWork((value, tags), static (histogram, tuple) => histogram.Record(tuple.value.TotalMilliseconds, tuple.tags));
+
+            public void Record(TimeSpan value, ReadOnlySpan<KeyValuePair<string, object?>> tags)
+            {
+                lock (this)
+                {
+                    UnderlyingHistogram.Record(value.TotalMilliseconds, tags);
+                    _workQueue.AddWork(this);
+                }
+            }
+
+            private void RecordAndAddWork<TData>(TData data, Action<IHistogram<double>, TData> action)
+            {
+                lock (this)
+                {
+                    action(UnderlyingHistogram, data);
+                    _workQueue.AddWork(this);
+                }
             }
         }
     }
@@ -119,8 +185,6 @@ namespace Microsoft.CodeAnalysis.Telemetry
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
 {
-
-
     internal partial class SuggestedActionsSourceProvider
     {
         private partial class AsyncSuggestedActionsSource : SuggestedActionsSource, IAsyncSuggestedActionsSource
