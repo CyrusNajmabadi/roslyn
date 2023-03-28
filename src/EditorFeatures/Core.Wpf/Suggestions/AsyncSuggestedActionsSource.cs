@@ -18,6 +18,7 @@ using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Telemetry;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
@@ -31,6 +32,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
         private partial class AsyncSuggestedActionsSource : SuggestedActionsSource, IAsyncSuggestedActionsSource
         {
             private readonly IAsynchronousOperationListener _listener;
+            private readonly AsyncLazy<ITimeBasedHistogramFactory> _histogramFactory;
 
             public AsyncSuggestedActionsSource(
                 IThreadingContext threadingContext,
@@ -43,6 +45,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 : base(threadingContext, globalOptions, owner, textView, textBuffer, suggestedActionCategoryRegistry)
             {
                 _listener = listener;
+                _histogramFactory = AsyncLazy.Create(cancellationToken => TimeBasedHistogramFactory.CreateAsync(threadingContext, listener), cacheResult: true);
             }
 
             public async Task GetSuggestedActionsAsync(
@@ -51,23 +54,25 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 ImmutableArray<ISuggestedActionSetCollector> collectors,
                 CancellationToken cancellationToken)
             {
-                using (var meter = _meterProvider.CreateMeter("Microsoft.VisualStudio.Roslyn"))
+                AssertIsForeground();
+
+                using var _ = ArrayBuilder<ISuggestedActionSetCollector>.GetInstance(out var completedCollectors);
+                try
                 {
-                    AssertIsForeground();
-                    using var _ = ArrayBuilder<ISuggestedActionSetCollector>.GetInstance(out var completedCollectors);
-                    try
+                    var histogramFactory = await _histogramFactory.GetValueAsync(cancellationToken).ConfigureAwait(true);
+                    var histogramPrefix = "AsyncSuggestedActionsSource.GetSuggestedActionsAsync";
+                    using var histogram = histogramFactory.GetScopedHistogram(histogramPrefix);
+
+                    await GetSuggestedActionsWorkerAsync(
+                        requestedActionCategories, range, collectors, completedCollectors, histogramFactory, histogramPrefix, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    // Always ensure that all the collectors are marked as complete so we don't hang the UI.
+                    foreach (var collector in collectors)
                     {
-                        await GetSuggestedActionsWorkerAsync(
-                            requestedActionCategories, range, collectors, completedCollectors, cancellationToken).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        // Always ensure that all the collectors are marked as complete so we don't hang the UI.
-                        foreach (var collector in collectors)
-                        {
-                            if (!completedCollectors.Contains(collector))
-                                collector.Complete();
-                        }
+                        if (!completedCollectors.Contains(collector))
+                            collector.Complete();
                     }
                 }
             }
@@ -77,6 +82,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 SnapshotSpan range,
                 ImmutableArray<ISuggestedActionSetCollector> collectors,
                 ArrayBuilder<ISuggestedActionSetCollector> completedCollectors,
+                ITimeBasedHistogramFactory histogramFactory,
+                string histogramPrefix,
                 CancellationToken cancellationToken)
             {
                 AssertIsForeground();
@@ -89,7 +96,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     return;
 
                 var selection = TryGetCodeRefactoringSelection(state, range);
-                await workspace.Services.GetRequiredService<IWorkspaceStatusService>().WaitUntilFullyLoadedAsync(cancellationToken).ConfigureAwait(false);
+
+                using var _1 = ArrayBuilder<SuggestedActionSet>.GetInstance(out var lowPrioritySets);
+
+                using (histogramFactory.GetScopedHistogram(histogramPrefix + ".WaitUntilFullyLoadedAsync"))
+                {
+                    await workspace.Services.GetRequiredService<IWorkspaceStatusService>().WaitUntilFullyLoadedAsync(cancellationToken).ConfigureAwait(false);
+                }
 
                 using (Logger.LogBlock(FunctionId.SuggestedActions_GetSuggestedActionsAsync, cancellationToken))
                 {
@@ -103,7 +116,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     // especially important as we are sending disparate requests for diagnostics, and we do not want the
                     // individual diagnostic requests to redo all the work to run source generators, create skeletons,
                     // etc.
-                    using var _1 = RemoteKeepAliveSession.Create(document.Project.Solution, _listener);
+                    using var _2 = RemoteKeepAliveSession.Create(document.Project.Solution, _listener);
 
                     // Keep track of how many actions we've put in the lightbulb at each priority level.  We do
                     // this as each priority level will both sort and inline actions.  However, we don't want to
@@ -113,54 +126,70 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     // items should be pushed higher up, and less important items shouldn't take up that much space.
                     var currentActionCount = 0;
 
-                    using var _2 = ArrayBuilder<SuggestedActionSet>.GetInstance(out var lowPrioritySets);
-
                     // Collectors are in priority order.  So just walk them from highest to lowest.
                     foreach (var collector in collectors)
                     {
-                        var priority = TryGetPriority(collector.Priority);
-
-                        if (priority != null)
+                        var prefix = histogramPrefix + ".ProcessSingleCollectorAsync";
+                        using (histogramFactory.GetScopedHistogram(prefix))
                         {
-                            var allSets = GetCodeFixesAndRefactoringsAsync(
-                                state, requestedActionCategories, document,
-                                range, selection,
-                                addOperationScope: _ => null,
-                                priority.Value,
-                                currentActionCount, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false);
+                            currentActionCount = await ProcessSingleCollectorAsync(
+                                document, currentActionCount, lowPrioritySets, collector, prefix).ConfigureAwait(false);
+                        }
+                    }
+                }
 
-                            await foreach (var set in allSets)
+                return;
+
+                async Task<int> ProcessSingleCollectorAsync(
+                    TextDocument document,
+                    int currentActionCount,
+                    ArrayBuilder<SuggestedActionSet> lowPrioritySets,
+                    ISuggestedActionSetCollector collector,
+                    string histogramPrefix)
+                {
+                    var priority = TryGetPriority(collector.Priority);
+
+                    if (priority != null)
+                    {
+                        var allSets = GetCodeFixesAndRefactoringsAsync(
+                            state, requestedActionCategories, document,
+                            range, selection,
+                            addOperationScope: _ => null,
+                            priority.Value,
+                            currentActionCount, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false);
+
+                        await foreach (var set in allSets)
+                        {
+                            if (priority == CodeActionRequestPriority.High && set.Priority == SuggestedActionSetPriority.Low)
                             {
-                                if (priority == CodeActionRequestPriority.High && set.Priority == SuggestedActionSetPriority.Low)
-                                {
-                                    // if we're processing the high pri bucket, but we get action sets for lower pri
-                                    // groups, then keep track of them and add them in later when we get to that group.
-                                    lowPrioritySets.Add(set);
-                                }
-                                else
-                                {
-                                    currentActionCount += set.Actions.Count();
-                                    collector.Add(set);
-                                }
+                                // if we're processing the high pri bucket, but we get action sets for lower pri
+                                // groups, then keep track of them and add them in later when we get to that group.
+                                lowPrioritySets.Add(set);
                             }
-
-                            if (priority == CodeActionRequestPriority.Normal)
+                            else
                             {
-                                // now, add any low pri items we've been waiting on to the final group.
-                                foreach (var set in lowPrioritySets)
-                                {
-                                    currentActionCount += set.Actions.Count();
-                                    collector.Add(set);
-                                }
+                                currentActionCount += set.Actions.Count();
+                                collector.Add(set);
                             }
                         }
 
-                        // Ensure we always complete the collector even if we didn't add any items to it.
-                        // This ensures that we unblock the UI from displaying all the results for that
-                        // priority class.
-                        collector.Complete();
-                        completedCollectors.Add(collector);
+                        if (priority == CodeActionRequestPriority.Normal)
+                        {
+                            // now, add any low pri items we've been waiting on to the final group.
+                            foreach (var set in lowPrioritySets)
+                            {
+                                currentActionCount += set.Actions.Count();
+                                collector.Add(set);
+                            }
+                        }
                     }
+
+                    // Ensure we always complete the collector even if we didn't add any items to it.
+                    // This ensures that we unblock the UI from displaying all the results for that
+                    // priority class.
+                    collector.Complete();
+                    completedCollectors.Add(collector);
+                    return currentActionCount;
                 }
             }
 

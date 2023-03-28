@@ -24,6 +24,7 @@ internal sealed partial class TimeBasedHistogramFactory : ITimeBasedHistogramFac
     /// </summary>
     private static readonly double[] s_defaultHistogramBuckets =
     {
+        0,
         50 * Math.Pow(1.5, 0),  // 50ms
         50 * Math.Pow(1.5, 1),  // 70ms
         50 * Math.Pow(1.5, 2),  // 113ms
@@ -81,7 +82,7 @@ internal sealed partial class TimeBasedHistogramFactory : ITimeBasedHistogramFac
             threadingContext.DisposalToken);
     }
 
-    public static async Task<TimeBasedHistogramFactory> CreateAsync(
+    public static async Task<ITimeBasedHistogramFactory> CreateAsync(
         IThreadingContext threadingContext,
         IAsynchronousOperationListener asyncListener)
     {

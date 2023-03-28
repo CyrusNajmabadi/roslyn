@@ -2,6 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Collections.Generic;
+using Roslyn.Utilities;
+
 namespace Microsoft.CodeAnalysis.Telemetry;
 
 /// <summary>
@@ -21,4 +25,37 @@ internal interface ITimeBasedHistogramFactory
     /// histogram instance being returned.
     /// </summary>
     ITimeBasedHistogram GetHistogram(string name, string description);
+}
+
+internal static class ITimeBasedHistogramFactoryExtensions
+{
+    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, string description = "")
+        => GetScopedHistogram(factory, name, tag: null, description);
+
+    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, KeyValuePair<string, object?>? tag = null, string description = "")
+        => new(factory.GetHistogram(name, description), tag);
+
+    public readonly struct ScopedTimedBasedHistogram : IDisposable
+    {
+        private readonly ITimeBasedHistogram _histogram;
+        private readonly KeyValuePair<string, object?>? _tag;
+
+        private readonly SharedStopwatch _stopwatch = SharedStopwatch.StartNew();
+
+        public ScopedTimedBasedHistogram(
+            ITimeBasedHistogram histogram,
+            KeyValuePair<string, object?>? tag)
+        {
+            _histogram = histogram;
+            _tag = tag;
+        }
+
+        public void Dispose()
+        {
+            if (_tag == null)
+                _histogram.Record(_stopwatch.Elapsed);
+            else
+                _histogram.Record(_stopwatch.Elapsed, _tag.Value);
+        }
+    }
 }
