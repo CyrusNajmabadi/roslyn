@@ -58,7 +58,7 @@ internal sealed partial class TimeBasedHistogramFactory : ITimeBasedHistogramFac
     private readonly IMeter _meter;
     private readonly TelemetryEvent _event;
 
-    private readonly ConcurrentDictionary<(string name, string description), ITimeBasedHistogram> _histogramMap = new();
+    private readonly ConcurrentDictionary<string, ITimeBasedHistogram> _histogramMap = new();
 
     private readonly AsyncBatchingWorkQueue<TimeBasedHistogram> _postDataQueue;
 
@@ -97,14 +97,12 @@ internal sealed partial class TimeBasedHistogramFactory : ITimeBasedHistogramFac
         return new TimeBasedHistogramFactory(session, threadingContext, asyncListener);
     }
 
-    public ITimeBasedHistogram GetHistogram(string name, string description)
-        => _histogramMap.GetOrAdd((name, description), static (tuple, @this) =>
+    public ITimeBasedHistogram GetHistogram(string name)
+        => _histogramMap.GetOrAdd(name, static (name, @this) =>
         {
-            var (name, description) = tuple;
-
             // histogram can live longer than the meter used to create it.
             var underlyingHistogram = @this._meter.CreateHistogram<double>(
-                name, s_histogramConfiguration, unit: "ms", description);
+                name, s_histogramConfiguration, unit: "ms");
             return new TimeBasedHistogram(underlyingHistogram, @this._postDataQueue);
         }, this);
 

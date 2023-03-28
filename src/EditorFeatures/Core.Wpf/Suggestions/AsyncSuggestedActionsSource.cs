@@ -130,7 +130,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     foreach (var collector in collectors)
                     {
                         var prefix = histogramPrefix + ".ProcessSingleCollectorAsync";
-                        using (histogramFactory.GetScopedHistogram(prefix, KeyValuePairUtil.Create(nameof(collector.Priority), (object?)collector.Priority), cancellationToken))
+                        using (histogramFactory.GetScopedHistogram(prefix, (nameof(collector.Priority), collector.Priority), cancellationToken))
                         {
                             currentActionCount = await ProcessSingleCollectorAsync(
                                 document, currentActionCount, lowPrioritySets, collector, prefix).ConfigureAwait(false);

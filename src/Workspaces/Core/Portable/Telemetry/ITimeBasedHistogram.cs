@@ -18,9 +18,9 @@ namespace Microsoft.CodeAnalysis.Telemetry;
 internal interface ITimeBasedHistogram
 {
     void Record(TimeSpan value);
-    void Record(TimeSpan value, KeyValuePair<string, object?> tag);
-    void Record(TimeSpan value, KeyValuePair<string, object?> tag1, KeyValuePair<string, object?> tag2);
-    void Record(TimeSpan value, KeyValuePair<string, object?> tag1, KeyValuePair<string, object?> tag2, KeyValuePair<string, object?> tag3);
-    void Record(TimeSpan value, params KeyValuePair<string, object>[] tags);
-    void Record(TimeSpan value, ReadOnlySpan<KeyValuePair<string, object?>> tags);
+    void Record(TimeSpan value, (string key, object value) tag);
+    void Record(TimeSpan value, (string key, object value) tag1, (string key, object value) tag2);
+    void Record(TimeSpan value, (string key, object value) tag1, (string key, object value) tag2, (string key, object value) tag3);
+    void Record(TimeSpan value, params (string key, object value)[] tags);
+    // void Record(TimeSpan value, ReadOnlySpan<(string key, object value)> tags);
 }

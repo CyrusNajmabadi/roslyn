@@ -33,19 +33,19 @@ internal static class ITimeBasedHistogramFactoryExtensions
     public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, CancellationToken cancellationToken)
         => GetScopedHistogram(factory, name, tag: null, cancellationToken);
 
-    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, KeyValuePair<string, object?>? tag, CancellationToken cancellationToken)
+    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, (string key, object value)? tag, CancellationToken cancellationToken)
         => new(factory.GetHistogram(name), tag, cancellationToken);
 
     public readonly struct ScopedTimedBasedHistogram : IDisposable
     {
         private readonly ITimeBasedHistogram _histogram;
-        private readonly KeyValuePair<string, object?>? _tag;
+        private readonly (string key, object value)? _tag;
         private readonly CancellationToken _cancellationToken;
         private readonly SharedStopwatch _stopwatch = SharedStopwatch.StartNew();
 
         public ScopedTimedBasedHistogram(
             ITimeBasedHistogram histogram,
-            KeyValuePair<string, object?>? tag,
+            (string key, object value)? tag,
             CancellationToken cancellationToken)
         {
             _histogram = histogram;
@@ -55,7 +55,7 @@ internal static class ITimeBasedHistogramFactoryExtensions
 
         public void Dispose()
         {
-            var cancelledKVP = KeyValuePairUtil.Create(nameof(_cancellationToken.IsCancellationRequested), (object?)_cancellationToken.IsCancellationRequested);
+            var cancelledKVP = (nameof(_cancellationToken.IsCancellationRequested), _cancellationToken.IsCancellationRequested);
 
             if (_tag == null)
                 _histogram.Record(_stopwatch.Elapsed, cancelledKVP);
