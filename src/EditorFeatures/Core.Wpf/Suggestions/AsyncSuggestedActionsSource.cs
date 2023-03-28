@@ -61,7 +61,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 {
                     var histogramFactory = await _histogramFactory.GetValueAsync(cancellationToken).ConfigureAwait(true);
                     var histogramPrefix = "AsyncSuggestedActionsSource.GetSuggestedActionsAsync";
-                    using var histogram = histogramFactory.GetScopedHistogram(histogramPrefix);
+                    using var histogram = histogramFactory.GetScopedHistogram(histogramPrefix, cancellationToken);
 
                     await GetSuggestedActionsWorkerAsync(
                         requestedActionCategories, range, collectors, completedCollectors, histogramFactory, histogramPrefix, cancellationToken).ConfigureAwait(false);
@@ -99,7 +99,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
 
                 using var _1 = ArrayBuilder<SuggestedActionSet>.GetInstance(out var lowPrioritySets);
 
-                using (histogramFactory.GetScopedHistogram(histogramPrefix + ".WaitUntilFullyLoadedAsync"))
+                using (histogramFactory.GetScopedHistogram(histogramPrefix + ".WaitUntilFullyLoadedAsync", cancellationToken))
                 {
                     await workspace.Services.GetRequiredService<IWorkspaceStatusService>().WaitUntilFullyLoadedAsync(cancellationToken).ConfigureAwait(false);
                 }
@@ -130,7 +130,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     foreach (var collector in collectors)
                     {
                         var prefix = histogramPrefix + ".ProcessSingleCollectorAsync";
-                        using (histogramFactory.GetScopedHistogram(prefix, KeyValuePairUtil.Create(nameof(collector.Priority), (object?)collector.Priority)))
+                        using (histogramFactory.GetScopedHistogram(prefix, KeyValuePairUtil.Create(nameof(collector.Priority), (object?)collector.Priority), cancellationToken))
                         {
                             currentActionCount = await ProcessSingleCollectorAsync(
                                 document, currentActionCount, lowPrioritySets, collector, prefix).ConfigureAwait(false);

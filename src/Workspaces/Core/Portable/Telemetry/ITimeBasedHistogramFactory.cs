@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Telemetry;
@@ -24,38 +25,42 @@ internal interface ITimeBasedHistogramFactory
     /// Gets a histogram with a given name and description. The same name/description will result in the same
     /// histogram instance being returned.
     /// </summary>
-    ITimeBasedHistogram GetHistogram(string name, string description);
+    ITimeBasedHistogram GetHistogram(string name);
 }
 
 internal static class ITimeBasedHistogramFactoryExtensions
 {
-    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, string description = "")
-        => GetScopedHistogram(factory, name, tag: null, description);
+    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, CancellationToken cancellationToken)
+        => GetScopedHistogram(factory, name, tag: null, cancellationToken);
 
-    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, KeyValuePair<string, object?>? tag, string description = "")
-        => new(factory.GetHistogram(name, description), tag);
+    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, KeyValuePair<string, object?>? tag, CancellationToken cancellationToken)
+        => new(factory.GetHistogram(name), tag, cancellationToken);
 
     public readonly struct ScopedTimedBasedHistogram : IDisposable
     {
         private readonly ITimeBasedHistogram _histogram;
         private readonly KeyValuePair<string, object?>? _tag;
-
+        private readonly CancellationToken _cancellationToken;
         private readonly SharedStopwatch _stopwatch = SharedStopwatch.StartNew();
 
         public ScopedTimedBasedHistogram(
             ITimeBasedHistogram histogram,
-            KeyValuePair<string, object?>? tag)
+            KeyValuePair<string, object?>? tag,
+            CancellationToken cancellationToken)
         {
             _histogram = histogram;
             _tag = tag;
+            _cancellationToken = cancellationToken;
         }
 
         public void Dispose()
         {
+            var cancelledKVP = KeyValuePairUtil.Create(nameof(_cancellationToken.IsCancellationRequested), (object?)_cancellationToken.IsCancellationRequested);
+
             if (_tag == null)
-                _histogram.Record(_stopwatch.Elapsed);
+                _histogram.Record(_stopwatch.Elapsed, cancelledKVP);
             else
-                _histogram.Record(_stopwatch.Elapsed, _tag.Value);
+                _histogram.Record(_stopwatch.Elapsed, cancelledKVP, _tag.Value);
         }
     }
 }
