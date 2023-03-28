@@ -130,7 +130,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     foreach (var collector in collectors)
                     {
                         var prefix = histogramPrefix + ".ProcessSingleCollectorAsync";
-                        using (histogramFactory.GetScopedHistogram(prefix))
+                        using (histogramFactory.GetScopedHistogram(prefix, KeyValuePairUtil.Create(nameof(collector.Priority), (object?)collector.Priority)))
                         {
                             currentActionCount = await ProcessSingleCollectorAsync(
                                 document, currentActionCount, lowPrioritySets, collector, prefix).ConfigureAwait(false);
@@ -156,7 +156,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                             range, selection,
                             addOperationScope: _ => null,
                             priority.Value,
-                            currentActionCount, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false);
+                            currentActionCount,
+                            histogramFactory,
+                            histogramPrefix,
+                            cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false);
 
                         await foreach (var set in allSets)
                         {
@@ -202,6 +205,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 Func<string, IDisposable?> addOperationScope,
                 CodeActionRequestPriority priority,
                 int currentActionCount,
+                ITimeBasedHistogramFactory histogramFactory,
+                string histogramPrefix,
                 [EnumeratorCancellation] CancellationToken cancellationToken)
             {
                 var workspace = document.Project.Solution.Workspace;

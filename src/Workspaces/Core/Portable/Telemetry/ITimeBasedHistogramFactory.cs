@@ -32,7 +32,7 @@ internal static class ITimeBasedHistogramFactoryExtensions
     public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, string description = "")
         => GetScopedHistogram(factory, name, tag: null, description);
 
-    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, KeyValuePair<string, object?>? tag = null, string description = "")
+    public static ScopedTimedBasedHistogram GetScopedHistogram(this ITimeBasedHistogramFactory factory, string name, KeyValuePair<string, object?>? tag, string description = "")
         => new(factory.GetHistogram(name, description), tag);
 
     public readonly struct ScopedTimedBasedHistogram : IDisposable
