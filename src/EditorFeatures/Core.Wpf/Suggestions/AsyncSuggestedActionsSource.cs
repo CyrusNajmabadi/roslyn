@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -21,12 +22,105 @@ using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.UnifiedSuggestions;
 using Microsoft.VisualStudio.Language.Intellisense;
+using Microsoft.VisualStudio.Telemetry.Metrics;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Roslyn.Utilities;
 
+namespace Microsoft.CodeAnalysis.Telemetry
+{
+    /// <summary>
+    /// Threadsafe.
+    /// </summary>
+    internal interface ITimeBasedHistogram
+    {
+
+    }
+
+    internal sealed class TimeBasedHistogramFactory
+    {
+        /// <summary>
+        /// Defaults that go from 50ms to about 10minutes.  
+        /// </summary>
+        private static readonly double[] s_defaultHistogramBuckets =
+        {
+            50 * Math.Pow(1.5, 0),  // 50ms
+            50 * Math.Pow(1.5, 1),  // 70ms
+            50 * Math.Pow(1.5, 2),  // 113ms
+            50 * Math.Pow(1.5, 3),  // 169ms
+            50 * Math.Pow(1.5, 4),  // 253ms
+            50 * Math.Pow(1.5, 5),  // 380ms
+            50 * Math.Pow(1.5, 6),  // 570ms
+            50 * Math.Pow(1.5, 7),  // 854ms
+            50 * Math.Pow(1.5, 8),  // 1.3s
+            50 * Math.Pow(1.5, 9),  // 1.9s
+            50 * Math.Pow(1.5, 10), // 2.8s
+            50 * Math.Pow(1.5, 11), // 4.3s
+            50 * Math.Pow(1.5, 12), // 6.5s
+            50 * Math.Pow(1.5, 13), // 9.7s
+            50 * Math.Pow(1.5, 14), // 14.5s
+            50 * Math.Pow(1.5, 15), // 21.9s
+            50 * Math.Pow(1.5, 16), // 32.8s
+            50 * Math.Pow(1.5, 17), // 49.2s
+            50 * Math.Pow(1.5, 18), // 1.2m
+            50 * Math.Pow(1.5, 19), // 1.8m
+            50 * Math.Pow(1.5, 20), // 2.8m
+            50 * Math.Pow(1.5, 21), // 4.1m
+            50 * Math.Pow(1.5, 22), // 6.2s
+            50 * Math.Pow(1.5, 23), // 9.3s
+        };
+
+        private static readonly HistogramConfiguration s_histogramConfiguration = new(s_defaultHistogramBuckets, recordMinMax: true);
+
+        private static readonly VSTelemetryMeterProvider s_meterProvider = new();
+
+        private readonly ConcurrentDictionary<(string name, string description), ITimeBasedHistogram> _histogramMap = new();
+
+        private readonly AsyncBatchingWorkQueue<TimeBasedHistogram> _postDataQueue;
+
+        public TimeBasedHistogramFactory(
+            IThreadingContext threadingContext,
+            IAsynchronousOperationListener asyncListener)
+        {
+            _postDataQueue = new AsyncBatchingWorkQueue<TimeBasedHistogram>(
+                TimeSpan.FromMinutes(10),
+                PostHistogramsAsync,
+                asyncListener,
+                threadingContext.DisposalToken);
+        }
+
+        private ITimeBasedHistogram GetDisposableHistogram(string name, string description)
+        {
+            return _histogramMap.GetOrAdd((name, description), static tuple =>
+            {
+                var (name, description) = tuple;
+                using (var meter = s_meterProvider.CreateMeter("Microsoft.VisualStudio.Roslyn"))
+                {
+                    var underlyingHistogram = meter.CreateHistogram<double>(
+                        name, s_histogramConfiguration, unit: "ms", description);
+                    return new TimeBasedHistogram(underlyingHistogram);
+                }
+            });
+        }
+
+
+
+        private sealed class TimeBasedHistogram : ITimeBasedHistogram, IDisposable
+        {
+            private readonly IHistogram<double> _underlyingHistogram;
+
+            public TimeBasedHistogram(IHistogram<double> underlyingHistogram)
+            {
+                _underlyingHistogram = underlyingHistogram;
+            }
+        }
+    }
+}
+
 namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
 {
+
+
     internal partial class SuggestedActionsSourceProvider
     {
         private partial class AsyncSuggestedActionsSource : SuggestedActionsSource, IAsyncSuggestedActionsSource
@@ -52,20 +146,23 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 ImmutableArray<ISuggestedActionSetCollector> collectors,
                 CancellationToken cancellationToken)
             {
-                AssertIsForeground();
-                using var _ = ArrayBuilder<ISuggestedActionSetCollector>.GetInstance(out var completedCollectors);
-                try
+                using (var meter = _meterProvider.CreateMeter("Microsoft.VisualStudio.Roslyn"))
                 {
-                    await GetSuggestedActionsWorkerAsync(
-                        requestedActionCategories, range, collectors, completedCollectors, cancellationToken).ConfigureAwait(false);
-                }
-                finally
-                {
-                    // Always ensure that all the collectors are marked as complete so we don't hang the UI.
-                    foreach (var collector in collectors)
+                    AssertIsForeground();
+                    using var _ = ArrayBuilder<ISuggestedActionSetCollector>.GetInstance(out var completedCollectors);
+                    try
                     {
-                        if (!completedCollectors.Contains(collector))
-                            collector.Complete();
+                        await GetSuggestedActionsWorkerAsync(
+                            requestedActionCategories, range, collectors, completedCollectors, cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        // Always ensure that all the collectors are marked as complete so we don't hang the UI.
+                        foreach (var collector in collectors)
+                        {
+                            if (!completedCollectors.Contains(collector))
+                                collector.Complete();
+                        }
                     }
                 }
             }
