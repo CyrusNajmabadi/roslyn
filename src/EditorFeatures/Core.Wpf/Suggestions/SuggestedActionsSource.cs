@@ -21,6 +21,8 @@ using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Telemetry;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
 using Microsoft.CodeAnalysis.UnifiedSuggestions;
@@ -34,29 +36,34 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
 {
     internal partial class SuggestedActionsSourceProvider
     {
-        private abstract partial class SuggestedActionsSource : ForegroundThreadAffinitizedObject, ISuggestedActionsSource3
+        private sealed partial class SuggestedActionsSource : ForegroundThreadAffinitizedObject, ISuggestedActionsSource3
         {
             private readonly ISuggestedActionCategoryRegistryService _suggestedActionCategoryRegistry;
 
             private readonly ReferenceCountedDisposable<State> _state;
+            private readonly IAsynchronousOperationListener _listener;
+            private readonly AsyncLazy<ITimeBasedHistogramFactory> _histogramFactory;
 
             public event EventHandler<EventArgs>? SuggestedActionsChanged { add { } remove { } }
 
             public readonly IGlobalOptionService GlobalOptions;
 
-            protected SuggestedActionsSource(
+            public SuggestedActionsSource(
                 IThreadingContext threadingContext,
                 IGlobalOptionService globalOptions,
                 SuggestedActionsSourceProvider owner,
                 ITextView textView,
                 ITextBuffer textBuffer,
-                ISuggestedActionCategoryRegistryService suggestedActionCategoryRegistry)
+                ISuggestedActionCategoryRegistryService suggestedActionCategoryRegistry,
+                IAsynchronousOperationListener listener)
                 : base(threadingContext)
             {
                 GlobalOptions = globalOptions;
 
                 _suggestedActionCategoryRegistry = suggestedActionCategoryRegistry;
                 _state = new ReferenceCountedDisposable<State>(new State(this, owner, textView, textBuffer));
+                _histogramFactory = AsyncLazy.Create(cancellationToken => TimeBasedHistogramFactory.CreateAsync(threadingContext, listener), cacheResult: true);
+                _listener = listener;
 
                 _state.Target.TextView.Closed += OnTextViewClosed;
             }
@@ -66,7 +73,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 _state.Dispose();
             }
 
-            protected ReferenceCountedDisposable<State> SourceState => _state;
+            private ReferenceCountedDisposable<State> SourceState => _state;
 
             public bool TryGetTelemetryId(out Guid telemetryId)
             {
@@ -193,7 +200,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 }
             }
 
-            protected ImmutableArray<SuggestedActionSet> ConvertToSuggestedActionSets(
+            private ImmutableArray<SuggestedActionSet> ConvertToSuggestedActionSets(
                 ReferenceCountedDisposable<State> state,
                 TextSpan? selection,
                 ImmutableArray<UnifiedSuggestedActionSet> fixes,
@@ -256,7 +263,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                     };
             }
 
-            protected static Task<ImmutableArray<UnifiedSuggestedActionSet>> GetCodeFixesAsync(
+            private static Task<ImmutableArray<UnifiedSuggestedActionSet>> GetCodeFixesAsync(
                 ReferenceCountedDisposable<State> state,
                 ITextBufferSupportsFeatureService supportsFeatureService,
                 ISuggestedActionCategorySet requestedActionCategories,
@@ -296,7 +303,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 }
             }
 
-            protected static Task<ImmutableArray<UnifiedSuggestedActionSet>> GetRefactoringsAsync(
+            private static Task<ImmutableArray<UnifiedSuggestedActionSet>> GetRefactoringsAsync(
                 ReferenceCountedDisposable<State> state,
                 ITextBufferSupportsFeatureService supportsFeatureService,
                 ISuggestedActionCategorySet requestedActionCategories,
@@ -483,7 +490,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 return null;
             }
 
-            protected TextSpan? TryGetCodeRefactoringSelection(ReferenceCountedDisposable<State> state, SnapshotSpan range)
+            private TextSpan? TryGetCodeRefactoringSelection(ReferenceCountedDisposable<State> state, SnapshotSpan range)
             {
                 this.AssertIsForeground();
 
