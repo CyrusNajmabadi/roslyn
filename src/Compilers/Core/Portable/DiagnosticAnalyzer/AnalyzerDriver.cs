@@ -2720,57 +2720,75 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         {
             // Eliminate descendant member declarations within declarations.
             // There will be separate symbols declared for the members.
-            HashSet<SyntaxNode>? descendantDeclsToSkip = null;
-            bool first = true;
-            foreach (var declInNode in declarationsInNode)
+            var descendantDeclsToSkip = PooledHashSet<SyntaxNode>.GetInstance();
+            try
             {
-                analyzerExecutor.CancellationToken.ThrowIfCancellationRequested();
-
-                if (declInNode.DeclaredNode != declaredNode)
+                bool first = true;
+                foreach (var declInNode in declarationsInNode)
                 {
-                    // Might be:
-                    // (1) A field declaration statement with multiple fields declared.
-                    //     If so, we execute syntax node analysis for entire field declaration (and its descendants)
-                    //     if we processing the first field and skip syntax actions for remaining fields in the declaration.
-                    // (2) A namespace declaration statement with qualified name "namespace A.B { }"
-                    if (IsEquivalentSymbol(declaredSymbol, declInNode.DeclaredSymbol))
+                    analyzerExecutor.CancellationToken.ThrowIfCancellationRequested();
+
+                    if (declInNode.DeclaredNode != declaredNode)
                     {
-                        if (first)
+                        // Might be:
+                        // (1) A field declaration statement with multiple fields declared.
+                        //     If so, we execute syntax node analysis for entire field declaration (and its descendants)
+                        //     if we processing the first field and skip syntax actions for remaining fields in the declaration.
+                        // (2) A namespace declaration statement with qualified name "namespace A.B { }"
+                        if (IsEquivalentSymbol(declaredSymbol, declInNode.DeclaredSymbol))
                         {
-                            break;
+                            if (first)
+                            {
+                                break;
+                            }
+
+                            return ImmutableArray<SyntaxNode>.Empty;
                         }
 
-                        return ImmutableArray<SyntaxNode>.Empty;
+                        // Compute the topmost node representing the syntax declaration for the member that needs to be skipped.
+                        var declarationNodeToSkip = declInNode.DeclaredNode;
+                        var declaredSymbolOfDeclInNode = declInNode.DeclaredSymbol ?? semanticModel.GetDeclaredSymbol(declInNode.DeclaredNode, analyzerExecutor.CancellationToken);
+                        if (declaredSymbolOfDeclInNode != null)
+                        {
+                            declarationNodeToSkip = semanticModel.GetTopmostNodeForDiagnosticAnalysis(declaredSymbolOfDeclInNode, declInNode.DeclaredNode);
+                        }
+
+                        descendantDeclsToSkip.Add(declarationNodeToSkip);
                     }
 
-                    // Compute the topmost node representing the syntax declaration for the member that needs to be skipped.
-                    var declarationNodeToSkip = declInNode.DeclaredNode;
-                    var declaredSymbolOfDeclInNode = declInNode.DeclaredSymbol ?? semanticModel.GetDeclaredSymbol(declInNode.DeclaredNode, analyzerExecutor.CancellationToken);
-                    if (declaredSymbolOfDeclInNode != null)
-                    {
-                        declarationNodeToSkip = semanticModel.GetTopmostNodeForDiagnosticAnalysis(declaredSymbolOfDeclInNode, declInNode.DeclaredNode);
-                    }
-
-                    descendantDeclsToSkip ??= new HashSet<SyntaxNode>();
-                    descendantDeclsToSkip.Add(declarationNodeToSkip);
+                    first = false;
                 }
 
-                first = false;
-            }
+                Func<SyntaxNode, bool>? additionalFilter = semanticModel.GetSyntaxNodesToAnalyzeFilter(declaredNode, declaredSymbol);
+                Func<SyntaxNode, bool> shouldAddNode = node => !descendantDeclsToSkip.Contains(node) && additionalFilter?.Invoke(node) is not false;
 
-            Func<SyntaxNode, bool>? additionalFilter = semanticModel.GetSyntaxNodesToAnalyzeFilter(declaredNode, declaredSymbol);
-            bool shouldAddNode(SyntaxNode node) => (descendantDeclsToSkip == null || !descendantDeclsToSkip.Contains(node)) && (additionalFilter is null || additionalFilter(node));
-            var nodeBuilder = ArrayBuilder<SyntaxNode>.GetInstance();
-            foreach (var node in declaredNode.DescendantNodesAndSelf(descendIntoChildren: shouldAddNode, descendIntoTrivia: true))
-            {
-                if (shouldAddNode(node) &&
-                    !semanticModel.ShouldSkipSyntaxNodeAnalysis(node, declaredSymbol))
+                // First descend the nodes to determine how many items we'll have in our builder. This helps by avoiding
+                // costly reallocs when actually producing the final set of nodes.
+                var count = 0;
+                descendNodes(_ => count++);
+
+                var nodeBuilder = ArrayBuilder<SyntaxNode>.GetInstance(count);
+                descendNodes(n => nodeBuilder.Add(n));
+
+                Debug.Assert(nodeBuilder.Count == count);
+                return nodeBuilder.ToImmutableAndFree();
+
+                void descendNodes(Action<SyntaxNode> action)
                 {
-                    nodeBuilder.Add(node);
+                    foreach (var node in declaredNode.DescendantNodesAndSelf(descendIntoChildren: shouldAddNode, descendIntoTrivia: true))
+                    {
+                        if (shouldAddNode(node) &&
+                            !semanticModel.ShouldSkipSyntaxNodeAnalysis(node, declaredSymbol))
+                        {
+                            action(node);
+                        }
+                    }
                 }
             }
-
-            return nodeBuilder.ToImmutableAndFree();
+            finally
+            {
+                descendantDeclsToSkip.Free();
+            }
         }
 
         private static bool IsEquivalentSymbol(ISymbol declaredSymbol, ISymbol? otherSymbol)
