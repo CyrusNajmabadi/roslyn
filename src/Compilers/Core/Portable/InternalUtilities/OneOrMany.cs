@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.PooledObjects;
 
@@ -85,15 +84,12 @@ namespace Roslyn.Utilities
             }
 
             builder.Add(one);
-            return new OneOrMany<T>(builder.ToImmutableAndFree());
+            return OneOrMany.Create(builder.ToImmutableAndFree());
         }
 
         public bool Contains(T item)
         {
-            if (HasOne)
-                return EqualityComparer<T>.Default.Equals(item, _one);
-
-            foreach (var value in _many)
+            foreach (var value in this)
             {
                 if (EqualityComparer<T>.Default.Equals(item, value))
                     return true;
@@ -106,7 +102,7 @@ namespace Roslyn.Utilities
         {
             if (HasOne)
             {
-                return EqualityComparer<T>.Default.Equals(item, _one) ? default : this;
+                return EqualityComparer<T>.Default.Equals(item, _one) ? Empty : this;
             }
 
             var builder = ArrayBuilder<T>.GetInstance();
@@ -117,28 +113,24 @@ namespace Roslyn.Utilities
                     builder.Add(value);
             }
 
-            if (builder.Count == 0)
+            if (builder.Count == Count)
             {
                 builder.Free();
-                return default;
+                return this;
             }
-
-            return builder.Count == Count ? this : new OneOrMany<T>(builder.ToImmutableAndFree());
+            
+            return OneOrMany.Create(builder.ToImmutableAndFree());
         }
 
         public OneOrMany<TResult> Select<TResult>(Func<T, TResult> selector)
-        {
-            return HasOne ?
-                OneOrMany.Create(selector(_one)) :
-                OneOrMany.Create(_many.SelectAsArray(selector));
-        }
+            => HasOne
+                ? OneOrMany.Create(selector(_one))
+                : OneOrMany.Create(_many.SelectAsArray(selector));
 
         public OneOrMany<TResult> Select<TResult, TArg>(Func<T, TArg, TResult> selector, TArg arg)
-        {
-            return HasOne ?
-                OneOrMany.Create(selector(_one, arg)) :
-                OneOrMany.Create(_many.SelectAsArray(selector, arg));
-        }
+            => HasOne
+                ? OneOrMany.Create(selector(_one, arg))
+                : OneOrMany.Create(_many.SelectAsArray(selector, arg));
 
         public IEnumerable<TResult> OfType<TResult>()
         {
@@ -160,17 +152,10 @@ namespace Roslyn.Utilities
 
         public T? FirstOrDefault(Func<T, bool> predicate)
         {
-            if (HasOne)
-            {
-                return predicate(_one) ? _one : default;
-            }
-
-            foreach (var item in _many)
+            foreach (var item in this)
             {
                 if (predicate(item))
-                {
                     return item;
-                }
             }
 
             return default;
@@ -178,17 +163,10 @@ namespace Roslyn.Utilities
 
         public T? FirstOrDefault<TArg>(Func<T, TArg, bool> predicate, TArg arg)
         {
-            if (HasOne)
-            {
-                return predicate(_one, arg) ? _one : default;
-            }
-
-            foreach (var item in _many)
+            foreach (var item in this)
             {
                 if (predicate(item, arg))
-                {
                     return item;
-                }
             }
 
             return default;
@@ -249,7 +227,7 @@ namespace Roslyn.Utilities
                 return _index < _collection.Count;
             }
 
-            public T Current => _collection[_index];
+            public readonly T Current => _collection[_index];
         }
     }
 
@@ -259,6 +237,6 @@ namespace Roslyn.Utilities
             => new OneOrMany<T>(one);
 
         public static OneOrMany<T> Create<T>(ImmutableArray<T> many)
-            => new OneOrMany<T>(many);
+            => many.Length == 1 ? Create(many[0]) : new OneOrMany<T>(many);
     }
 }
