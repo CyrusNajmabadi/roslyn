@@ -3,13 +3,17 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.CSharp.UnitTests;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
@@ -81,6 +85,10 @@ namespace N2
         GeneratorDriver driver = CSharpGeneratorDriver.Create(new ISourceGenerator[] { generator }, parseOptions: parseOptions, driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true));
         driver = driver.RunGenerators(compilation);
         var runResult = driver.GetRunResult().Results[0];
+
+#if NET
+        var value = new Mermaid().ToMermaid(runResult);
+#endif
 
         Assert.Collection(runResult.TrackedSteps["result_ForAttributeWithMetadataName"],
             step => Assert.True(step.Outputs.Single().Value is ClassDeclarationSyntax { Identifier.ValueText: "C1" }));
@@ -1709,3 +1717,191 @@ class C { }
 
     #endregion
 }
+
+#if NET
+
+class Mermaid
+{
+    public string ToMermaid(GeneratorRunResult result)
+    {
+        var nodeIdCache = new Dictionary<IncrementalGeneratorRunStep, int>();
+
+        var builder = new StringBuilder();
+        builder.AppendLine("flowchart LR");
+
+        foreach (var (name, steps) in result.TrackedOutputSteps)
+        {
+            for (var i = 0; i < steps.Length; i++)
+            {
+                var step = steps[i];
+                DefineNode(step, isOutput: true, name, i, builder, nodeIdCache);
+            }
+        }
+
+        foreach (var (name, steps) in result.TrackedSteps)
+        {
+            for (var i = 0; i < steps.Length; i++)
+            {
+                var step = steps[i];
+                DefineNode(step, isOutput: false, name, i, builder, nodeIdCache);
+            }
+        }
+
+        foreach (var step in GetAllRunSteps(result.TrackedOutputSteps.SelectMany(namedStep => namedStep.Value).Concat(result.TrackedSteps.SelectMany(namedStep => namedStep.Value))))
+        {
+            DefineNode(step, isOutput: false, "", 0, builder, nodeIdCache);
+        }
+
+        foreach (var (step, targetId) in nodeIdCache)
+        {
+            for (var inputIndex = 0; inputIndex < step.Inputs.Length; inputIndex++)
+            {
+                var (source, outputIndex) = step.Inputs[inputIndex];
+                var sourceId = nodeIdCache[source];
+                builder.AppendLine(CultureInfo.InvariantCulture, $@"  {sourceId}_O_{outputIndex} --> {targetId}_I_{inputIndex}");
+            }
+        }
+
+        builder.AppendLine("  classDef Context fill:#ccc");
+        builder.AppendLine("  classDef Skipped fill:#fffef0");
+        builder.AppendLine("  classDef SourceOutput fill:#cfc");
+        builder.AppendLine("  classDef Executed fill:#fffec0");
+        builder.AppendLine("  classDef Inputs stroke-width:0px,fill:none");
+        builder.AppendLine("  classDef Outputs stroke-width:0px,fill:none");
+        builder.AppendLine("  classDef Cached stroke-dasharray: 2 2");
+        builder.AppendLine("  classDef Modified stroke:#f00,fill:#fcc");
+        builder.AppendLine("  classDef Unchanged stroke:#00f,fill:#ccf");
+
+        return builder.ToString();
+
+        static IEnumerable<IncrementalGeneratorRunStep> GetAllRunSteps(IEnumerable<IncrementalGeneratorRunStep> initialSteps)
+        {
+            var visited = new HashSet<IncrementalGeneratorRunStep>();
+            var queue = new Queue<IncrementalGeneratorRunStep>(initialSteps);
+            while (queue.TryDequeue(out var result))
+            {
+                if (!visited.Add(result))
+                {
+                    continue;
+                }
+
+                yield return result;
+
+                foreach (var (source, _) in result.Inputs)
+                {
+                    queue.Enqueue(source);
+                }
+            }
+        }
+
+        static void DefineNode(IncrementalGeneratorRunStep step, bool isOutput, string name, int index, StringBuilder builder, Dictionary<IncrementalGeneratorRunStep, int> nodeIdCache)
+        {
+            if (nodeIdCache.ContainsKey(step))
+            {
+                return;
+            }
+
+            var id = GetNodeId(step, nodeIdCache);
+            var displayName = string.IsNullOrEmpty(name) ? id.ToString(CultureInfo.InvariantCulture) : $"{name}[{index}]";
+            bool includeTime = true;
+            string className;
+            if (!step.Inputs.Any())
+            {
+                className = "Context";
+                includeTime = false;
+            }
+            else if (step.Inputs.All(step => step.Source.Outputs[step.OutputIndex].Reason is IncrementalStepRunReason.Unchanged or IncrementalStepRunReason.Cached))
+            {
+                className = "Skipped";
+                includeTime = false;
+            }
+            else if (isOutput && name == "SourceOutput")
+            {
+                className = "SourceOutput";
+            }
+            else
+            {
+                className = "Executed";
+            }
+
+            if (includeTime)
+            {
+                displayName = $"{displayName}<br/>{Math.Round(step.ElapsedTime.TotalMilliseconds)}ms";
+            }
+
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"  subgraph {id} [""{displayName}""]");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"    direction LR");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"    subgraph {id}_I ["" ""]");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"      direction TB");
+
+            if (step.Inputs.Any())
+            {
+                builder.Append("      ");
+                for (var j = 0; j < step.Inputs.Length; j++)
+                {
+                    if (j > 0)
+                    {
+                        builder.Append(" ~~~ ");
+                    }
+
+                    builder.Append(CultureInfo.InvariantCulture, $@"{id}_I_{j}[I{j}]:::{step.Inputs[j].Source.Outputs[step.Inputs[j].OutputIndex].Reason}");
+                }
+
+                builder.AppendLine();
+            }
+
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"    end");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"    subgraph {id}_O ["" ""]");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"      direction TB");
+
+            if (step.Outputs.Any())
+            {
+                builder.Append("      ");
+                for (var j = 0; j < step.Outputs.Length; j++)
+                {
+                    if (j > 0)
+                    {
+                        builder.Append(" ~~~ ");
+                    }
+
+                    builder.Append(CultureInfo.InvariantCulture, $@"{id}_O_{j}[{GetOutputName(step.Outputs[j].Value, j)}]:::{step.Outputs[j].Reason}");
+                }
+
+                builder.AppendLine();
+            }
+
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"    end");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"    {id}_I:::Inputs ~~~ {id}_O:::Outputs");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"  end");
+            builder.AppendLine(CultureInfo.InvariantCulture, $@"  {id}:::{className}");
+
+            static string GetOutputName(object? value, int index)
+            {
+                return value switch
+                {
+                    AnalyzerConfigOptionsProvider => nameof(AnalyzerConfigOptionsProvider),
+                    (IEnumerable, ImmutableArray<Diagnostic>) => $"O{index}",
+                    Compilation compilation => $"Compilation<br/>'{compilation.AssemblyName}'",
+                    AdditionalText text => $"AdditionalText<br/>'{text.Path}'",
+                    string => "string",
+                    bool b => b.ToString(),
+                    ParseOptions => nameof(ParseOptions),
+                    _ => $"O{index}",
+                };
+            }
+        }
+
+        static int GetNodeId(IncrementalGeneratorRunStep step, Dictionary<IncrementalGeneratorRunStep, int> nodeIdCache)
+        {
+            if (!nodeIdCache.TryGetValue(step, out var result))
+            {
+                result = nodeIdCache.Count;
+                nodeIdCache.Add(step, result);
+            }
+
+            return result;
+        }
+    }
+}
+
+#endif
