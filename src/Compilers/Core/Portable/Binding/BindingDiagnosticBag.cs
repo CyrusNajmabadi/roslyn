@@ -18,50 +18,76 @@ namespace Microsoft.CodeAnalysis
     /// This is base class for a bag used to accumulate information while binding is performed.
     /// Including diagnostic messages and dependencies in the form of "used" assemblies. 
     /// </summary>
-    internal readonly struct BindingDiagnosticBag
-    {
-        public readonly DiagnosticBag? DiagnosticBag;
+    //<<<<<<< HEAD
+    //    internal readonly struct BindingDiagnosticBag
+    //=======
+    //    internal abstract class BindingDiagnosticBag<TAssemblySymbol>
+    //        where TAssemblySymbol : class, IAssemblySymbolInternal
+    //>>>>>>> genericDiagBag
+    //    {
+    //        public readonly ICollection<TAssemblySymbol>? DependenciesBag;
 
-        public BindingDiagnosticBag(DiagnosticBag? diagnosticBag)
-        {
-            DiagnosticBag = diagnosticBag;
-        }
+    //<<<<<<< HEAD
+    //        public BindingDiagnosticBag(DiagnosticBag? diagnosticBag)
+    //=======
+    //        private BindingDiagnosticBag(DiagnosticBag? diagnosticBag)
+    //>>>>>>> genericDiagBag
+    //        {
+    //            DiagnosticBag = diagnosticBag;
+    //        }
 
-        [MemberNotNullWhen(true, nameof(DiagnosticBag))]
-        internal bool AccumulatesDiagnostics => DiagnosticBag is object;
+    //        protected BindingDiagnosticBag(DiagnosticBag? diagnosticBag, ICollection<TAssemblySymbol>? dependenciesBag)
+    //            : this(diagnosticBag)
+    //        {
+    //            Debug.Assert(diagnosticBag?.GetType().IsValueType != true);
+    //            DependenciesBag = dependenciesBag;
+    //        }
 
-        internal void AddRange<T>(ImmutableArray<T> diagnostics) where T : Diagnostic
-        {
-            DiagnosticBag?.AddRange(diagnostics);
-        }
+    //        protected BindingDiagnosticBag(bool usePool)
+    //            : this(usePool ? DiagnosticBag.GetInstance() : new DiagnosticBag(), usePool ? PooledHashSet<TAssemblySymbol>.GetInstance() : new HashSet<TAssemblySymbol>())
+    //        {
+    //        }
 
-        internal void AddRange(IEnumerable<Diagnostic> diagnostics)
-        {
-            DiagnosticBag?.AddRange(diagnostics);
-        }
+    //        [MemberNotNullWhen(true, nameof(DiagnosticBag))]
+    //        internal bool AccumulatesDiagnostics => DiagnosticBag is object;
 
-        internal bool HasAnyResolvedErrors()
-        {
-            Debug.Assert(DiagnosticBag is object);
-            return DiagnosticBag?.HasAnyResolvedErrors() == true;
-        }
+    //        internal void AddRange<T>(ImmutableArray<T> diagnostics) where T : Diagnostic
+    //        {
+    //            DiagnosticBag?.AddRange(diagnostics);
+    //        }
 
-        internal bool HasAnyErrors()
-        {
-            Debug.Assert(DiagnosticBag is object);
-            return DiagnosticBag?.HasAnyErrors() == true;
-        }
+    //        internal void AddRange(IEnumerable<Diagnostic> diagnostics)
+    //        {
+    //            DiagnosticBag?.AddRange(diagnostics);
+    //        }
 
-        internal void Add(Diagnostic diag)
-        {
-            DiagnosticBag?.Add(diag);
-        }
-    }
+    //        internal bool HasAnyResolvedErrors()
+    //        {
+    //            Debug.Assert(DiagnosticBag is object);
+    //            return DiagnosticBag?.HasAnyResolvedErrors() == true;
+    //        }
 
+    //        internal bool HasAnyErrors()
+    //        {
+    //            Debug.Assert(DiagnosticBag is object);
+    //            return DiagnosticBag?.HasAnyErrors() == true;
+    //        }
+
+    //        internal void Add(Diagnostic diag)
+    //        {
+    //            DiagnosticBag?.Add(diag);
+    //        }
+    //<<<<<<< HEAD
+    //    }
+
+    /// <summary>
+    /// This is base class for a bag used to accumulate information while binding is performed.
+    /// Including diagnostic messages and dependencies in the form of "used" assemblies. 
+    /// </summary>
     internal readonly struct BindingDiagnosticBag<TAssemblySymbol>
         where TAssemblySymbol : class, IAssemblySymbolInternal
     {
-        private readonly BindingDiagnosticBag _diagnosticBag;
+        private readonly DiagnosticBag? _diagnosticBag;
         private readonly Func<DiagnosticInfo, DiagnosticBag, Location, bool> _reportUseSiteDiagnostic;
 
         public readonly ICollection<TAssemblySymbol>? DependenciesBag;
@@ -71,7 +97,7 @@ namespace Microsoft.CodeAnalysis
             ICollection<TAssemblySymbol>? dependenciesBag,
             Func<DiagnosticInfo, DiagnosticBag, Location, bool> reportUseSiteDiagnostic)
         {
-            _diagnosticBag = new(diagnosticBag);
+            _diagnosticBag = diagnosticBag;
             Debug.Assert(diagnosticBag?.GetType().IsValueType != true);
             DependenciesBag = dependenciesBag;
             _reportUseSiteDiagnostic = reportUseSiteDiagnostic;
@@ -92,31 +118,7 @@ namespace Microsoft.CodeAnalysis
             return DiagnosticBag;
         }
 
-        #region forwarding methods
-
-        internal bool AccumulatesDiagnostics => _diagnosticBag.AccumulatesDiagnostics;
-
-        internal void AddRange<T>(ImmutableArray<T> diagnostics) where T : Diagnostic
-            => _diagnosticBag.AddRange(diagnostics);
-
-        internal void AddRange(IEnumerable<Diagnostic> diagnostics)
-            => _diagnosticBag.AddRange(diagnostics);
-
-        internal bool HasAnyResolvedErrors()
-            => _diagnosticBag.HasAnyResolvedErrors();
-
-        internal bool HasAnyErrors()
-            => _diagnosticBag.HasAnyErrors();
-
-        internal void Add(Diagnostic diag)
-            => _diagnosticBag.Add(diag);
-
-        #endregion
-
-        public static implicit operator BindingDiagnosticBag(BindingDiagnosticBag<TAssemblySymbol> bag)
-            => bag._diagnosticBag;
-
-        public DiagnosticBag? DiagnosticBag => _diagnosticBag.DiagnosticBag;
+        public DiagnosticBag? DiagnosticBag => _diagnosticBag;
 
         internal bool AccumulatesDependencies => DependenciesBag is object;
 
