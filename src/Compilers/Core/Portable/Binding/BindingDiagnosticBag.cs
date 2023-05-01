@@ -86,6 +86,12 @@ namespace Microsoft.CodeAnalysis
         {
         }
 
+        public object GetLock()
+        {
+            Debug.Assert(DiagnosticBag != null);
+            return DiagnosticBag;
+        }
+
         #region forwarding methods
 
         internal bool AccumulatesDiagnostics => _diagnosticBag.AccumulatesDiagnostics;

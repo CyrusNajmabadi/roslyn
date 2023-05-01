@@ -1359,8 +1359,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                 && method.ContainingType is SourceMemberContainerTypeSymbol containingType)
             {
                 Binder.ProcessedFieldInitializers discardedInitializers = default;
-                Binder.BindFieldInitializers(compilation, null, method.IsStatic ? containingType.StaticInitializers : containingType.InstanceInitializers, CSharpBindingDiagnosticBag.Discarded, ref discardedInitializers);
-                return GetAfterInitializersState(compilation, method, InitializerRewriter.RewriteConstructor(discardedInitializers.BoundInitializers, method), constructorBody, diagnostics: CSharpBindingDiagnosticBag.Discarded);
+                Binder.BindFieldInitializers(compilation, null, method.IsStatic ? containingType.StaticInitializers : containingType.InstanceInitializers, BindingDiagnosticBag.Discarded, ref discardedInitializers);
+                return GetAfterInitializersState(compilation, method, InitializerRewriter.RewriteConstructor(discardedInitializers.BoundInitializers, method), constructorBody, diagnostics: BindingDiagnosticBag.Discarded);
             }
 
             return null;
@@ -1377,7 +1377,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             DiagnosticBag diagnosticsBag;
             if (diagnostics.DiagnosticBag == null)
             {
-                diagnostics = CSharpBindingDiagnosticBag.Discarded;
+                diagnostics = BindingDiagnosticBag.Discarded;
                 diagnosticsBag = DiagnosticBag.GetInstance();
                 ownsDiagnostics = true;
             }

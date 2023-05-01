@@ -258,12 +258,12 @@ namespace Microsoft.CodeAnalysis.CSharp
             BoundExpression boundNode;
             if (bindingOption == SpeculativeBindingOption.BindAsTypeOrNamespace || binder.Flags.Includes(BinderFlags.CrefParameterOrReturnType))
             {
-                boundNode = binder.BindNamespaceOrType(expression, CSharpBindingDiagnosticBag.Discarded);
+                boundNode = binder.BindNamespaceOrType(expression, BindingDiagnosticBag.Discarded);
             }
             else
             {
                 Debug.Assert(bindingOption == SpeculativeBindingOption.BindAsExpression);
-                boundNode = binder.BindExpression(expression, CSharpBindingDiagnosticBag.Discarded);
+                boundNode = binder.BindExpression(expression, BindingDiagnosticBag.Discarded);
             }
 
             return boundNode;
@@ -295,7 +295,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (binder.Flags.Includes(BinderFlags.CrefParameterOrReturnType))
             {
-                crefSymbols = ImmutableArray.Create<Symbol>(binder.BindType(expression, CSharpBindingDiagnosticBag.Discarded).Type);
+                crefSymbols = ImmutableArray.Create<Symbol>(binder.BindType(expression, BindingDiagnosticBag.Discarded).Type);
                 return null;
             }
             else if (binder.InCref)
@@ -324,7 +324,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal static ImmutableArray<Symbol> BindCref(CrefSyntax crefSyntax, Binder binder)
         {
             Symbol unusedAmbiguityWinner;
-            var symbols = binder.BindCref(crefSyntax, out unusedAmbiguityWinner, CSharpBindingDiagnosticBag.Discarded);
+            var symbols = binder.BindCref(crefSyntax, out unusedAmbiguityWinner, BindingDiagnosticBag.Discarded);
             return symbols;
         }
 
@@ -410,9 +410,9 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             AliasSymbol aliasOpt; // not needed.
-            NamedTypeSymbol attributeType = (NamedTypeSymbol)binder.BindType(attribute.Name, CSharpBindingDiagnosticBag.Discarded, out aliasOpt).Type;
+            NamedTypeSymbol attributeType = (NamedTypeSymbol)binder.BindType(attribute.Name, BindingDiagnosticBag.Discarded, out aliasOpt).Type;
             // note: we don't need to pass an 'attributedMember' here because we only need symbolInfo from this node
-            var boundNode = new ExecutableCodeBinder(attribute, binder.ContainingMemberOrLambda, binder).BindAttribute(attribute, attributeType, attributedMember: null, CSharpBindingDiagnosticBag.Discarded);
+            var boundNode = new ExecutableCodeBinder(attribute, binder.ContainingMemberOrLambda, binder).BindAttribute(attribute, attributeType, attributedMember: null, BindingDiagnosticBag.Discarded);
 
             return boundNode;
         }
@@ -809,7 +809,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 binder = new ExecutableCodeBinder(constructorInitializer, binder.ContainingMemberOrLambda, binder);
 
-                BoundExpressionStatement bnode = binder.BindConstructorInitializer(constructorInitializer, CSharpBindingDiagnosticBag.Discarded);
+                BoundExpressionStatement bnode = binder.BindConstructorInitializer(constructorInitializer, BindingDiagnosticBag.Discarded);
                 var binfo = GetSymbolInfoFromBoundConstructorInitializer(memberModel, binder, bnode);
                 return binfo;
             }
@@ -882,7 +882,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 binder = new ExecutableCodeBinder(constructorInitializer, binder.ContainingMemberOrLambda, binder);
 
-                BoundExpressionStatement bnode = binder.BindConstructorInitializer(constructorInitializer, CSharpBindingDiagnosticBag.Discarded);
+                BoundExpressionStatement bnode = binder.BindConstructorInitializer(constructorInitializer, BindingDiagnosticBag.Discarded);
                 SymbolInfo binfo = GetSymbolInfoFromBoundConstructorInitializer(memberModel, binder, bnode);
                 return binfo;
             }
@@ -1749,7 +1749,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     // binder.ResultSymbol is defined only for type/namespace lookups
                     bool wasError;
-                    Symbol singleSymbol = binder.ResultSymbol(lookupResult, name, arity, this.Root, CSharpBindingDiagnosticBag.Discarded, true, out wasError, container, options);
+                    Symbol singleSymbol = binder.ResultSymbol(lookupResult, name, arity, this.Root, BindingDiagnosticBag.Discarded, true, out wasError, container, options);
 
                     if (!wasError)
                     {
@@ -2762,7 +2762,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             AliasSymbol aliasOpt;
-            var attributeType = (NamedTypeSymbol)binder.BindType(attribute.Name, CSharpBindingDiagnosticBag.Discarded, out aliasOpt).Type;
+            var attributeType = (NamedTypeSymbol)binder.BindType(attribute.Name, BindingDiagnosticBag.Discarded, out aliasOpt).Type;
             speculativeModel = ((SyntaxTreeSemanticModel)this).CreateSpeculativeAttributeSemanticModel(position, attribute, binder, aliasOpt, attributeType);
             return true;
         }
@@ -2844,7 +2844,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             var binder = this.GetEnclosingBinder(position);
             if (binder != null)
             {
-                var bnode = binder.BindExpression(expression, CSharpBindingDiagnosticBag.Discarded);
+                var bnode = binder.BindExpression(expression, BindingDiagnosticBag.Discarded);
 
                 if (bnode != null && !cdestination.IsErrorType())
                 {
@@ -2896,7 +2896,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             var binder = this.GetEnclosingBinder(position);
             if (binder != null)
             {
-                var bnode = binder.BindExpression(expression, CSharpBindingDiagnosticBag.Discarded);
+                var bnode = binder.BindExpression(expression, BindingDiagnosticBag.Discarded);
 
                 if (bnode != null && !destination.IsErrorType())
                 {

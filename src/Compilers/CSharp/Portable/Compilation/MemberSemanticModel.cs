@@ -191,7 +191,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 position = CheckAndAdjustPosition(position);
                 expression = SyntaxFactory.GetStandaloneExpression(expression);
                 binder = GetSpeculativeBinder(position, expression, bindingOption);
-                var boundRoot = binder.BindExpression(expression, CSharpBindingDiagnosticBag.Discarded);
+                var boundRoot = binder.BindExpression(expression, BindingDiagnosticBag.Discarded);
                 ImmutableDictionary<Symbol, Symbol> ignored = null;
                 return (BoundExpression)NullableWalker.AnalyzeAndRewriteSpeculation(position, boundRoot, binder, snapshotManager, newSnapshots: out _, remappedSymbols: ref ignored);
             }
@@ -1680,7 +1680,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             using (_nodeMapLock.DisposableWrite())
             {
-                BoundNode boundOuterExpression = this.Bind(incrementalBinder, nodeToBind, CSharpBindingDiagnosticBag.Discarded);
+                BoundNode boundOuterExpression = this.Bind(incrementalBinder, nodeToBind, BindingDiagnosticBag.Discarded);
 
                 // https://github.com/dotnet/roslyn/issues/35038: Rewrite the above node and add a test that hits this path with nullable
                 // enabled
@@ -1712,7 +1712,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             using (_nodeMapLock.DisposableWrite())
             {
-                BoundNode boundOuterExpression = this.Bind(incrementalBinder, lambdaOrQuery, CSharpBindingDiagnosticBag.Discarded);
+                BoundNode boundOuterExpression = this.Bind(incrementalBinder, lambdaOrQuery, BindingDiagnosticBag.Discarded);
 
                 // https://github.com/dotnet/roslyn/issues/35038: We need to do a rewrite here, and create a test that can hit this.
                 if (!IsNullableAnalysisEnabled() && Compilation.IsNullableAnalysisEnabledAlways)
@@ -1963,7 +1963,7 @@ done:
             BoundNode bind(CSharpSyntaxNode root, out Binder binder)
             {
                 binder = GetBinderToBindNode(root);
-                return Bind(binder, root, CSharpBindingDiagnosticBag.Discarded);
+                return Bind(binder, root, BindingDiagnosticBag.Discarded);
             }
 
             void rewriteAndCache()
@@ -2084,7 +2084,7 @@ done:
 
             using (_nodeMapLock.DisposableWrite())
             {
-                BoundNode boundStatement = this.Bind(incrementalBinder, nodeToBind, CSharpBindingDiagnosticBag.Discarded);
+                BoundNode boundStatement = this.Bind(incrementalBinder, nodeToBind, BindingDiagnosticBag.Discarded);
                 results = GuardedAddBoundTreeAndGetBoundNodeFromMap(node, boundStatement);
             }
 
@@ -2113,7 +2113,7 @@ done:
                 // https://github.com/dotnet/roslyn/issues/35038: We have to run analysis on this node in some manner
                 using (_nodeMapLock.DisposableWrite())
                 {
-                    var boundNode = this.Bind(incrementalBinder, node, CSharpBindingDiagnosticBag.Discarded);
+                    var boundNode = this.Bind(incrementalBinder, node, BindingDiagnosticBag.Discarded);
                     GuardedAddBoundTreeForStandaloneSyntax(node, boundNode);
                     results = GuardedGetBoundNodesFromMap(node);
                 }

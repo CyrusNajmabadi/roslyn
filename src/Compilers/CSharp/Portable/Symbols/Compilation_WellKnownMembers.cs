@@ -644,7 +644,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     if (diagnosticsOpt != null)
                     {
-                        var errorReported = Binder.ReportUseSite(userDefinedAttribute, diagnosticsOpt, locationOpt);
+                        var errorReported = Binder.ReportUseSite(userDefinedAttribute, diagnosticsOpt.Value, locationOpt);
                         Debug.Assert(errorReported);
                     }
                 }

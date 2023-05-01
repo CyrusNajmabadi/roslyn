@@ -55,13 +55,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             if (numElements >= ValueTupleRestPosition && diagnostics != null && !underlyingType.IsErrorType())
             {
                 WellKnownMember wellKnownTupleRest = GetTupleTypeMember(ValueTupleRestPosition, ValueTupleRestPosition);
-                _ = GetWellKnownMemberInType(underlyingType.OriginalDefinition, wellKnownTupleRest, diagnostics, syntax);
+                _ = GetWellKnownMemberInType(underlyingType.OriginalDefinition, wellKnownTupleRest, diagnostics.Value, syntax);
             }
 
             if (diagnostics?.DiagnosticBag is object && ((SourceModuleSymbol)compilation.SourceModule).AnyReferencedAssembliesAreLinked)
             {
                 // Complain about unembeddable types from linked assemblies.
-                Emit.NoPia.EmbeddedTypesManager.IsValidEmbeddableType(underlyingType, syntax, diagnostics.DiagnosticBag);
+                Emit.NoPia.EmbeddedTypesManager.IsValidEmbeddableType(underlyingType, syntax, diagnostics.Value.DiagnosticBag);
             }
 
             var locations = locationOpt is null ? ImmutableArray<Location>.Empty : ImmutableArray.Create(locationOpt);

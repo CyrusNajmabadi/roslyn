@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             CSharpBindingDiagnosticBag diagnostics,
             ref ProcessedFieldInitializers processedInitializers)
         {
-            var diagsForInstanceInitializers = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
+            var diagsForInstanceInitializers = BindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
             ImportChain? firstImportChain;
             processedInitializers.BoundInitializers = BindFieldInitializers(compilation, scriptInitializerOpt, fieldInitializers, diagsForInstanceInitializers, out firstImportChain);
             processedInitializers.HasErrors = diagsForInstanceInitializers.HasAnyErrors();
@@ -298,7 +298,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             CSharpBindingDiagnosticBag initializerDiagnostics;
             if (isImplicitlyTypedField)
             {
-                initializerDiagnostics = CSharpBindingDiagnosticBag.Discarded;
+                initializerDiagnostics = BindingDiagnosticBag.Discarded;
             }
             else
             {

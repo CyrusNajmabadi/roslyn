@@ -2565,7 +2565,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 return true;
                             }
 
-                            bool receiverIsLValue = CheckValueKind(receiver.Syntax, receiver, BindValueKind.AddressOf, checkingReceiver: false, diagnostics: CSharpBindingDiagnosticBag.Discarded);
+                            bool receiverIsLValue = CheckValueKind(receiver.Syntax, receiver, BindValueKind.AddressOf, checkingReceiver: false, diagnostics: BindingDiagnosticBag.Discarded);
 
                             if (!receiverIsLValue)
                             {
@@ -3184,7 +3184,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 ((CSharpParseOptions)node.SyntaxTree.Options).IsFeatureEnabled(MessageID.IDS_FeaturePatternMatching))
             {
                 // it did not bind as a type; try binding as a constant expression pattern
-                var isPatternDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                var isPatternDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
                 if ((object)operand.Type == null)
                 {
                     if (!operandHasErrors)
@@ -3293,7 +3293,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 out CSharpBindingDiagnosticBag bindAsTypeDiagnostics,
                 out BoundTypeExpression boundType)
             {
-                bindAsTypeDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: diagnostics.AccumulatesDependencies);
+                bindAsTypeDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: diagnostics.AccumulatesDependencies);
                 TypeWithAnnotations targetTypeWithAnnotations = BindType(possibleType, bindAsTypeDiagnostics, out AliasSymbol alias);
                 TypeSymbol targetType = targetTypeWithAnnotations.Type;
                 boundType = new BoundTypeExpression(possibleType, alias, targetTypeWithAnnotations);

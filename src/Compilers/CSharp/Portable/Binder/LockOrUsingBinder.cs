@@ -75,12 +75,12 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        protected BoundExpression BindTargetExpression(CSharpBindingDiagnosticBag diagnostics, Binder originalBinder, TypeSymbol targetTypeOpt = null)
+        protected BoundExpression BindTargetExpression(CSharpBindingDiagnosticBag? diagnostics, Binder originalBinder, TypeSymbol targetTypeOpt = null)
         {
             if (_lazyExpressionAndDiagnostics == null)
             {
                 // Filter out method group in conversion.
-                var expressionDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                var expressionDiagnostics = BindingDiagnosticBag.GetInstance();
                 BoundExpression boundExpression = originalBinder.BindValue(TargetExpressionSyntax, expressionDiagnostics, Binder.BindValueKind.RValueOrMethodGroup);
                 if (targetTypeOpt is object)
                 {
@@ -96,7 +96,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (diagnostics != null)
             {
-                diagnostics.AddRange(_lazyExpressionAndDiagnostics.Diagnostics, allowMismatchInDependencyAccumulation: true);
+                diagnostics.Value.AddRange(_lazyExpressionAndDiagnostics.Diagnostics, allowMismatchInDependencyAccumulation: true);
             }
 
             return _lazyExpressionAndDiagnostics.Expression;

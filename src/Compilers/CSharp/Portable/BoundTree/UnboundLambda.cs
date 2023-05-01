@@ -679,7 +679,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if (!HasExplicitReturnType(out var returnRefKind, out var returnType))
             {
                 var lambdaBodyBinder = new ExecutableCodeBinder(_unboundLambda.Syntax, lambdaSymbol, GetWithParametersBinder(lambdaSymbol, Binder));
-                var block = BindLambdaBody(lambdaSymbol, lambdaBodyBinder, CSharpBindingDiagnosticBag.Discarded);
+                var block = BindLambdaBody(lambdaSymbol, lambdaBodyBinder, BindingDiagnosticBag.Discarded);
                 var returnTypes = ArrayBuilder<(BoundReturnStatement, TypeWithAnnotations)>.GetInstance();
                 BoundLambda.BlockReturns.GetReturnTypes(returnTypes, block);
                 var inferredReturnType = BoundLambda.InferReturnType(
@@ -743,7 +743,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Binder lambdaBodyBinder;
             BoundBlock block;
 
-            var diagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, _unboundLambda.WithDependencies);
+            var diagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, _unboundLambda.WithDependencies);
             var compilation = Binder.Compilation;
             var cacheKey = ReturnInferenceCacheKey.Create(delegateType, IsAsync);
 
@@ -951,7 +951,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             TypeWithAnnotations returnType,
             RefKind refKind)
         {
-            var diagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, _unboundLambda.WithDependencies);
+            var diagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, _unboundLambda.WithDependencies);
             var lambdaSymbol = CreateLambdaSymbol(Binder.ContainingMemberOrLambda!,
                                                   returnType,
                                                   parameterTypes,

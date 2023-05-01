@@ -371,7 +371,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                 // We will recompute this diagnostics more accurately later, when binding without BinderFlags.SuppressTypeArgumentBinding  
                 clauses = withTypeParametersBinder.BindTypeParameterConstraintClauses(containingSymbol, typeParameters, typeParameterList, constraintClauses,
-                                                                    CSharpBindingDiagnosticBag.Discarded, performOnlyCycleSafeValidation: true);
+                                                                    BindingDiagnosticBag.Discarded, performOnlyCycleSafeValidation: true);
 
                 clauses = AdjustConstraintKindsBasedOnConstraintTypes(typeParameters, clauses);
             }
@@ -475,7 +475,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             CSharpCompilation compilation,
             ConversionsBase conversions)
         {
-            var diagnostics = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
+            var diagnostics = BindingDiagnosticBag.CreateNewInstance(DiagnosticBag.GetInstance());
 
             // Nullability checks can only add warnings here so skip them for this check as we are only
             // concerned with errors.
@@ -499,20 +499,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             public readonly ConversionsBase Conversions;
             public readonly bool IncludeNullability;
             public readonly Location Location;
-            public readonly CSharpBindingDiagnosticBag Diagnostics;
+            public readonly CSharpBindingDiagnosticBag? Diagnostics;
             public readonly CompoundUseSiteInfo<AssemblySymbol> Template;
 
-            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, Location location, CSharpBindingDiagnosticBag diagnostics) :
+            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, Location location, CSharpBindingDiagnosticBag? diagnostics) :
                 this(currentCompilation, conversions, currentCompilation.IsFeatureEnabled(MessageID.IDS_FeatureNullableReferenceTypes), location, diagnostics)
             {
             }
 
-            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag diagnostics) :
+            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag? diagnostics) :
                 this(currentCompilation, conversions, includeNullability, location, diagnostics, template: new CompoundUseSiteInfo<AssemblySymbol>(diagnostics, currentCompilation.Assembly))
             {
             }
 
-            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag diagnostics, CompoundUseSiteInfo<AssemblySymbol> template)
+            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag? diagnostics, CompoundUseSiteInfo<AssemblySymbol> template)
             {
                 this.CurrentCompilation = currentCompilation;
                 this.Conversions = conversions;

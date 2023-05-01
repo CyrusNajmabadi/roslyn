@@ -526,7 +526,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if (needToCheckConversionToObject)
             {
                 TypeSymbol objectType = GetSpecialType(SpecialType.System_Object, diagnostics, syntax);
-                CSharpBindingDiagnosticBag conversionDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
+                CSharpBindingDiagnosticBag conversionDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
                 foreach (var parts in partsArray)
                 {
                     foreach (var currentPart in parts)
@@ -582,7 +582,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             populateArguments(syntax, outConstructorAdditionalArguments, baseStringLength, numFormatHoles, intType, argumentsBuilder);
 
             BoundExpression constructorCall;
-            var outConstructorDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: diagnostics.AccumulatesDependencies);
+            var outConstructorDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: diagnostics.AccumulatesDependencies);
             var outConstructorCall = MakeConstructorInvocation(interpolatedStringHandlerType, argumentsBuilder, refKindsBuilder, syntax, outConstructorDiagnostics);
             if (outConstructorCall is not BoundObjectCreationExpression { ResultKind: LookupResultKind.Viable })
             {
@@ -594,7 +594,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 populateArguments(syntax, additionalConstructorArguments, baseStringLength, numFormatHoles, intType, argumentsBuilder);
                 refKindsBuilder.RemoveLast();
 
-                var nonOutConstructorDiagnostics = CSharpBindingDiagnosticBag.GetInstance(template: outConstructorDiagnostics);
+                var nonOutConstructorDiagnostics = BindingDiagnosticBag.GetInstance(template: outConstructorDiagnostics);
                 BoundExpression nonOutConstructorCall = MakeConstructorInvocation(interpolatedStringHandlerType, argumentsBuilder, refKindsBuilder, syntax, nonOutConstructorDiagnostics);
 
                 if (nonOutConstructorCall is BoundObjectCreationExpression { ResultKind: LookupResultKind.Viable })

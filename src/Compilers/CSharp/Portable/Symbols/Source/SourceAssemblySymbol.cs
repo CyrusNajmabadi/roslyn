@@ -912,7 +912,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     case CompletionPart.FinishAttributeChecks:
                         if (_state.NotePartComplete(CompletionPart.StartAttributeChecks))
                         {
-                            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                            var diagnostics = BindingDiagnosticBag.GetInstance();
                             ValidateAttributeSemantics(diagnostics);
                             AddDeclarationDiagnostics(diagnostics);
                             var thisThreadCompleted = _state.NotePartComplete(CompletionPart.FinishAttributeChecks);
@@ -959,7 +959,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private void ReportDiagnosticsForAddedModules()
         {
-            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+            var diagnostics = BindingDiagnosticBag.GetInstance();
 
             foreach (var pair in _compilation.GetBoundReferenceManager().ReferencedModuleIndexMap)
             {
@@ -1358,7 +1358,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
             else
             {
-                var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                var diagnostics = BindingDiagnosticBag.GetInstance();
 
                 ImmutableArray<string> netModuleNames;
                 ImmutableArray<CSharpAttributeData> attributesFromNetModules = GetNetModuleAttributes(out netModuleNames);
@@ -1488,7 +1488,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 for (int i = netModuleAttributesCount - 1; i >= 0; i--)
                 {
                     CSharpAttributeData attribute = attributesFromNetModules[i];
-                    if (!attribute.HasErrors && ValidateAttributeUsageForNetModuleAttribute(attribute, netModuleNames[i], CSharpBindingDiagnosticBag.Discarded, ref uniqueAttributes))
+                    if (!attribute.HasErrors && ValidateAttributeUsageForNetModuleAttribute(attribute, netModuleNames[i], BindingDiagnosticBag.Discarded, ref uniqueAttributes))
                     {
                         limitedDecodeWellKnownAttribute(attribute, attributeMatches, ref result);
                     }

@@ -201,7 +201,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         var result = state.fromExpression;
 
                         // ignore missing or malformed Select method
-                        BoundExpression? unoptimized = FinalTranslation(state, CSharpBindingDiagnosticBag.Discarded);
+                        BoundExpression? unoptimized = FinalTranslation(state, BindingDiagnosticBag.Discarded);
 
                         if (unoptimized.HasAnyErrors && !result.HasAnyErrors) unoptimized = null;
                         return MakeQueryClause(state.selectOrGroup, result, unoptimizedForm: unoptimized);
@@ -258,7 +258,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         var lambdaLeft = MakeQueryUnboundLambda(state.RangeVariableMap(), x, k, diagnostics.AccumulatesDependencies);
 
                         // this is the unoptimized form (when v is not the identifier x)
-                        var d = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                        var d = BindingDiagnosticBag.GetInstance(diagnostics);
                         BoundExpression lambdaRight = MakeQueryUnboundLambda(state.RangeVariableMap(), x, v, diagnostics.AccumulatesDependencies);
                         result = MakeQueryInvocation(state.selectOrGroup, e, "GroupBy", ImmutableArray.Create(lambdaLeft, lambdaRight), d
 #if DEBUG

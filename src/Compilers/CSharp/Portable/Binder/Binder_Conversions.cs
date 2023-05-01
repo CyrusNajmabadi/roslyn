@@ -73,7 +73,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             else if (source.Type is not null && filterConversion(conversion))
             {
                 var placeholder2 = new BoundValuePlaceholder(source.Syntax, source.Type);
-                var result2 = createConversion(syntax, placeholder2, conversion, isCast, conversionGroupOpt, wasCompilerGenerated, destination, CSharpBindingDiagnosticBag.Discarded, hasErrors);
+                var result2 = createConversion(syntax, placeholder2, conversion, isCast, conversionGroupOpt, wasCompilerGenerated, destination, BindingDiagnosticBag.Discarded, hasErrors);
                 Debug.Assert(BoundNode.GetConversion(result2, placeholder2) == conversion);
             }
 

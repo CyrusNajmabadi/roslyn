@@ -159,7 +159,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 filterSpanWithinTree: null,
                 processIncludes: processIncludes,
                 isForSingleSymbol: true,
-                diagnostics: CSharpBindingDiagnosticBag.Discarded,
+                diagnostics: BindingDiagnosticBag.Discarded,
                 cancellationToken: cancellationToken);
             compiler.Visit(symbol);
             Debug.Assert(compiler._indentDepth == 0);

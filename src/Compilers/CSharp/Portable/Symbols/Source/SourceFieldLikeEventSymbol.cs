@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             _name = declaratorSyntax.Identifier.ValueText;
 
-            var declaratorDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
+            var declaratorDiagnostics = BindingDiagnosticBag.GetInstance();
             var declarationSyntax = (VariableDeclarationSyntax)declaratorSyntax.Parent;
             _type = BindEventType(binder, declarationSyntax.Type, declaratorDiagnostics);
 
@@ -176,7 +176,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private SourceEventFieldSymbol MakeAssociatedField(VariableDeclaratorSyntax declaratorSyntax)
         {
-            var field = new SourceEventFieldSymbol(this, declaratorSyntax, CSharpBindingDiagnosticBag.Discarded);
+            var field = new SourceEventFieldSymbol(this, declaratorSyntax, BindingDiagnosticBag.Discarded);
 
             Debug.Assert(field.Name == _name);
             return field;

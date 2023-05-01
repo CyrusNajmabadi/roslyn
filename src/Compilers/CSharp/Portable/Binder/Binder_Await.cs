@@ -118,13 +118,13 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // Could we bind await on this expression (ignoring whether we are in async context)?
             var syntax = expression.Syntax;
-            if (ReportBadAwaitContext(syntax, syntax.Location, CSharpBindingDiagnosticBag.Discarded))
+            if (ReportBadAwaitContext(syntax, syntax.Location, BindingDiagnosticBag.Discarded))
             {
                 return false;
             }
 
             return GetAwaitableExpressionInfo(expression, getAwaiterGetResultCall: out _,
-                node: syntax, diagnostics: CSharpBindingDiagnosticBag.Discarded);
+                node: syntax, diagnostics: BindingDiagnosticBag.Discarded);
         }
 
         /// <summary>

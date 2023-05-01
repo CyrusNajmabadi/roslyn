@@ -53,7 +53,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         qualifiedName = SyntaxFactory.QualifiedName(left: qualifiedName, right: SyntaxFactory.IdentifierName(identifiers[j]));
                     }
 
-                    var directiveDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                    var directiveDiagnostics = BindingDiagnosticBag.GetInstance();
                     Debug.Assert(directiveDiagnostics.DiagnosticBag is object);
                     Debug.Assert(directiveDiagnostics.DependenciesBag is object);
 
@@ -129,7 +129,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
 
                 DiagnosticBag semanticDiagnostics = compilation.DeclarationDiagnostics;
-                var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                var diagnostics = BindingDiagnosticBag.GetInstance();
                 Debug.Assert(diagnostics.DiagnosticBag is object);
                 Debug.Assert(diagnostics.DependenciesBag is object);
 

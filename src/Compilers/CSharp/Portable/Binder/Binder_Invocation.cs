@@ -626,7 +626,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         // we want to force any unbound lambda arguments to cache an appropriate conversion if possible; see 9448.
                         result = BindInvocationExpressionContinued(
                             syntax, expression, methodName, resolution.OverloadResolutionResult, resolution.AnalyzedArguments,
-                            resolution.MethodGroup, delegateTypeOpt: null, diagnostics: CSharpBindingDiagnosticBag.Discarded, queryClause: queryClause);
+                            resolution.MethodGroup, delegateTypeOpt: null, diagnostics: BindingDiagnosticBag.Discarded, queryClause: queryClause);
                     }
 
                     // Since the resolution is non-empty and has no diagnostics, the LookupResultKind in its MethodGroup is uninteresting.
@@ -815,7 +815,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             var finalCandidates = ArrayBuilder<TMethodOrPropertySymbol>.GetInstance();
             CSharpBindingDiagnosticBag firstFailed = null;
-            var candidateDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+            var candidateDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
 
             for (int i = 0, n = overloadResolutionResult.ResultsBuilder.Count; i < n; i++)
             {
@@ -840,7 +840,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     if (firstFailed == null)
                     {
                         firstFailed = candidateDiagnostics;
-                        candidateDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                        candidateDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
                     }
                     else
                     {
@@ -1887,7 +1887,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             var argument = node.ArgumentList.Arguments[0].Expression;
             var boundArgument = BindExpression(argument, diagnostics);
 
-            bool syntaxIsOk = CheckSyntaxForNameofArgument(argument, out string name, boundArgument.HasAnyErrors ? CSharpBindingDiagnosticBag.Discarded : diagnostics);
+            bool syntaxIsOk = CheckSyntaxForNameofArgument(argument, out string name, boundArgument.HasAnyErrors ? BindingDiagnosticBag.Discarded : diagnostics);
             if (!boundArgument.HasAnyErrors && syntaxIsOk && boundArgument.Kind == BoundKind.MethodGroup)
             {
                 var methodGroup = (BoundMethodGroup)boundArgument;

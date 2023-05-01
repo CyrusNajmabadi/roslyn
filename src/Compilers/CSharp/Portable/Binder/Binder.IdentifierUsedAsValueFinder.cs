@@ -170,7 +170,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             private bool CheckLambda(AnonymousFunctionExpressionSyntax lambdaSyntax, Binder enclosingBinder)
             {
-                UnboundLambda unboundLambda = enclosingBinder.AnalyzeAnonymousFunction(lambdaSyntax, CSharpBindingDiagnosticBag.Discarded);
+                UnboundLambda unboundLambda = enclosingBinder.AnalyzeAnonymousFunction(lambdaSyntax, BindingDiagnosticBag.Discarded);
                 var lambdaBodyBinder = CreateLambdaBodyBinder(enclosingBinder, unboundLambda);
                 return CheckIdentifiersInNode(lambdaSyntax.Body, lambdaBodyBinder.GetBinder(lambdaSyntax.Body) ?? lambdaBodyBinder);
             }
@@ -269,7 +269,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     Debug.Assert(lookupResult.Symbols.Any());
 
                     var members = ArrayBuilder<Symbol>.GetInstance();
-                    Symbol symbol = enclosingBinder.GetSymbolOrMethodOrPropertyGroup(lookupResult, memberAccessNode, memberName, targetMemberArity, members, CSharpBindingDiagnosticBag.Discarded, wasError: out _,
+                    Symbol symbol = enclosingBinder.GetSymbolOrMethodOrPropertyGroup(lookupResult, memberAccessNode, memberName, targetMemberArity, members, BindingDiagnosticBag.Discarded, wasError: out _,
                                                                                      qualifierOpt: null);
 
                     if ((object)symbol == null)
@@ -310,7 +310,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 if (CheckIdentifiersInNode(query.FromClause.Expression, enclosingBinder))
                 {
-                    (QueryTranslationState state, _) = enclosingBinder.MakeInitialQueryTranslationState(query, CSharpBindingDiagnosticBag.Discarded);
+                    (QueryTranslationState state, _) = enclosingBinder.MakeInitialQueryTranslationState(query, BindingDiagnosticBag.Discarded);
 
                     bool result = BindQueryInternal(enclosingBinder, state);
 
@@ -320,7 +320,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         //     from ... into x ...
                         // is translated into
                         //     from x in ( from ... ) ...
-                        enclosingBinder.PrepareQueryTranslationStateForContinuation(state, continuation, CSharpBindingDiagnosticBag.Discarded);
+                        enclosingBinder.PrepareQueryTranslationStateForContinuation(state, continuation, BindingDiagnosticBag.Discarded);
                         result = BindQueryInternal(enclosingBinder, state);
                     }
 
@@ -437,7 +437,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 if (CheckIdentifiersInNode(join.InExpression, enclosingBinder) &&
                     MakeQueryUnboundLambda(enclosingBinder, state.RangeVariableMap(), state.rangeVariable, join.LeftExpression))
                 {
-                    var x2 = state.AddRangeVariable(enclosingBinder, join.Identifier, CSharpBindingDiagnosticBag.Discarded);
+                    var x2 = state.AddRangeVariable(enclosingBinder, join.Identifier, BindingDiagnosticBag.Discarded);
 
                     if (MakeQueryUnboundLambda(enclosingBinder, QueryTranslationState.RangeVariableMap(x2), x2, join.RightExpression))
                     {
@@ -446,7 +446,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                             state.allRangeVariables[x2].Free();
                             state.allRangeVariables.Remove(x2);
 
-                            state.AddRangeVariable(enclosingBinder, join.Into.Identifier, CSharpBindingDiagnosticBag.Discarded);
+                            state.AddRangeVariable(enclosingBinder, join.Into.Identifier, BindingDiagnosticBag.Discarded);
                         }
 
                         return true;
@@ -493,7 +493,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 var x1 = state.rangeVariable;
                 if (MakeQueryUnboundLambda(enclosingBinder, state.RangeVariableMap(), x1, from.Expression))
                 {
-                    state.AddRangeVariable(enclosingBinder, from.Identifier, CSharpBindingDiagnosticBag.Discarded);
+                    state.AddRangeVariable(enclosingBinder, from.Identifier, BindingDiagnosticBag.Discarded);
                     return true;
                 }
 
@@ -518,7 +518,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     state.rangeVariable = state.TransparentRangeVariable(enclosingBinder);
                     state.AddTransparentIdentifier(x.Name);
-                    var y = state.AddRangeVariable(enclosingBinder, let.Identifier, CSharpBindingDiagnosticBag.Discarded);
+                    var y = state.AddRangeVariable(enclosingBinder, let.Identifier, BindingDiagnosticBag.Discarded);
                     state.allRangeVariables[y].Add(let.Identifier.ValueText);
                     return true;
                 }

@@ -189,7 +189,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal TypeSymbol GetInputType(BoundExpression? inputExpression = null)
         {
-            inputExpression ??= BindSwitchGoverningExpression(CSharpBindingDiagnosticBag.Discarded);
+            inputExpression ??= BindSwitchGoverningExpression(BindingDiagnosticBag.Discarded);
             Debug.Assert(inputExpression.Type is not null);
             return inputExpression.Type;
         }

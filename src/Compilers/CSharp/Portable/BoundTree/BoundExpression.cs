@@ -609,7 +609,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         public BoundExpression TypeExpression { get; }
         public CSharpBindingDiagnosticBag TypeDiagnostics { get; }
 
-        public BoundTypeOrValueData(Symbol valueSymbol, BoundExpression valueExpression, CSharpBindingDiagnosticBag valueDiagnostics, BoundExpression typeExpression, CSharpBindingDiagnosticBag typeDiagnostics)
+        public BoundTypeOrValueData(Symbol valueSymbol, BoundExpression valueExpression, CSharpBindingDiagnosticBag? valueDiagnostics, BoundExpression typeExpression, CSharpBindingDiagnosticBag? typeDiagnostics)
         {
             Debug.Assert(valueSymbol != null, "Field 'valueSymbol' cannot be null (use Null=\"allow\" in BoundNodes.xml to remove this check)");
             Debug.Assert(valueExpression != null, "Field 'valueExpression' cannot be null (use Null=\"allow\" in BoundNodes.xml to remove this check)");
@@ -619,9 +619,9 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             this.ValueSymbol = valueSymbol;
             this.ValueExpression = valueExpression;
-            this.ValueDiagnostics = valueDiagnostics;
+            this.ValueDiagnostics = valueDiagnostics.Value;
             this.TypeExpression = typeExpression;
-            this.TypeDiagnostics = typeDiagnostics;
+            this.TypeDiagnostics = typeDiagnostics.Value;
         }
 
         // operator==, operator!=, GetHashCode, and Equals are needed by the generated bound tree.

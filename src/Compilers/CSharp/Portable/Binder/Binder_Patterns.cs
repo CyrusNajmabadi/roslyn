@@ -345,7 +345,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// </summary>
         private bool IsCountableAndIndexable(SyntaxNode node, TypeSymbol inputType, out PropertySymbol? lengthProperty)
         {
-            var success = BindLengthAndIndexerForListPattern(node, inputType, CSharpBindingDiagnosticBag.Discarded,
+            var success = BindLengthAndIndexerForListPattern(node, inputType, BindingDiagnosticBag.Discarded,
                 indexerAccess: out _, out var lengthAccess, receiverPlaceholder: out _, argumentPlaceholder: out _);
             lengthProperty = success ? GetPropertySymbol(lengthAccess, out _, out _) : null;
             return success;
@@ -691,7 +691,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     {
                         // Null is a special case here because we want to compare null to the Nullable<T> itself, not to the underlying type.
                         // We are not interested in the diagnostic that get created here
-                        convertedExpression = CreateConversion(operand, inputType.GetNullableUnderlyingType(), CSharpBindingDiagnosticBag.Discarded);
+                        convertedExpression = CreateConversion(operand, inputType.GetNullableUnderlyingType(), BindingDiagnosticBag.Discarded);
                     }
                     else if ((conversion.ConversionKind == ConversionKind.Boxing || conversion.ConversionKind == ConversionKind.ImplicitReference)
                         && operand.ConstantValueOpt != null && convertedExpression.ConstantValueOpt == null)
@@ -905,7 +905,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         // We should have the right binder in the chain for a script or interactive, so we use the field for the pattern.
                         Debug.Assert(designation.SyntaxTree.Options.Kind != SourceCodeKind.Regular);
                         GlobalExpressionVariable expressionVariableField = LookupDeclaredField(singleVariableDesignation);
-                        expressionVariableField.SetTypeWithAnnotations(declType, CSharpBindingDiagnosticBag.Discarded);
+                        expressionVariableField.SetTypeWithAnnotations(declType, BindingDiagnosticBag.Discarded);
                         BoundExpression receiver = SynthesizeReceiver(designation, expressionVariableField, diagnostics);
 
                         variableSymbol = expressionVariableField;
@@ -996,7 +996,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     // It is not a tuple type. Seek an appropriate Deconstruct method.
                     var inputPlaceholder = new BoundImplicitReceiver(positionalClause, declType); // A fake receiver expression to permit us to reuse binding logic
-                    var deconstructDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                    var deconstructDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
                     BoundExpression deconstruct = MakeDeconstructInvocationExpression(
                         positionalClause.Subpatterns.Count, inputPlaceholder, positionalClause,
                         deconstructDiagnostics, outPlaceholders: out ImmutableArray<BoundDeconstructValuePlaceholder> outPlaceholders,
@@ -1392,7 +1392,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         {
                             // It is not a tuple type. Seek an appropriate Deconstruct method.
                             var inputPlaceholder = new BoundImplicitReceiver(node, strippedInputType); // A fake receiver expression to permit us to reuse binding logic
-                            var deconstructDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                            var deconstructDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
                             BoundExpression deconstruct = MakeDeconstructInvocationExpression(
                                 tupleDesignation.Variables.Count, inputPlaceholder, node, deconstructDiagnostics,
                                 outPlaceholders: out ImmutableArray<BoundDeconstructValuePlaceholder> outPlaceholders,

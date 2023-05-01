@@ -216,7 +216,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     CSharpBindingDiagnosticBag patternDiagnostics = originalBinder.Compilation.IsFeatureEnabled(MessageID.IDS_FeatureDisposalPattern)
                                                        ? diagnostics
-                                                       : CSharpBindingDiagnosticBag.Discarded;
+                                                       : BindingDiagnosticBag.Discarded;
                     MethodSymbol disposeMethod = originalBinder.TryFindDisposePatternMethod(receiver, syntax, hasAwait, patternDiagnostics);
                     if (disposeMethod is object)
                     {

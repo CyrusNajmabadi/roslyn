@@ -71,7 +71,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 StringBuilder builder)
             {
                 StringWriter writer = new StringWriter(builder, CultureInfo.InvariantCulture);
-                DocumentationCommentWalker walker = new DocumentationCommentWalker(compilation, CSharpBindingDiagnosticBag.Discarded, symbol, writer, includeElementNodes, documentedParameters: null, documentedTypeParameters: null);
+                DocumentationCommentWalker walker = new DocumentationCommentWalker(compilation, BindingDiagnosticBag.Discarded, symbol, writer, includeElementNodes, documentedParameters: null, documentedTypeParameters: null);
 
                 // Before: <param name="NAME">CONTENT</param>
                 // After: <summary>CONTENT</summary>
@@ -150,7 +150,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     Binder binder = factory.GetBinder(cref);
 
                     // Do this for the diagnostics, even if it won't be written.
-                    string docCommentId = GetDocumentationCommentId(cref, binder, diagnose ? _diagnostics : new BindingDiagnosticBag(diagnosticBag: null, _diagnostics.DependenciesBag));
+                    string docCommentId = GetDocumentationCommentId(cref, binder, diagnose ? _diagnostics : BindingDiagnosticBag.CreateNewInstance(diagnosticBag: null, _diagnostics.DependenciesBag));
 
                     if (_writer != null)
                     {

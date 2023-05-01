@@ -297,7 +297,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Action<AttributeSyntax>? beforeAttributePartBound = null,
             Action<AttributeSyntax>? afterAttributePartBound = null)
         {
-            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+            var diagnostics = BindingDiagnosticBag.GetInstance();
             var compilation = this.DeclaringCompilation;
 
             ImmutableArray<Binder> binders;
@@ -492,7 +492,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         //    3. Remove the collected diagnostics, if any.
                         if (toRemove.Count != 0)
                         {
-                            var filtered = CSharpBindingDiagnosticBag.GetInstance();
+                            var filtered = BindingDiagnosticBag.GetInstance();
 
                             filtered.AddDependencies(diagnostics);
 
@@ -532,10 +532,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     foreach (var attributeSyntax in attributeListSyntax.Attributes)
                     {
-                        var boundType = binder.BindType(attributeSyntax.Name, CSharpBindingDiagnosticBag.Discarded);
+                        var boundType = binder.BindType(attributeSyntax.Name, BindingDiagnosticBag.Discarded);
                         var boundTypeSymbol = (NamedTypeSymbol)boundType.Type;
                         var boundAttribute = binder.GetAttribute(attributeSyntax, boundTypeSymbol,
-                            beforeAttributePartBound: null, afterAttributePartBound: null, CSharpBindingDiagnosticBag.Discarded);
+                            beforeAttributePartBound: null, afterAttributePartBound: null, BindingDiagnosticBag.Discarded);
                         boundAttributeArrayBuilder.Add(boundAttribute);
                     }
                 }

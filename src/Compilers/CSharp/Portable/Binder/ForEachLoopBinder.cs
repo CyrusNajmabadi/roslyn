@@ -374,7 +374,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         else
                         {
                             // Bind the expression for error recovery, but discard all new diagnostics
-                            iterationErrorExpression = BindToTypeForErrorRecovery(BindExpression(node.Variable, CSharpBindingDiagnosticBag.Discarded));
+                            iterationErrorExpression = BindToTypeForErrorRecovery(BindExpression(node.Variable, BindingDiagnosticBag.Discarded));
                             if (iterationErrorExpression.Kind == BoundKind.DiscardExpression)
                             {
                                 iterationErrorExpression = ((BoundDiscardExpression)iterationErrorExpression).FailInference(this, diagnosticsOpt: null);
@@ -469,11 +469,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
                 hasErrors = true;
 
-                createConversionDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: false, withDependencies: false);
+                createConversionDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: false, withDependencies: false);
             }
             else
             {
-                createConversionDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                createConversionDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
             }
 
             BoundExpression elementConversion = CreateConversion(_syntax, elementPlaceholder, elementConversionClassification, isCast: false, conversionGroupOpt: null, iterationVariableType.Type, createConversionDiagnostics);
@@ -725,7 +725,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // Retry with a different assumption about whether the foreach is async
             var ignoredBuilder = new ForEachEnumeratorInfo.Builder();
-            bool wrongAsync = GetEnumeratorInfo(ref ignoredBuilder, ref collectionExpr, !isAsync, CSharpBindingDiagnosticBag.Discarded) == EnumeratorResult.Succeeded;
+            bool wrongAsync = GetEnumeratorInfo(ref ignoredBuilder, ref collectionExpr, !isAsync, BindingDiagnosticBag.Discarded) == EnumeratorResult.Succeeded;
 
             var errorCode = wrongAsync
                 ? (isAsync ? ErrorCode.ERR_AwaitForEachMissingMemberWrongAsync : ErrorCode.ERR_ForEachMissingMemberWrongAsync)
@@ -1022,7 +1022,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 // we throw away any binding diagnostics, and assume it's not disposable if we encounter errors
                 var receiver = new BoundDisposableValuePlaceholder(_syntax, enumeratorType);
-                patternDisposeMethod = TryFindDisposePatternMethod(receiver, _syntax, isAsync, CSharpBindingDiagnosticBag.Discarded);
+                patternDisposeMethod = TryFindDisposePatternMethod(receiver, _syntax, isAsync, BindingDiagnosticBag.Discarded);
                 if (patternDisposeMethod is object)
                 {
                     Debug.Assert(!patternDisposeMethod.IsExtensionMethod);

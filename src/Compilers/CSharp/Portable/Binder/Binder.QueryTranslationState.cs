@@ -84,7 +84,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     }
                 }
 
-                if (!error && (object)diagnostics != CSharpBindingDiagnosticBag.Discarded)
+                if (!error && (object)diagnostics != BindingDiagnosticBag.Discarded)
                 {
                     var collisionDetector = new LocalScopeBinder(binder);
                     collisionDetector.ValidateDeclarationNameConflictsInScope(result, diagnostics);

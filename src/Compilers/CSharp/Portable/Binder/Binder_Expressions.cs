@@ -264,8 +264,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return null;
             var result =
                 !expression.NeedsToBeConverted() ? expression :
-                type is null ? BindToNaturalType(expression, CSharpBindingDiagnosticBag.Discarded, reportNoTargetType: false) :
-                GenerateConversionForAssignment(type, expression, CSharpBindingDiagnosticBag.Discarded);
+                type is null ? BindToNaturalType(expression, BindingDiagnosticBag.Discarded, reportNoTargetType: false) :
+                GenerateConversionForAssignment(type, expression, BindingDiagnosticBag.Discarded);
             return result;
         }
 
@@ -1040,7 +1040,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         private static (ImmutableArray<string> elementNamesArray, ImmutableArray<bool> inferredArray, bool hasErrors) ExtractTupleElementNames(
-            SeparatedSyntaxList<ArgumentSyntax> arguments, CSharpBindingDiagnosticBag diagnostics)
+            SeparatedSyntaxList<ArgumentSyntax> arguments, CSharpBindingDiagnosticBag? diagnostics)
         {
             bool hasErrors = false;
             int numElements = arguments.Count;
@@ -1060,7 +1060,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     name = nameSyntax.Identifier.ValueText;
 
-                    if (diagnostics != null && !CheckTupleMemberName(name, i, argumentSyntax.NameColon.Name, diagnostics, uniqueFieldNames))
+                    if (diagnostics != null && !CheckTupleMemberName(name, i, argumentSyntax.NameColon.Name, diagnostics.Value, uniqueFieldNames))
                     {
                         hasErrors = true;
                     }
@@ -2736,7 +2736,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return BindCastCore(node, operand, targetTypeWithAnnotations, wasCompilerGenerated: operand.WasCompilerGenerated, diagnostics: diagnostics);
             }
 
-            var bag = new BindingDiagnosticBag(DiagnosticBag.GetInstance(), diagnostics.DependenciesBag);
+            var bag = BindingDiagnosticBag.CreateNewInstance(DiagnosticBag.GetInstance(), diagnostics.DependenciesBag);
             try
             {
                 var underlyingExpr = BindCastCore(node, operand, underlyingTargetTypeWithAnnotations, wasCompilerGenerated: false, diagnostics: bag);
@@ -2752,7 +2752,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return BindCastCore(node, underlyingExpr, targetTypeWithAnnotations, wasCompilerGenerated: operand.WasCompilerGenerated, diagnostics: diagnostics);
                 }
 
-                var bag2 = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                var bag2 = BindingDiagnosticBag.GetInstance(diagnostics);
 
                 var result = BindCastCore(node, operand, targetTypeWithAnnotations, wasCompilerGenerated: operand.WasCompilerGenerated, diagnostics: bag2);
 
@@ -3063,7 +3063,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 if (typeSyntax.IsVar)
                 {
-                    BindTypeOrAliasOrVarKeyword(typeSyntax, CSharpBindingDiagnosticBag.Discarded, out isVar);
+                    BindTypeOrAliasOrVarKeyword(typeSyntax, BindingDiagnosticBag.Discarded, out isVar);
 
                     if (isVar)
                     {
@@ -3887,7 +3887,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     {
                         if (size.Kind() != SyntaxKind.OmittedArraySizeExpression)
                         {
-                            builder.Add(BindExpression(size, CSharpBindingDiagnosticBag.Discarded));
+                            builder.Add(BindExpression(size, BindingDiagnosticBag.Discarded));
                         }
                     }
                 }
@@ -6500,7 +6500,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             string name = id.Identifier.ValueText;
 
             return (type.Name == name || IsUsingAliasInScope(name)) &&
-                   TypeSymbol.Equals(BindNamespaceOrType(id, CSharpBindingDiagnosticBag.Discarded).Type, type, TypeCompareKind.AllIgnoreOptions);
+                   TypeSymbol.Equals(BindNamespaceOrType(id, BindingDiagnosticBag.Discarded).Type, type, TypeCompareKind.AllIgnoreOptions);
         }
 
         // returns true if name matches a using alias in scope
@@ -7344,7 +7344,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             foreach (var scope in new ExtensionMethodScopes(this))
             {
                 var methodGroup = MethodGroup.GetInstance();
-                var diagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies);
+                var diagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies);
 
                 this.PopulateExtensionMethodsFromSingleBinder(scope, methodGroup, expression, left, methodName, typeArgumentsWithAnnotations, diagnostics);
 
@@ -7979,7 +7979,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 // able to get more semantic analysis of the indexing operation. We do not
                 // want to report cascading errors.
 
-                BoundExpression result = BindElementAccessCore(node, expr, analyzedArguments, CSharpBindingDiagnosticBag.Discarded);
+                BoundExpression result = BindElementAccessCore(node, expr, analyzedArguments, BindingDiagnosticBag.Discarded);
                 return result;
             }
 
@@ -8176,7 +8176,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 GenerateImplicitConversionError(diagnostics, node, failedConversion, index, int32);
 
                 // Suppress any additional diagnostics
-                return CreateConversion(node, index, failedConversion, isCast: false, conversionGroupOpt: null, destination: int32, diagnostics: CSharpBindingDiagnosticBag.Discarded);
+                return CreateConversion(node, index, failedConversion, isCast: false, conversionGroupOpt: null, destination: int32, diagnostics: BindingDiagnosticBag.Discarded);
             }
 
             return result;
@@ -8192,7 +8192,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return null;
             }
 
-            var attemptDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+            var attemptDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
             var result = TryImplicitConversionToArrayIndex(expr, type, node, attemptDiagnostics);
             if (result is object)
             {
@@ -8205,7 +8205,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private BoundExpression TryImplicitConversionToArrayIndex(BoundExpression expr, SpecialType specialType, SyntaxNode node, CSharpBindingDiagnosticBag diagnostics)
         {
-            var attemptDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+            var attemptDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
 
             TypeSymbol type = GetSpecialType(specialType, attemptDiagnostics, node);
 
@@ -8976,7 +8976,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 Debug.Assert(node.LookupError == null);
 
-                var diagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, useSiteInfo.AccumulatesDependencies);
+                var diagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, useSiteInfo.AccumulatesDependencies);
                 diagnostics.AddRange(methodResolution.Diagnostics); // Could still have use site warnings.
                 BindMemberAccessReportError(node, diagnostics);
 
@@ -9106,7 +9106,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             var sealedDiagnostics = ImmutableBindingDiagnostic<AssemblySymbol>.Empty;
             if (node.LookupError != null)
             {
-                var diagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
+                var diagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
                 Error(diagnostics, node.LookupError, node.NameSyntax);
                 sealedDiagnostics = diagnostics.ToReadOnlyAndFree();
             }
@@ -9202,7 +9202,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 foreach (var scope in new ExtensionMethodScopes(this))
                 {
                     var methodGroup = MethodGroup.GetInstance();
-                    PopulateExtensionMethodsFromSingleBinder(scope, methodGroup, node.Syntax, receiver, node.Name, node.TypeArgumentsOpt, CSharpBindingDiagnosticBag.Discarded);
+                    PopulateExtensionMethodsFromSingleBinder(scope, methodGroup, node.Syntax, receiver, node.Name, node.TypeArgumentsOpt, BindingDiagnosticBag.Discarded);
                     foreach (var m in methodGroup.Methods)
                     {
                         if (m.ReduceExtensionMethod(receiver.Type, Compilation) is { } reduced &&

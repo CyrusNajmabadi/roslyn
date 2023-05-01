@@ -321,7 +321,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 if (typeSyntax.IsVar)
                 {
                     bool isVar;
-                    TypeWithAnnotations declType = this.TypeSyntaxBinder.BindTypeOrVarKeyword(typeSyntax, CSharpBindingDiagnosticBag.Discarded, out isVar);
+                    TypeWithAnnotations declType = this.TypeSyntaxBinder.BindTypeOrVarKeyword(typeSyntax, BindingDiagnosticBag.Discarded, out isVar);
                     return isVar;
                 }
 
@@ -339,7 +339,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             // the statements of a method from top to bottom, and an inferred type is given to a variable
             // before the variable's type is used by the compiler.
             //
-            var diagnostics = CSharpBindingDiagnosticBag.Discarded;
+            var diagnostics = BindingDiagnosticBag.Discarded;
 
             Binder typeBinder = this.TypeSyntaxBinder;
 
@@ -467,7 +467,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return false; }
         }
 
-        internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag diagnostics)
+        internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag? diagnostics)
         {
             return null;
         }
@@ -559,7 +559,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 {
                     var value = Microsoft.CodeAnalysis.ConstantValue.Bad;
                     Location initValueNodeLocation = _initializer.Value.Location;
-                    var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                    var diagnostics = BindingDiagnosticBag.GetInstance();
                     Debug.Assert(inProgress != this);
                     var type = this.Type;
                     if (boundInitValue == null)
@@ -573,13 +573,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
             }
 
-            internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag diagnostics = null)
+            internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag? diagnostics = null)
             {
                 if (this.IsConst && inProgress == this)
                 {
                     if (diagnostics != null)
                     {
-                        diagnostics.Add(ErrorCode.ERR_CircConstValue, node.GetLocation(), this);
+                        diagnostics.Value.Add(ErrorCode.ERR_CircConstValue, node.GetLocation(), this);
                     }
 
                     return Microsoft.CodeAnalysis.ConstantValue.Bad;

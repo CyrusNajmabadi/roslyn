@@ -90,7 +90,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // Diagnostics that don't prevent us from getting a symbol don't matter - the caller will report
             // an umbrella diagnostic if the result is an error type.
-            NamespaceOrTypeSymbol namespaceOrTypeSymbol = BindNamespaceOrTypeSymbol(syntax, CSharpBindingDiagnosticBag.Discarded).NamespaceOrTypeSymbol;
+            NamespaceOrTypeSymbol namespaceOrTypeSymbol = BindNamespaceOrTypeSymbol(syntax, BindingDiagnosticBag.Discarded).NamespaceOrTypeSymbol;
 
             Debug.Assert((object)namespaceOrTypeSymbol != null);
             return namespaceOrTypeSymbol;
@@ -888,7 +888,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 var unusedDiagnostics =
 #if DEBUG
-                    new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
+                    BindingDiagnosticBag.CreateNewInstance(DiagnosticBag.GetInstance());
                 Debug.Assert(unusedDiagnostics.DiagnosticBag is object);
 #else
                     BindingDiagnosticBag.Discarded;
@@ -962,7 +962,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 this.Compilation.GetBinderFactory(typeSyntax.SyntaxTree).GetBinder(typeSyntax).Flags ==
                 (parameterOrReturnTypeBinder.Flags & ~BinderFlags.SemanticModel));
 
-            var localDiagnostics = new BindingDiagnosticBag(DiagnosticBag.GetInstance(), // Examined, but not reported.
+            var localDiagnostics = BindingDiagnosticBag.CreateNewInstance(DiagnosticBag.GetInstance(), // Examined, but not reported.
                                                             diagnostics.DependenciesBag);
             Debug.Assert(localDiagnostics.DiagnosticBag is object);
 

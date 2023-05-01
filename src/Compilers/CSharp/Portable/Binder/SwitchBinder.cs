@@ -176,7 +176,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             foreach (var section in SwitchSyntax.Sections)
             {
                 // add switch case/default labels
-                BuildSwitchLabels(section.Labels, GetBinder(section), labels, CSharpBindingDiagnosticBag.Discarded);
+                BuildSwitchLabels(section.Labels, GetBinder(section), labels, BindingDiagnosticBag.Discarded);
 
                 // add regular labels from the statements in the switch section
                 BuildLabels(section.Statements, ref labels);

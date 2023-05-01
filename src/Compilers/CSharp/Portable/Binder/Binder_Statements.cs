@@ -532,7 +532,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         ImmutableArray<BoundNode> childNodes;
                         if (node.Expression != null)
                         {
-                            var value = BindRValueWithoutTargetType(node.Expression, CSharpBindingDiagnosticBag.Discarded);
+                            var value = BindRValueWithoutTargetType(node.Expression, BindingDiagnosticBag.Discarded);
                             childNodes = ImmutableArray.Create<BoundNode>(value);
                         }
                         else
@@ -566,7 +566,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 if (node.ExpressionBody != null)
                 {
-                    expressionBody = runAnalysis(BindExpressionBodyAsBlock(node.ExpressionBody, CSharpBindingDiagnosticBag.Discarded), CSharpBindingDiagnosticBag.Discarded);
+                    expressionBody = runAnalysis(BindExpressionBodyAsBlock(node.ExpressionBody, BindingDiagnosticBag.Discarded), BindingDiagnosticBag.Discarded);
                 }
             }
             else if (node.ExpressionBody != null)
@@ -988,7 +988,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Debug.Assert(declTypeOpt.HasType || isVar);
             Debug.Assert(typeSyntax != null);
 
-            var localDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
+            var localDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
             // if we are not given desired syntax, we use declarator
             associatedSyntaxNode = associatedSyntaxNode ?? declarator;
 
@@ -1279,7 +1279,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     }
 
                     // check for a special ref-returning method
-                    var additionalDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+                    var additionalDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
                     fixedPatternMethod = GetFixedPatternMethodOpt(initializerOpt, additionalDiagnostics);
 
                     // check for String
@@ -1389,7 +1389,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 elementPlaceholder = new BoundValuePlaceholder(initializerSyntax, pointerType).MakeCompilerGenerated();
                 elementConversion = CreateConversion(initializerSyntax, elementPlaceholder, elementConversionClassification, isCast: false, conversionGroupOpt: null, declType,
-                    elementConversionClassification.IsImplicit ? diagnostics : CSharpBindingDiagnosticBag.Discarded);
+                    elementConversionClassification.IsImplicit ? diagnostics : BindingDiagnosticBag.Discarded);
             }
             else
             {
@@ -1922,7 +1922,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (expression.HasAnyErrors && expression.Kind != BoundKind.UnboundLambda)
             {
-                diagnostics = CSharpBindingDiagnosticBag.Discarded;
+                diagnostics = BindingDiagnosticBag.Discarded;
             }
 
             CompoundUseSiteInfo<AssemblySymbol> useSiteInfo = GetNewCompoundUseSiteInfo(diagnostics);
@@ -1959,7 +1959,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
 
                 // Suppress any additional diagnostics
-                diagnostics = CSharpBindingDiagnosticBag.Discarded;
+                diagnostics = BindingDiagnosticBag.Discarded;
             }
 
             return CreateConversion(expression.Syntax, expression, conversion, isCast: false, conversionGroupOpt: null, targetType, diagnostics);
@@ -3649,7 +3649,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                                   constructor.ExpressionBody == null ?
                                                       null :
                                                       bodyBinder.BindExpressionBodyAsBlock(constructor.ExpressionBody,
-                                                                                           constructor.Body == null ? diagnostics : CSharpBindingDiagnosticBag.Discarded));
+                                                                                           constructor.Body == null ? diagnostics : BindingDiagnosticBag.Discarded));
 
             bool hasPrimaryConstructor() =>
                 ContainingType is SourceMemberContainerTypeSymbol { HasPrimaryConstructor: true };
@@ -3934,7 +3934,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                                      expressionBody == null ?
                                                          null :
                                                          BindExpressionBodyAsBlock(expressionBody,
-                                                                                   blockBody == null ? diagnostics : CSharpBindingDiagnosticBag.Discarded));
+                                                                                   blockBody == null ? diagnostics : BindingDiagnosticBag.Discarded));
         }
 
         internal virtual ImmutableArray<LocalSymbol> Locals
@@ -3999,7 +3999,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal PatternLookupResult PerformPatternMethodLookup(BoundExpression receiver, string methodName,
                                                                 SyntaxNode syntaxNode, CSharpBindingDiagnosticBag diagnostics, out MethodSymbol result)
         {
-            var bindingDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
+            var bindingDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
 
             try
             {

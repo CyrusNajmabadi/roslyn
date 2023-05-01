@@ -758,7 +758,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                                     flags |= BinderFlags.UnsafeRegion;
                             }
 
-                            var directiveDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                            var directiveDiagnostics = BindingDiagnosticBag.GetInstance();
                             Debug.Assert(directiveDiagnostics.DiagnosticBag is object);
                             Debug.Assert(directiveDiagnostics.DependenciesBag is object);
 
@@ -951,7 +951,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 DiagnosticBag semanticDiagnostics = compilation.DeclarationDiagnostics;
 
                 // Check constraints within named aliases.
-                var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                var diagnostics = BindingDiagnosticBag.GetInstance();
                 Debug.Assert(diagnostics.DiagnosticBag is object);
                 Debug.Assert(diagnostics.DependenciesBag is object);
 

@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Action<AttributeSyntax> afterAttributePartBound,
             out bool generatedDiagnostics)
         {
-            var dummyDiagnosticBag = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
+            var dummyDiagnosticBag = BindingDiagnosticBag.CreateNewInstance(DiagnosticBag.GetInstance());
             var result = base.GetAttribute(node, boundAttributeType, beforeAttributePartBound, afterAttributePartBound, dummyDiagnosticBag);
             generatedDiagnostics = !dummyDiagnosticBag.DiagnosticBag.IsEmptyWithoutResolution;
             dummyDiagnosticBag.Free();

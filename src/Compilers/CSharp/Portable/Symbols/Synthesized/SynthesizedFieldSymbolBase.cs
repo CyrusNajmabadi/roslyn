@@ -59,7 +59,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             if (!this.SuppressDynamicAttribute &&
                 type.ContainsDynamic() &&
-                compilation.HasDynamicEmitAttributes(CSharpBindingDiagnosticBag.Discarded, Location.None) &&
+                compilation.HasDynamicEmitAttributes(BindingDiagnosticBag.Discarded, Location.None) &&
                 compilation.CanEmitBoolean())
             {
                 AddSynthesizedAttribute(ref attributes, compilation.SynthesizeDynamicAttribute(type, typeWithAnnotations.CustomModifiers.Length));
@@ -71,7 +71,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
 
             if (type.ContainsTupleNames() &&
-                compilation.HasTupleNamesAttributes(CSharpBindingDiagnosticBag.Discarded, Location.None) &&
+                compilation.HasTupleNamesAttributes(BindingDiagnosticBag.Discarded, Location.None) &&
                 compilation.CanEmitSpecialType(SpecialType.System_String))
             {
                 AddSynthesizedAttribute(ref attributes,

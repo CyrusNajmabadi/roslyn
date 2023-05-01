@@ -80,7 +80,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             var compilation = this.DeclaringCompilation;
 
-            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+            var diagnostics = BindingDiagnosticBag.GetInstance();
             TypeWithAnnotations type;
             bool isVar;
 
@@ -200,11 +200,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                         // This occurs, for example, in
                         // int x, y[out var Z, 1 is int I];
                         // for (int x, y[out var Z, 1 is int I]; ;) {}
-                        binder.BindDeclaratorArguments((VariableDeclaratorSyntax)nodeToBind, CSharpBindingDiagnosticBag.Discarded);
+                        binder.BindDeclaratorArguments((VariableDeclaratorSyntax)nodeToBind, BindingDiagnosticBag.Discarded);
                         break;
 
                     default:
-                        binder.BindExpression((ExpressionSyntax)nodeToBind, CSharpBindingDiagnosticBag.Discarded);
+                        binder.BindExpression((ExpressionSyntax)nodeToBind, BindingDiagnosticBag.Discarded);
                         break;
                 }
             }

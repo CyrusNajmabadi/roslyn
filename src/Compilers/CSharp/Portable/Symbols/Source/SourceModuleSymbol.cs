@@ -195,7 +195,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 if ((object)_globalNamespace == null)
                 {
-                    var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
+                    var diagnostics = BindingDiagnosticBag.GetInstance();
                     var globalNS = new SourceNamespaceSymbol(
                         this, this, DeclaringCompilation.MergedRootDeclaration, diagnostics);
 
@@ -235,19 +235,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                     case CompletionPart.StartValidatingReferencedAssemblies:
                         {
-                            CSharpBindingDiagnosticBag diagnostics = null;
+                            CSharpBindingDiagnosticBag? diagnostics = null;
 
                             if (AnyReferencedAssembliesAreLinked)
                             {
-                                diagnostics = CSharpBindingDiagnosticBag.GetInstance();
-                                ValidateLinkedAssemblies(diagnostics, cancellationToken);
+                                diagnostics = BindingDiagnosticBag.GetInstance();
+                                ValidateLinkedAssemblies(diagnostics.Value, cancellationToken);
                             }
 
                             if (_state.NotePartComplete(CompletionPart.StartValidatingReferencedAssemblies))
                             {
                                 if (diagnostics != null)
                                 {
-                                    _assemblySymbol.AddDeclarationDiagnostics(diagnostics);
+                                    _assemblySymbol.AddDeclarationDiagnostics(diagnostics.Value);
                                 }
 
                                 _state.NotePartComplete(CompletionPart.FinishValidatingReferencedAssemblies);
@@ -255,7 +255,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                             if (diagnostics != null)
                             {
-                                diagnostics.Free();
+                                diagnostics.Value.Free();
                             }
                         }
                         break;
