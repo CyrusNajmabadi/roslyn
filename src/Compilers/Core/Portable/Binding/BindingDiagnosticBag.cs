@@ -18,11 +18,11 @@ namespace Microsoft.CodeAnalysis
     /// This is base class for a bag used to accumulate information while binding is performed.
     /// Including diagnostic messages and dependencies in the form of "used" assemblies. 
     /// </summary>
-    internal abstract class BindingDiagnosticBag
+    internal readonly struct BindingDiagnosticBag
     {
         public readonly DiagnosticBag? DiagnosticBag;
 
-        protected BindingDiagnosticBag(DiagnosticBag? diagnosticBag)
+        public BindingDiagnosticBag(DiagnosticBag? diagnosticBag)
         {
             DiagnosticBag = diagnosticBag;
         }
@@ -58,21 +58,59 @@ namespace Microsoft.CodeAnalysis
         }
     }
 
-    internal abstract class BindingDiagnosticBag<TAssemblySymbol> : BindingDiagnosticBag
+    internal readonly struct BindingDiagnosticBag<TAssemblySymbol>
         where TAssemblySymbol : class, IAssemblySymbolInternal
     {
+        private readonly BindingDiagnosticBag _diagnosticBag;
+        private readonly Func<DiagnosticInfo, DiagnosticBag, Location, bool> _reportUseSiteDiagnostic;
+
         public readonly ICollection<TAssemblySymbol>? DependenciesBag;
 
-        protected BindingDiagnosticBag(DiagnosticBag? diagnosticBag, ICollection<TAssemblySymbol>? dependenciesBag)
-            : base(diagnosticBag)
+        public BindingDiagnosticBag(
+            DiagnosticBag? diagnosticBag,
+            ICollection<TAssemblySymbol>? dependenciesBag,
+            Func<DiagnosticInfo, DiagnosticBag, Location, bool> reportUseSiteDiagnostic)
         {
+            _diagnosticBag = new(diagnosticBag);
             Debug.Assert(diagnosticBag?.GetType().IsValueType != true);
             DependenciesBag = dependenciesBag;
+            _reportUseSiteDiagnostic = reportUseSiteDiagnostic;
         }
 
-        protected BindingDiagnosticBag(bool usePool)
-            : this(usePool ? DiagnosticBag.GetInstance() : new DiagnosticBag(), usePool ? PooledHashSet<TAssemblySymbol>.GetInstance() : new HashSet<TAssemblySymbol>())
-        { }
+        public BindingDiagnosticBag(bool usePool,
+            Func<DiagnosticInfo, DiagnosticBag, Location, bool> reportUseSiteDiagnostic)
+            : this(
+                  usePool ? CodeAnalysis.DiagnosticBag.GetInstance() : new DiagnosticBag(),
+                  usePool ? PooledHashSet<TAssemblySymbol>.GetInstance() : new HashSet<TAssemblySymbol>(),
+                  reportUseSiteDiagnostic)
+        {
+        }
+
+        #region forwarding methods
+
+        internal bool AccumulatesDiagnostics => _diagnosticBag.AccumulatesDiagnostics;
+
+        internal void AddRange<T>(ImmutableArray<T> diagnostics) where T : Diagnostic
+            => _diagnosticBag.AddRange(diagnostics);
+
+        internal void AddRange(IEnumerable<Diagnostic> diagnostics)
+            => _diagnosticBag.AddRange(diagnostics);
+
+        internal bool HasAnyResolvedErrors()
+            => _diagnosticBag.HasAnyResolvedErrors();
+
+        internal bool HasAnyErrors()
+            => _diagnosticBag.HasAnyErrors();
+
+        internal void Add(Diagnostic diag)
+            => _diagnosticBag.Add(diag);
+
+        #endregion
+
+        public static implicit operator BindingDiagnosticBag(BindingDiagnosticBag<TAssemblySymbol> bag)
+            => bag._diagnosticBag;
+
+        public DiagnosticBag? DiagnosticBag => _diagnosticBag.DiagnosticBag;
 
         internal bool AccumulatesDependencies => DependenciesBag is object;
 
@@ -270,7 +308,8 @@ namespace Microsoft.CodeAnalysis
             return false;
         }
 
-        protected abstract bool ReportUseSiteDiagnostic(DiagnosticInfo diagnosticInfo, DiagnosticBag diagnosticBag, Location location);
+        public bool ReportUseSiteDiagnostic(DiagnosticInfo diagnosticInfo, DiagnosticBag diagnosticBag, Location location)
+            => _reportUseSiteDiagnostic(diagnosticInfo, diagnosticBag, location);
 
         internal bool Add(UseSiteInfo<TAssemblySymbol> useSiteInfo, SyntaxNode node)
             => Add(useSiteInfo, static node => node.Location, node);
