@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Action<AttributeSyntax> afterAttributePartBound,
             out bool generatedDiagnostics)
         {
-            var dummyDiagnosticBag = new BindingDiagnosticBag(DiagnosticBag.GetInstance());
+            var dummyDiagnosticBag = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
             var result = base.GetAttribute(node, boundAttributeType, beforeAttributePartBound, afterAttributePartBound, dummyDiagnosticBag);
             generatedDiagnostics = !dummyDiagnosticBag.DiagnosticBag.IsEmptyWithoutResolution;
             dummyDiagnosticBag.Free();
@@ -43,7 +43,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             AttributeSyntax node, NamedTypeSymbol boundAttributeType,
             Action<AttributeSyntax> beforeAttributePartBound,
             Action<AttributeSyntax> afterAttributePartBound,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(false, "Don't call this overload.");
             diagnostics.Add(ErrorCode.ERR_InternalError, node.Location);

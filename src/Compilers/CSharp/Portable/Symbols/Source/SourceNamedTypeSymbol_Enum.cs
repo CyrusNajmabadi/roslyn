@@ -27,7 +27,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 if (ReferenceEquals(_lazyEnumUnderlyingType, ErrorTypeSymbol.UnknownResultType))
                 {
-                    BindingDiagnosticBag diagnostics = BindingDiagnosticBag.GetInstance();
+                    CSharpBindingDiagnosticBag diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                     if ((object)Interlocked.CompareExchange(ref _lazyEnumUnderlyingType, this.GetEnumUnderlyingType(diagnostics), ErrorTypeSymbol.UnknownResultType) ==
                         (object)ErrorTypeSymbol.UnknownResultType)
                     {
@@ -41,7 +41,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        private NamedTypeSymbol GetEnumUnderlyingType(BindingDiagnosticBag diagnostics)
+        private NamedTypeSymbol GetEnumUnderlyingType(CSharpBindingDiagnosticBag diagnostics)
         {
             if (this.TypeKind != TypeKind.Enum)
             {

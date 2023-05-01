@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             EqualsValueClauseSyntax equalsValueNode,
             HashSet<SourceFieldSymbolWithSyntaxReference> dependencies,
             bool earlyDecodingWellKnownAttributes,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             var compilation = symbol.DeclaringCompilation;
             var binderFactory = compilation.GetBinderFactory(equalsValueNode.SyntaxTree);
@@ -57,7 +57,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Binder binder,
             FieldSymbol fieldSymbol,
             EqualsValueClauseSyntax initializer,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             var enumConstant = fieldSymbol as SourceEnumConstantSymbol;
             Binder collisionDetector = new LocalScopeBinder(binder);
@@ -81,7 +81,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Symbol thisSymbol,
             TypeSymbol typeSymbol,
             Location initValueNodeLocation,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             var value = ConstantValue.Bad;
             CheckLangVersionForConstantValue(boundValue, diagnostics);
@@ -147,9 +147,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private sealed class CheckConstantInterpolatedStringValidity : BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
         {
-            internal readonly BindingDiagnosticBag diagnostics;
+            internal readonly CSharpBindingDiagnosticBag diagnostics;
 
-            public CheckConstantInterpolatedStringValidity(BindingDiagnosticBag diagnostics)
+            public CheckConstantInterpolatedStringValidity(CSharpBindingDiagnosticBag diagnostics)
             {
                 this.diagnostics = diagnostics;
             }
@@ -161,7 +161,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        internal static void CheckLangVersionForConstantValue(BoundExpression expression, BindingDiagnosticBag diagnostics)
+        internal static void CheckLangVersionForConstantValue(BoundExpression expression, CSharpBindingDiagnosticBag diagnostics)
         {
             if (!(expression.Type is null) && expression.Type.IsStringType())
             {

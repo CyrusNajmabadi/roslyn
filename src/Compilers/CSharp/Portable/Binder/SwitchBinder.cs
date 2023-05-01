@@ -22,7 +22,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private readonly GeneratedLabelSymbol _breakLabel;
         private BoundExpression _switchGoverningExpression;
-        private BindingDiagnosticBag _switchGoverningDiagnostics;
+        private CSharpBindingDiagnosticBag _switchGoverningDiagnostics;
 
         private SwitchBinder(Binder next, SwitchStatementSyntax switchSyntax)
             : base(next)
@@ -46,7 +46,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         protected TypeSymbol SwitchGoverningType => SwitchGoverningExpression.Type;
 
-        protected BindingDiagnosticBag SwitchGoverningDiagnostics
+        protected CSharpBindingDiagnosticBag SwitchGoverningDiagnostics
         {
             get
             {
@@ -59,7 +59,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             if (_switchGoverningExpression == null)
             {
-                var switchGoverningDiagnostics = new BindingDiagnosticBag();
+                var switchGoverningDiagnostics = new CSharpBindingDiagnosticBag();
                 var boundSwitchExpression = BindSwitchGoverningExpression(switchGoverningDiagnostics);
                 _switchGoverningDiagnostics = switchGoverningDiagnostics;
                 Interlocked.CompareExchange(ref _switchGoverningExpression, boundSwitchExpression, null);
@@ -176,7 +176,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             foreach (var section in SwitchSyntax.Sections)
             {
                 // add switch case/default labels
-                BuildSwitchLabels(section.Labels, GetBinder(section), labels, BindingDiagnosticBag.Discarded);
+                BuildSwitchLabels(section.Labels, GetBinder(section), labels, CSharpBindingDiagnosticBag.Discarded);
 
                 // add regular labels from the statements in the switch section
                 BuildLabels(section.Statements, ref labels);
@@ -193,7 +193,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private void BuildSwitchLabels(SyntaxList<SwitchLabelSyntax> labelsSyntax, Binder sectionBinder, ArrayBuilder<LabelSymbol> labels, BindingDiagnosticBag tempDiagnosticBag)
+        private void BuildSwitchLabels(SyntaxList<SwitchLabelSyntax> labelsSyntax, Binder sectionBinder, ArrayBuilder<LabelSymbol> labels, CSharpBindingDiagnosticBag tempDiagnosticBag)
         {
             // add switch case/default labels
             foreach (var labelSyntax in labelsSyntax)
@@ -233,7 +233,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        protected BoundExpression ConvertCaseExpression(CSharpSyntaxNode node, BoundExpression caseExpression, out ConstantValue constantValueOpt, BindingDiagnosticBag diagnostics, bool isGotoCaseExpr = false)
+        protected BoundExpression ConvertCaseExpression(CSharpSyntaxNode node, BoundExpression caseExpression, out ConstantValue constantValueOpt, CSharpBindingDiagnosticBag diagnostics, bool isGotoCaseExpr = false)
         {
             bool hasErrors = false;
             if (isGotoCaseExpr)
@@ -352,7 +352,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         # region "Switch statement binding methods"
 
         // Bind the switch expression
-        private BoundExpression BindSwitchGoverningExpression(BindingDiagnosticBag diagnostics)
+        private BoundExpression BindSwitchGoverningExpression(CSharpBindingDiagnosticBag diagnostics)
         {
             // We are at present inside the switch binder, but the switch expression is not
             // bound in the context of the switch binder; it's bound in the context of the
@@ -465,7 +465,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal BoundStatement BindGotoCaseOrDefault(GotoStatementSyntax node, Binder gotoBinder, BindingDiagnosticBag diagnostics)
+        internal BoundStatement BindGotoCaseOrDefault(GotoStatementSyntax node, Binder gotoBinder, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(node.Kind() == SyntaxKind.GotoCaseStatement || node.Kind() == SyntaxKind.GotoDefaultStatement);
             BoundExpression gotoCaseExpressionOpt = null;

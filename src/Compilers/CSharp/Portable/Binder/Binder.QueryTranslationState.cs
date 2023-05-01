@@ -69,7 +69,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return result;
             }
 
-            internal RangeVariableSymbol AddRangeVariable(Binder binder, SyntaxToken identifier, BindingDiagnosticBag diagnostics)
+            internal RangeVariableSymbol AddRangeVariable(Binder binder, SyntaxToken identifier, CSharpBindingDiagnosticBag diagnostics)
             {
                 string name = identifier.ValueText;
                 var result = new RangeVariableSymbol(name, binder.ContainingMemberOrLambda, identifier.GetLocation());
@@ -84,7 +84,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     }
                 }
 
-                if (!error && (object)diagnostics != BindingDiagnosticBag.Discarded)
+                if (!error && (object)diagnostics != CSharpBindingDiagnosticBag.Discarded)
                 {
                     var collisionDetector = new LocalScopeBinder(binder);
                     collisionDetector.ValidateDeclarationNameConflictsInScope(result, diagnostics);

@@ -407,7 +407,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     DeclaringCompilation,
                     sourceType.IsScriptClass ? sourceType.GetScriptInitializer() : null,
                     sourceType.StaticInitializers,
-                    BindingDiagnosticBag.Discarded,
+                    CSharpBindingDiagnosticBag.Discarded,
                     out _);
             }
 

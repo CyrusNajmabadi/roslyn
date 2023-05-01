@@ -16,7 +16,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 {
     internal partial class Binder
     {
-        private BoundExpression BindInterpolatedString(InterpolatedStringExpressionSyntax node, BindingDiagnosticBag diagnostics)
+        private BoundExpression BindInterpolatedString(InterpolatedStringExpressionSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
             if (CheckFeatureAvailability(node, MessageID.IDS_FeatureInterpolatedStrings, diagnostics))
             {
@@ -214,7 +214,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private BoundInterpolatedString BindUnconvertedInterpolatedStringToString(BoundUnconvertedInterpolatedString unconvertedInterpolatedString, BindingDiagnosticBag diagnostics)
+        private BoundInterpolatedString BindUnconvertedInterpolatedStringToString(BoundUnconvertedInterpolatedString unconvertedInterpolatedString, CSharpBindingDiagnosticBag diagnostics)
         {
             // We have 4 possible lowering strategies, dependent on the contents of the string, in this order:
             //  1. The string is a constant value. We can just use the final value.
@@ -297,7 +297,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private static bool AllInterpolatedStringPartsAreStrings(ImmutableArray<BoundExpression> parts)
             => parts.All(p => p is BoundLiteral or BoundStringInsert { Value.Type.SpecialType: SpecialType.System_String, Alignment: null, Format: null });
 
-        private bool TryBindUnconvertedBinaryOperatorToDefaultInterpolatedStringHandler(BoundBinaryOperator binaryOperator, BindingDiagnosticBag diagnostics, [NotNullWhen(true)] out BoundBinaryOperator? convertedBinaryOperator)
+        private bool TryBindUnconvertedBinaryOperatorToDefaultInterpolatedStringHandler(BoundBinaryOperator binaryOperator, CSharpBindingDiagnosticBag diagnostics, [NotNullWhen(true)] out BoundBinaryOperator? convertedBinaryOperator)
         {
             // Much like BindUnconvertedInterpolatedStringToString above, we only want to use DefaultInterpolatedStringHandler if it's worth it. We therefore
             // check for cases 1 and 2: if they are present, we let normal string binary operator binding machinery handle it. Otherwise, we take care of it ourselves.
@@ -366,7 +366,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return true;
         }
 
-        private BoundBinaryOperator UpdateBinaryOperatorWithInterpolatedContents(BoundBinaryOperator originalOperator, ImmutableArray<ImmutableArray<BoundExpression>> appendCalls, InterpolatedStringHandlerData data, SyntaxNode rootSyntax, BindingDiagnosticBag diagnostics)
+        private BoundBinaryOperator UpdateBinaryOperatorWithInterpolatedContents(BoundBinaryOperator originalOperator, ImmutableArray<ImmutableArray<BoundExpression>> appendCalls, InterpolatedStringHandlerData data, SyntaxNode rootSyntax, CSharpBindingDiagnosticBag diagnostics)
         {
             var @string = GetSpecialType(SpecialType.System_String, diagnostics, rootSyntax);
 
@@ -409,7 +409,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private BoundExpression BindUnconvertedInterpolatedExpressionToHandlerType(
             BoundExpression unconvertedExpression,
             NamedTypeSymbol interpolatedStringHandlerType,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             ImmutableArray<BoundInterpolatedStringArgumentPlaceholder> additionalConstructorArguments = default,
             ImmutableArray<RefKind> additionalConstructorRefKinds = default)
             => unconvertedExpression switch
@@ -428,7 +428,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private BoundInterpolatedString BindUnconvertedInterpolatedStringToHandlerType(
             BoundUnconvertedInterpolatedString unconvertedInterpolatedString,
             NamedTypeSymbol interpolatedStringHandlerType,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool isHandlerConversion,
             ImmutableArray<BoundInterpolatedStringArgumentPlaceholder> additionalConstructorArguments = default,
             ImmutableArray<RefKind> additionalConstructorRefKinds = default)
@@ -455,7 +455,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private BoundBinaryOperator BindUnconvertedBinaryOperatorToInterpolatedStringHandlerType(
             BoundBinaryOperator binaryOperator,
             NamedTypeSymbol interpolatedStringHandlerType,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             ImmutableArray<BoundInterpolatedStringArgumentPlaceholder> additionalConstructorArguments,
             ImmutableArray<RefKind> additionalConstructorRefKinds)
         {
@@ -487,7 +487,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             SyntaxNode syntax,
             ImmutableArray<ImmutableArray<BoundExpression>> partsArray,
             NamedTypeSymbol interpolatedStringHandlerType,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool isHandlerConversion,
             ImmutableArray<BoundInterpolatedStringArgumentPlaceholder> additionalConstructorArguments,
             ImmutableArray<RefKind> additionalConstructorRefKinds)
@@ -526,7 +526,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if (needToCheckConversionToObject)
             {
                 TypeSymbol objectType = GetSpecialType(SpecialType.System_Object, diagnostics, syntax);
-                BindingDiagnosticBag conversionDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
+                CSharpBindingDiagnosticBag conversionDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
                 foreach (var parts in partsArray)
                 {
                     foreach (var currentPart in parts)
@@ -582,7 +582,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             populateArguments(syntax, outConstructorAdditionalArguments, baseStringLength, numFormatHoles, intType, argumentsBuilder);
 
             BoundExpression constructorCall;
-            var outConstructorDiagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: diagnostics.AccumulatesDependencies);
+            var outConstructorDiagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: diagnostics.AccumulatesDependencies);
             var outConstructorCall = MakeConstructorInvocation(interpolatedStringHandlerType, argumentsBuilder, refKindsBuilder, syntax, outConstructorDiagnostics);
             if (outConstructorCall is not BoundObjectCreationExpression { ResultKind: LookupResultKind.Viable })
             {
@@ -594,7 +594,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 populateArguments(syntax, additionalConstructorArguments, baseStringLength, numFormatHoles, intType, argumentsBuilder);
                 refKindsBuilder.RemoveLast();
 
-                var nonOutConstructorDiagnostics = BindingDiagnosticBag.GetInstance(template: outConstructorDiagnostics);
+                var nonOutConstructorDiagnostics = CSharpBindingDiagnosticBag.GetInstance(template: outConstructorDiagnostics);
                 BoundExpression nonOutConstructorCall = MakeConstructorInvocation(interpolatedStringHandlerType, argumentsBuilder, refKindsBuilder, syntax, nonOutConstructorDiagnostics);
 
                 if (nonOutConstructorCall is BoundObjectCreationExpression { ResultKind: LookupResultKind.Viable })
@@ -679,7 +679,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private ImmutableArray<BoundExpression> BindInterpolatedStringParts(BoundUnconvertedInterpolatedString unconvertedInterpolatedString, BindingDiagnosticBag diagnostics)
+        private ImmutableArray<BoundExpression> BindInterpolatedStringParts(BoundUnconvertedInterpolatedString unconvertedInterpolatedString, CSharpBindingDiagnosticBag diagnostics)
         {
             ArrayBuilder<BoundExpression>? partsBuilder = null;
             var objectType = GetSpecialType(SpecialType.System_Object, diagnostics, unconvertedInterpolatedString.Syntax);
@@ -727,7 +727,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private (ImmutableArray<ImmutableArray<BoundExpression>> AppendFormatCalls, bool UsesBoolReturn, ImmutableArray<ImmutableArray<(bool IsLiteral, bool HasAlignment, bool HasFormat)>>, int BaseStringLength, int NumFormatHoles) BindInterpolatedStringAppendCalls(
             ImmutableArray<ImmutableArray<BoundExpression>> partsArray,
             BoundInterpolatedStringHandlerPlaceholder implicitBuilderReceiver,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             if (partsArray.IsEmpty && partsArray.All(p => p.IsEmpty))
             {
@@ -851,7 +851,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             ref MemberAnalysisResult memberAnalysisResult,
             int interpolatedStringArgNum,
             BoundExpression? receiver,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(unconvertedString is BoundUnconvertedInterpolatedString or BoundBinaryOperator { IsUnconvertedInterpolatedStringAddition: true });
             var interpolatedStringConversion = memberAnalysisResult.ConversionForArg(interpolatedStringArgNum);

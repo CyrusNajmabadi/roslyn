@@ -63,7 +63,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         protected override ConstantValue MakeConstantValue(
             HashSet<SourceFieldSymbolWithSyntaxReference> dependencies,
             bool earlyDecodingWellKnownAttributes,
-            BindingDiagnosticBag diagnostics) => null;
+            CSharpBindingDiagnosticBag diagnostics) => null;
 
         public sealed override RefKind RefKind => RefKind.None;
 
@@ -80,7 +80,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             var compilation = this.DeclaringCompilation;
 
-            var diagnostics = BindingDiagnosticBag.GetInstance();
+            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
             TypeWithAnnotations type;
             bool isVar;
 
@@ -124,7 +124,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// Can add some diagnostics into <paramref name="diagnostics"/>. 
         /// Returns the type that it actually locks onto (it's possible that it had already locked onto ErrorType).
         /// </summary>
-        private TypeWithAnnotations SetType(BindingDiagnosticBag diagnostics, TypeWithAnnotations type)
+        private TypeWithAnnotations SetType(CSharpBindingDiagnosticBag diagnostics, TypeWithAnnotations type)
         {
             var originalType = _lazyType?.Value.DefaultType;
 
@@ -149,7 +149,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// Can add some diagnostics into <paramref name="diagnostics"/>.
         /// Returns the type that it actually locks onto (it's possible that it had already locked onto ErrorType).
         /// </summary>
-        internal TypeWithAnnotations SetTypeWithAnnotations(TypeWithAnnotations type, BindingDiagnosticBag diagnostics)
+        internal TypeWithAnnotations SetTypeWithAnnotations(TypeWithAnnotations type, CSharpBindingDiagnosticBag diagnostics)
         {
             return SetType(diagnostics, type);
         }
@@ -200,11 +200,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                         // This occurs, for example, in
                         // int x, y[out var Z, 1 is int I];
                         // for (int x, y[out var Z, 1 is int I]; ;) {}
-                        binder.BindDeclaratorArguments((VariableDeclaratorSyntax)nodeToBind, BindingDiagnosticBag.Discarded);
+                        binder.BindDeclaratorArguments((VariableDeclaratorSyntax)nodeToBind, CSharpBindingDiagnosticBag.Discarded);
                         break;
 
                     default:
-                        binder.BindExpression((ExpressionSyntax)nodeToBind, BindingDiagnosticBag.Discarded);
+                        binder.BindExpression((ExpressionSyntax)nodeToBind, CSharpBindingDiagnosticBag.Discarded);
                         break;
                 }
             }

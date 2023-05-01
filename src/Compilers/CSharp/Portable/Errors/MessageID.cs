@@ -346,7 +346,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal static bool CheckFeatureAvailability(
             this MessageID feature,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             SyntaxNode syntax,
             Location? location = null)
         {
@@ -360,7 +360,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal static bool CheckFeatureAvailability(
             this MessageID feature,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             SyntaxToken syntax,
             Location? location = null)
         {
@@ -389,7 +389,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private static bool CheckFeatureAvailability<TData>(
             this MessageID feature,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             ParseOptions parseOptions,
             Func<TData, Location> getLocation,
             TData data)
@@ -404,7 +404,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal static bool CheckFeatureAvailability(
             this MessageID feature,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             Compilation compilation,
             Location location)
         {

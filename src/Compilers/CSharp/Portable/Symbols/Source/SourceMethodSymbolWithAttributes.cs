@@ -501,7 +501,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert((object)arguments.AttributeSyntaxOpt != null);
 
             var attribute = arguments.Attribute;
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
             Debug.Assert(!attribute.HasErrors);
 
             if (attribute.IsTargetAttribute(this, AttributeDescription.PreserveSigAttribute))
@@ -636,7 +636,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 if (this.IsAccessor())
                 {
-                    var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+                    var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
 
                     if (this is SourceEventAccessorSymbol)
                     {
@@ -656,7 +656,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return false;
         }
 
-        private void ValidateConditionalAttribute(CSharpAttributeData attribute, AttributeSyntax node, BindingDiagnosticBag diagnostics)
+        private void ValidateConditionalAttribute(CSharpAttributeData attribute, AttributeSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(this.IsConditional);
 
@@ -726,7 +726,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert((object)arguments.AttributeSyntaxOpt != null);
 
             var attribute = arguments.Attribute;
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
             Debug.Assert(!attribute.HasErrors);
 
             if (attribute.IsTargetAttribute(this, AttributeDescription.MarshalAsAttribute))
@@ -764,7 +764,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             RoslynDebug.Assert(arguments.AttributeSyntaxOpt?.ArgumentList is object);
 
             var attribute = arguments.Attribute;
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
             Debug.Assert(!attribute.HasErrors);
             bool hasErrors = false;
 
@@ -888,7 +888,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private void DecodeModuleInitializerAttribute(DecodeWellKnownAttributeArguments<AttributeSyntax, CSharpAttributeData, AttributeLocation> arguments)
         {
             Debug.Assert(arguments.AttributeSyntaxOpt is object);
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
 
             if (MethodKind != MethodKind.Ordinary)
             {
@@ -937,7 +937,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private void DecodeUnmanagedCallersOnlyAttribute(ref DecodeWellKnownAttributeArguments<AttributeSyntax, CSharpAttributeData, AttributeLocation> arguments)
         {
             Debug.Assert(arguments.AttributeSyntaxOpt != null);
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
 
             arguments.GetOrCreateData<MethodWellKnownAttributeData>().UnmanagedCallersOnlyAttributeData =
                 DecodeUnmanagedCallersOnlyAttributeData(this, arguments.Attribute, arguments.AttributeSyntaxOpt.Location, diagnostics);
@@ -962,7 +962,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 checkAndReportManagedTypes(param.Type, param.RefKind, param.GetNonNullSyntaxNode(), isParam: true, diagnostics);
             }
 
-            static void checkAndReportManagedTypes(TypeSymbol type, RefKind refKind, SyntaxNode syntax, bool isParam, BindingDiagnosticBag diagnostics)
+            static void checkAndReportManagedTypes(TypeSymbol type, RefKind refKind, SyntaxNode syntax, bool isParam, CSharpBindingDiagnosticBag diagnostics)
             {
                 if (refKind != RefKind.None)
                 {
@@ -990,7 +990,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
             }
 
-            static UnmanagedCallersOnlyAttributeData DecodeUnmanagedCallersOnlyAttributeData(SourceMethodSymbolWithAttributes @this, CSharpAttributeData attribute, Location location, BindingDiagnosticBag diagnostics)
+            static UnmanagedCallersOnlyAttributeData DecodeUnmanagedCallersOnlyAttributeData(SourceMethodSymbolWithAttributes @this, CSharpAttributeData attribute, Location location, CSharpBindingDiagnosticBag diagnostics)
             {
                 Debug.Assert(attribute.AttributeClass is not null);
                 ImmutableHashSet<CodeAnalysis.Symbols.INamedTypeSymbolInternal>? callingConventionTypes = null;
@@ -1020,7 +1020,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        internal override void PostDecodeWellKnownAttributes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> allAttributeSyntaxNodes, BindingDiagnosticBag diagnostics, AttributeLocation symbolPart, WellKnownAttributeData decodedData)
+        internal override void PostDecodeWellKnownAttributes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> allAttributeSyntaxNodes, CSharpBindingDiagnosticBag diagnostics, AttributeLocation symbolPart, WellKnownAttributeData decodedData)
         {
             Debug.Assert(!boundAttributes.IsDefault);
             Debug.Assert(!allAttributeSyntaxNodes.IsDefault);
@@ -1074,12 +1074,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             base.PostDecodeWellKnownAttributes(boundAttributes, allAttributeSyntaxNodes, diagnostics, symbolPart, decodedData);
         }
 
-        protected void AsyncMethodChecks(BindingDiagnosticBag diagnostics)
+        protected void AsyncMethodChecks(CSharpBindingDiagnosticBag diagnostics)
         {
             AsyncMethodChecks(verifyReturnType: true, this.GetFirstLocation(), diagnostics);
         }
 
-        protected void AsyncMethodChecks(bool verifyReturnType, Location errorLocation, BindingDiagnosticBag diagnostics)
+        protected void AsyncMethodChecks(bool verifyReturnType, Location errorLocation, CSharpBindingDiagnosticBag diagnostics)
         {
             if (IsAsync)
             {

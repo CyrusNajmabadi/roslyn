@@ -30,7 +30,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             private readonly Symbol _memberSymbol;
             private readonly ImmutableArray<CSharpSyntaxNode> _sourceIncludeElementNodes;
             private readonly CSharpCompilation _compilation;
-            private readonly BindingDiagnosticBag _diagnostics;
+            private readonly CSharpBindingDiagnosticBag _diagnostics;
             private readonly CancellationToken _cancellationToken;
 
             private int _nextSourceIncludeElementIndex;
@@ -46,7 +46,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 HashSet<ParameterSymbol> documentedParameters,
                 HashSet<TypeParameterSymbol> documentedTypeParameters,
                 DocumentationCommentIncludeCache includedFileCache,
-                BindingDiagnosticBag diagnostics,
+                CSharpBindingDiagnosticBag diagnostics,
                 CancellationToken cancellationToken)
             {
                 _memberSymbol = memberSymbol;
@@ -71,7 +71,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 ref HashSet<TypeParameterSymbol> documentedTypeParameters,
                 ref DocumentationCommentIncludeCache includedFileCache,
                 TextWriter writer,
-                BindingDiagnosticBag diagnostics,
+                CSharpBindingDiagnosticBag diagnostics,
                 CancellationToken cancellationToken)
             {
                 // If there are no include elements, then there's nothing to expand.
@@ -515,7 +515,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 Binder binder = BinderFactory.MakeCrefBinder(crefSyntax, memberDeclSyntax, _compilation.GetBinderFactory(memberDeclSyntax.SyntaxTree));
 
-                var crefDiagnostics = BindingDiagnosticBag.GetInstance(_diagnostics);
+                var crefDiagnostics = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
                 attribute.Value = GetDocumentationCommentId(crefSyntax, binder, crefDiagnostics); // NOTE: mutation (element must be a copy)
                 RecordBindingDiagnostics(crefDiagnostics, sourceLocation); // Respects DocumentationMode.
                 crefDiagnostics.Free();
@@ -535,7 +535,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Debug.Assert(memberDeclSyntax != null,
                     "Why are we processing a documentation comment that is not attached to a member declaration?");
 
-                var nameDiagnostics = BindingDiagnosticBag.GetInstance(_diagnostics);
+                var nameDiagnostics = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
                 Binder binder = MakeNameBinder(isParameter, isTypeParameterRef, _memberSymbol, _compilation, originatingSyntax.SyntaxTree);
                 DocumentationCommentCompiler.BindName(attrSyntax, binder, _memberSymbol, ref _documentedParameters, ref _documentedTypeParameters, nameDiagnostics);
                 RecordBindingDiagnostics(nameDiagnostics, sourceLocation); // Respects DocumentationMode.
@@ -647,7 +647,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             /// <remarks>
             /// Respects the DocumentationMode at the source location.
             /// </remarks>
-            private void RecordBindingDiagnostics(BindingDiagnosticBag bindingDiagnostics, Location sourceLocation)
+            private void RecordBindingDiagnostics(CSharpBindingDiagnosticBag bindingDiagnostics, Location sourceLocation)
             {
                 if (((SyntaxTree)sourceLocation.SourceTree).ReportDocumentationCommentDiagnostics())
                 {

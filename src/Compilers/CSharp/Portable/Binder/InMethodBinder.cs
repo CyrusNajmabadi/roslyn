@@ -27,7 +27,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
 #if DEBUG
         /// <summary>
-        /// This map is used by <see cref="MethodCompiler.BindMethodBody(MethodSymbol, TypeCompilationState, BindingDiagnosticBag, bool, BoundNode?, bool, out ImportChain?, out bool, out bool, out MethodBodySemanticModel.InitialState)"/>
+        /// This map is used by <see cref="MethodCompiler.BindMethodBody(MethodSymbol, TypeCompilationState, CSharpBindingDiagnosticBag, bool, BoundNode?, bool, out ImportChain?, out bool, out bool, out MethodBodySemanticModel.InitialState)"/>
         /// and <see cref="Binder.BindIdentifier"/> to validate some assumptions around identifiers.
         /// 
         /// Values in the dictionary are bit flags.
@@ -118,7 +118,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        protected override void ValidateYield(YieldStatementSyntax node, BindingDiagnosticBag diagnostics)
+        protected override void ValidateYield(YieldStatementSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
         }
 
@@ -143,7 +143,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         internal static TypeWithAnnotations GetIteratorElementTypeFromReturnType(CSharpCompilation compilation,
-            RefKind refKind, TypeSymbol returnType, Location errorLocation, BindingDiagnosticBag diagnostics)
+            RefKind refKind, TypeSymbol returnType, Location errorLocation, CSharpBindingDiagnosticBag diagnostics)
         {
             if (refKind == RefKind.None && returnType.Kind == SymbolKind.NamedType)
             {
@@ -239,7 +239,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private static bool ReportConflictWithParameter(Symbol parameter, Symbol newSymbol, string name, Location newLocation, BindingDiagnosticBag diagnostics)
+        private static bool ReportConflictWithParameter(Symbol parameter, Symbol newSymbol, string name, Location newLocation, CSharpBindingDiagnosticBag diagnostics)
         {
 #if DEBUG
             var locations = parameter.Locations;
@@ -319,7 +319,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return true;
         }
 
-        internal override bool EnsureSingleDefinition(Symbol symbol, string name, Location location, BindingDiagnosticBag diagnostics)
+        internal override bool EnsureSingleDefinition(Symbol symbol, string name, Location location, CSharpBindingDiagnosticBag diagnostics)
         {
             var parameters = _methodSymbol.Parameters;
             var typeParameters = _methodSymbol.TypeParameters;

@@ -229,7 +229,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         // basesBeingResolved is only used to break circular references.
         internal abstract NamespaceOrTypeSymbol GetAliasTarget(ConsList<TypeSymbol>? basesBeingResolved);
 
-        internal void CheckConstraints(BindingDiagnosticBag diagnostics)
+        internal void CheckConstraints(CSharpBindingDiagnosticBag diagnostics)
         {
             var target = this.Target as TypeSymbol;
             if ((object?)target != null && Locations.Length > 0)
@@ -280,7 +280,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private NamespaceOrTypeSymbol? _aliasTarget;
 
         // lazy binding
-        private BindingDiagnosticBag? _aliasTargetDiagnostics;
+        private CSharpBindingDiagnosticBag? _aliasTargetDiagnostics;
 
         internal AliasSymbolFromSyntax(SourceNamespaceSymbol containingSymbol, UsingDirectiveSyntax syntax)
             : base(syntax.Alias!.Name.Identifier.ValueText, containingSymbol, ImmutableArray.Create(syntax.Alias!.Name.Identifier.GetLocation()), isExtern: false)
@@ -315,7 +315,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 // the target is not yet bound. If it is an ordinary alias, bind the target
                 // symbol. If it is an extern alias then find the target in the list of metadata references.
-                var newDiagnostics = BindingDiagnosticBag.GetInstance();
+                var newDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
 
                 NamespaceOrTypeSymbol symbol = this.IsExtern
                     ? ResolveExternAliasTarget(newDiagnostics)
@@ -343,7 +343,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return _aliasTarget!;
         }
 
-        internal BindingDiagnosticBag AliasTargetDiagnostics
+        internal CSharpBindingDiagnosticBag AliasTargetDiagnostics
         {
             get
             {
@@ -353,7 +353,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        private NamespaceSymbol ResolveExternAliasTarget(BindingDiagnosticBag diagnostics)
+        private NamespaceSymbol ResolveExternAliasTarget(CSharpBindingDiagnosticBag diagnostics)
         {
             NamespaceSymbol? target;
             if (!ContainingSymbol.DeclaringCompilation.GetExternAliasTarget(Name, out target))
@@ -369,7 +369,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private NamespaceOrTypeSymbol ResolveAliasTarget(
             UsingDirectiveSyntax usingDirective,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             ConsList<TypeSymbol>? basesBeingResolved)
         {
             if (usingDirective.UnsafeKeyword != default)

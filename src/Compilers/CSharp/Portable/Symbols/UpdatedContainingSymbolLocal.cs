@@ -90,7 +90,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         internal override bool IsKnownToReferToTempIfReferenceType => _underlyingLocal.IsKnownToReferToTempIfReferenceType;
         internal override bool IsCompilerGenerated => _underlyingLocal.IsCompilerGenerated;
         internal override ScopedKind Scope => _underlyingLocal.Scope;
-        internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, BindingDiagnosticBag? diagnostics = null) =>
+        internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag? diagnostics = null) =>
             _underlyingLocal.GetConstantValue(node, inProgress, diagnostics);
         internal override ImmutableBindingDiagnostic<AssemblySymbol> GetConstantValueDiagnostics(BoundExpression boundInitValue) =>
             _underlyingLocal.GetConstantValueDiagnostics(boundInitValue);

@@ -195,7 +195,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 if ((object)_globalNamespace == null)
                 {
-                    var diagnostics = BindingDiagnosticBag.GetInstance();
+                    var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                     var globalNS = new SourceNamespaceSymbol(
                         this, this, DeclaringCompilation.MergedRootDeclaration, diagnostics);
 
@@ -235,11 +235,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                     case CompletionPart.StartValidatingReferencedAssemblies:
                         {
-                            BindingDiagnosticBag diagnostics = null;
+                            CSharpBindingDiagnosticBag diagnostics = null;
 
                             if (AnyReferencedAssembliesAreLinked)
                             {
-                                diagnostics = BindingDiagnosticBag.GetInstance();
+                                diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                                 ValidateLinkedAssemblies(diagnostics, cancellationToken);
                             }
 
@@ -295,7 +295,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        private void ValidateLinkedAssemblies(BindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
+        private void ValidateLinkedAssemblies(CSharpBindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
         {
             foreach (AssemblySymbol a in GetReferencedAssemblySymbols())
             {
@@ -516,7 +516,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 if (!ModuleWellKnownAttributeData.IsValidCharSet(charSet))
                 {
                     CSharpSyntaxNode attributeArgumentSyntax = attribute.GetAttributeArgumentSyntax(0, arguments.AttributeSyntaxOpt);
-                    ((BindingDiagnosticBag)arguments.Diagnostics).Add(ErrorCode.ERR_InvalidAttributeArgument, attributeArgumentSyntax.Location, arguments.AttributeSyntaxOpt.GetErrorDisplayName());
+                    ((CSharpBindingDiagnosticBag)arguments.Diagnostics).Add(ErrorCode.ERR_InvalidAttributeArgument, attributeArgumentSyntax.Location, arguments.AttributeSyntaxOpt.GetErrorDisplayName());
                 }
                 else
                 {

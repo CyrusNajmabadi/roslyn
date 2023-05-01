@@ -86,7 +86,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
         public sealed override ImmutableArray<NamedTypeSymbol> GetAdditionalTopLevelTypes()
             => _additionalTypes;
 
-        internal sealed override ImmutableArray<NamedTypeSymbol> GetEmbeddedTypes(BindingDiagnosticBag diagnostics)
+        internal sealed override ImmutableArray<NamedTypeSymbol> GetEmbeddedTypes(CSharpBindingDiagnosticBag diagnostics)
         {
             var builder = ArrayBuilder<NamedTypeSymbol>.GetInstance();
 
@@ -318,7 +318,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
             return base.TrySynthesizeIsByRefLikeAttribute();
         }
 
-        private void CreateEmbeddedAttributesIfNeeded(BindingDiagnosticBag diagnostics)
+        private void CreateEmbeddedAttributesIfNeeded(CSharpBindingDiagnosticBag diagnostics)
         {
             EmbeddableAttributes needsAttributes = GetNeedsGeneratedAttributes();
 
@@ -339,7 +339,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
                 return;
             }
 
-            var createParameterlessEmbeddedAttributeSymbol = new Func<string, NamespaceSymbol, BindingDiagnosticBag, SynthesizedEmbeddedAttributeSymbol>(CreateParameterlessEmbeddedAttributeSymbol);
+            var createParameterlessEmbeddedAttributeSymbol = new Func<string, NamespaceSymbol, CSharpBindingDiagnosticBag, SynthesizedEmbeddedAttributeSymbol>(CreateParameterlessEmbeddedAttributeSymbol);
 
             CreateAttributeIfNeeded(
                 ref _lazyEmbeddedAttribute,
@@ -430,14 +430,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
             }
         }
 
-        private SynthesizedEmbeddedAttributeSymbol CreateParameterlessEmbeddedAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedAttributeSymbol CreateParameterlessEmbeddedAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedAttributeSymbol(
                     name,
                     containingNamespace,
                     SourceModule,
                     baseType: GetWellKnownType(WellKnownType.System_Attribute, diagnostics));
 
-        private SynthesizedEmbeddedNullableAttributeSymbol CreateNullableAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedNullableAttributeSymbol CreateNullableAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedNullableAttributeSymbol(
                     name,
                     containingNamespace,
@@ -445,7 +445,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
                     GetWellKnownType(WellKnownType.System_Attribute, diagnostics),
                     GetSpecialType(SpecialType.System_Byte, diagnostics));
 
-        private SynthesizedEmbeddedNullableContextAttributeSymbol CreateNullableContextAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedNullableContextAttributeSymbol CreateNullableContextAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedNullableContextAttributeSymbol(
                     name,
                     containingNamespace,
@@ -453,7 +453,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
                     GetWellKnownType(WellKnownType.System_Attribute, diagnostics),
                     GetSpecialType(SpecialType.System_Byte, diagnostics));
 
-        private SynthesizedEmbeddedNullablePublicOnlyAttributeSymbol CreateNullablePublicOnlyAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedNullablePublicOnlyAttributeSymbol CreateNullablePublicOnlyAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedNullablePublicOnlyAttributeSymbol(
                     name,
                     containingNamespace,
@@ -461,7 +461,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
                     GetWellKnownType(WellKnownType.System_Attribute, diagnostics),
                     GetSpecialType(SpecialType.System_Boolean, diagnostics));
 
-        private SynthesizedEmbeddedNativeIntegerAttributeSymbol CreateNativeIntegerAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedNativeIntegerAttributeSymbol CreateNativeIntegerAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedNativeIntegerAttributeSymbol(
                     name,
                     containingNamespace,
@@ -469,14 +469,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
                     GetWellKnownType(WellKnownType.System_Attribute, diagnostics),
                     GetSpecialType(SpecialType.System_Boolean, diagnostics));
 
-        private SynthesizedEmbeddedScopedRefAttributeSymbol CreateScopedRefAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedScopedRefAttributeSymbol CreateScopedRefAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedScopedRefAttributeSymbol(
                     name,
                     containingNamespace,
                     SourceModule,
                     GetWellKnownType(WellKnownType.System_Attribute, diagnostics));
 
-        private SynthesizedEmbeddedRefSafetyRulesAttributeSymbol CreateRefSafetyRulesAttributeSymbol(string name, NamespaceSymbol containingNamespace, BindingDiagnosticBag diagnostics)
+        private SynthesizedEmbeddedRefSafetyRulesAttributeSymbol CreateRefSafetyRulesAttributeSymbol(string name, NamespaceSymbol containingNamespace, CSharpBindingDiagnosticBag diagnostics)
             => new SynthesizedEmbeddedRefSafetyRulesAttributeSymbol(
                     name,
                     containingNamespace,
@@ -486,9 +486,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
 
         private void CreateAttributeIfNeeded<T>(
             ref T symbol,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             AttributeDescription description,
-            Func<string, NamespaceSymbol, BindingDiagnosticBag, T> factory)
+            Func<string, NamespaceSymbol, CSharpBindingDiagnosticBag, T> factory)
             where T : SynthesizedEmbeddedAttributeSymbolBase
         {
             if (symbol is null)
@@ -511,7 +511,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
 
 #nullable enable
 
-        private void AddDiagnosticsForExistingAttribute(AttributeDescription description, BindingDiagnosticBag diagnostics)
+        private void AddDiagnosticsForExistingAttribute(AttributeDescription description, CSharpBindingDiagnosticBag diagnostics)
         {
             var attributeMetadataName = MetadataTypeName.FromFullName(description.FullName);
             var userDefinedAttribute = _sourceAssembly.SourceModule.LookupTopLevelMetadataType(ref attributeMetadataName);
@@ -545,21 +545,21 @@ namespace Microsoft.CodeAnalysis.CSharp.Emit
             return result;
         }
 
-        private NamedTypeSymbol GetWellKnownType(WellKnownType type, BindingDiagnosticBag diagnostics)
+        private NamedTypeSymbol GetWellKnownType(WellKnownType type, CSharpBindingDiagnosticBag diagnostics)
         {
             var result = _sourceAssembly.DeclaringCompilation.GetWellKnownType(type);
             Binder.ReportUseSite(result, diagnostics, Location.None);
             return result;
         }
 
-        private NamedTypeSymbol GetSpecialType(SpecialType type, BindingDiagnosticBag diagnostics)
+        private NamedTypeSymbol GetSpecialType(SpecialType type, CSharpBindingDiagnosticBag diagnostics)
         {
             var result = _sourceAssembly.DeclaringCompilation.GetSpecialType(type);
             Binder.ReportUseSite(result, diagnostics, Location.None);
             return result;
         }
 
-        private void EnsureAttributeUsageAttributeMembersAvailable(BindingDiagnosticBag diagnostics)
+        private void EnsureAttributeUsageAttributeMembersAvailable(CSharpBindingDiagnosticBag diagnostics)
         {
             var compilation = _sourceAssembly.DeclaringCompilation;
             Binder.GetWellKnownTypeMember(compilation, WellKnownMember.System_AttributeUsageAttribute__ctor, diagnostics, Location.None);

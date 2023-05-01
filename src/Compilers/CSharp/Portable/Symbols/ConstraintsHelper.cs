@@ -75,7 +75,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             ImmutableArray<TypeWithAnnotations> constraintTypes,
             bool inherited,
             CSharpCompilation currentCompilation,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             var diagnosticsBuilder = ArrayBuilder<TypeParameterDiagnosticInfo>.GetInstance();
             ArrayBuilder<TypeParameterDiagnosticInfo> useSiteDiagnosticsBuilder = null;
@@ -319,7 +319,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             ImmutableArray<TypeParameterSymbol> typeParameters,
             TypeParameterListSyntax typeParameterList,
             SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             if (typeParameters.Length == 0 || constraintClauses.Count == 0)
             {
@@ -371,7 +371,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                 // We will recompute this diagnostics more accurately later, when binding without BinderFlags.SuppressTypeArgumentBinding  
                 clauses = withTypeParametersBinder.BindTypeParameterConstraintClauses(containingSymbol, typeParameters, typeParameterList, constraintClauses,
-                                                                    BindingDiagnosticBag.Discarded, performOnlyCycleSafeValidation: true);
+                                                                    CSharpBindingDiagnosticBag.Discarded, performOnlyCycleSafeValidation: true);
 
                 clauses = AdjustConstraintKindsBasedOnConstraintTypes(typeParameters, clauses);
             }
@@ -462,7 +462,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             CSharpCompilation compilation,
             ConversionsBase conversions,
             Location location,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             bool includeNullability = compilation.IsFeatureEnabled(MessageID.IDS_FeatureNullableReferenceTypes);
             var boxedArgs = CheckConstraintsArgsBoxed.Allocate(compilation, conversions, includeNullability, location, diagnostics);
@@ -475,7 +475,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             CSharpCompilation compilation,
             ConversionsBase conversions)
         {
-            var diagnostics = new BindingDiagnosticBag(DiagnosticBag.GetInstance());
+            var diagnostics = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
 
             // Nullability checks can only add warnings here so skip them for this check as we are only
             // concerned with errors.
@@ -499,20 +499,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             public readonly ConversionsBase Conversions;
             public readonly bool IncludeNullability;
             public readonly Location Location;
-            public readonly BindingDiagnosticBag Diagnostics;
+            public readonly CSharpBindingDiagnosticBag Diagnostics;
             public readonly CompoundUseSiteInfo<AssemblySymbol> Template;
 
-            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, Location location, BindingDiagnosticBag diagnostics) :
+            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, Location location, CSharpBindingDiagnosticBag diagnostics) :
                 this(currentCompilation, conversions, currentCompilation.IsFeatureEnabled(MessageID.IDS_FeatureNullableReferenceTypes), location, diagnostics)
             {
             }
 
-            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, BindingDiagnosticBag diagnostics) :
+            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag diagnostics) :
                 this(currentCompilation, conversions, includeNullability, location, diagnostics, template: new CompoundUseSiteInfo<AssemblySymbol>(diagnostics, currentCompilation.Assembly))
             {
             }
 
-            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, BindingDiagnosticBag diagnostics, CompoundUseSiteInfo<AssemblySymbol> template)
+            public CheckConstraintsArgs(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag diagnostics, CompoundUseSiteInfo<AssemblySymbol> template)
             {
                 this.CurrentCompilation = currentCompilation;
                 this.Conversions = conversions;
@@ -530,7 +530,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             public CheckConstraintsArgs Args;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            public static CheckConstraintsArgsBoxed Allocate(CSharpCompilation currentCompilation, ConversionsBase conversions, Location location, BindingDiagnosticBag diagnostics)
+            public static CheckConstraintsArgsBoxed Allocate(CSharpCompilation currentCompilation, ConversionsBase conversions, Location location, CSharpBindingDiagnosticBag diagnostics)
             {
                 var boxedArgs = s_checkConstraintsArgsBoxedPool.Allocate();
                 boxedArgs.Args = new CheckConstraintsArgs(currentCompilation, conversions, location, diagnostics);
@@ -538,7 +538,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            public static CheckConstraintsArgsBoxed Allocate(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, BindingDiagnosticBag diagnostics)
+            public static CheckConstraintsArgsBoxed Allocate(CSharpCompilation currentCompilation, ConversionsBase conversions, bool includeNullability, Location location, CSharpBindingDiagnosticBag diagnostics)
             {
                 var boxedArgs = s_checkConstraintsArgsBoxedPool.Allocate();
                 boxedArgs.Args = new CheckConstraintsArgs(currentCompilation, conversions, includeNullability, location, diagnostics);
@@ -572,7 +572,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             in CheckConstraintsArgs args,
             SyntaxNode typeSyntax,
             ImmutableArray<Location> elementLocations,
-            BindingDiagnosticBag nullabilityDiagnosticsOpt)
+            CSharpBindingDiagnosticBag nullabilityDiagnosticsOpt)
         {
             Debug.Assert(tuple.IsTupleType);
             if (!RequiresChecking(tuple))
@@ -611,7 +611,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                 offset += NamedTypeSymbol.ValueTupleRestIndex;
 
-                void populateDiagnosticsAndClear(ArrayBuilder<TypeParameterDiagnosticInfo> builder, BindingDiagnosticBag bag)
+                void populateDiagnosticsAndClear(ArrayBuilder<TypeParameterDiagnosticInfo> builder, CSharpBindingDiagnosticBag bag)
                 {
                     if (bag is null)
                     {

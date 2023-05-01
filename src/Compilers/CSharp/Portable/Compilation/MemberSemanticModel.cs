@@ -191,7 +191,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 position = CheckAndAdjustPosition(position);
                 expression = SyntaxFactory.GetStandaloneExpression(expression);
                 binder = GetSpeculativeBinder(position, expression, bindingOption);
-                var boundRoot = binder.BindExpression(expression, BindingDiagnosticBag.Discarded);
+                var boundRoot = binder.BindExpression(expression, CSharpBindingDiagnosticBag.Discarded);
                 ImmutableDictionary<Symbol, Symbol> ignored = null;
                 return (BoundExpression)NullableWalker.AnalyzeAndRewriteSpeculation(position, boundRoot, binder, snapshotManager, newSnapshots: out _, remappedSymbols: ref ignored);
             }
@@ -1680,7 +1680,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             using (_nodeMapLock.DisposableWrite())
             {
-                BoundNode boundOuterExpression = this.Bind(incrementalBinder, nodeToBind, BindingDiagnosticBag.Discarded);
+                BoundNode boundOuterExpression = this.Bind(incrementalBinder, nodeToBind, CSharpBindingDiagnosticBag.Discarded);
 
                 // https://github.com/dotnet/roslyn/issues/35038: Rewrite the above node and add a test that hits this path with nullable
                 // enabled
@@ -1712,7 +1712,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             using (_nodeMapLock.DisposableWrite())
             {
-                BoundNode boundOuterExpression = this.Bind(incrementalBinder, lambdaOrQuery, BindingDiagnosticBag.Discarded);
+                BoundNode boundOuterExpression = this.Bind(incrementalBinder, lambdaOrQuery, CSharpBindingDiagnosticBag.Discarded);
 
                 // https://github.com/dotnet/roslyn/issues/35038: We need to do a rewrite here, and create a test that can hit this.
                 if (!IsNullableAnalysisEnabled() && Compilation.IsNullableAnalysisEnabledAlways)
@@ -1963,7 +1963,7 @@ done:
             BoundNode bind(CSharpSyntaxNode root, out Binder binder)
             {
                 binder = GetBinderToBindNode(root);
-                return Bind(binder, root, BindingDiagnosticBag.Discarded);
+                return Bind(binder, root, CSharpBindingDiagnosticBag.Discarded);
             }
 
             void rewriteAndCache()
@@ -2084,7 +2084,7 @@ done:
 
             using (_nodeMapLock.DisposableWrite())
             {
-                BoundNode boundStatement = this.Bind(incrementalBinder, nodeToBind, BindingDiagnosticBag.Discarded);
+                BoundNode boundStatement = this.Bind(incrementalBinder, nodeToBind, CSharpBindingDiagnosticBag.Discarded);
                 results = GuardedAddBoundTreeAndGetBoundNodeFromMap(node, boundStatement);
             }
 
@@ -2113,7 +2113,7 @@ done:
                 // https://github.com/dotnet/roslyn/issues/35038: We have to run analysis on this node in some manner
                 using (_nodeMapLock.DisposableWrite())
                 {
-                    var boundNode = this.Bind(incrementalBinder, node, BindingDiagnosticBag.Discarded);
+                    var boundNode = this.Bind(incrementalBinder, node, CSharpBindingDiagnosticBag.Discarded);
                     GuardedAddBoundTreeForStandaloneSyntax(node, boundNode);
                     results = GuardedGetBoundNodesFromMap(node);
                 }
@@ -2379,7 +2379,7 @@ foundParent:;
                 return null;
             }
 
-            public override BoundStatement BindStatement(StatementSyntax node, BindingDiagnosticBag diagnostics)
+            public override BoundStatement BindStatement(StatementSyntax node, CSharpBindingDiagnosticBag diagnostics)
             {
                 // Check the bound node cache to see if the statement was already bound.
                 if (node.SyntaxTree == _semanticModel.SyntaxTree)
@@ -2411,7 +2411,7 @@ foundParent:;
                 return statement;
             }
 
-            internal override BoundBlock BindEmbeddedBlock(BlockSyntax node, BindingDiagnosticBag diagnostics)
+            internal override BoundBlock BindEmbeddedBlock(BlockSyntax node, CSharpBindingDiagnosticBag diagnostics)
             {
                 BoundBlock block = (BoundBlock)TryGetBoundNodeFromMap(node);
 
@@ -2442,7 +2442,7 @@ foundParent:;
                 return null;
             }
 
-            public override BoundNode BindMethodBody(CSharpSyntaxNode node, BindingDiagnosticBag diagnostics)
+            public override BoundNode BindMethodBody(CSharpSyntaxNode node, CSharpBindingDiagnosticBag diagnostics)
             {
                 BoundNode boundNode = TryGetBoundNodeFromMap(node);
 
@@ -2456,17 +2456,17 @@ foundParent:;
                 return boundNode;
             }
 
-            internal override BoundExpressionStatement BindConstructorInitializer(ConstructorInitializerSyntax node, BindingDiagnosticBag diagnostics)
+            internal override BoundExpressionStatement BindConstructorInitializer(ConstructorInitializerSyntax node, CSharpBindingDiagnosticBag diagnostics)
             {
                 return (BoundExpressionStatement)TryGetBoundNodeFromMap(node) ?? base.BindConstructorInitializer(node, diagnostics);
             }
 
-            internal override BoundExpressionStatement BindConstructorInitializer(PrimaryConstructorBaseTypeSyntax node, BindingDiagnosticBag diagnostics)
+            internal override BoundExpressionStatement BindConstructorInitializer(PrimaryConstructorBaseTypeSyntax node, CSharpBindingDiagnosticBag diagnostics)
             {
                 return (BoundExpressionStatement)TryGetBoundNodeFromMap(node) ?? base.BindConstructorInitializer(node, diagnostics);
             }
 
-            internal override BoundBlock BindExpressionBodyAsBlock(ArrowExpressionClauseSyntax node, BindingDiagnosticBag diagnostics)
+            internal override BoundBlock BindExpressionBodyAsBlock(ArrowExpressionClauseSyntax node, CSharpBindingDiagnosticBag diagnostics)
             {
                 BoundBlock block = (BoundBlock)TryGetBoundNodeFromMap(node);
 

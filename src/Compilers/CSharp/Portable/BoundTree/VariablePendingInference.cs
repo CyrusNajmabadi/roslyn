@@ -24,14 +24,14 @@ namespace Microsoft.CodeAnalysis.CSharp
 
     internal partial class VariablePendingInference : BoundExpression
     {
-        internal BoundExpression SetInferredTypeWithAnnotations(TypeWithAnnotations type, BindingDiagnosticBag? diagnosticsOpt)
+        internal BoundExpression SetInferredTypeWithAnnotations(TypeWithAnnotations type, CSharpBindingDiagnosticBag? diagnosticsOpt)
         {
             Debug.Assert(type.HasType);
 
             return SetInferredTypeWithAnnotations(type, null, diagnosticsOpt);
         }
 
-        internal BoundExpression SetInferredTypeWithAnnotations(TypeWithAnnotations type, Binder? binderOpt, BindingDiagnosticBag? diagnosticsOpt)
+        internal BoundExpression SetInferredTypeWithAnnotations(TypeWithAnnotations type, Binder? binderOpt, CSharpBindingDiagnosticBag? diagnosticsOpt)
         {
             Debug.Assert(binderOpt != null || type.HasType);
             Debug.Assert(this.Syntax.Kind() == SyntaxKind.SingleVariableDesignation ||
@@ -77,7 +77,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 case SymbolKind.Field:
                     var fieldSymbol = (GlobalExpressionVariable)this.VariableSymbol;
-                    var inferenceDiagnostics = new BindingDiagnosticBag(DiagnosticBag.GetInstance()
+                    var inferenceDiagnostics = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance()
 #if DEBUG
                                                                         , PooledHashSet<AssemblySymbol>.GetInstance()
 #endif
@@ -109,12 +109,12 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal BoundExpression FailInference(Binder binder, BindingDiagnosticBag? diagnosticsOpt)
+        internal BoundExpression FailInference(Binder binder, CSharpBindingDiagnosticBag? diagnosticsOpt)
         {
             return this.SetInferredTypeWithAnnotations(default, binder, diagnosticsOpt);
         }
 
-        private void ReportInferenceFailure(BindingDiagnosticBag diagnostics)
+        private void ReportInferenceFailure(CSharpBindingDiagnosticBag diagnostics)
         {
             SingleVariableDesignationSyntax designation;
             switch (this.Syntax.Kind())

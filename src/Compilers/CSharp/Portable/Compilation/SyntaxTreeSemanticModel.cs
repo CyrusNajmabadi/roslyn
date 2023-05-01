@@ -226,7 +226,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         // will be one in the binder chain and one isn't necessarily required for the batch case.
                         binder = new LocalScopeBinder(binder);
 
-                        BoundExpression bound = binder.BindExpression((ExpressionSyntax)node, BindingDiagnosticBag.Discarded);
+                        BoundExpression bound = binder.BindExpression((ExpressionSyntax)node, CSharpBindingDiagnosticBag.Discarded);
 
                         SymbolInfo info = GetSymbolInfoForNode(options, bound, bound, boundNodeForSyntacticParent: null, binderOpt: null);
                         if ((object)info.Symbol != null)
@@ -340,17 +340,17 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     if (SyntaxFacts.IsNamespaceAliasQualifier(type))
                     {
-                        return binder.BindNamespaceAliasSymbol(node as IdentifierNameSyntax, BindingDiagnosticBag.Discarded);
+                        return binder.BindNamespaceAliasSymbol(node as IdentifierNameSyntax, CSharpBindingDiagnosticBag.Discarded);
                     }
                     else if (SyntaxFacts.IsInTypeOnlyContext(type))
                     {
                         if (!type.IsVar)
                         {
-                            return binder.BindTypeOrAlias(type, BindingDiagnosticBag.Discarded, basesBeingResolved).Symbol;
+                            return binder.BindTypeOrAlias(type, CSharpBindingDiagnosticBag.Discarded, basesBeingResolved).Symbol;
                         }
 
                         Symbol result = bindVarAsAliasFirst
-                            ? binder.BindTypeOrAlias(type, BindingDiagnosticBag.Discarded, basesBeingResolved).Symbol
+                            ? binder.BindTypeOrAlias(type, CSharpBindingDiagnosticBag.Discarded, basesBeingResolved).Symbol
                             : null;
 
                         // CONSIDER: we might bind "var" twice - once to see if it is an alias and again
@@ -378,11 +378,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                             }
                         }
 
-                        return result ?? binder.BindTypeOrAlias(type, BindingDiagnosticBag.Discarded, basesBeingResolved).Symbol;
+                        return result ?? binder.BindTypeOrAlias(type, CSharpBindingDiagnosticBag.Discarded, basesBeingResolved).Symbol;
                     }
                     else
                     {
-                        return binder.BindNamespaceOrTypeOrAliasSymbol(type, BindingDiagnosticBag.Discarded, basesBeingResolved, basesBeingResolved != null).Symbol;
+                        return binder.BindNamespaceOrTypeOrAliasSymbol(type, CSharpBindingDiagnosticBag.Discarded, basesBeingResolved, basesBeingResolved != null).Symbol;
                     }
                 }
             }

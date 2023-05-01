@@ -24,7 +24,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // there's no default label if the original switch is exhaustive.
                     // we generate a new label here because the new dag might not be.
                     defaultLabel ??= new GeneratedLabelSymbol("default"),
-                    BindingDiagnosticBag.Discarded,
+                    CSharpBindingDiagnosticBag.Discarded,
                     forLowering: true);
                 Debug.Assert(!decisionDag.ContainsAnySynthesizedNodes());
             }

@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private readonly BoundStatement? _methodEntryInstrumentation;
         private readonly ArrayTypeSymbol _payloadType;
         private readonly LocalSymbol _methodPayload;
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
         private readonly DebugDocumentProvider _debugDocumentProvider;
         private readonly SyntheticBoundNodeFactory _methodBodyFactory;
 
@@ -40,7 +40,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             MethodSymbol method,
             BoundStatement methodBody,
             SyntheticBoundNodeFactory methodBodyFactory,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             DebugDocumentProvider debugDocumentProvider,
             Instrumenter previous,
             [NotNullWhen(true)] out CodeCoverageInstrumenter? instrumenter)
@@ -104,7 +104,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             SyntheticBoundNodeFactory methodBodyFactory,
             MethodSymbol createPayloadForMethodsSpanningSingleFile,
             MethodSymbol createPayloadForMethodsSpanningMultipleFiles,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             DebugDocumentProvider debugDocumentProvider,
             Instrumenter previous) : base(previous)
         {
@@ -561,7 +561,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return syntaxForSpan;
         }
 
-        private static MethodSymbol GetCreatePayloadOverload(CSharpCompilation compilation, WellKnownMember overload, SyntaxNode syntax, BindingDiagnosticBag diagnostics)
+        private static MethodSymbol GetCreatePayloadOverload(CSharpCompilation compilation, WellKnownMember overload, SyntaxNode syntax, CSharpBindingDiagnosticBag diagnostics)
         {
             return (MethodSymbol)Binder.GetWellKnownTypeMember(compilation, overload, diagnostics, syntax: syntax);
         }

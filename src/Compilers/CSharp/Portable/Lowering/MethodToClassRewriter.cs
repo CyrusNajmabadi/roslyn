@@ -48,12 +48,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// <summary> A not-null collection of synthesized methods generated for the current source type. </summary>
         protected readonly TypeCompilationState CompilationState;
 
-        protected readonly BindingDiagnosticBag Diagnostics;
+        protected readonly CSharpBindingDiagnosticBag Diagnostics;
         protected readonly VariableSlotAllocator? slotAllocatorOpt;
 
         private readonly Dictionary<BoundValuePlaceholderBase, BoundExpression> _placeholderMap;
 
-        protected MethodToClassRewriter(VariableSlotAllocator? slotAllocatorOpt, TypeCompilationState compilationState, BindingDiagnosticBag diagnostics)
+        protected MethodToClassRewriter(VariableSlotAllocator? slotAllocatorOpt, TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(compilationState != null);
             Debug.Assert(diagnostics != null);

@@ -629,7 +629,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
                 int indexInside = localIndex - method.LocalsForBindingOutside.Length;
                 var local = indexInside >= 0 ? method.LocalsForBindingInside[indexInside] : method.LocalsForBindingOutside[localIndex];
-                var expression = new BoundLocal(syntax, local, constantValueOpt: local.GetConstantValue(null, null, new BindingDiagnosticBag(diagnostics)), type: local.Type);
+                var expression = new BoundLocal(syntax, local, constantValueOpt: local.GetConstantValue(null, null, new CSharpBindingDiagnosticBag(diagnostics)), type: local.Type);
                 properties = default;
                 return new BoundReturnStatement(syntax, RefKind.None, expression, @checked: false) { WasCompilerGenerated = true };
             });
@@ -677,7 +677,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         private static BoundStatement? BindExpression(Binder binder, ExpressionSyntax syntax, DiagnosticBag diagnostics, out ResultProperties resultProperties)
         {
             var flags = DkmClrCompilationResultFlags.None;
-            var bindingDiagnostics = new BindingDiagnosticBag(diagnostics);
+            var bindingDiagnostics = new CSharpBindingDiagnosticBag(diagnostics);
 
             // In addition to C# expressions, the native EE also supports
             // type names which are bound to a representation of the type
@@ -756,18 +756,18 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         private static BoundStatement BindStatement(Binder binder, StatementSyntax syntax, DiagnosticBag diagnostics, out ResultProperties properties)
         {
             properties = new ResultProperties(DkmClrCompilationResultFlags.PotentialSideEffect | DkmClrCompilationResultFlags.ReadOnlyResult);
-            return binder.BindStatement(syntax, new BindingDiagnosticBag(diagnostics));
+            return binder.BindStatement(syntax, new CSharpBindingDiagnosticBag(diagnostics));
         }
 
         private static bool IsAssignableExpression(Binder binder, BoundExpression expression)
         {
-            var result = binder.CheckValueKind(expression.Syntax, expression, Binder.BindValueKind.Assignable, checkingReceiver: false, BindingDiagnosticBag.Discarded);
+            var result = binder.CheckValueKind(expression.Syntax, expression, Binder.BindValueKind.Assignable, checkingReceiver: false, CSharpBindingDiagnosticBag.Discarded);
             return result;
         }
 
         private static BoundStatement? BindAssignment(Binder binder, ExpressionSyntax syntax, DiagnosticBag diagnostics)
         {
-            var expression = binder.BindValue(syntax, new BindingDiagnosticBag(diagnostics), Binder.BindValueKind.RValue);
+            var expression = binder.BindValue(syntax, new CSharpBindingDiagnosticBag(diagnostics), Binder.BindValueKind.RValue);
             if (diagnostics.HasAnyErrors())
             {
                 return null;
@@ -1117,7 +1117,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                                     continue;
                                 }
 
-                                var aliasSymbol = (AliasSymbol)binder.BindNamespaceAliasSymbol(externAliasSyntax, BindingDiagnosticBag.Discarded);
+                                var aliasSymbol = (AliasSymbol)binder.BindNamespaceAliasSymbol(externAliasSyntax, CSharpBindingDiagnosticBag.Discarded);
 
                                 if (aliasSymbol is null)
                                 {

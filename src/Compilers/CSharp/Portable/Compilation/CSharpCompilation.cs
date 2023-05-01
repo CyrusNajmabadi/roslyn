@@ -1591,7 +1591,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return GetSpecialTypeMember(specialMember);
         }
 
-        internal TypeSymbol GetTypeByReflectionType(Type type, BindingDiagnosticBag diagnostics)
+        internal TypeSymbol GetTypeByReflectionType(Type type, CSharpBindingDiagnosticBag diagnostics)
         {
             var result = Assembly.GetTypeByReflectionType(type);
             if (result is null)
@@ -1709,7 +1709,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     if (simpleProgramEntryPointSymbol is object)
                     {
-                        var diagnostics = BindingDiagnosticBag.GetInstance();
+                        var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                         diagnostics.Add(ErrorCode.ERR_SimpleProgramNotAnExecutable, simpleProgramEntryPointSymbol.ReturnTypeSyntax.Location);
                         entryPoint = new EntryPoint(null, diagnostics.ToReadOnlyAndFree());
                     }
@@ -1753,7 +1753,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private MethodSymbol? FindEntryPoint(MethodSymbol? simpleProgramEntryPointSymbol, CancellationToken cancellationToken, out ImmutableBindingDiagnostic<AssemblySymbol> sealedDiagnostics)
         {
-            var diagnostics = BindingDiagnosticBag.GetInstance();
+            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
             RoslynDebug.Assert(diagnostics.DiagnosticBag is object);
             var entryPointCandidates = ArrayBuilder<MethodSymbol>.GetInstance();
 
@@ -1823,14 +1823,14 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 // Validity and diagnostics are also tracked because they must be conditionally handled
                 // if there are not any "traditional" entrypoints found.
-                var taskEntryPoints = ArrayBuilder<(bool IsValid, MethodSymbol Candidate, BindingDiagnosticBag SpecificDiagnostics)>.GetInstance();
+                var taskEntryPoints = ArrayBuilder<(bool IsValid, MethodSymbol Candidate, CSharpBindingDiagnosticBag SpecificDiagnostics)>.GetInstance();
 
                 // These diagnostics (warning only) are added to the compilation only if
                 // there were not any main methods found.
-                var noMainFoundDiagnostics = BindingDiagnosticBag.GetInstance(diagnostics);
+                var noMainFoundDiagnostics = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
                 RoslynDebug.Assert(noMainFoundDiagnostics.DiagnosticBag is object);
 
-                bool checkValid(MethodSymbol candidate, bool isCandidate, BindingDiagnosticBag specificDiagnostics)
+                bool checkValid(MethodSymbol candidate, bool isCandidate, CSharpBindingDiagnosticBag specificDiagnostics)
                 {
                     if (!isCandidate)
                     {
@@ -1852,7 +1852,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 foreach (var candidate in entryPointCandidates)
                 {
-                    var perCandidateBag = BindingDiagnosticBag.GetInstance(diagnostics);
+                    var perCandidateBag = CSharpBindingDiagnosticBag.GetInstance(diagnostics);
                     var (IsCandidate, IsTaskLike) = HasEntryPointSignature(candidate, perCandidateBag);
 
                     if (IsTaskLike)
@@ -2001,7 +2001,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal bool ReturnsAwaitableToVoidOrInt(MethodSymbol method, BindingDiagnosticBag diagnostics)
+        internal bool ReturnsAwaitableToVoidOrInt(MethodSymbol method, CSharpBindingDiagnosticBag diagnostics)
         {
             // Common case optimization
             if (method.ReturnType.IsVoidType() || method.ReturnType.SpecialType == SpecialType.System_Int32)
@@ -2039,7 +2039,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// is either void or int.
         /// - has either no parameter or a single parameter of type string[]
         /// </summary>
-        internal (bool IsCandidate, bool IsTaskLike) HasEntryPointSignature(MethodSymbol method, BindingDiagnosticBag bag)
+        internal (bool IsCandidate, bool IsTaskLike) HasEntryPointSignature(MethodSymbol method, CSharpBindingDiagnosticBag bag)
         {
             if (method.IsVararg)
             {
@@ -2387,10 +2387,10 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal override void ReportUnusedImports(DiagnosticBag diagnostics, CancellationToken cancellationToken)
         {
-            ReportUnusedImports(filterTree: null, new BindingDiagnosticBag(diagnostics), cancellationToken);
+            ReportUnusedImports(filterTree: null, new CSharpBindingDiagnosticBag(diagnostics), cancellationToken);
         }
 
-        private void ReportUnusedImports(SyntaxTree? filterTree, BindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
+        private void ReportUnusedImports(SyntaxTree? filterTree, CSharpBindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
         {
             if (_lazyImportInfos != null && (filterTree is null || ReportUnusedImportsInTree(filterTree)))
             {
@@ -2448,7 +2448,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // We could do this check after we have built the transitive closure
                     // in GetCompleteSetOfUsedAssemblies.completeTheSetOfUsedAssemblies. However,
                     // the level of accuracy is probably not worth the complexity this would add.
-                    var bindingDiagnostics = new BindingDiagnosticBag(diagnosticBag: null, PooledHashSet<AssemblySymbol>.GetInstance());
+                    var bindingDiagnostics = new CSharpBindingDiagnosticBag(diagnosticBag: null, PooledHashSet<AssemblySymbol>.GetInstance());
                     RoslynDebug.Assert(bindingDiagnostics.DependenciesBag is object);
 
                     foreach (var aliasedNamespace in externAliasesToCheck)
@@ -2673,14 +2673,14 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             DiagnosticBag? builder = DiagnosticBag.GetInstance();
 
-            GetDiagnosticsWithoutFiltering(stage, includeEarlierStages, new BindingDiagnosticBag(builder), cancellationToken);
+            GetDiagnosticsWithoutFiltering(stage, includeEarlierStages, new CSharpBindingDiagnosticBag(builder), cancellationToken);
 
             // Before returning diagnostics, we filter warnings
             // to honor the compiler options (e.g., /nowarn, /warnaserror and /warn) and the pragmas.
             FilterAndAppendAndFreeDiagnostics(diagnostics, ref builder, cancellationToken);
         }
 
-        private void GetDiagnosticsWithoutFiltering(CompilationStage stage, bool includeEarlierStages, BindingDiagnosticBag builder, CancellationToken cancellationToken)
+        private void GetDiagnosticsWithoutFiltering(CompilationStage stage, bool includeEarlierStages, CSharpBindingDiagnosticBag builder, CancellationToken cancellationToken)
         {
             RoslynDebug.Assert(builder.DiagnosticBag is object);
 
@@ -2759,7 +2759,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (stage == CompilationStage.Compile || stage > CompilationStage.Compile && includeEarlierStages)
             {
-                var methodBodyDiagnostics = new BindingDiagnosticBag(DiagnosticBag.GetInstance(),
+                var methodBodyDiagnostics = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance(),
                                                                      builder.DependenciesBag is object ? new ConcurrentSet<AssemblySymbol>() : null);
                 RoslynDebug.Assert(methodBodyDiagnostics.DiagnosticBag is object);
                 GetDiagnosticsForAllMethodBodies(methodBodyDiagnostics, doLowering: false, cancellationToken);
@@ -2788,7 +2788,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // Do the steps in compilation to get the method body diagnostics, but don't actually generate
         // IL or emit an assembly.
-        private void GetDiagnosticsForAllMethodBodies(BindingDiagnosticBag diagnostics, bool doLowering, CancellationToken cancellationToken)
+        private void GetDiagnosticsForAllMethodBodies(CSharpBindingDiagnosticBag diagnostics, bool doLowering, CancellationToken cancellationToken)
         {
             RoslynDebug.Assert(diagnostics.DiagnosticBag is object);
             MethodCompiler.CompileMethodBodies(
@@ -2833,7 +2833,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private ImmutableArray<Diagnostic> GetDiagnosticsForMethodBodiesInTree(SyntaxTree tree, TextSpan? span, CancellationToken cancellationToken)
         {
             var diagnostics = DiagnosticBag.GetInstance();
-            var bindingDiagnostics = new BindingDiagnosticBag(diagnostics);
+            var bindingDiagnostics = new CSharpBindingDiagnosticBag(diagnostics);
 
             // Report unused directives only if computing diagnostics for the entire tree.
             // Otherwise we cannot determine if a particular directive is used outside of the given sub-span within the tree.
@@ -2880,7 +2880,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     Debug.Assert(reportUnusedUsings);
 
-                    var discarded = new BindingDiagnosticBag(DiagnosticBag.GetInstance());
+                    var discarded = new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
                     Debug.Assert(discarded.DiagnosticBag is object);
 
                     foreach (var otherTree in SyntaxTrees)
@@ -2911,7 +2911,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             return diagnostics.ToReadOnlyAndFree();
 
-            void compileMethodBodiesAndDocComments(SyntaxTree? filterTree, TextSpan? filterSpan, BindingDiagnosticBag bindingDiagnostics, CancellationToken cancellationToken)
+            void compileMethodBodiesAndDocComments(SyntaxTree? filterTree, TextSpan? filterSpan, CSharpBindingDiagnosticBag bindingDiagnostics, CancellationToken cancellationToken)
             {
                 MethodCompiler.CompileMethodBodies(
                                 compilation: this,
@@ -3007,14 +3007,14 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             if (syntaxTree != null)
             {
-                var builder = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
+                var builder = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
                 ClsComplianceChecker.CheckCompliance(this, builder, cancellationToken, syntaxTree, filterSpanWithinTree);
                 return builder.ToReadOnlyAndFree();
             }
 
             if (_lazyClsComplianceDiagnostics.IsDefault || _lazyClsComplianceDependencies.IsDefault)
             {
-                var builder = BindingDiagnosticBag.GetInstance();
+                var builder = CSharpBindingDiagnosticBag.GetInstance();
                 ClsComplianceChecker.CheckCompliance(this, builder, cancellationToken);
                 var result = builder.ToReadOnlyAndFree();
                 ImmutableInterlocked.InterlockedInitialize(ref _lazyClsComplianceDependencies, result.Dependencies);
@@ -3264,7 +3264,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     emittingPdb,
                     hasDeclarationErrors,
                     emitMethodBodies: true,
-                    diagnostics: new BindingDiagnosticBag(methodBodyDiagnosticBag),
+                    diagnostics: new CSharpBindingDiagnosticBag(methodBodyDiagnosticBag),
                     filterOpt: filterOpt,
                     cancellationToken: cancellationToken);
 
@@ -3417,7 +3417,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             DiagnosticBag? xmlDiagnostics = DiagnosticBag.GetInstance();
 
             string? assemblyName = FileNameUtilities.ChangeExtension(outputNameOverride, extension: null);
-            DocumentationCommentCompiler.WriteDocumentationCommentXml(this, assemblyName, xmlDocStream, new BindingDiagnosticBag(xmlDiagnostics), cancellationToken);
+            DocumentationCommentCompiler.WriteDocumentationCommentXml(this, assemblyName, xmlDocStream, new CSharpBindingDiagnosticBag(xmlDiagnostics), cancellationToken);
 
             return FilterAndAppendAndFreeDiagnostics(diagnostics, ref xmlDiagnostics, cancellationToken);
         }
@@ -4364,13 +4364,13 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// dynamic types.
         /// </summary>
         /// <returns></returns>
-        internal bool HasDynamicEmitAttributes(BindingDiagnosticBag diagnostics, Location location)
+        internal bool HasDynamicEmitAttributes(CSharpBindingDiagnosticBag diagnostics, Location location)
         {
             return Binder.GetWellKnownTypeMember(this, WellKnownMember.System_Runtime_CompilerServices_DynamicAttribute__ctor, diagnostics, location) is object &&
                    Binder.GetWellKnownTypeMember(this, WellKnownMember.System_Runtime_CompilerServices_DynamicAttribute__ctorTransformFlags, diagnostics, location) is object;
         }
 
-        internal bool HasTupleNamesAttributes(BindingDiagnosticBag diagnostics, Location location) =>
+        internal bool HasTupleNamesAttributes(CSharpBindingDiagnosticBag diagnostics, Location location) =>
             Binder.GetWellKnownTypeMember(this, WellKnownMember.System_Runtime_CompilerServices_TupleElementNamesAttribute__ctorTransformNames, diagnostics, location) is object;
 
         /// <summary>

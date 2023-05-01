@@ -39,7 +39,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 ArrayBuilder<StateMachineStateDebugInfo> stateMachineStateDebugInfoBuilder,
                 VariableSlotAllocator slotAllocatorOpt,
                 TypeCompilationState compilationState,
-                BindingDiagnosticBag diagnostics)
+                CSharpBindingDiagnosticBag diagnostics)
                 : base(body, method, methodOrdinal, stateMachineType, stateMachineStateDebugInfoBuilder, slotAllocatorOpt, compilationState, diagnostics)
             {
                 Debug.Assert(!TypeSymbol.Equals(method.IteratorElementTypeWithAnnotations.Type, null, TypeCompareKind.ConsiderEverything2));
@@ -48,7 +48,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Debug.Assert(_isEnumerable != method.IsAsyncReturningIAsyncEnumerator(method.DeclaringCompilation));
             }
 
-            protected override void VerifyPresenceOfRequiredAPIs(BindingDiagnosticBag bag)
+            protected override void VerifyPresenceOfRequiredAPIs(CSharpBindingDiagnosticBag bag)
             {
                 base.VerifyPresenceOfRequiredAPIs(bag);
 

@@ -46,12 +46,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected void CheckAccessibility(BindingDiagnosticBag diagnostics)
+        protected void CheckAccessibility(CSharpBindingDiagnosticBag diagnostics)
         {
             ModifierUtils.CheckAccessibility(Modifiers, this, isExplicitInterfaceImplementation: false, diagnostics, ErrorLocation);
         }
 
-        protected void ReportModifiersDiagnostics(BindingDiagnosticBag diagnostics)
+        protected void ReportModifiersDiagnostics(CSharpBindingDiagnosticBag diagnostics)
         {
             if (ContainingType.IsSealed && this.DeclaredAccessibility.HasProtected())
             {
@@ -114,7 +114,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         protected sealed override void DecodeWellKnownAttributeImpl(ref DecodeWellKnownAttributeArguments<AttributeSyntax, CSharpAttributeData, AttributeLocation> arguments)
         {
             Debug.Assert((object)arguments.AttributeSyntaxOpt != null);
-            Debug.Assert(arguments.Diagnostics is BindingDiagnosticBag);
+            Debug.Assert(arguments.Diagnostics is CSharpBindingDiagnosticBag);
 
             var attribute = arguments.Attribute;
             Debug.Assert(!attribute.HasErrors);
@@ -123,7 +123,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             if (attribute.IsTargetAttribute(this, AttributeDescription.FixedBufferAttribute))
             {
                 // error CS1716: Do not use 'System.Runtime.CompilerServices.FixedBuffer' attribute. Use the 'fixed' field modifier instead.
-                ((BindingDiagnosticBag)arguments.Diagnostics).Add(ErrorCode.ERR_DoNotUseFixedBufferAttr, arguments.AttributeSyntaxOpt.Name.Location);
+                ((CSharpBindingDiagnosticBag)arguments.Diagnostics).Add(ErrorCode.ERR_DoNotUseFixedBufferAttr, arguments.AttributeSyntaxOpt.Name.Location);
             }
             else
             {
@@ -131,7 +131,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        internal override void AfterAddingTypeMembersChecks(ConversionsBase conversions, BindingDiagnosticBag diagnostics)
+        internal override void AfterAddingTypeMembersChecks(ConversionsBase conversions, CSharpBindingDiagnosticBag diagnostics)
         {
             var compilation = DeclaringCompilation;
             var location = ErrorLocation;
@@ -290,7 +290,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             ImmutableHashSet<SourceFieldSymbolWithSyntaxReference> dependencies;
             var builder = PooledHashSet<SourceFieldSymbolWithSyntaxReference>.GetInstance();
-            var diagnostics = BindingDiagnosticBag.GetInstance();
+            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
             value = MakeConstantValue(builder, earlyDecodingWellKnownAttributes, diagnostics);
 
             // Only persist if there are no dependencies and the calculation
@@ -327,7 +327,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
 
             var builder = PooledHashSet<SourceFieldSymbolWithSyntaxReference>.GetInstance();
-            var diagnostics = BindingDiagnosticBag.GetInstance();
+            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
             if (startsCycle)
             {
                 diagnostics.Add(ErrorCode.ERR_CircConstValue, GetFirstLocation(), this);
@@ -351,7 +351,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private void SetLazyConstantValue(
             ConstantValue value,
             bool earlyDecodingWellKnownAttributes,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool startsCycle)
         {
             Debug.Assert(value != Microsoft.CodeAnalysis.ConstantValue.Unset);
@@ -378,6 +378,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected abstract ConstantValue MakeConstantValue(HashSet<SourceFieldSymbolWithSyntaxReference> dependencies, bool earlyDecodingWellKnownAttributes, BindingDiagnosticBag diagnostics);
+        protected abstract ConstantValue MakeConstantValue(HashSet<SourceFieldSymbolWithSyntaxReference> dependencies, bool earlyDecodingWellKnownAttributes, CSharpBindingDiagnosticBag diagnostics);
     }
 }

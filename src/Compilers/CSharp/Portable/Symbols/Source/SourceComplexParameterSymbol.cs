@@ -228,7 +228,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             // Rebind default value expression, ignoring any diagnostics, in order to produce
             // a bound node that can be used for passes such as definite assignment.
-            MakeDefaultExpression(BindingDiagnosticBag.Discarded, out var _, out var parameterEqualsValue);
+            MakeDefaultExpression(CSharpBindingDiagnosticBag.Discarded, out var _, out var parameterEqualsValue);
             return parameterEqualsValue;
         }
 
@@ -238,7 +238,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 if (state.NotePartComplete(CompletionPart.StartDefaultSyntaxValue))
                 {
-                    var diagnostics = BindingDiagnosticBag.GetInstance();
+                    var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                     Debug.Assert(diagnostics.DiagnosticBag != null);
                     var previousValue = Interlocked.CompareExchange(
                         ref _lazyDefaultSyntaxValue,
@@ -341,7 +341,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 // we will just get a bad constant value above and return early.
                 new BoundLiteral(parameterSyntax, defaultValue, Type));
 
-            var diagnostics = BindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
+            var diagnostics = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, withDependencies: false);
             Debug.Assert(diagnostics.DiagnosticBag != null);
             NullableWalker.AnalyzeIfNeeded(binder, parameterEqualsValue, parameterSyntax, diagnostics.DiagnosticBag);
             AddDeclarationDiagnostics(diagnostics);
@@ -350,7 +350,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         // This method *must not* depend on attributes on the parameter symbol.
         // Otherwise we will have cycles when binding usage of attributes whose constructors have optional parameters
-        private ConstantValue MakeDefaultExpression(BindingDiagnosticBag diagnostics, out Binder? binder, out BoundParameterEqualsValue? parameterEqualsValue)
+        private ConstantValue MakeDefaultExpression(CSharpBindingDiagnosticBag diagnostics, out Binder? binder, out BoundParameterEqualsValue? parameterEqualsValue)
         {
             binder = null;
             parameterEqualsValue = null;
@@ -731,7 +731,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert(!attribute.HasErrors);
             Debug.Assert(arguments.SymbolPart == AttributeLocation.None);
             Debug.Assert(AttributeDescription.InterpolatedStringHandlerArgumentAttribute.Signatures.Length == 2);
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
 
             if (attribute.IsTargetAttribute(this, AttributeDescription.DefaultParameterValueAttribute))
             {
@@ -845,7 +845,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             else if (attribute.IsTargetAttribute(this, AttributeDescription.EnumeratorCancellationAttribute))
             {
                 arguments.GetOrCreateData<ParameterWellKnownAttributeData>().HasEnumeratorCancellationAttribute = true;
-                ValidateCancellationTokenAttribute(arguments.AttributeSyntaxOpt, (BindingDiagnosticBag)arguments.Diagnostics);
+                ValidateCancellationTokenAttribute(arguments.AttributeSyntaxOpt, (CSharpBindingDiagnosticBag)arguments.Diagnostics);
             }
             else if (attribute.GetTargetAttributeSignatureIndex(this, AttributeDescription.InterpolatedStringHandlerArgumentAttribute) is (0 or 1) and var index)
             {
@@ -881,7 +881,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             var attribute = arguments.Attribute;
             var syntax = arguments.AttributeSyntaxOpt;
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
 
             Debug.Assert(syntax != null);
             Debug.Assert(diagnostics != null);
@@ -898,7 +898,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// (DefaultParameterValueAttribute, DateTimeConstantAttribute or DecimalConstantAttribute).
         /// If not, report ERR_ParamDefaultValueDiffersFromAttribute.
         /// </summary>
-        private void VerifyParamDefaultValueMatchesAttributeIfAny(ConstantValue value, SyntaxNode syntax, BindingDiagnosticBag diagnostics)
+        private void VerifyParamDefaultValueMatchesAttributeIfAny(ConstantValue value, SyntaxNode syntax, CSharpBindingDiagnosticBag diagnostics)
         {
             var data = GetEarlyDecodedWellKnownAttributeData();
             if (data != null)
@@ -913,7 +913,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        private ConstantValue DecodeDefaultParameterValueAttribute(AttributeDescription description, CSharpAttributeData attribute, AttributeSyntax node, bool diagnose, BindingDiagnosticBag diagnosticsOpt)
+        private ConstantValue DecodeDefaultParameterValueAttribute(AttributeDescription description, CSharpAttributeData attribute, AttributeSyntax node, bool diagnose, CSharpBindingDiagnosticBag diagnosticsOpt)
         {
             Debug.Assert(!attribute.HasErrors);
 
@@ -932,7 +932,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        private ConstantValue DecodeDefaultParameterValueAttribute(CSharpAttributeData attribute, AttributeSyntax node, bool diagnose, BindingDiagnosticBag diagnosticsOpt)
+        private ConstantValue DecodeDefaultParameterValueAttribute(CSharpAttributeData attribute, AttributeSyntax node, bool diagnose, CSharpBindingDiagnosticBag diagnosticsOpt)
         {
             Debug.Assert(!diagnose || diagnosticsOpt != null);
 
@@ -1045,7 +1045,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return false;
         }
 
-        private void ValidateCallerLineNumberAttribute(AttributeSyntax node, BindingDiagnosticBag diagnostics)
+        private void ValidateCallerLineNumberAttribute(AttributeSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
             CSharpCompilation compilation = this.DeclaringCompilation;
             var useSiteInfo = new CompoundUseSiteInfo<AssemblySymbol>(diagnostics, ContainingAssembly);
@@ -1073,7 +1073,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             diagnostics.Add(node.Name, useSiteInfo);
         }
 
-        private void ValidateCallerFilePathAttribute(AttributeSyntax node, BindingDiagnosticBag diagnostics)
+        private void ValidateCallerFilePathAttribute(AttributeSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
             CSharpCompilation compilation = this.DeclaringCompilation;
             var useSiteInfo = new CompoundUseSiteInfo<AssemblySymbol>(diagnostics, ContainingAssembly);
@@ -1106,7 +1106,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             diagnostics.Add(node.Name, useSiteInfo);
         }
 
-        private void ValidateCallerMemberNameAttribute(AttributeSyntax node, BindingDiagnosticBag diagnostics)
+        private void ValidateCallerMemberNameAttribute(AttributeSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
             CSharpCompilation compilation = this.DeclaringCompilation;
             var useSiteInfo = new CompoundUseSiteInfo<AssemblySymbol>(diagnostics, ContainingAssembly);
@@ -1144,7 +1144,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             diagnostics.Add(node.Name, useSiteInfo);
         }
 
-        private void ValidateCallerArgumentExpressionAttribute(AttributeSyntax node, CSharpAttributeData attribute, BindingDiagnosticBag diagnostics)
+        private void ValidateCallerArgumentExpressionAttribute(AttributeSyntax node, CSharpAttributeData attribute, CSharpBindingDiagnosticBag diagnostics)
         {
             // We intentionally don't report an error for earlier language versions here. The attribute already existed
             // before the feature was developed. The error is only reported when the binder supplies a value
@@ -1201,7 +1201,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             diagnostics.Add(node.Name, useSiteInfo);
         }
 
-        private void ValidateCancellationTokenAttribute(AttributeSyntax node, BindingDiagnosticBag diagnostics)
+        private void ValidateCancellationTokenAttribute(AttributeSyntax node, CSharpBindingDiagnosticBag diagnostics)
         {
             if (needsReporting())
             {
@@ -1227,7 +1227,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
 #nullable enable
-        private void DecodeInterpolatedStringHandlerArgumentAttribute(ref DecodeWellKnownAttributeArguments<AttributeSyntax, CSharpAttributeData, AttributeLocation> arguments, BindingDiagnosticBag diagnostics, int attributeIndex)
+        private void DecodeInterpolatedStringHandlerArgumentAttribute(ref DecodeWellKnownAttributeArguments<AttributeSyntax, CSharpAttributeData, AttributeLocation> arguments, CSharpBindingDiagnosticBag diagnostics, int attributeIndex)
         {
             Debug.Assert(attributeIndex is 0 or 1);
             Debug.Assert(arguments.Attribute.IsTargetAttribute(this, AttributeDescription.InterpolatedStringHandlerArgumentAttribute) && arguments.Attribute.CommonConstructorArguments.Length == 1);
@@ -1376,7 +1376,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 #nullable disable
 
-        internal override void PostDecodeWellKnownAttributes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> allAttributeSyntaxNodes, BindingDiagnosticBag diagnostics, AttributeLocation symbolPart, WellKnownAttributeData decodedData)
+        internal override void PostDecodeWellKnownAttributes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> allAttributeSyntaxNodes, CSharpBindingDiagnosticBag diagnostics, AttributeLocation symbolPart, WellKnownAttributeData decodedData)
         {
             Debug.Assert(!boundAttributes.IsDefault);
             Debug.Assert(!allAttributeSyntaxNodes.IsDefault);

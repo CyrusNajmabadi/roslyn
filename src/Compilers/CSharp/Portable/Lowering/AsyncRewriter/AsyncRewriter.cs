@@ -28,7 +28,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             ArrayBuilder<StateMachineStateDebugInfo> stateMachineStateDebugInfoBuilder,
             VariableSlotAllocator? slotAllocatorOpt,
             TypeCompilationState compilationState,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
             : base(body, method, stateMachineType, stateMachineStateDebugInfoBuilder, slotAllocatorOpt, compilationState, diagnostics)
         {
             _constructedSuccessfully = AsyncMethodBuilderMemberCollection.TryCreate(F, method, this.stateMachineType.TypeMap, out _asyncMethodBuilderMemberCollection);
@@ -45,7 +45,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             ArrayBuilder<StateMachineStateDebugInfo> stateMachineStateDebugInfoBuilder,
             VariableSlotAllocator? slotAllocatorOpt,
             TypeCompilationState compilationState,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             out AsyncStateMachine? stateMachineType)
         {
             Debug.Assert(compilationState.ModuleBuilderOpt != null);
@@ -103,7 +103,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// </returns>
         protected bool VerifyPresenceOfRequiredAPIs()
         {
-            var bag = BindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
+            var bag = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
 
             VerifyPresenceOfRequiredAPIs(bag);
 
@@ -121,13 +121,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             return !hasErrors && _constructedSuccessfully;
         }
 
-        protected virtual void VerifyPresenceOfRequiredAPIs(BindingDiagnosticBag bag)
+        protected virtual void VerifyPresenceOfRequiredAPIs(CSharpBindingDiagnosticBag bag)
         {
             EnsureWellKnownMember(WellKnownMember.System_Runtime_CompilerServices_IAsyncStateMachine_MoveNext, bag);
             EnsureWellKnownMember(WellKnownMember.System_Runtime_CompilerServices_IAsyncStateMachine_SetStateMachine, bag);
         }
 
-        private Symbol EnsureWellKnownMember(WellKnownMember member, BindingDiagnosticBag bag)
+        private Symbol EnsureWellKnownMember(WellKnownMember member, CSharpBindingDiagnosticBag bag)
         {
             return Binder.GetWellKnownTypeMember(F.Compilation, member, bag, body.Syntax.Location);
         }

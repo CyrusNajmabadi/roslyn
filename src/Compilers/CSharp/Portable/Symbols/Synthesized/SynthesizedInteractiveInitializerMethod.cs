@@ -23,7 +23,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private readonly TypeSymbol _returnType;
         private ThreeState _lazyIsNullableAnalysisEnabled;
 
-        internal SynthesizedInteractiveInitializerMethod(SourceMemberContainerTypeSymbol containingType, BindingDiagnosticBag diagnostics)
+        internal SynthesizedInteractiveInitializerMethod(SourceMemberContainerTypeSymbol containingType, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(containingType.IsScriptClass);
 
@@ -257,7 +257,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private static void CalculateReturnType(
             SourceMemberContainerTypeSymbol containingType,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             out TypeSymbol resultType,
             out TypeSymbol returnType)
         {

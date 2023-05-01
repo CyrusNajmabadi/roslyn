@@ -75,12 +75,12 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        protected BoundExpression BindTargetExpression(BindingDiagnosticBag diagnostics, Binder originalBinder, TypeSymbol targetTypeOpt = null)
+        protected BoundExpression BindTargetExpression(CSharpBindingDiagnosticBag diagnostics, Binder originalBinder, TypeSymbol targetTypeOpt = null)
         {
             if (_lazyExpressionAndDiagnostics == null)
             {
                 // Filter out method group in conversion.
-                var expressionDiagnostics = BindingDiagnosticBag.GetInstance();
+                var expressionDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
                 BoundExpression boundExpression = originalBinder.BindValue(TargetExpressionSyntax, expressionDiagnostics, Binder.BindValueKind.RValueOrMethodGroup);
                 if (targetTypeOpt is object)
                 {

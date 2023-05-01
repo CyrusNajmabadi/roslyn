@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private class DocumentationCommentWalker : CSharpSyntaxWalker
         {
             private readonly CSharpCompilation _compilation;
-            private readonly BindingDiagnosticBag _diagnostics;
+            private readonly CSharpBindingDiagnosticBag _diagnostics;
             private readonly Symbol _memberSymbol;
             private readonly StringWriter _writer;
             private readonly ArrayBuilder<CSharpSyntaxNode> _includeElementNodes;
@@ -39,7 +39,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             private DocumentationCommentWalker(
                 CSharpCompilation compilation,
-                BindingDiagnosticBag diagnostics,
+                CSharpBindingDiagnosticBag diagnostics,
                 Symbol memberSymbol,
                 StringWriter writer,
                 ArrayBuilder<CSharpSyntaxNode> includeElementNodes,
@@ -71,7 +71,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 StringBuilder builder)
             {
                 StringWriter writer = new StringWriter(builder, CultureInfo.InvariantCulture);
-                DocumentationCommentWalker walker = new DocumentationCommentWalker(compilation, BindingDiagnosticBag.Discarded, symbol, writer, includeElementNodes, documentedParameters: null, documentedTypeParameters: null);
+                DocumentationCommentWalker walker = new DocumentationCommentWalker(compilation, CSharpBindingDiagnosticBag.Discarded, symbol, writer, includeElementNodes, documentedParameters: null, documentedTypeParameters: null);
 
                 // Before: <param name="NAME">CONTENT</param>
                 // After: <summary>CONTENT</summary>
@@ -116,7 +116,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             /// </remarks>
             public static string GetSubstitutedText(
                 CSharpCompilation compilation,
-                BindingDiagnosticBag diagnostics,
+                CSharpBindingDiagnosticBag diagnostics,
                 Symbol symbol,
                 DocumentationCommentTriviaSyntax trivia,
                 ArrayBuilder<CSharpSyntaxNode> includeElementNodes,

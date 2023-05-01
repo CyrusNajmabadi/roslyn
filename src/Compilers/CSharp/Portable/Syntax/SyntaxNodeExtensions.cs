@@ -219,7 +219,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal static RefKind GetRefKindInLocalOrReturn(this TypeSyntax syntax, BindingDiagnosticBag diagnostics)
+        internal static RefKind GetRefKindInLocalOrReturn(this TypeSyntax syntax, CSharpBindingDiagnosticBag diagnostics)
         {
             syntax.SkipRefInLocalOrReturn(diagnostics, out var refKind);
             return refKind;
@@ -242,10 +242,10 @@ namespace Microsoft.CodeAnalysis.CSharp
             return SkipRefWorker(syntax, diagnostics: null, out refKind);
         }
 
-        internal static TypeSyntax SkipRefInLocalOrReturn(this TypeSyntax syntax, BindingDiagnosticBag? diagnostics, out RefKind refKind)
+        internal static TypeSyntax SkipRefInLocalOrReturn(this TypeSyntax syntax, CSharpBindingDiagnosticBag? diagnostics, out RefKind refKind)
             => SkipRefWorker(syntax, diagnostics, out refKind);
 
-        private static TypeSyntax SkipRefWorker(TypeSyntax syntax, BindingDiagnosticBag? diagnostics, out RefKind refKind)
+        private static TypeSyntax SkipRefWorker(TypeSyntax syntax, CSharpBindingDiagnosticBag? diagnostics, out RefKind refKind)
         {
             if (syntax.Kind() == SyntaxKind.RefType)
             {
@@ -316,7 +316,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         internal static ExpressionSyntax? CheckAndUnwrapRefExpression(
             this ExpressionSyntax? syntax,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             out RefKind refKind)
         {
             if (syntax is not RefExpressionSyntax { Expression: var expression } refExpression)
@@ -332,7 +332,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return expression;
         }
 
-        internal static void CheckDeconstructionCompatibleArgument(this ExpressionSyntax expression, BindingDiagnosticBag diagnostics)
+        internal static void CheckDeconstructionCompatibleArgument(this ExpressionSyntax expression, CSharpBindingDiagnosticBag diagnostics)
         {
             if (IsDeconstructionCompatibleArgument(expression))
             {

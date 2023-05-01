@@ -152,7 +152,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
         internal static BoundExpression ConvertToLocalType(CSharpCompilation compilation, BoundExpression expr, TypeSymbol type, DiagnosticBag diagnostics)
         {
-            var bindingDiagnostics = new BindingDiagnosticBag(diagnostics);
+            var bindingDiagnostics = new CSharpBindingDiagnosticBag(diagnostics);
 
             if (type.IsPointerType())
             {
@@ -183,7 +183,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return ConvertToLocalTypeHelper(compilation, expr, type, bindingDiagnostics);
         }
 
-        private static BoundExpression ConvertToLocalTypeHelper(CSharpCompilation compilation, BoundExpression expr, TypeSymbol type, BindingDiagnosticBag diagnostics)
+        private static BoundExpression ConvertToLocalTypeHelper(CSharpCompilation compilation, BoundExpression expr, TypeSymbol type, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(diagnostics.DiagnosticBag != null);
 

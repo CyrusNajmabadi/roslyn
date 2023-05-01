@@ -24,7 +24,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private readonly SynthesizedEventAccessorSymbol _addMethod;
         private readonly SynthesizedEventAccessorSymbol _removeMethod;
 
-        internal SourceFieldLikeEventSymbol(SourceMemberContainerTypeSymbol containingType, Binder binder, SyntaxTokenList modifiers, VariableDeclaratorSyntax declaratorSyntax, BindingDiagnosticBag diagnostics)
+        internal SourceFieldLikeEventSymbol(SourceMemberContainerTypeSymbol containingType, Binder binder, SyntaxTokenList modifiers, VariableDeclaratorSyntax declaratorSyntax, CSharpBindingDiagnosticBag diagnostics)
             : base(containingType, declaratorSyntax, modifiers, isFieldLike: true, interfaceSpecifierSyntaxOpt: null,
                    nameTokenSyntax: declaratorSyntax.Identifier, diagnostics: diagnostics)
         {
@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             _name = declaratorSyntax.Identifier.ValueText;
 
-            var declaratorDiagnostics = BindingDiagnosticBag.GetInstance();
+            var declaratorDiagnostics = CSharpBindingDiagnosticBag.GetInstance();
             var declarationSyntax = (VariableDeclarationSyntax)declaratorSyntax.Parent;
             _type = BindEventType(binder, declarationSyntax.Type, declaratorDiagnostics);
 
@@ -176,7 +176,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         private SourceEventFieldSymbol MakeAssociatedField(VariableDeclaratorSyntax declaratorSyntax)
         {
-            var field = new SourceEventFieldSymbol(this, declaratorSyntax, BindingDiagnosticBag.Discarded);
+            var field = new SourceEventFieldSymbol(this, declaratorSyntax, CSharpBindingDiagnosticBag.Discarded);
 
             Debug.Assert(field.Name == _name);
             return field;

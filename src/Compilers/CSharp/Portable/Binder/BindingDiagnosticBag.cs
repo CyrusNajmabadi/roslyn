@@ -12,34 +12,34 @@ using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
-    internal sealed class BindingDiagnosticBag : BindingDiagnosticBag<AssemblySymbol>
+    internal sealed class CSharpBindingDiagnosticBag : BindingDiagnosticBag<AssemblySymbol>
     {
-        public static readonly BindingDiagnosticBag Discarded = new BindingDiagnosticBag(null, null);
+        public static readonly CSharpBindingDiagnosticBag Discarded = new CSharpBindingDiagnosticBag(null, null);
 
-        public BindingDiagnosticBag()
+        public CSharpBindingDiagnosticBag()
             : this(usePool: false)
         { }
 
-        private BindingDiagnosticBag(bool usePool)
+        private CSharpBindingDiagnosticBag(bool usePool)
             : base(usePool)
         { }
 
-        public BindingDiagnosticBag(DiagnosticBag? diagnosticBag)
+        public CSharpBindingDiagnosticBag(DiagnosticBag? diagnosticBag)
             : base(diagnosticBag, dependenciesBag: null)
         {
         }
 
-        public BindingDiagnosticBag(DiagnosticBag? diagnosticBag, ICollection<AssemblySymbol>? dependenciesBag)
+        public CSharpBindingDiagnosticBag(DiagnosticBag? diagnosticBag, ICollection<AssemblySymbol>? dependenciesBag)
             : base(diagnosticBag, dependenciesBag)
         {
         }
 
-        internal static BindingDiagnosticBag GetInstance()
+        internal static CSharpBindingDiagnosticBag GetInstance()
         {
-            return new BindingDiagnosticBag(usePool: true);
+            return new CSharpBindingDiagnosticBag(usePool: true);
         }
 
-        internal static BindingDiagnosticBag GetInstance(bool withDiagnostics, bool withDependencies)
+        internal static CSharpBindingDiagnosticBag GetInstance(bool withDiagnostics, bool withDependencies)
         {
             if (withDiagnostics)
             {
@@ -48,11 +48,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return GetInstance();
                 }
 
-                return new BindingDiagnosticBag(DiagnosticBag.GetInstance());
+                return new CSharpBindingDiagnosticBag(DiagnosticBag.GetInstance());
             }
             else if (withDependencies)
             {
-                return new BindingDiagnosticBag(diagnosticBag: null, PooledHashSet<AssemblySymbol>.GetInstance());
+                return new CSharpBindingDiagnosticBag(diagnosticBag: null, PooledHashSet<AssemblySymbol>.GetInstance());
             }
             else
             {
@@ -60,25 +60,25 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal static BindingDiagnosticBag GetInstance(BindingDiagnosticBag template)
+        internal static CSharpBindingDiagnosticBag GetInstance(CSharpBindingDiagnosticBag template)
         {
             return GetInstance(template.AccumulatesDiagnostics, template.AccumulatesDependencies);
         }
 
-        internal static BindingDiagnosticBag Create(BindingDiagnosticBag template)
+        internal static CSharpBindingDiagnosticBag Create(CSharpBindingDiagnosticBag template)
         {
             if (template.AccumulatesDiagnostics)
             {
                 if (template.AccumulatesDependencies)
                 {
-                    return new BindingDiagnosticBag();
+                    return new CSharpBindingDiagnosticBag();
                 }
 
-                return new BindingDiagnosticBag(new DiagnosticBag());
+                return new CSharpBindingDiagnosticBag(new DiagnosticBag());
             }
             else if (template.AccumulatesDependencies)
             {
-                return new BindingDiagnosticBag(diagnosticBag: null, new HashSet<AssemblySymbol>());
+                return new CSharpBindingDiagnosticBag(diagnosticBag: null, new HashSet<AssemblySymbol>());
             }
             else
             {

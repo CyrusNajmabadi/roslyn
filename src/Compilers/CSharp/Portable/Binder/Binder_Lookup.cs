@@ -1670,7 +1670,7 @@ symIsHidden:;
             return IsAccessible(symbol, accessThroughType, out failedThroughTypeCheck, ref useSiteInfo, basesBeingResolved);
         }
 
-        internal bool IsAccessible(Symbol symbol, SyntaxNode syntax, BindingDiagnosticBag diagnostics)
+        internal bool IsAccessible(Symbol symbol, SyntaxNode syntax, CSharpBindingDiagnosticBag diagnostics)
         {
             var useSiteInfo = GetNewCompoundUseSiteInfo(diagnostics);
             var result = IsAccessible(symbol, ref useSiteInfo);

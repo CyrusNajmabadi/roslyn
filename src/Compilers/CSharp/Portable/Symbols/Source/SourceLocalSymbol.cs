@@ -321,7 +321,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 if (typeSyntax.IsVar)
                 {
                     bool isVar;
-                    TypeWithAnnotations declType = this.TypeSyntaxBinder.BindTypeOrVarKeyword(typeSyntax, BindingDiagnosticBag.Discarded, out isVar);
+                    TypeWithAnnotations declType = this.TypeSyntaxBinder.BindTypeOrVarKeyword(typeSyntax, CSharpBindingDiagnosticBag.Discarded, out isVar);
                     return isVar;
                 }
 
@@ -339,7 +339,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             // the statements of a method from top to bottom, and an inferred type is given to a variable
             // before the variable's type is used by the compiler.
             //
-            var diagnostics = BindingDiagnosticBag.Discarded;
+            var diagnostics = CSharpBindingDiagnosticBag.Discarded;
 
             Binder typeBinder = this.TypeSyntaxBinder;
 
@@ -377,7 +377,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return declType;
         }
 
-        protected virtual TypeWithAnnotations InferTypeOfVarVariable(BindingDiagnosticBag diagnostics)
+        protected virtual TypeWithAnnotations InferTypeOfVarVariable(CSharpBindingDiagnosticBag diagnostics)
         {
             // TODO: this method must be overridden for pattern variables to bind the
             // expression or statement that is the nearest enclosing to the pattern variable's
@@ -467,7 +467,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return false; }
         }
 
-        internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, BindingDiagnosticBag diagnostics)
+        internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag diagnostics)
         {
             return null;
         }
@@ -539,7 +539,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 _initializerBinder = initializerBinder;
             }
 
-            protected override TypeWithAnnotations InferTypeOfVarVariable(BindingDiagnosticBag diagnostics)
+            protected override TypeWithAnnotations InferTypeOfVarVariable(CSharpBindingDiagnosticBag diagnostics)
             {
                 BoundExpression initializerOpt = this._initializerBinder.BindInferredVariableInitializer(diagnostics, RefKind, _initializer, _initializer);
                 return TypeWithAnnotations.Create(initializerOpt?.Type);
@@ -559,7 +559,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 {
                     var value = Microsoft.CodeAnalysis.ConstantValue.Bad;
                     Location initValueNodeLocation = _initializer.Value.Location;
-                    var diagnostics = BindingDiagnosticBag.GetInstance();
+                    var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                     Debug.Assert(inProgress != this);
                     var type = this.Type;
                     if (boundInitValue == null)
@@ -573,7 +573,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
             }
 
-            internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, BindingDiagnosticBag diagnostics = null)
+            internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, CSharpBindingDiagnosticBag diagnostics = null)
             {
                 if (this.IsConst && inProgress == this)
                 {
@@ -624,7 +624,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             /// </summary>
             private ForEachLoopBinder ForEachLoopBinder => (ForEachLoopBinder)ScopeBinder;
 
-            protected override TypeWithAnnotations InferTypeOfVarVariable(BindingDiagnosticBag diagnostics)
+            protected override TypeWithAnnotations InferTypeOfVarVariable(CSharpBindingDiagnosticBag diagnostics)
             {
                 return ForEachLoopBinder.InferCollectionElementType(diagnostics, _collection);
             }
@@ -659,7 +659,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 _nodeBinder = nodeBinder;
             }
 
-            protected override TypeWithAnnotations InferTypeOfVarVariable(BindingDiagnosticBag diagnostics)
+            protected override TypeWithAnnotations InferTypeOfVarVariable(CSharpBindingDiagnosticBag diagnostics)
             {
                 // Try binding enclosing deconstruction-declaration (the top-level VariableDeclaration), this should force the inference.
                 switch (_deconstruction.Kind())
@@ -743,7 +743,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             // the diagnostic for out variables here.
             internal override ErrorCode ForbiddenDiagnostic => ErrorCode.ERR_ImplicitlyTypedOutVariableUsedInTheSameArgumentList;
 
-            protected override TypeWithAnnotations InferTypeOfVarVariable(BindingDiagnosticBag diagnostics)
+            protected override TypeWithAnnotations InferTypeOfVarVariable(CSharpBindingDiagnosticBag diagnostics)
             {
                 switch (_nodeToBind.Kind())
                 {

@@ -42,7 +42,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         public CSharpCompilation Compilation { get { return CompilationState.Compilation; } }
         public SyntaxNode Syntax { get; set; }
         public PEModuleBuilder? ModuleBuilderOpt { get { return CompilationState.ModuleBuilderOpt; } }
-        public BindingDiagnosticBag Diagnostics { get; }
+        public CSharpBindingDiagnosticBag Diagnostics { get; }
         public InstrumentationState? InstrumentationState { get; }
         public TypeCompilationState CompilationState { get; }
 
@@ -100,7 +100,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             BoundExpression receiver,
             string methodName,
             ImmutableArray<BoundExpression> args,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             ImmutableArray<TypeSymbol> typeArgs = default(ImmutableArray<TypeSymbol>),
             bool allowUnexpandedForm = true)
         {
@@ -147,7 +147,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <param name="compilationState">The state of compilation of the enclosing type</param>
         /// <param name="diagnostics">A bag where any diagnostics should be output</param>
         /// <param name="instrumentationState">Instrumentation state, if the factory is used for local lowering phase.</param>
-        public SyntheticBoundNodeFactory(MethodSymbol topLevelMethod, SyntaxNode node, TypeCompilationState compilationState, BindingDiagnosticBag diagnostics, InstrumentationState? instrumentationState = null)
+        public SyntheticBoundNodeFactory(MethodSymbol topLevelMethod, SyntaxNode node, TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics, InstrumentationState? instrumentationState = null)
             : this(topLevelMethod, topLevelMethod.ContainingType, node, compilationState, diagnostics, instrumentationState)
         {
         }
@@ -158,7 +158,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <param name="compilationState">The state of compilation of the enclosing type</param>
         /// <param name="diagnostics">A bag where any diagnostics should be output</param>
         /// <param name="instrumentationState">Instrumentation state, if the factory is used for local lowering phase.</param>
-        public SyntheticBoundNodeFactory(MethodSymbol? topLevelMethodOpt, NamedTypeSymbol? currentClassOpt, SyntaxNode node, TypeCompilationState compilationState, BindingDiagnosticBag diagnostics, InstrumentationState? instrumentationState = null)
+        public SyntheticBoundNodeFactory(MethodSymbol? topLevelMethodOpt, NamedTypeSymbol? currentClassOpt, SyntaxNode node, TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics, InstrumentationState? instrumentationState = null)
         {
             Debug.Assert(node != null);
             Debug.Assert(compilationState != null);

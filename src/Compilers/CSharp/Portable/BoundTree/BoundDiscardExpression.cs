@@ -16,7 +16,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return this.Update(type.NullableAnnotation, isInferred: true, type.Type);
         }
 
-        public BoundDiscardExpression FailInference(Binder binder, BindingDiagnosticBag? diagnosticsOpt)
+        public BoundDiscardExpression FailInference(Binder binder, CSharpBindingDiagnosticBag? diagnosticsOpt)
         {
             if (diagnosticsOpt?.DiagnosticBag != null)
             {

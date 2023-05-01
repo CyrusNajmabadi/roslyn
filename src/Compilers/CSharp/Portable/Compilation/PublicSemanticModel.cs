@@ -17,7 +17,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         protected AttributeSemanticModel CreateModelForAttribute(Binder enclosingBinder, AttributeSyntax attribute, MemberSemanticModel containingModel)
         {
             AliasSymbol aliasOpt;
-            var attributeType = (NamedTypeSymbol)enclosingBinder.BindType(attribute.Name, BindingDiagnosticBag.Discarded, out aliasOpt).Type;
+            var attributeType = (NamedTypeSymbol)enclosingBinder.BindType(attribute.Name, CSharpBindingDiagnosticBag.Discarded, out aliasOpt).Type;
 
             // For attributes where a nameof could introduce some type parameters, we need to track the attribute target
             Symbol? attributeTarget = getAttributeTarget(attribute.Parent?.Parent);

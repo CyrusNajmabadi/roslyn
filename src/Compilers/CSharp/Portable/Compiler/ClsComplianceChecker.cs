@@ -26,7 +26,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private readonly CSharpCompilation _compilation;
         private readonly SyntaxTree _filterTree; //if not null, limit analysis to types residing in this tree
         private readonly TextSpan? _filterSpanWithinTree; //if filterTree and filterSpanWithinTree is not null, limit analysis to types residing within this span in the filterTree.
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
         private readonly CancellationToken _cancellationToken;
 
         private readonly ConcurrentDictionary<Symbol, Compliance> _declaredOrInheritedCompliance;
@@ -38,7 +38,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             CSharpCompilation compilation,
             SyntaxTree filterTree,
             TextSpan? filterSpanWithinTree,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             CancellationToken cancellationToken)
         {
             Debug.Assert(diagnostics.DependenciesBag is null || diagnostics.DependenciesBag is ConcurrentSet<AssemblySymbol>);
@@ -70,7 +70,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <param name="cancellationToken">To stop traversing the symbol table early.</param>
         /// <param name="filterTree">Only report diagnostics from this syntax tree, if non-null.</param>
         /// <param name="filterSpanWithinTree">If <paramref name="filterTree"/> and <paramref name="filterSpanWithinTree"/> is non-null, report diagnostics within this span in the <paramref name="filterTree"/>.</param>
-        public static void CheckCompliance(CSharpCompilation compilation, BindingDiagnosticBag diagnostics, CancellationToken cancellationToken, SyntaxTree filterTree = null, TextSpan? filterSpanWithinTree = null)
+        public static void CheckCompliance(CSharpCompilation compilation, CSharpBindingDiagnosticBag diagnostics, CancellationToken cancellationToken, SyntaxTree filterTree = null, TextSpan? filterSpanWithinTree = null)
         {
             var queue = new BindingDiagnosticBag(diagnostics.DiagnosticBag, diagnostics.AccumulatesDependencies ? new ConcurrentSet<AssemblySymbol>() : null);
             var checker = new ClsComplianceChecker(compilation, filterTree, filterSpanWithinTree, queue, cancellationToken);

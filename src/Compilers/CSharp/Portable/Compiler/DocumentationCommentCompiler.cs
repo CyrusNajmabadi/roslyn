@@ -38,7 +38,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private readonly TextSpan? _filterSpanWithinTree; //if filterTree and filterSpanWithinTree is not null, limit analysis to types residing within this span in the filterTree.
         private readonly bool _processIncludes;
         private readonly bool _isForSingleSymbol; //minor differences in behavior between batch case and API case.
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
         private readonly CancellationToken _cancellationToken;
 
         private SyntaxNodeLocationComparer _lazyComparer;
@@ -56,7 +56,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             TextSpan? filterSpanWithinTree,
             bool processIncludes,
             bool isForSingleSymbol,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             CancellationToken cancellationToken)
         {
             _assemblyName = assemblyName;
@@ -83,7 +83,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <param name="filterTree">Only report diagnostics from this syntax tree, if non-null.</param>
         /// <param name="filterSpanWithinTree">If <paramref name="filterTree"/> and filterSpanWithinTree is non-null, report diagnostics within this span in the <paramref name="filterTree"/>.</param>
 #nullable enable
-        public static void WriteDocumentationCommentXml(CSharpCompilation compilation, string? assemblyName, Stream? xmlDocStream, BindingDiagnosticBag diagnostics, CancellationToken cancellationToken, SyntaxTree? filterTree = null, TextSpan? filterSpanWithinTree = null)
+        public static void WriteDocumentationCommentXml(CSharpCompilation compilation, string? assemblyName, Stream? xmlDocStream, CSharpBindingDiagnosticBag diagnostics, CancellationToken cancellationToken, SyntaxTree? filterTree = null, TextSpan? filterSpanWithinTree = null)
 #nullable disable
         {
             StreamWriter writer = null;
@@ -159,7 +159,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 filterSpanWithinTree: null,
                 processIncludes: processIncludes,
                 isForSingleSymbol: true,
-                diagnostics: BindingDiagnosticBag.Discarded,
+                diagnostics: CSharpBindingDiagnosticBag.Discarded,
                 cancellationToken: cancellationToken);
             compiler.Visit(symbol);
             Debug.Assert(compiler._indentDepth == 0);
@@ -1054,7 +1054,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <remarks>
         /// Does not respect DocumentationMode, so use a temporary bag if diagnostics are not desired.
         /// </remarks>
-        private static string GetDocumentationCommentId(CrefSyntax crefSyntax, Binder binder, BindingDiagnosticBag diagnostics)
+        private static string GetDocumentationCommentId(CrefSyntax crefSyntax, Binder binder, CSharpBindingDiagnosticBag diagnostics)
         {
             if (crefSyntax.ContainsDiagnostics)
             {
@@ -1121,7 +1121,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Symbol memberSymbol,
             ref HashSet<ParameterSymbol> documentedParameters,
             ref HashSet<TypeParameterSymbol> documentedTypeParameters,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             XmlNameAttributeElementKind elementKind = syntax.GetElementKind();
 

@@ -981,7 +981,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             TypedConstant value,
             bool isField,
             Location? location,
-            BindingDiagnosticBag? diagnostics)
+            CSharpBindingDiagnosticBag? diagnostics)
         {
             ImmutableHashSet<INamedTypeSymbolInternal>? callingConventionTypes = null;
 
@@ -1023,7 +1023,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// bag if it is not null. <paramref name="location"/> and <paramref name="diagnostics"/> should both be null, or 
         /// neither should be null. If an error would be reported (whether or not diagnostics is null), true is returned.
         /// </summary>
-        internal bool CheckAndReportValidUnmanagedCallersOnlyTarget(Location? location, BindingDiagnosticBag? diagnostics)
+        internal bool CheckAndReportValidUnmanagedCallersOnlyTarget(Location? location, CSharpBindingDiagnosticBag? diagnostics)
         {
             Debug.Assert((location == null) == (diagnostics == null));
 
@@ -1097,7 +1097,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// a collection of method bodies of the current module. This method is supposed to only be
         /// called for method symbols which return SynthesizesLoweredBoundBody == true.
         /// </summary>
-        internal virtual void GenerateMethodBody(TypeCompilationState compilationState, BindingDiagnosticBag diagnostics)
+        internal virtual void GenerateMethodBody(TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics)
         {
             throw ExceptionUtilities.Unreachable();
         }
@@ -1148,7 +1148,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             var compilation = this.DeclaringCompilation;
             var type = this.ReturnTypeWithAnnotations;
 
-            if (type.Type.ContainsDynamic() && compilation.HasDynamicEmitAttributes(BindingDiagnosticBag.Discarded, Location.None))
+            if (type.Type.ContainsDynamic() && compilation.HasDynamicEmitAttributes(CSharpBindingDiagnosticBag.Discarded, Location.None))
             {
                 AddSynthesizedAttribute(ref attributes, compilation.SynthesizeDynamicAttribute(type.Type, type.CustomModifiers.Length + this.RefCustomModifiers.Length, this.RefKind));
             }
@@ -1158,7 +1158,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 AddSynthesizedAttribute(ref attributes, moduleBuilder.SynthesizeNativeIntegerAttribute(this, type.Type));
             }
 
-            if (type.Type.ContainsTupleNames() && compilation.HasTupleNamesAttributes(BindingDiagnosticBag.Discarded, Location.None))
+            if (type.Type.ContainsTupleNames() && compilation.HasTupleNamesAttributes(CSharpBindingDiagnosticBag.Discarded, Location.None))
             {
                 AddSynthesizedAttribute(ref attributes, compilation.SynthesizeTupleNamesAttribute(type.Type));
             }

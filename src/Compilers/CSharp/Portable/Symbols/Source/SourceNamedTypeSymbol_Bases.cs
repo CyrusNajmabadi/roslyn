@@ -45,7 +45,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                         var tmp = ContainingType.BaseTypeNoUseSiteDiagnostics;
                     }
 
-                    var diagnostics = BindingDiagnosticBag.GetInstance();
+                    var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                     var acyclicBase = this.MakeAcyclicBaseType(diagnostics);
                     if (ReferenceEquals(Interlocked.CompareExchange(ref _lazyBaseType, acyclicBase, ErrorTypeSymbol.UnknownResultType), ErrorTypeSymbol.UnknownResultType))
                     {
@@ -71,7 +71,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     return ImmutableArray<NamedTypeSymbol>.Empty;
                 }
 
-                var diagnostics = BindingDiagnosticBag.GetInstance();
+                var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                 var acyclicInterfaces = MakeAcyclicInterfaces(basesBeingResolved, diagnostics);
                 if (ImmutableInterlocked.InterlockedCompareExchange(ref _lazyInterfaces, acyclicInterfaces, default(ImmutableArray<NamedTypeSymbol>)).IsDefault)
                 {
@@ -83,7 +83,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return _lazyInterfaces;
         }
 
-        protected override void CheckBase(BindingDiagnosticBag diagnostics)
+        protected override void CheckBase(CSharpBindingDiagnosticBag diagnostics)
         {
             var localBase = this.BaseTypeNoUseSiteDiagnostics;
 
@@ -140,7 +140,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected override void CheckInterfaces(BindingDiagnosticBag diagnostics)
+        protected override void CheckInterfaces(CSharpBindingDiagnosticBag diagnostics)
         {
             // Check declared interfaces and all base interfaces. This is necessary
             // since references to all interfaces will be emitted to metadata
@@ -222,7 +222,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     foreach (var baseTypeSyntax in bases.Types)
                     {
                         var b = baseTypeSyntax.Type;
-                        var curBaseSym = baseBinder.BindType(b, BindingDiagnosticBag.Discarded).Type;
+                        var curBaseSym = baseBinder.BindType(b, CSharpBindingDiagnosticBag.Discarded).Type;
 
                         if (baseSym.Equals(curBaseSym))
                         {
@@ -255,7 +255,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             if (ReferenceEquals(_lazyDeclaredBases, null))
             {
-                var diagnostics = BindingDiagnosticBag.GetInstance();
+                var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                 if (Interlocked.CompareExchange(ref _lazyDeclaredBases, MakeDeclaredBases(basesBeingResolved, diagnostics), null) == null)
                 {
                     AddDeclarationDiagnostics(diagnostics);
@@ -276,7 +276,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return GetDeclaredBases(basesBeingResolved).Item2;
         }
 
-        private Tuple<NamedTypeSymbol, ImmutableArray<NamedTypeSymbol>> MakeDeclaredBases(ConsList<TypeSymbol> basesBeingResolved, BindingDiagnosticBag diagnostics)
+        private Tuple<NamedTypeSymbol, ImmutableArray<NamedTypeSymbol>> MakeDeclaredBases(ConsList<TypeSymbol> basesBeingResolved, CSharpBindingDiagnosticBag diagnostics)
         {
             if (this.TypeKind == TypeKind.Enum)
             {
@@ -434,7 +434,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         // process the base list for one part of a partial class, or for the only part of any other type declaration.
-        private Tuple<NamedTypeSymbol, ImmutableArray<NamedTypeSymbol>> MakeOneDeclaredBases(ConsList<TypeSymbol> newBasesBeingResolved, SingleTypeDeclaration decl, BindingDiagnosticBag diagnostics)
+        private Tuple<NamedTypeSymbol, ImmutableArray<NamedTypeSymbol>> MakeOneDeclaredBases(ConsList<TypeSymbol> newBasesBeingResolved, SingleTypeDeclaration decl, CSharpBindingDiagnosticBag diagnostics)
         {
             BaseListSyntax bases = GetBaseListOpt(decl);
             if (bases == null)
@@ -655,7 +655,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return false;
         }
 
-        private ImmutableArray<NamedTypeSymbol> MakeAcyclicInterfaces(ConsList<TypeSymbol> basesBeingResolved, BindingDiagnosticBag diagnostics)
+        private ImmutableArray<NamedTypeSymbol> MakeAcyclicInterfaces(ConsList<TypeSymbol> basesBeingResolved, CSharpBindingDiagnosticBag diagnostics)
         {
             var typeKind = this.TypeKind;
 
@@ -706,7 +706,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return isInterface ? result.ToImmutableAndFree() : declaredInterfaces;
         }
 
-        private NamedTypeSymbol MakeAcyclicBaseType(BindingDiagnosticBag diagnostics)
+        private NamedTypeSymbol MakeAcyclicBaseType(CSharpBindingDiagnosticBag diagnostics)
         {
             var typeKind = this.TypeKind;
             var compilation = this.DeclaringCompilation;

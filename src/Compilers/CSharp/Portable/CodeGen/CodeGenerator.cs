@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         private readonly BoundStatement _boundBody;
         private readonly ILBuilder _builder;
         private readonly PEModuleBuilder _module;
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
         private readonly ILEmitStyle _ilEmitStyle;
         private readonly bool _emitPdbSequencePoints;
 
@@ -85,7 +85,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             BoundStatement boundBody,
             ILBuilder builder,
             PEModuleBuilder moduleBuilder,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             OptimizationLevel optimizations,
             bool emittingPdb)
         {

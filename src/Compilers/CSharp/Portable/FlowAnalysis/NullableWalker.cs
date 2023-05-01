@@ -1359,8 +1359,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                 && method.ContainingType is SourceMemberContainerTypeSymbol containingType)
             {
                 Binder.ProcessedFieldInitializers discardedInitializers = default;
-                Binder.BindFieldInitializers(compilation, null, method.IsStatic ? containingType.StaticInitializers : containingType.InstanceInitializers, BindingDiagnosticBag.Discarded, ref discardedInitializers);
-                return GetAfterInitializersState(compilation, method, InitializerRewriter.RewriteConstructor(discardedInitializers.BoundInitializers, method), constructorBody, diagnostics: BindingDiagnosticBag.Discarded);
+                Binder.BindFieldInitializers(compilation, null, method.IsStatic ? containingType.StaticInitializers : containingType.InstanceInitializers, CSharpBindingDiagnosticBag.Discarded, ref discardedInitializers);
+                return GetAfterInitializersState(compilation, method, InitializerRewriter.RewriteConstructor(discardedInitializers.BoundInitializers, method), constructorBody, diagnostics: CSharpBindingDiagnosticBag.Discarded);
             }
 
             return null;
@@ -1370,14 +1370,14 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Gets the "after initializers state" which should be used at the beginning of nullable analysis
         /// of certain constructors.
         /// </summary>
-        internal static VariableState? GetAfterInitializersState(CSharpCompilation compilation, MethodSymbol method, BoundNode nodeToAnalyze, BoundNode? constructorBody, BindingDiagnosticBag diagnostics)
+        internal static VariableState? GetAfterInitializersState(CSharpCompilation compilation, MethodSymbol method, BoundNode nodeToAnalyze, BoundNode? constructorBody, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(method.IsConstructor());
             bool ownsDiagnostics;
             DiagnosticBag diagnosticsBag;
             if (diagnostics.DiagnosticBag == null)
             {
-                diagnostics = BindingDiagnosticBag.Discarded;
+                diagnostics = CSharpBindingDiagnosticBag.Discarded;
                 diagnosticsBag = DiagnosticBag.GetInstance();
                 ownsDiagnostics = true;
             }
@@ -7619,7 +7619,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     var locations = tupleOpt.TupleElements.SelectAsArray((element, location) => element.TryGetFirstLocation() ?? location, node.Syntax.Location);
                     tupleOpt.CheckConstraints(new ConstraintsHelper.CheckConstraintsArgs(compilation, _conversions, includeNullability: true, node.Syntax.Location, diagnostics: null),
-                                              typeSyntax: node.Syntax, locations, nullabilityDiagnosticsOpt: new BindingDiagnosticBag(Diagnostics));
+                                              typeSyntax: node.Syntax, locations, nullabilityDiagnosticsOpt: new CSharpBindingDiagnosticBag(Diagnostics));
                 }
 
                 SetResultType(node, TypeWithState.Create(tupleOpt, NullableFlowState.NotNull));
@@ -7811,20 +7811,20 @@ namespace Microsoft.CodeAnalysis.CSharp
                 compilation,
                 targetInvokeMethod,
                 sourceInvokeMethod,
-                new BindingDiagnosticBag(Diagnostics),
+                new CSharpBindingDiagnosticBag(Diagnostics),
                 reportBadDelegateReturn,
                 reportBadDelegateParameter,
                 extraArgument: (targetType, location),
                 invokedAsExtensionMethod: invokedAsExtensionMethod);
 
-            void reportBadDelegateReturn(BindingDiagnosticBag bag, MethodSymbol targetInvokeMethod, MethodSymbol sourceInvokeMethod, bool topLevel, (TypeSymbol targetType, Location location) arg)
+            void reportBadDelegateReturn(CSharpBindingDiagnosticBag bag, MethodSymbol targetInvokeMethod, MethodSymbol sourceInvokeMethod, bool topLevel, (TypeSymbol targetType, Location location) arg)
             {
                 ReportDiagnostic(ErrorCode.WRN_NullabilityMismatchInReturnTypeOfTargetDelegate, arg.location,
                     new FormattedSymbol(sourceInvokeMethod, SymbolDisplayFormat.MinimallyQualifiedFormat),
                     arg.targetType);
             }
 
-            void reportBadDelegateParameter(BindingDiagnosticBag bag, MethodSymbol sourceInvokeMethod, MethodSymbol targetInvokeMethod, ParameterSymbol parameter, bool topLevel, (TypeSymbol targetType, Location location) arg)
+            void reportBadDelegateParameter(CSharpBindingDiagnosticBag bag, MethodSymbol sourceInvokeMethod, MethodSymbol targetInvokeMethod, ParameterSymbol parameter, bool topLevel, (TypeSymbol targetType, Location location) arg)
             {
                 ReportDiagnostic(ErrorCode.WRN_NullabilityMismatchInParameterTypeOfTargetDelegate, arg.location,
                     GetParameterAsDiagnosticArgument(parameter),
@@ -7857,7 +7857,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 location = Location.Create(lambdaSyntax.SyntaxTree, new Text.TextSpan(start, lambdaSyntax.ArrowToken.Span.End - start));
             }
 
-            var diagnostics = new BindingDiagnosticBag(Diagnostics);
+            var diagnostics = new CSharpBindingDiagnosticBag(Diagnostics);
             if (SourceMemberContainerTypeSymbol.CheckValidNullableMethodOverride(
                 compilation,
                 targetInvokeMethod,
@@ -7881,14 +7881,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                 extraArgument: location,
                 invokedAsExtensionMethod: false);
 
-            void reportBadDelegateReturn(BindingDiagnosticBag bag, MethodSymbol targetInvokeMethod, MethodSymbol sourceInvokeMethod, bool topLevel, Location location)
+            void reportBadDelegateReturn(CSharpBindingDiagnosticBag bag, MethodSymbol targetInvokeMethod, MethodSymbol sourceInvokeMethod, bool topLevel, Location location)
             {
                 ReportDiagnostic(ErrorCode.WRN_NullabilityMismatchInReturnTypeOfTargetDelegate, location,
                     unboundLambda.MessageID.Localize(),
                     delegateType);
             }
 
-            void reportBadDelegateParameter(BindingDiagnosticBag bag, MethodSymbol sourceInvokeMethod, MethodSymbol targetInvokeMethod, ParameterSymbol parameterSymbol, bool topLevel, Location location)
+            void reportBadDelegateParameter(CSharpBindingDiagnosticBag bag, MethodSymbol sourceInvokeMethod, MethodSymbol targetInvokeMethod, ParameterSymbol parameterSymbol, bool topLevel, Location location)
             {
                 // For anonymous functions with implicit parameters, no need to report this since the parameters can't be referenced
                 if (unboundLambda.HasSignature)

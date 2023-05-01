@@ -120,7 +120,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private readonly Scope _scope;
         private readonly SyntheticBoundNodeFactory _factory;
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
 
         /// <summary>
         /// Type of the variable that holds on the instrumentation context (LocalStateTracker).
@@ -131,7 +131,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Scope scope,
             TypeSymbol contextType,
             SyntheticBoundNodeFactory factory,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             Instrumenter previous)
             : base(previous)
         {
@@ -153,7 +153,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             MethodSymbol method,
             BoundStatement methodBody,
             SyntheticBoundNodeFactory factory,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             Instrumenter previous,
             [NotNullWhen(true)] out LocalStateTracingInstrumenter? instrumenter)
         {

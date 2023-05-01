@@ -51,7 +51,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Binder bodyBinder,
             MethodDeclarationSyntax syntax,
             bool isNullableAnalysisEnabled,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             var interfaceSpecifier = syntax.ExplicitInterfaceSpecifier;
             var nameToken = syntax.Identifier;
@@ -75,7 +75,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             MethodDeclarationSyntax syntax,
             MethodKind methodKind,
             bool isNullableAnalysisEnabled,
-            BindingDiagnosticBag diagnostics) :
+            CSharpBindingDiagnosticBag diagnostics) :
             base(containingType,
                  name,
                  location,
@@ -105,7 +105,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 syntax.Body, syntax.ExpressionBody, syntax, diagnostics);
         }
 
-        protected override ImmutableArray<TypeParameterSymbol> MakeTypeParameters(CSharpSyntaxNode node, BindingDiagnosticBag diagnostics)
+        protected override ImmutableArray<TypeParameterSymbol> MakeTypeParameters(CSharpSyntaxNode node, CSharpBindingDiagnosticBag diagnostics)
         {
             var syntax = (MethodDeclarationSyntax)node;
             if (syntax.Arity == 0)
@@ -119,7 +119,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected override (TypeWithAnnotations ReturnType, ImmutableArray<ParameterSymbol> Parameters, bool IsVararg, ImmutableArray<TypeParameterConstraintClause> DeclaredConstraintsForOverrideOrImplementation) MakeParametersAndBindReturnType(BindingDiagnosticBag diagnostics)
+        protected override (TypeWithAnnotations ReturnType, ImmutableArray<ParameterSymbol> Parameters, bool IsVararg, ImmutableArray<TypeParameterConstraintClause> DeclaredConstraintsForOverrideOrImplementation) MakeParametersAndBindReturnType(CSharpBindingDiagnosticBag diagnostics)
         {
             var syntax = GetSyntax();
             var withTypeParamsBinder = this.DeclaringCompilation.GetBinderFactory(syntax.SyntaxTree).GetBinder(syntax.ReturnType, syntax, this);
@@ -211,7 +211,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected override void ExtensionMethodChecks(BindingDiagnosticBag diagnostics)
+        protected override void ExtensionMethodChecks(CSharpBindingDiagnosticBag diagnostics)
         {
             // errors relevant for extension methods
             if (IsExtensionMethod)
@@ -275,7 +275,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected override MethodSymbol FindExplicitlyImplementedMethod(BindingDiagnosticBag diagnostics)
+        protected override MethodSymbol FindExplicitlyImplementedMethod(CSharpBindingDiagnosticBag diagnostics)
         {
             var syntax = GetSyntax();
             return this.FindExplicitlyImplementedMethod(isOperator: false, _explicitInterfaceType, syntax.Identifier.ValueText, syntax.ExplicitInterfaceSpecifier, diagnostics);
@@ -312,7 +312,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 GetTypeParameterConstraintKinds();
 
-                var diagnostics = BindingDiagnosticBag.GetInstance();
+                var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
                 var syntax = GetSyntax();
                 var withTypeParametersBinder =
                     this.DeclaringCompilation
@@ -521,14 +521,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return _isExpressionBodied; }
         }
 
-        protected override DeclarationModifiers MakeDeclarationModifiers(DeclarationModifiers allowedModifiers, BindingDiagnosticBag diagnostics)
+        protected override DeclarationModifiers MakeDeclarationModifiers(DeclarationModifiers allowedModifiers, CSharpBindingDiagnosticBag diagnostics)
         {
             var syntax = GetSyntax();
             return ModifierUtils.MakeAndCheckNonTypeMemberModifiers(isOrdinaryMethod: true, isForInterfaceMember: ContainingType.IsInterface,
                                                                     syntax.Modifiers, defaultAccess: DeclarationModifiers.None, allowedModifiers, GetFirstLocation(), diagnostics, out _);
         }
 
-        private ImmutableArray<TypeParameterSymbol> MakeTypeParameters(MethodDeclarationSyntax syntax, BindingDiagnosticBag diagnostics)
+        private ImmutableArray<TypeParameterSymbol> MakeTypeParameters(MethodDeclarationSyntax syntax, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(syntax.TypeParameterList != null);
 
@@ -625,7 +625,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 this.SourcePartialImplementation?.IsDefinedInSourceTree(tree, definedWithinSpan, cancellationToken) == true;
         }
 
-        protected override void CheckConstraintsForExplicitInterfaceType(ConversionsBase conversions, BindingDiagnosticBag diagnostics)
+        protected override void CheckConstraintsForExplicitInterfaceType(ConversionsBase conversions, CSharpBindingDiagnosticBag diagnostics)
         {
             if ((object)_explicitInterfaceType != null)
             {
@@ -635,7 +635,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        protected override void PartialMethodChecks(BindingDiagnosticBag diagnostics)
+        protected override void PartialMethodChecks(CSharpBindingDiagnosticBag diagnostics)
         {
             var implementingPart = this.SourcePartialImplementation;
             if ((object)implementingPart != null)
@@ -649,7 +649,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// parts of a partial method. Diagnostics are reported on the
         /// implementing part, matching Dev10 behavior.
         /// </summary>
-        private static void PartialMethodChecks(SourceOrdinaryMethodSymbol definition, SourceOrdinaryMethodSymbol implementation, BindingDiagnosticBag diagnostics)
+        private static void PartialMethodChecks(SourceOrdinaryMethodSymbol definition, SourceOrdinaryMethodSymbol implementation, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(!ReferenceEquals(definition, implementation));
 
@@ -760,7 +760,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        private static void PartialMethodConstraintsChecks(SourceOrdinaryMethodSymbol definition, SourceOrdinaryMethodSymbol implementation, BindingDiagnosticBag diagnostics)
+        private static void PartialMethodConstraintsChecks(SourceOrdinaryMethodSymbol definition, SourceOrdinaryMethodSymbol implementation, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(!ReferenceEquals(definition, implementation));
             Debug.Assert(definition.Arity == implementation.Arity);

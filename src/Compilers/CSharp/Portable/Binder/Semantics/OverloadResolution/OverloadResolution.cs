@@ -2897,7 +2897,7 @@ outerDefault:
         {
             if (conv.IsMethodGroup)
             {
-                bool result = !_binder.MethodIsCompatibleWithDelegateOrFunctionPointer(node.ReceiverOpt, conv.IsExtensionMethod, conv.Method, delegateType, Location.None, BindingDiagnosticBag.Discarded);
+                bool result = !_binder.MethodIsCompatibleWithDelegateOrFunctionPointer(node.ReceiverOpt, conv.IsExtensionMethod, conv.Method, delegateType, Location.None, CSharpBindingDiagnosticBag.Discarded);
                 return result;
             }
 

@@ -248,7 +248,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <param name="diagnostics">Diagnostic bag.</param>
         /// <param name="symbolPart">Specific part of the symbol to which the attributes apply, or <see cref="AttributeLocation.None"/> if the attributes apply to the symbol itself.</param>
         /// <param name="decodedData">Decoded well-known attribute data, could be null.</param>
-        internal virtual void PostDecodeWellKnownAttributes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> allAttributeSyntaxNodes, BindingDiagnosticBag diagnostics, AttributeLocation symbolPart, WellKnownAttributeData decodedData)
+        internal virtual void PostDecodeWellKnownAttributes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> allAttributeSyntaxNodes, CSharpBindingDiagnosticBag diagnostics, AttributeLocation symbolPart, WellKnownAttributeData decodedData)
         {
         }
 
@@ -297,7 +297,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             Action<AttributeSyntax>? beforeAttributePartBound = null,
             Action<AttributeSyntax>? afterAttributePartBound = null)
         {
-            var diagnostics = BindingDiagnosticBag.GetInstance();
+            var diagnostics = CSharpBindingDiagnosticBag.GetInstance();
             var compilation = this.DeclaringCompilation;
 
             ImmutableArray<Binder> binders;
@@ -424,7 +424,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             diagnostics.Free();
             return lazyAttributesStoredOnThisThread;
 
-            void removeObsoleteDiagnosticsForForwardedTypes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> attributesToBind, ref BindingDiagnosticBag diagnostics)
+            void removeObsoleteDiagnosticsForForwardedTypes(ImmutableArray<CSharpAttributeData> boundAttributes, ImmutableArray<AttributeSyntax> attributesToBind, ref CSharpBindingDiagnosticBag diagnostics)
             {
                 Debug.Assert(diagnostics.DiagnosticBag is not null);
 
@@ -492,7 +492,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         //    3. Remove the collected diagnostics, if any.
                         if (toRemove.Count != 0)
                         {
-                            var filtered = BindingDiagnosticBag.GetInstance();
+                            var filtered = CSharpBindingDiagnosticBag.GetInstance();
 
                             filtered.AddDependencies(diagnostics);
 
@@ -532,10 +532,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     foreach (var attributeSyntax in attributeListSyntax.Attributes)
                     {
-                        var boundType = binder.BindType(attributeSyntax.Name, BindingDiagnosticBag.Discarded);
+                        var boundType = binder.BindType(attributeSyntax.Name, CSharpBindingDiagnosticBag.Discarded);
                         var boundTypeSymbol = (NamedTypeSymbol)boundType.Type;
                         var boundAttribute = binder.GetAttribute(attributeSyntax, boundTypeSymbol,
-                            beforeAttributePartBound: null, afterAttributePartBound: null, BindingDiagnosticBag.Discarded);
+                            beforeAttributePartBound: null, afterAttributePartBound: null, CSharpBindingDiagnosticBag.Discarded);
                         boundAttributeArrayBuilder.Add(boundAttribute);
                     }
                 }
@@ -569,7 +569,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private ImmutableArray<AttributeSyntax> GetAttributesToBind(
             OneOrMany<SyntaxList<AttributeListSyntax>> attributeDeclarationSyntaxLists,
             AttributeLocation symbolPart,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             CSharpCompilation compilation,
             Func<AttributeSyntax, bool> attributeMatchesOpt,
             Binder rootBinderOpt,
@@ -645,7 +645,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        protected virtual bool ShouldBindAttributes(AttributeListSyntax attributeDeclarationSyntax, BindingDiagnosticBag diagnostics)
+        protected virtual bool ShouldBindAttributes(AttributeListSyntax attributeDeclarationSyntax, CSharpBindingDiagnosticBag diagnostics)
         {
             return true;
         }
@@ -660,7 +660,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 #nullable disable
 
-        private static bool MatchAttributeTarget(IAttributeTargetSymbol attributeTarget, AttributeLocation symbolPart, AttributeTargetSpecifierSyntax targetOpt, BindingDiagnosticBag diagnostics)
+        private static bool MatchAttributeTarget(IAttributeTargetSymbol attributeTarget, AttributeLocation symbolPart, AttributeTargetSpecifierSyntax targetOpt, CSharpBindingDiagnosticBag diagnostics)
         {
             IAttributeTargetSymbol attributesOwner = attributeTarget.AttributesOwner;
 
@@ -823,7 +823,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             ImmutableArray<Binder> binders,
             ImmutableArray<AttributeSyntax> attributeSyntaxList,
             ImmutableArray<CSharpAttributeData> boundAttributes,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             AttributeLocation symbolPart)
         {
             Debug.Assert(binders.Any());
@@ -873,7 +873,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             AttributeSyntax node,
             CSharpCompilation compilation,
             AttributeLocation symbolPart,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             HashSet<NamedTypeSymbol> uniqueAttributeTypes)
         {
             Debug.Assert(!attribute.HasErrors);

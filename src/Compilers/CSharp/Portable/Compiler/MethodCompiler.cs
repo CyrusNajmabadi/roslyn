@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private readonly CSharpCompilation _compilation;
         private readonly bool _emittingPdb;
         private readonly CancellationToken _cancellationToken;
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
         private readonly bool _hasDeclarationErrors;
         private readonly bool _emitMethodBodies;
         private readonly PEModuleBuilder _moduleBeingBuiltOpt; // Null if compiling for diagnostics
@@ -85,7 +85,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // Internal for testing only.
         internal MethodCompiler(CSharpCompilation compilation, PEModuleBuilder moduleBeingBuiltOpt, bool emittingPdb, bool hasDeclarationErrors, bool emitMethodBodies,
-            BindingDiagnosticBag diagnostics, Predicate<Symbol> filterOpt, SynthesizedEntryPointSymbol.AsyncForwardEntryPoint entryPointOpt, CancellationToken cancellationToken)
+            CSharpBindingDiagnosticBag diagnostics, Predicate<Symbol> filterOpt, SynthesizedEntryPointSymbol.AsyncForwardEntryPoint entryPointOpt, CancellationToken cancellationToken)
         {
             Debug.Assert(compilation != null);
             Debug.Assert(diagnostics != null);
@@ -112,7 +112,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             bool emittingPdb,
             bool hasDeclarationErrors,
             bool emitMethodBodies,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             Predicate<Symbol> filterOpt,
             CancellationToken cancellationToken)
         {
@@ -211,7 +211,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // Returns the MethodSymbol for the assembly entrypoint.  If the user has a Task returning main,
         // this function returns the synthesized Main MethodSymbol.
-        private static MethodSymbol GetEntryPoint(CSharpCompilation compilation, PEModuleBuilder moduleBeingBuilt, bool hasDeclarationErrors, bool emitMethodBodies, BindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
+        private static MethodSymbol GetEntryPoint(CSharpCompilation compilation, PEModuleBuilder moduleBeingBuilt, bool hasDeclarationErrors, bool emitMethodBodies, CSharpBindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
         {
             Debug.Assert(diagnostics.DiagnosticBag != null);
 
@@ -327,7 +327,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private static void WarnUnusedFields(CSharpCompilation compilation, BindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
+        private static void WarnUnusedFields(CSharpCompilation compilation, CSharpBindingDiagnosticBag diagnostics, CancellationToken cancellationToken)
         {
             SourceAssemblySymbol assembly = (SourceAssemblySymbol)compilation.Assembly;
             diagnostics.AddRange(assembly.GetUnusedFieldWarnings(cancellationToken));
@@ -666,7 +666,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return method;
         }
 
-        private void CompileSynthesizedMethods(PrivateImplementationDetails privateImplClass, BindingDiagnosticBag diagnostics)
+        private void CompileSynthesizedMethods(PrivateImplementationDetails privateImplClass, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(_moduleBeingBuiltOpt != null);
 
@@ -682,7 +682,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             compilationState.Free();
         }
 
-        private void CompileSynthesizedMethods(ImmutableArray<NamedTypeSymbol> additionalTypes, BindingDiagnosticBag diagnostics)
+        private void CompileSynthesizedMethods(ImmutableArray<NamedTypeSymbol> additionalTypes, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(diagnostics.DiagnosticBag != null);
 
@@ -726,7 +726,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // We make sure that an asynchronous mutation to the diagnostic bag does not
                     // confuse the method body generator by making a fresh bag and then loading
                     // any diagnostics emitted into it back into the main diagnostic bag.
-                    var diagnosticsThisMethod = BindingDiagnosticBag.GetInstance(_diagnostics);
+                    var diagnosticsThisMethod = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
 
                     var method = methodWithBody.Method;
                     var lambda = method as SynthesizedClosureMethod;
@@ -830,7 +830,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // we are not generating any observable diagnostics here so it is ok to short-circuit on global errors.
             if (!_globalHasErrors)
             {
-                var discardedDiagnostics = BindingDiagnosticBag.GetInstance(_diagnostics);
+                var discardedDiagnostics = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
                 foreach (var synthesizedExplicitImpl in sourceTypeSymbol.GetSynthesizedExplicitImplementations(_cancellationToken).ForwardingMethods)
                 {
                     Debug.Assert(synthesizedExplicitImpl.SynthesizesLoweredBoundBody);
@@ -852,7 +852,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if ((object)synthesizedAccessor != null && !_globalHasErrors)
             {
                 Debug.Assert(synthesizedAccessor.SynthesizesLoweredBoundBody);
-                var discardedDiagnostics = BindingDiagnosticBag.GetInstance(_diagnostics);
+                var discardedDiagnostics = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
                 synthesizedAccessor.GenerateMethodBody(compilationState, discardedDiagnostics);
                 Debug.Assert(!discardedDiagnostics.HasAnyErrors());
                 _diagnostics.AddDependencies(discardedDiagnostics);
@@ -869,7 +869,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             MethodSymbol accessor = isAddMethod ? eventSymbol.AddMethod : eventSymbol.RemoveMethod;
 
-            var diagnosticsThisMethod = BindingDiagnosticBag.GetInstance(_diagnostics);
+            var diagnosticsThisMethod = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
             try
             {
                 BoundBlock boundBody = MethodBodySynthesizer.ConstructFieldLikeEventAccessorBody(eventSymbol, isAddMethod, _compilation, diagnosticsThisMethod);
@@ -973,7 +973,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             ImportChain oldImportChain = compilationState.CurrentImportChain;
 
             // In order to avoid generating code for methods with errors, we create a diagnostic bag just for this method.
-            var diagsForCurrentMethod = BindingDiagnosticBag.GetInstance(_diagnostics);
+            var diagsForCurrentMethod = CSharpBindingDiagnosticBag.GetInstance(_diagnostics);
 
             try
             {
@@ -1037,7 +1037,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     var unusedDiagnostics = DiagnosticBag.GetInstance();
                     DefiniteAssignmentPass.Analyze(_compilation, methodSymbol, initializerStatements, unusedDiagnostics, out _, requireOutParamsAssigned: false);
-                    DiagnosticsPass.IssueDiagnostics(_compilation, initializerStatements, BindingDiagnosticBag.Discarded, methodSymbol);
+                    DiagnosticsPass.IssueDiagnostics(_compilation, initializerStatements, CSharpBindingDiagnosticBag.Discarded, methodSymbol);
                     unusedDiagnostics.Free();
                 }
                 else
@@ -1408,7 +1408,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             MethodInstrumentation instrumentation,
             DebugDocumentProvider debugDocumentProvider,
             out ImmutableArray<SourceSpan> codeCoverageSpans,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             ref VariableSlotAllocator lazyVariableSlotAllocator,
             ArrayBuilder<LambdaDebugInfo> lambdaDebugInfoBuilder,
             ArrayBuilder<ClosureDebugInfo> closureDebugInfoBuilder,
@@ -1530,7 +1530,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             ImmutableArray<StateMachineStateDebugInfo> stateMachineStateDebugInfos,
             StateMachineTypeSymbol stateMachineTypeOpt,
             VariableSlotAllocator variableSlotAllocatorOpt,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             DebugDocumentProvider debugDocumentProvider,
             ImportChain importChainOpt,
             bool emittingPdb,
@@ -1546,7 +1546,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             ILBuilder builder = new ILBuilder(moduleBuilder, localSlotManager, optimizations, method.AreLocalsZeroed);
             bool hasStackalloc;
-            var diagnosticsForThisMethod = BindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
+            var diagnosticsForThisMethod = CSharpBindingDiagnosticBag.GetInstance(withDiagnostics: true, diagnostics.AccumulatesDependencies);
             try
             {
                 StateMachineMoveNextBodyDebugInfo moveNextBodyDebugInfoOpt = null;
@@ -1687,7 +1687,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             PEModuleBuilder moduleBuilder,
             IEnumerable<Cci.IFieldDefinition> fieldDefs,
             VariableSlotAllocator variableSlotAllocatorOpt,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             out ImmutableArray<EncHoistedLocalInfo> hoistedVariableSlots,
             out ImmutableArray<Cci.ITypeReference> awaiterSlots)
         {
@@ -1750,7 +1750,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // NOTE: can return null if the method has no body.
 #nullable enable
-        internal static BoundBlock? BindSynthesizedMethodBody(MethodSymbol method, TypeCompilationState compilationState, BindingDiagnosticBag diagnostics)
+        internal static BoundBlock? BindSynthesizedMethodBody(MethodSymbol method, TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics)
         {
             return BindMethodBody(
                 method,
@@ -1769,7 +1769,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         private static BoundBlock? BindMethodBody(
             MethodSymbol method,
             TypeCompilationState compilationState,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool includeInitializersInBody,
             BoundNode? initializersBody,
             bool reportNullableDiagnostics,
@@ -1908,7 +1908,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                             {
                                 Debug.Assert(constructor.Initializer is null);
                                 Debug.Assert(constructor.Locals.IsEmpty);
-                                Debug.Assert(BindImplicitConstructorInitializerIfAny(method, compilationState, BindingDiagnosticBag.Discarded) is null);
+                                Debug.Assert(BindImplicitConstructorInitializerIfAny(method, compilationState, CSharpBindingDiagnosticBag.Discarded) is null);
                             }
 
                             return body;
@@ -2146,7 +2146,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // Confirm that our prediction was accurate enough.
             // Correctness of SynthesizedPrimaryConstructor.GetCapturedParameters depends on this.
-            static void assertBindIdentifierTargets(InMethodBinder? inMethodBinder, ConcurrentDictionary<IdentifierNameSyntax, int>? identifierMap, BoundNode methodBody, BindingDiagnosticBag diagnostics)
+            static void assertBindIdentifierTargets(InMethodBinder? inMethodBinder, ConcurrentDictionary<IdentifierNameSyntax, int>? identifierMap, BoundNode methodBody, CSharpBindingDiagnosticBag diagnostics)
             {
                 if (identifierMap != null && inMethodBinder!.IdentifierMap == identifierMap)
                 {
@@ -2269,7 +2269,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return BoundBlock.SynthesizedNoLocals(symbol.GetNonNullSyntaxNode());
         }
 
-        private static BoundStatement BindImplicitConstructorInitializerIfAny(MethodSymbol method, TypeCompilationState compilationState, BindingDiagnosticBag diagnostics)
+        private static BoundStatement BindImplicitConstructorInitializerIfAny(MethodSymbol method, TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics)
         {
             Debug.Assert(!method.ContainingType.IsDelegateType());
 
@@ -2293,7 +2293,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return null;
         }
 
-        private static void ReportCtorInitializerCycles(MethodSymbol method, BoundExpression initializerInvocation, TypeCompilationState compilationState, BindingDiagnosticBag diagnostics)
+        private static void ReportCtorInitializerCycles(MethodSymbol method, BoundExpression initializerInvocation, TypeCompilationState compilationState, CSharpBindingDiagnosticBag diagnostics)
         {
             var ctorCall = initializerInvocation as BoundCall;
             if (ctorCall != null && !ctorCall.HasAnyErrors && ctorCall.Method != method && TypeSymbol.Equals(ctorCall.Method.ContainingType, method.ContainingType, TypeCompareKind.ConsiderEverything2))

@@ -665,7 +665,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Perform additional checks after the member has been
         /// added to the member list of the containing type.
         /// </summary>
-        internal virtual void AfterAddingTypeMembersChecks(ConversionsBase conversions, BindingDiagnosticBag diagnostics)
+        internal virtual void AfterAddingTypeMembersChecks(ConversionsBase conversions, CSharpBindingDiagnosticBag diagnostics)
         {
         }
 
@@ -932,7 +932,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return $"{this.Kind} {this.ToDisplayString(s_debuggerDisplayFormat)}";
         }
 
-        internal virtual void AddDeclarationDiagnostics(BindingDiagnosticBag diagnostics)
+        internal virtual void AddDeclarationDiagnostics(CSharpBindingDiagnosticBag diagnostics)
         {
 #if DEBUG
             if (ContainingSymbol is SourceMemberContainerTypeSymbol container)
@@ -1101,7 +1101,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return info.Severity == DiagnosticSeverity.Error;
         }
 
-        internal static bool ReportUseSiteDiagnostic(DiagnosticInfo info, BindingDiagnosticBag diagnostics, Location location)
+        internal static bool ReportUseSiteDiagnostic(DiagnosticInfo info, CSharpBindingDiagnosticBag diagnostics, Location location)
         {
             return diagnostics.ReportUseSiteDiagnostic(info, location);
         }
@@ -1408,7 +1408,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             CSharpSyntaxNode block,
             CSharpSyntaxNode expression,
             CSharpSyntaxNode syntax,
-            BindingDiagnosticBag diagnostics)
+            CSharpBindingDiagnosticBag diagnostics)
         {
             if (block != null && expression != null)
             {
@@ -1437,7 +1437,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal bool ReportExplicitUseOfReservedAttributes(in DecodeWellKnownAttributeArguments<AttributeSyntax, CSharpAttributeData, AttributeLocation> arguments, ReservedAttributes reserved)
         {
             var attribute = arguments.Attribute;
-            var diagnostics = (BindingDiagnosticBag)arguments.Diagnostics;
+            var diagnostics = (CSharpBindingDiagnosticBag)arguments.Diagnostics;
 
             if ((reserved & ReservedAttributes.DynamicAttribute) != 0 &&
                 attribute.IsTargetAttribute(this, AttributeDescription.DynamicAttribute))

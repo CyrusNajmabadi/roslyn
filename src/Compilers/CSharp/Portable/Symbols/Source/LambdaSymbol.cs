@@ -23,7 +23,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private readonly bool _isSynthesized;
         private readonly bool _isAsync;
         private readonly bool _isStatic;
-        private readonly BindingDiagnosticBag _declarationDiagnostics;
+        private readonly CSharpBindingDiagnosticBag _declarationDiagnostics;
 
         /// <summary>
         /// This symbol is used as the return type of a LambdaSymbol when we are interpreting
@@ -64,7 +64,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             _isStatic = unboundLambda.IsStatic;
             // No point in making this lazy. We are always going to need these soon after creation of the symbol.
             _parameters = MakeParameters(compilation, unboundLambda, parameterTypes, parameterRefKinds);
-            _declarationDiagnostics = new BindingDiagnosticBag();
+            _declarationDiagnostics = new CSharpBindingDiagnosticBag();
         }
 
         public MessageID MessageID { get { return _messageID; } }
@@ -274,7 +274,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 default;
         }
 
-        internal void GetDeclarationDiagnostics(BindingDiagnosticBag addTo)
+        internal void GetDeclarationDiagnostics(CSharpBindingDiagnosticBag addTo)
         {
             foreach (var parameter in _parameters)
             {
@@ -293,7 +293,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             addTo.AddRange(_declarationDiagnostics, allowMismatchInDependencyAccumulation: true);
         }
 
-        internal override void AddDeclarationDiagnostics(BindingDiagnosticBag diagnostics)
+        internal override void AddDeclarationDiagnostics(CSharpBindingDiagnosticBag diagnostics)
             => _declarationDiagnostics.AddRange(diagnostics);
 
         private ImmutableArray<ParameterSymbol> MakeParameters(

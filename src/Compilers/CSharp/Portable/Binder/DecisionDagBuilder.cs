@@ -57,7 +57,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private readonly CSharpCompilation _compilation;
         private readonly Conversions _conversions;
-        private readonly BindingDiagnosticBag _diagnostics;
+        private readonly CSharpBindingDiagnosticBag _diagnostics;
         private readonly LabelSymbol _defaultLabel;
         /// <summary>
         /// We might need to build a dedicated dag for lowering during which we
@@ -66,7 +66,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// </summary>
         private readonly bool _forLowering;
 
-        private DecisionDagBuilder(CSharpCompilation compilation, LabelSymbol defaultLabel, bool forLowering, BindingDiagnosticBag diagnostics)
+        private DecisionDagBuilder(CSharpCompilation compilation, LabelSymbol defaultLabel, bool forLowering, CSharpBindingDiagnosticBag diagnostics)
         {
             this._compilation = compilation;
             this._conversions = compilation.Conversions;
@@ -84,7 +84,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             BoundExpression switchGoverningExpression,
             ImmutableArray<BoundSwitchSection> switchSections,
             LabelSymbol defaultLabel,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool forLowering = false)
         {
             var builder = new DecisionDagBuilder(compilation, defaultLabel, forLowering, diagnostics);
@@ -100,7 +100,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             BoundExpression switchExpressionInput,
             ImmutableArray<BoundSwitchExpressionArm> switchArms,
             LabelSymbol defaultLabel,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool forLowering = false)
         {
             var builder = new DecisionDagBuilder(compilation, defaultLabel, forLowering, diagnostics);
@@ -117,7 +117,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             BoundPattern pattern,
             LabelSymbol whenTrueLabel,
             LabelSymbol whenFalseLabel,
-            BindingDiagnosticBag diagnostics,
+            CSharpBindingDiagnosticBag diagnostics,
             bool forLowering = false)
         {
             var builder = new DecisionDagBuilder(compilation, defaultLabel: whenFalseLabel, forLowering, diagnostics);

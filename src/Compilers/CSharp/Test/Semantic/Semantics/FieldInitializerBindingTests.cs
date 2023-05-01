@@ -296,7 +296,7 @@ class C
                 typeSymbol.DeclaringCompilation,
                 initializers,
                 boundInitializers,
-                new BindingDiagnosticBag(diagnostics),
+                new CSharpBindingDiagnosticBag(diagnostics),
                 firstDebugImports: out unused);
             diagnostics.Verify();
             diagnostics.Free();
