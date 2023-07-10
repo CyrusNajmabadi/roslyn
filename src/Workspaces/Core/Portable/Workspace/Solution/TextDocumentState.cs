@@ -75,7 +75,7 @@ namespace Microsoft.CodeAnalysis
             => new ConstantTextAndVersionSource(text);
 
         private static ITextAndVersionSource CreateStrongText(TextLoader loader)
-            => new LoadableTextAndVersionSource(loader, cacheResult: true);
+            => new LoadableTextAndVersionSource(loader);
 
         public bool TryGetText([NotNullWhen(returnValue: true)] out SourceText? text)
         {
