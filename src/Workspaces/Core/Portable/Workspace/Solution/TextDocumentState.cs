@@ -60,7 +60,7 @@ namespace Microsoft.CodeAnalysis
                    info.DocumentServiceProvider,
                    info.Attributes,
                    textAndVersionSource: info.TextLoader != null
-                    ? CreateRecoverableText(info.TextLoader, solutionServices)
+                    ? CreateStrongText(info.TextLoader)
                     : CreateStrongText(TextAndVersion.Create(SourceText.From(string.Empty, encoding: null, loadTextOptions.ChecksumAlgorithm), VersionStamp.Default, info.FilePath)),
                    loadTextOptions)
         {
@@ -76,44 +76,6 @@ namespace Microsoft.CodeAnalysis
 
         private static ITextAndVersionSource CreateStrongText(TextLoader loader)
             => new LoadableTextAndVersionSource(loader, cacheResult: true);
-
-        private static ITextAndVersionSource CreateRecoverableText(TextAndVersion text, LoadTextOptions loadTextOptions, SolutionServices services)
-        {
-            var service = services.GetRequiredService<IWorkspaceConfigurationService>();
-            var options = service.Options;
-
-            if (options.DisableRecoverableText)
-                return CreateStrongText(text);
-
-            var result = new RecoverableTextAndVersion(new ConstantTextAndVersionSource(text), services);
-
-            if (!options.DeferCreatingRecoverableText)
-            {
-                // This RecoverableTextAndVersion is created directly from a TextAndVersion instance. In its initial state,
-                // the RecoverableTextAndVersion keeps a strong reference to the initial TextAndVersion, and only
-                // transitions to a weak reference backed by temporary storage after the first time GetValue (or
-                // GetValueAsync) is called. Since we know we are creating a RecoverableTextAndVersion for the purpose of
-                // avoiding problematic address space overhead, we call GetValue immediately to force the object to weakly
-                // hold its data from the start.
-                result.GetValue(loadTextOptions, CancellationToken.None);
-            }
-
-            return result;
-        }
-
-        private static ITextAndVersionSource CreateRecoverableText(TextLoader loader, SolutionServices services)
-        {
-            var service = services.GetRequiredService<IWorkspaceConfigurationService>();
-            var options = service.Options;
-
-            if (options.DisableRecoverableText)
-                return CreateStrongText(loader);
-
-            return new RecoverableTextAndVersion(new LoadableTextAndVersionSource(loader, cacheResult: false), services);
-        }
-
-        public ITemporaryTextStorageInternal? Storage
-            => (TextAndVersionSource as RecoverableTextAndVersion)?.Storage;
 
         public bool TryGetText([NotNullWhen(returnValue: true)] out SourceText? text)
         {
@@ -175,11 +137,7 @@ namespace Microsoft.CodeAnalysis
 
         public TextDocumentState UpdateText(TextAndVersion newTextAndVersion, PreservationMode mode)
         {
-            var newTextSource = mode == PreservationMode.PreserveIdentity
-                ? CreateStrongText(newTextAndVersion)
-                : CreateRecoverableText(newTextAndVersion, LoadTextOptions, solutionServices);
-
-            return UpdateText(newTextSource, mode, incremental: true);
+            return UpdateText(CreateStrongText(newTextAndVersion), mode, incremental: true);
         }
 
         public TextDocumentState UpdateText(SourceText newText, PreservationMode mode)
@@ -192,12 +150,7 @@ namespace Microsoft.CodeAnalysis
 
         public TextDocumentState UpdateText(TextLoader loader, PreservationMode mode)
         {
-            // don't blow up on non-text documents.
-            var newTextSource = mode == PreservationMode.PreserveIdentity
-                ? CreateStrongText(loader)
-                : CreateRecoverableText(loader, solutionServices);
-
-            return UpdateText(newTextSource, mode, incremental: false);
+            return UpdateText(CreateStrongText(loader), mode, incremental: false);
         }
 
         protected virtual TextDocumentState UpdateText(ITextAndVersionSource newTextSource, PreservationMode mode, bool incremental)
