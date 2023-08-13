@@ -9542,7 +9542,7 @@ const int w;
 readonly int y;
 static int z;
 ";
-            ParseAndValidate(test, new ErrorDescription { Code = 145, Line = 3, Column = 11 });
+            ParseAndValidate(test);
         }
 
         /// bug="3782" project = "Roslyn"

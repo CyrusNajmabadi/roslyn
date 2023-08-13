@@ -4839,8 +4839,7 @@ parse_member_name:;
         private enum VariableFlags
         {
             Fixed = 0x01,
-            Const = 0x02,
-            LocalOrField = 0x04
+            LocalOrField = 0x02,
         }
 
         private static SyntaxTokenList GetOriginalModifiers(CSharp.CSharpSyntaxNode decl)
@@ -4899,11 +4898,6 @@ parse_member_name:;
             if (mods.Any(SyntaxKind.FixedKeyword))
             {
                 flags |= VariableFlags.Fixed;
-            }
-
-            if (mods.Any(SyntaxKind.ConstKeyword))
-            {
-                flags |= VariableFlags.Const;
             }
 
             if (parent != null && (parent.Kind() == SyntaxKind.VariableDeclaration || parent.Kind() == SyntaxKind.LocalDeclarationStatement))
@@ -5030,7 +5024,6 @@ parse_member_name:;
             EqualsValueClauseSyntax initializer = null;
             TerminatorState saveTerm = _termState;
             bool isFixed = (flags & VariableFlags.Fixed) != 0;
-            bool isConst = (flags & VariableFlags.Const) != 0;
             bool isLocalOrField = (flags & VariableFlags.LocalOrField) != 0;
 
             // Give better error message in the case where the user did something like:
@@ -5055,7 +5048,7 @@ parse_member_name:;
                     var equals = this.EatToken();
 
                     // check for lambda expression with explicit ref return type: `ref int () => { ... }`
-                    var refKeyword = isLocalOrField && !isConst && this.CurrentToken.Kind == SyntaxKind.RefKeyword && !this.IsPossibleLambdaExpression(Precedence.Expression)
+                    var refKeyword = isLocalOrField && this.CurrentToken.Kind == SyntaxKind.RefKeyword && !this.IsPossibleLambdaExpression(Precedence.Expression)
                         ? this.EatToken()
                         : null;
 
@@ -5141,11 +5134,7 @@ parse_member_name:;
                     break;
 
                 default:
-                    if (isConst)
-                    {
-                        name = this.AddError(name, ErrorCode.ERR_ConstValueRequired);  // Error here for missing constant initializers
-                    }
-                    else if (isFixed)
+                    if (isFixed)
                     {
                         if (parentType.Kind == SyntaxKind.ArrayType)
                         {
@@ -5216,7 +5205,7 @@ parse_member_name:;
             var type = this.ParseType();
 
             var variables = _pool.AllocateSeparated<VariableDeclaratorSyntax>();
-            this.ParseVariableDeclarators(type, VariableFlags.Const, variables, parentKind);
+            this.ParseVariableDeclarators(type, flags: 0, variables, parentKind);
             return _syntaxFactory.FieldDeclaration(
                 attributes,
                 modifiers.ToList(),
@@ -9754,17 +9743,11 @@ done:;
         {
             type = allowLocalFunctions ? ParseReturnType() : this.ParseType();
 
-            VariableFlags flags = VariableFlags.LocalOrField;
-            if (mods.Any((int)SyntaxKind.ConstKeyword))
-            {
-                flags |= VariableFlags.Const;
-            }
-
             var saveTerm = _termState;
             _termState |= TerminatorState.IsEndOfDeclarationClause;
             this.ParseVariableDeclarators(
                 type,
-                flags,
+                VariableFlags.LocalOrField,
                 variables,
                 variableDeclarationsExpected: true,
                 allowLocalFunctions: allowLocalFunctions,

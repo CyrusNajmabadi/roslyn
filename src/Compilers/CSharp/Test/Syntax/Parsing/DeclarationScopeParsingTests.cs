@@ -13984,13 +13984,26 @@ ref struct R2
                 // (4,18): error CS1001: Identifier expected
                 //     const scoped int F3;
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "int").WithLocation(4, 18),
-                // (4,18): error CS0145: A const field requires a value to be provided
-                //     const scoped int F3;
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "int").WithLocation(4, 18),
                 // (4,18): error CS1002: ; expected
                 //     const scoped int F3;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "int").WithLocation(4, 18)
-                );
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "int").WithLocation(4, 18));
+
+            CreateCompilation(source, parseOptions: TestOptions.Regular.WithLanguageVersion(langVersion)).VerifyDiagnostics(
+                // (4,11): error CS0246: The type or namespace name 'scoped' could not be found (are you missing a using directive or an assembly reference?)
+                //     const scoped int F3;
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "scoped").WithArguments("scoped").WithLocation(4, 11),
+                // (4,18): error CS1001: Identifier expected
+                //     const scoped int F3;
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, "int").WithLocation(4, 18),
+                // (4,18): error CS1002: ; expected
+                //     const scoped int F3;
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "int").WithLocation(4, 18),
+                // (4,18): error CS0145: A const field requires a value to be provided
+                //     const scoped int F3;
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "").WithLocation(4, 18),
+                // (4,22): warning CS0169: The field 'R2.F3' is never used
+                //     const scoped int F3;
+                Diagnostic(ErrorCode.WRN_UnreferencedField, "F3").WithArguments("R2.F3").WithLocation(4, 22));
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -14054,13 +14067,9 @@ ref struct R2
                 // (4,18): error CS1001: Identifier expected
                 //     const scoped ref int F3;
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "ref").WithLocation(4, 18),
-                // (4,18): error CS0145: A const field requires a value to be provided
-                //     const scoped ref int F3;
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "ref").WithLocation(4, 18),
                 // (4,18): error CS1002: ; expected
                 //     const scoped ref int F3;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "ref").WithLocation(4, 18)
-                );
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "ref").WithLocation(4, 18));
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -14354,11 +14363,15 @@ ref struct R2
             UsingTree(source, TestOptions.Regular.WithLanguageVersion(langVersion),
                 // (4,12): error CS1519: Invalid token 'const' in class, record, struct, or interface member declaration
                 //     scoped const int F3;
+                Diagnostic(ErrorCode.ERR_InvalidMemberDecl, "const").WithArguments("const").WithLocation(4, 12));
+
+            CreateCompilation(source, parseOptions: TestOptions.Regular.WithLanguageVersion(langVersion)).VerifyDiagnostics(
+                // (4,12): error CS1519: Invalid token 'const' in class, record, struct, or interface member declaration
+                //     scoped const int F3;
                 Diagnostic(ErrorCode.ERR_InvalidMemberDecl, "const").WithArguments("const").WithLocation(4, 12),
                 // (4,22): error CS0145: A const field requires a value to be provided
                 //     scoped const int F3;
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "F3").WithLocation(4, 22)
-                );
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "F3").WithLocation(4, 22));
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -14413,11 +14426,15 @@ ref struct R2
             UsingTree(source, TestOptions.Regular.WithLanguageVersion(langVersion),
                 // (4,16): error CS1031: Type expected
                 //     scoped ref const int F3;
+                Diagnostic(ErrorCode.ERR_TypeExpected, "const").WithLocation(4, 16));
+
+            CreateCompilation(source, parseOptions: TestOptions.Regular.WithLanguageVersion(langVersion)).VerifyDiagnostics(
+                // (4,16): error CS1031: Type expected
+                //     scoped ref const int F3;
                 Diagnostic(ErrorCode.ERR_TypeExpected, "const").WithLocation(4, 16),
                 // (4,26): error CS0145: A const field requires a value to be provided
                 //     scoped ref const int F3;
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "F3").WithLocation(4, 26)
-                );
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "F3").WithLocation(4, 26));
 
             N(SyntaxKind.CompilationUnit);
             {

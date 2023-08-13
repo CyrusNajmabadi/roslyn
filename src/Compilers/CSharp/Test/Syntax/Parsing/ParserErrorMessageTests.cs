@@ -216,7 +216,17 @@ namespace x
 }
 ";
 
-            ParseAndValidate(test, Diagnostic(ErrorCode.ERR_ConstValueRequired, "i"));
+            ParseAndValidate(test);
+            CreateCompilation(test).VerifyDiagnostics(
+                // (4,18): warning CS8981: The type name 'a' only contains lower-cased ascii characters. Such names may become reserved for the language.
+                //     public class a
+                Diagnostic(ErrorCode.WRN_LowerCaseTypeName, "a").WithArguments("a").WithLocation(4, 18),
+                // (11,18): warning CS8981: The type name 'b' only contains lower-cased ascii characters. Such names may become reserved for the language.
+                //     public class b : a
+                Diagnostic(ErrorCode.WRN_LowerCaseTypeName, "b").WithArguments("b").WithLocation(11, 18),
+                // (13,26): error CS0145: A const field requires a value to be provided
+                //         public const int i;
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "i").WithLocation(13, 26));
         }
 
         [WorkItem(536667, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536667")]
@@ -5529,9 +5539,6 @@ public class QueryExpressionTest
               // (12,35): error CS1001: Identifier expected
               //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
               Diagnostic(ErrorCode.ERR_IdentifierExpected, "in"),
-              // (12,35): error CS0145: A const field requires a value to be provided
-              //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
-              Diagnostic(ErrorCode.ERR_ConstValueRequired, "in"),
               // (12,35): error CS1003: Syntax error, ',' expected
               //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
               Diagnostic(ErrorCode.ERR_SyntaxError, "in").WithArguments(","),
@@ -5550,9 +5557,6 @@ public class QueryExpressionTest
               // (12,64): error CS1002: ; expected
               //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
               Diagnostic(ErrorCode.ERR_SemicolonExpected, "const"),
-              // (12,77): error CS0145: A const field requires a value to be provided
-              //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
-              Diagnostic(ErrorCode.ERR_ConstValueRequired, "i"),
               // (12,79): error CS1002: ; expected
               //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
               Diagnostic(ErrorCode.ERR_SemicolonExpected, "select"),
@@ -5571,12 +5575,6 @@ public class QueryExpressionTest
               // (12,97): error CS1001: Identifier expected
               //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
               Diagnostic(ErrorCode.ERR_IdentifierExpected, ","),
-              // (12,97): error CS0145: A const field requires a value to be provided
-              //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
-              Diagnostic(ErrorCode.ERR_ConstValueRequired, ","),
-              // (12,99): error CS0145: A const field requires a value to be provided
-              //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
-              Diagnostic(ErrorCode.ERR_ConstValueRequired, "i"),
               // (12,101): error CS1002: ; expected
               //         var query13 = from  const in expr1 join  i in expr2 on const equals i select new { const, i };
               Diagnostic(ErrorCode.ERR_SemicolonExpected, "}"),

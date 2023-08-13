@@ -280,9 +280,6 @@ class A
                 // (4,11): error CS1001: Identifier expected
                 //     const delegate void D();
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "delegate").WithLocation(4, 11),
-                // (4,11): error CS0145: A const field requires a value to be provided
-                //     const delegate void D();
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "delegate").WithLocation(4, 11),
                 // (4,11): error CS1002: ; expected
                 //     const delegate void D();
                 Diagnostic(ErrorCode.ERR_SemicolonExpected, "delegate").WithLocation(4, 11),
@@ -295,9 +292,6 @@ class A
                 // (5,46): error CS1001: Identifier expected
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "{").WithLocation(5, 46),
-                // (5,46): error CS0145: A const field requires a value to be provided
-                //     protected virtual void Finalize const () { }
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "{").WithLocation(5, 46),
                 // (5,46): error CS1003: Syntax error, ',' expected
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_SyntaxError, "{").WithArguments(",").WithLocation(5, 46),
@@ -307,9 +301,15 @@ class A
                 // (6,1): error CS1022: Type or namespace definition, or end-of-file expected
                 // }
                 Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(6, 1),
+                // (4,11): error CS0145: A const field requires a value to be provided
+                //     const delegate void D();
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "").WithLocation(4, 11),
                 // (5,28): error CS0106: The modifier 'virtual' is not valid for this item
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_BadMemberFlag, "Finalize").WithArguments("virtual").WithLocation(5, 28),
+                // (5,46): error CS0145: A const field requires a value to be provided
+                //     protected virtual void Finalize const () { }
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "").WithLocation(5, 46),
                 // (5,43): error CS8179: Predefined type 'System.ValueTuple`2' is not defined or imported
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_PredefinedValueTupleTypeNotFound, "()").WithArguments("System.ValueTuple`2").WithLocation(5, 43),
@@ -321,8 +321,7 @@ class A
                 Diagnostic(ErrorCode.ERR_DuplicateNameInClass, "").WithArguments("A", "").WithLocation(5, 46),
                 // (5,28): warning CS0649: Field 'A.Finalize' is never assigned to, and will always have its default value 
                 //     protected virtual void Finalize const () { }
-                Diagnostic(ErrorCode.WRN_UnassignedInternalField, "Finalize").WithArguments("A.Finalize", "").WithLocation(5, 28)
-                );
+                Diagnostic(ErrorCode.WRN_UnassignedInternalField, "Finalize").WithArguments("A.Finalize", "").WithLocation(5, 28));
         }
 
         [WorkItem(543538, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543538")]
@@ -345,27 +344,18 @@ class A
                 // (4,11): error CS1001: Identifier expected
                 //     const delegate void D();
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "delegate").WithLocation(4, 11),
-                // (4,11): error CS0145: A const field requires a value to be provided
-                //     const delegate void D();
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "delegate").WithLocation(4, 11),
                 // (4,11): error CS1002: ; expected
                 //     const delegate void D();
                 Diagnostic(ErrorCode.ERR_SemicolonExpected, "delegate").WithLocation(4, 11),
                 // (5,37): error CS1002: ; expected
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_SemicolonExpected, "const").WithLocation(5, 37),
-                // (5,43): error CS8059: Feature 'tuples' is not available in C# 6. Please use language version 7.0 or greater.
-                //     protected virtual void Finalize const () { }
-                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "()").WithArguments("tuples", "7.0").WithLocation(5, 43),
                 // (5,44): error CS8124: Tuple must contain at least two elements.
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_TupleTooFewElements, ")").WithLocation(5, 44),
                 // (5,46): error CS1001: Identifier expected
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "{").WithLocation(5, 46),
-                // (5,46): error CS0145: A const field requires a value to be provided
-                //     protected virtual void Finalize const () { }
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "{").WithLocation(5, 46),
                 // (5,46): error CS1003: Syntax error, ',' expected
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_SyntaxError, "{").WithArguments(",").WithLocation(5, 46),
@@ -375,9 +365,18 @@ class A
                 // (6,1): error CS1022: Type or namespace definition, or end-of-file expected
                 // }
                 Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(6, 1),
+                // (4,11): error CS0145: A const field requires a value to be provided
+                //     const delegate void D();
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "").WithLocation(4, 11),
                 // (5,28): error CS0106: The modifier 'virtual' is not valid for this item
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_BadMemberFlag, "Finalize").WithArguments("virtual").WithLocation(5, 28),
+                // (5,46): error CS0145: A const field requires a value to be provided
+                //     protected virtual void Finalize const () { }
+                Diagnostic(ErrorCode.ERR_ConstValueRequired, "").WithLocation(5, 46),
+                // (5,43): error CS8059: Feature 'tuples' is not available in C# 6. Please use language version 7.0 or greater.
+                //     protected virtual void Finalize const () { }
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "()").WithArguments("tuples", "7.0").WithLocation(5, 43),
                 // (5,43): error CS8179: Predefined type 'System.ValueTuple`2' is not defined or imported
                 //     protected virtual void Finalize const () { }
                 Diagnostic(ErrorCode.ERR_PredefinedValueTupleTypeNotFound, "()").WithArguments("System.ValueTuple`2").WithLocation(5, 43),
@@ -389,8 +388,7 @@ class A
                 Diagnostic(ErrorCode.ERR_DuplicateNameInClass, "").WithArguments("A", "").WithLocation(5, 46),
                 // (5,28): warning CS0649: Field 'A.Finalize' is never assigned to, and will always have its default value 
                 //     protected virtual void Finalize const () { }
-                Diagnostic(ErrorCode.WRN_UnassignedInternalField, "Finalize").WithArguments("A.Finalize", "").WithLocation(5, 28)
-                );
+                Diagnostic(ErrorCode.WRN_UnassignedInternalField, "Finalize").WithArguments("A.Finalize", "").WithLocation(5, 28));
         }
 
         [WorkItem(543791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543791")]

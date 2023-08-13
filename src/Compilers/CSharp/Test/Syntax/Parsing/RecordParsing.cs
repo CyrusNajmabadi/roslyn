@@ -3793,13 +3793,20 @@ class C(int X, int Y)
                 // (1,14): error CS1001: Identifier expected
                 // const record struct S;
                 Diagnostic(ErrorCode.ERR_IdentifierExpected, "struct").WithLocation(1, 14),
-                // (1,14): error CS0145: A const field requires a value to be provided
-                // const record struct S;
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, "struct").WithLocation(1, 14),
                 // (1,14): error CS1002: ; expected
                 // const record struct S;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "struct").WithLocation(1, 14)
-                );
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "struct").WithLocation(1, 14));
+
+            CreateCompilation(text, parseOptions: TestOptions.RegularPreview).VerifyDiagnostics(
+                // (1,7): error CS0246: The type or namespace name 'record' could not be found (are you missing a using directive or an assembly reference?)
+                // const record struct S;
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "record").WithArguments("record").WithLocation(1, 7),
+                // (1,14): error CS1001: Identifier expected
+                // const record struct S;
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, "struct").WithLocation(1, 14),
+                // (1,14): error CS1002: ; expected
+                // const record struct S;
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "struct").WithLocation(1, 14));
 
             N(SyntaxKind.CompilationUnit);
             {

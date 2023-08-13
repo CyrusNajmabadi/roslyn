@@ -1961,11 +1961,18 @@ e
                 Diagnostic(ErrorCode.ERR_TypeExpected, ";").WithLocation(1, 12),
                 // (1,12): error CS1001: Identifier expected
                 // using const;
-                Diagnostic(ErrorCode.ERR_IdentifierExpected, ";").WithLocation(1, 12),
-                // (1,12): error CS0145: A const field requires a value to be provided
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, ";").WithLocation(1, 12));
+
+            CreateCompilation(test).VerifyDiagnostics(
+                // (1,12): error CS1031: Type expected
                 // using const;
-                Diagnostic(ErrorCode.ERR_ConstValueRequired, ";").WithLocation(1, 12)
-                );
+                Diagnostic(ErrorCode.ERR_TypeExpected, ";").WithLocation(1, 12),
+                // (1,12): error CS1001: Identifier expected
+                // using const;
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, ";").WithLocation(1, 12),
+                // (1,12): error CS0210: You must provide an initializer in a fixed or using statement declaration
+                // using const;
+                Diagnostic(ErrorCode.ERR_FixedMustInit, "").WithLocation(1, 12));
 
             N(SyntaxKind.CompilationUnit);
             {

@@ -349,6 +349,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 this.ReportModifiersDiagnostics(diagnostics);
             }
 
+            if (!_hasInitializer && modifiers.HasFlag(DeclarationModifiers.Const))
+            {
+                diagnostics.Add(ErrorCode.ERR_ConstValueRequired, declarator.Identifier);
+            }
+
             if (containingType.IsInterface)
             {
                 if (this.IsStatic)
