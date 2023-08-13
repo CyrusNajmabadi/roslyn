@@ -15343,5 +15343,62 @@ catch (scoped ref readonly T a) {}
             }
             EOF();
         }
+
+        [Fact]
+        public void TestConstRef1()
+        {
+            string source =
+@"
+class C
+{
+    void M()
+    {
+        const int i = 0;
+        const int j = ref i;
+    }
+}
+";
+            UsingTree(source);
+
+            EOF();
+        }
+
+        [Fact]
+        public void TestConstRef2()
+        {
+            string source =
+@"
+class C
+{
+    void M()
+    {
+        const int i = 0;
+        const ref int j = i;
+    }
+}
+";
+            UsingTree(source);
+
+            EOF();
+        }
+
+        [Fact]
+        public void TestConstRef3()
+        {
+            string source =
+@"
+class C
+{
+    void M()
+    {
+        const int i = 0;
+        const ref int j = ref i;
+    }
+}
+";
+            UsingTree(source);
+
+            EOF();
+        }
     }
 }

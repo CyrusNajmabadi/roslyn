@@ -469,6 +469,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         internal override ConstantValue GetConstantValue(SyntaxNode node, LocalSymbol inProgress, BindingDiagnosticBag diagnostics)
         {
+            if (_declarationKind == LocalDeclarationKind.Constant)
+            {
+                diagnostics.Add(ErrorCode.ERR_ConstValueRequired, this.IdentifierToken);
+            }
+
             return null;
         }
 
