@@ -12,6 +12,7 @@ using Roslyn.Utilities;
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
+    using static Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax.SyntaxParser;
 
     // TODO: The Xml parser recognizes most commonplace XML, according to the XML spec.
     // It does not recognize the following:
@@ -32,20 +33,58 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
     // trying to understand them, e.g. like comments or CDATA, so that they are available
     // to whoever processes these comments and do not produce an error. 
 
-    internal class DocumentationCommentParser : SyntaxParser
+    internal struct DocumentationCommentParser
     {
         private readonly SyntaxListPool _pool = new SyntaxListPool();
         private bool _isDelimited;
 
+        private SyntaxParser _parser;
+
         internal DocumentationCommentParser(Lexer lexer, LexerMode modeflags)
-            : base(lexer, LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags, null, null, true)
         {
+            _parser = new SyntaxParser(lexer, LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags, oldTree: null, changes: null, allowModeReset: true);
             _isDelimited = (modeflags & LexerMode.XmlDocCommentStyleDelimited) != 0;
         }
 
+        private Lexer lexer => _parser.lexer;
+        private CSharpParseOptions Options => _parser.Options;
+
+        private LexerMode Mode
+        {
+            get => _parser.Mode;
+            set => _parser.Mode = value;
+        }
+
+        private SyntaxToken CurrentToken => _parser.CurrentToken;
+        private SyntaxToken EatContextualToken(SyntaxKind kind, bool reportError = true) => _parser.EatContextualToken(kind, reportError);
+        private SyntaxToken EatToken() => _parser.EatToken();
+        private SyntaxToken EatToken(SyntaxKind kind) => _parser.EatToken(kind);
+        private SyntaxToken EatToken(SyntaxKind kind, ErrorCode code, bool reportError = true) => _parser.EatToken(kind, code, reportError);
+        private SyntaxToken EatToken(SyntaxKind kind, bool reportError) => _parser.EatToken(kind, reportError);
+        private SyntaxToken TryEatToken(SyntaxKind kind) => _parser.TryEatToken(kind);
+
+        private TNode AddError<TNode>(TNode node, ErrorCode code) where TNode : GreenNode => _parser.AddError(node, code);
+        private TNode AddError<TNode>(TNode node, int offset, int length, ErrorCode code, params object[] args) where TNode : CSharpSyntaxNode => _parser.AddError(node, offset, length, code, args);
+        private TNode AddError<TNode>(TNode node, ErrorCode code, params object[] args) where TNode : GreenNode => _parser.AddError(node, code, args);
+        private TNode AddErrorAsWarning<TNode>(TNode node, ErrorCode code, params object[] args) where TNode : GreenNode => _parser.AddErrorAsWarning(node, code, args);
+
+        private void GetDiagnosticSpanForMissingToken(out int offset, out int width) => _parser.GetDiagnosticSpanForMissingToken(out offset, out width);
+
+        private TNode CheckFeatureAvailability<TNode>(TNode node, MessageID feature, bool forceWarning = false) where TNode : GreenNode => _parser.CheckFeatureAvailability(node, feature, forceWarning);
+
+        private void AddTrailingSkippedSyntax(SyntaxListBuilder list, GreenNode skippedSyntax) => _parser.AddTrailingSkippedSyntax(list, skippedSyntax);
+        private void AddTrailingSkippedSyntax<TNode>(SyntaxListBuilder<TNode> list, GreenNode skippedSyntax) where TNode : CSharpSyntaxNode => _parser.AddTrailingSkippedSyntax(list, skippedSyntax);
+        private TNode AddTrailingSkippedSyntax<TNode>(TNode node, GreenNode skippedSyntax) where TNode : CSharpSyntaxNode => _parser.AddTrailingSkippedSyntax(node, skippedSyntax);
+
+        private ResetPoint GetResetPoint() => _parser.GetResetPoint();
+        private void Reset(ref ResetPoint point) => _parser.Reset(ref point);
+        private void Release(ref ResetPoint point) => _parser.Release(ref point);
+
+        private SyntaxToken PeekToken(int n) => _parser.PeekToken(n);
+
         internal void ReInitialize(LexerMode modeflags)
         {
-            base.ReInitialize();
+            _parser.ReInitialize();
             this.Mode = LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags;
             _isDelimited = (modeflags & LexerMode.XmlDocCommentStyleDelimited) != 0;
         }
@@ -793,7 +832,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             // NOTE: There are no errors in crefs - only warnings.  We accomplish this by wrapping every diagnostic in ErrorCode.WRN_ErrorOverride.
             if (InCref)
             {
-                SyntaxDiagnosticInfo rawInfo = base.GetExpectedTokenError(expected, actual, offset, length);
+                SyntaxDiagnosticInfo rawInfo = _parser.GetExpectedTokenError(expected, actual, offset, length);
                 SyntaxDiagnosticInfo crefInfo = new SyntaxDiagnosticInfo(rawInfo.Offset, rawInfo.Width, ErrorCode.WRN_ErrorOverride, rawInfo, rawInfo.Code);
                 return crefInfo;
             }
@@ -814,7 +853,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             if (InCref)
             {
                 int offset, width;
-                this.GetDiagnosticSpanForMissingToken(out offset, out width);
+                GetDiagnosticSpanForMissingToken(out offset, out width);
 
                 return GetExpectedTokenError(expected, actual, offset, width);
             }
@@ -1110,7 +1149,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
         private SyntaxToken TryEatCheckedKeyword(bool isConversion, ref SyntaxToken operatorKeyword)
         {
-            SyntaxToken checkedKeyword = tryEatCheckedOrHandleUnchecked(ref operatorKeyword);
+            SyntaxToken checkedKeyword = tryEatCheckedOrHandleUnchecked(this, ref operatorKeyword);
 
             if (checkedKeyword is not null &&
                 (isConversion || SyntaxFacts.IsAnyOverloadableOperator(CurrentToken.Kind)))
@@ -1120,17 +1159,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
             return checkedKeyword;
 
-            SyntaxToken tryEatCheckedOrHandleUnchecked(ref SyntaxToken operatorKeyword)
+            SyntaxToken tryEatCheckedOrHandleUnchecked(DocumentationCommentParser @this, ref SyntaxToken operatorKeyword)
             {
-                if (CurrentToken.Kind == SyntaxKind.UncheckedKeyword)
+                if (@this.CurrentToken.Kind == SyntaxKind.UncheckedKeyword)
                 {
                     // if we encounter `operator unchecked`, we place the `unchecked` as skipped trivia on `operator`
-                    var misplacedToken = AddErrorAsWarning(EatToken(), ErrorCode.ERR_MisplacedUnchecked);
-                    operatorKeyword = AddTrailingSkippedSyntax(operatorKeyword, misplacedToken);
+                    var misplacedToken = @this.AddErrorAsWarning(@this.EatToken(), ErrorCode.ERR_MisplacedUnchecked);
+                    operatorKeyword = @this.AddTrailingSkippedSyntax(operatorKeyword, misplacedToken);
                     return null;
                 }
 
-                return TryEatToken(SyntaxKind.CheckedKeyword);
+                return @this.TryEatToken(SyntaxKind.CheckedKeyword);
             }
         }
 

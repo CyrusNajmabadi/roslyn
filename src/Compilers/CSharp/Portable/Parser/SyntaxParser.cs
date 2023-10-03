@@ -16,12 +16,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
 
-    internal ref partial struct SyntaxParser
+    internal partial struct SyntaxParser
     {
         public readonly Lexer lexer;
         private readonly bool _isIncremental;
         private readonly bool _allowModeReset;
         public readonly CancellationToken cancellationToken;
+
+        private readonly Func<SyntaxKind, SyntaxKind, SyntaxDiagnosticInfo> _getExpectedTokenError;
+        private readonly Func<SyntaxKind, SyntaxKind, int, int, SyntaxDiagnosticInfo> _getExpectedTokenErrorFull;
 
         private LexerMode _mode;
         private Blender _firstBlender;
@@ -55,6 +58,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             IEnumerable<TextChangeRange> changes,
             bool allowModeReset,
             bool preLexIfNotIncremental = false,
+            Func<SyntaxKind, SyntaxKind, SyntaxDiagnosticInfo> getExpectedTokenError = null,
+            Func<SyntaxKind, SyntaxKind, int, int, SyntaxDiagnosticInfo> getExpectedTokenErrorFull = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             this.lexer = lexer;
@@ -63,6 +68,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             this.cancellationToken = cancellationToken;
             _currentNode = default(BlendedNode);
             _isIncremental = oldTree != null;
+            _getExpectedTokenError = getExpectedTokenError;
+            _getExpectedTokenErrorFull = getExpectedTokenErrorFull;
 
             if (this.IsIncremental || allowModeReset)
             {
@@ -654,8 +661,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             }
         }
 
-        public virtual SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual, int offset, int width)
+        public SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual, int offset, int width)
         {
+            if (_getExpectedTokenErrorFull != null)
+                return _getExpectedTokenErrorFull(expected, actual, offset, width);
+
             var code = GetExpectedTokenErrorCode(expected, actual);
             if (code == ErrorCode.ERR_SyntaxError)
             {
@@ -671,8 +681,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             }
         }
 
-        public virtual SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual)
+        public SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual)
         {
+            if (_getExpectedTokenError != null)
+                return _getExpectedTokenError(expected, actual);
+
             int offset, width;
             this.GetDiagnosticSpanForMissingToken(out offset, out width);
 
