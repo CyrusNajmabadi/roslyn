@@ -33,24 +33,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
     // trying to understand them, e.g. like comments or CDATA, so that they are available
     // to whoever processes these comments and do not produce an error. 
 
-    internal struct DocumentationCommentParser
+    internal partial struct DocumentationCommentParser
     {
-        private readonly SyntaxListPool _pool = new SyntaxListPool();
-        private bool _isDelimited;
-
-        private SyntaxParser _parser;
-
-        internal DocumentationCommentParser(Lexer lexer, LexerMode modeflags)
-        {
-            _parser = new SyntaxParser(
-                lexer, LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags, oldTree: null, changes: null, allowModeReset: true,
-                // Don't attach any diagnostics to syntax nodes within a documentation comment if the DocumentationMode
-                // is not at least Diagnose.
-                includeAdditionalDiagnostics: lexer.Options.DocumentationMode >= DocumentationMode.Diagnose,
-                getExpectedTokenError: GetExpectedTokenError, getExpectedTokenErrorFull: GetExpectedTokenError);
-            _isDelimited = (modeflags & LexerMode.XmlDocCommentStyleDelimited) != 0;
-        }
-
         private Lexer lexer => _parser.lexer;
         private CSharpParseOptions Options => _parser.Options;
 
@@ -87,6 +71,25 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         private void Release(ref ResetPoint point) => _parser.Release(ref point);
 
         private SyntaxToken PeekToken(int n) => _parser.PeekToken(n);
+    }
+
+    internal partial struct DocumentationCommentParser
+    {
+        private readonly SyntaxListPool _pool = new SyntaxListPool();
+        private bool _isDelimited;
+
+        private SyntaxParser _parser;
+
+        internal DocumentationCommentParser(Lexer lexer, LexerMode modeflags)
+        {
+            _parser = new SyntaxParser(
+                lexer, LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags, oldTree: null, changes: null, allowModeReset: true,
+                // Don't attach any diagnostics to syntax nodes within a documentation comment if the DocumentationMode
+                // is not at least Diagnose.
+                includeAdditionalDiagnostics: lexer.Options.DocumentationMode >= DocumentationMode.Diagnose,
+                getExpectedTokenError: GetExpectedTokenError, getExpectedTokenErrorFull: GetExpectedTokenError);
+            _isDelimited = (modeflags & LexerMode.XmlDocCommentStyleDelimited) != 0;
+        }
 
         internal void ReInitialize(LexerMode modeflags)
         {

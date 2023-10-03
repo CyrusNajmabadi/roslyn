@@ -13,21 +13,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
     using Microsoft.CodeAnalysis.PooledObjects;
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
 
-    internal ref struct DirectiveParser
+    internal ref partial struct DirectiveParser
     {
-        private const int MAX_DIRECTIVE_IDENTIFIER_WIDTH = 128;
-
-        private readonly DirectiveStack _context;
-        private SyntaxParser _parser;
-
-        internal DirectiveParser(Lexer lexer, DirectiveStack context)
-        {
-            _context = context;
-            _parser = new SyntaxParser(lexer, LexerMode.Directive, oldTree: null, changes: null, allowModeReset: false);
-        }
-
-        public void Dipose() => _parser.Dispose();
-
         private Lexer lexer => _parser.lexer;
         private CSharpParseOptions Options => _parser.Options;
 
@@ -42,6 +29,22 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         private TNode AddError<TNode>(TNode node, int offset, int length, ErrorCode code, params object[] args) where TNode : CSharpSyntaxNode => _parser.AddError(node, offset, length, code, args);
 
         private TNode CheckFeatureAvailability<TNode>(TNode node, MessageID feature, bool forceWarning = false) where TNode : GreenNode => _parser.CheckFeatureAvailability(node, feature, forceWarning);
+    }
+
+    internal ref partial struct DirectiveParser
+    {
+        private const int MAX_DIRECTIVE_IDENTIFIER_WIDTH = 128;
+
+        private readonly DirectiveStack _context;
+        private SyntaxParser _parser;
+
+        internal DirectiveParser(Lexer lexer, DirectiveStack context)
+        {
+            _context = context;
+            _parser = new SyntaxParser(lexer, LexerMode.Directive, oldTree: null, changes: null, allowModeReset: false);
+        }
+
+        public void Dipose() => _parser.Dispose();
 
         public CSharpSyntaxNode ParseDirective(
             bool isActive,

@@ -9,8 +9,9 @@ using Roslyn.Utilities;
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
+    using static SyntaxParser;
 
-    internal ref partial struct LanguageParser
+    internal partial class LanguageParser
     {
         /// <summary>
         /// Parses the type, or pattern, right-hand operand of an is expression.

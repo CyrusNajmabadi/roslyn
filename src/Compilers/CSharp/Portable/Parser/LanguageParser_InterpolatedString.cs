@@ -13,7 +13,9 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
-    internal ref partial struct LanguageParser
+    using static SyntaxParser;
+
+    internal partial class LanguageParser
     {
         private ExpressionSyntax ParseInterpolatedStringToken()
         {

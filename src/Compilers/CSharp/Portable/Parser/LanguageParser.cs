@@ -16,8 +16,62 @@ using Roslyn.Utilities;
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
+    using static SyntaxParser;
 
-    internal ref partial struct LanguageParser
+    internal partial class LanguageParser
+    {
+        private Lexer lexer => _parser.lexer;
+        private CancellationToken cancellationToken => _parser.cancellationToken;
+        private CSharpParseOptions Options => _parser.Options;
+        private bool IsIncremental => _parser.IsIncremental;
+        private bool IsScript => _parser.IsScript;
+
+        private LexerMode Mode
+        {
+            get => _parser.Mode;
+            set => _parser.Mode = value;
+        }
+
+        private bool IsFeatureEnabled(MessageID feature) => _parser.IsFeatureEnabled(feature);
+
+        private SyntaxToken CurrentToken => _parser.CurrentToken;
+        private SyntaxToken EatContextualToken(SyntaxKind kind, bool reportError = true) => _parser.EatContextualToken(kind, reportError);
+        private SyntaxToken EatToken() => _parser.EatToken();
+        private SyntaxToken EatToken(SyntaxKind kind) => _parser.EatToken(kind);
+        private SyntaxToken EatToken(SyntaxKind kind, ErrorCode code, bool reportError = true) => _parser.EatToken(kind, code, reportError);
+        private SyntaxToken EatToken(SyntaxKind kind, bool reportError) => _parser.EatToken(kind, reportError);
+        private SyntaxToken TryEatToken(SyntaxKind kind) => _parser.TryEatToken(kind);
+        private SyntaxToken EatTokenAsKind(SyntaxKind expected) => _parser.EatTokenAsKind(expected);
+        private SyntaxToken EatTokenWithPrejudice(SyntaxKind kind) => _parser.EatTokenWithPrejudice(kind);
+
+        private SyntaxKind CurrentNodeKind => _parser.CurrentNodeKind;
+        private GreenNode EatNode() => _parser.EatNode();
+        private CSharp.CSharpSyntaxNode CurrentNode => _parser.CurrentNode;
+
+        private TNode AddError<TNode>(TNode node, ErrorCode code) where TNode : GreenNode => _parser.AddError(node, code);
+        private TNode AddError<TNode>(TNode node, int offset, int length, ErrorCode code, params object[] args) where TNode : CSharpSyntaxNode => _parser.AddError(node, offset, length, code, args);
+        private TNode AddError<TNode>(TNode node, ErrorCode code, params object[] args) where TNode : GreenNode => _parser.AddError(node, code, args);
+        private TNode AddError<TNode>(TNode node, CSharpSyntaxNode location, ErrorCode code, params object[] args) where TNode : CSharpSyntaxNode => _parser.AddError(node, location, code, args);
+        private TNode AddErrorAsWarning<TNode>(TNode node, ErrorCode code, params object[] args) where TNode : GreenNode => _parser.AddErrorAsWarning(node, code, args);
+
+        private TNode WithAdditionalDiagnostics<TNode>(TNode node, params DiagnosticInfo[] diagnostics) where TNode : GreenNode => _parser.WithAdditionalDiagnostics(node, diagnostics);
+        private void GetDiagnosticSpanForMissingToken(out int offset, out int width) => _parser.GetDiagnosticSpanForMissingToken(out offset, out width);
+        private SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual) => _parser.GetExpectedTokenError(expected, actual);
+
+        private TNode CheckFeatureAvailability<TNode>(TNode node, MessageID feature, bool forceWarning = false) where TNode : GreenNode => _parser.CheckFeatureAvailability(node, feature, forceWarning);
+
+        private TNode AddLeadingSkippedSyntax<TNode>(TNode node, GreenNode skippedSyntax) where TNode : CSharpSyntaxNode => _parser.AddLeadingSkippedSyntax(node, skippedSyntax);
+
+        private void AddTrailingSkippedSyntax(SyntaxListBuilder list, GreenNode skippedSyntax) => _parser.AddTrailingSkippedSyntax(list, skippedSyntax);
+        private void AddTrailingSkippedSyntax<TNode>(SyntaxListBuilder<TNode> list, GreenNode skippedSyntax) where TNode : CSharpSyntaxNode => _parser.AddTrailingSkippedSyntax(list, skippedSyntax);
+        private TNode AddTrailingSkippedSyntax<TNode>(TNode node, GreenNode skippedSyntax) where TNode : CSharpSyntaxNode => _parser.AddTrailingSkippedSyntax(node, skippedSyntax);
+
+        private SyntaxToken PeekToken(int n) => _parser.PeekToken(n);
+
+        private bool IsMakingProgress(ref int lastTokenPosition, bool assertIfFalse = true) => _parser.IsMakingProgress(ref lastTokenPosition, assertIfFalse);
+    }
+
+    internal partial class LanguageParser : IDisposable
     {
         // list pools - allocators for lists that are used to build sequences of nodes. The lists
         // can be reused (hence pooled) since the syntax factory methods don't keep references to
@@ -41,12 +95,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             IEnumerable<TextChangeRange>? changes,
             LexerMode lexerMode = LexerMode.Syntax,
             CancellationToken cancellationToken = default(CancellationToken))
-            : base(lexer, lexerMode, oldTree, changes, allowModeReset: false,
-                preLexIfNotIncremental: true, cancellationToken: cancellationToken)
         {
+            _parser = new SyntaxParser(lexer, lexerMode, oldTree, changes, allowModeReset: false,
+                preLexIfNotIncremental: true, cancellationToken: cancellationToken);
             _syntaxFactoryContext = new SyntaxFactoryContext();
             _syntaxFactory = new ContextAwareSyntax(_syntaxFactoryContext);
         }
+
+        public void Dispose()
+            => _parser.Dispose();
 
         private static bool IsSomeWord(SyntaxKind kind)
         {
