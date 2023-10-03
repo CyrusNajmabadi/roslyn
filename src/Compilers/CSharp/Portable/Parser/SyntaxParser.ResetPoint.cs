@@ -6,9 +6,9 @@
 
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
-    internal partial class SyntaxParser
+    internal ref partial struct SyntaxParser
     {
-        protected readonly struct ResetPoint
+        public readonly struct ResetPoint
         {
             internal readonly int ResetCount;
             internal readonly LexerMode Mode;
