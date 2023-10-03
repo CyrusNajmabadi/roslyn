@@ -10,7 +10,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
 
-    internal partial class LanguageParser : SyntaxParser
+    internal ref partial struct LanguageParser
     {
         /// <summary>
         /// Parses the type, or pattern, right-hand operand of an is expression.

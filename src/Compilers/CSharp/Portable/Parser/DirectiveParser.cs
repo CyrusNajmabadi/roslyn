@@ -13,17 +13,35 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
     using Microsoft.CodeAnalysis.PooledObjects;
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
 
-    internal class DirectiveParser : SyntaxParser
+    internal ref struct DirectiveParser
     {
         private const int MAX_DIRECTIVE_IDENTIFIER_WIDTH = 128;
 
         private readonly DirectiveStack _context;
+        private SyntaxParser _parser;
 
         internal DirectiveParser(Lexer lexer, DirectiveStack context)
-            : base(lexer, LexerMode.Directive, null, null, false)
         {
             _context = context;
+            _parser = new SyntaxParser(lexer, LexerMode.Directive, oldTree: null, changes: null, allowModeReset: false);
         }
+
+        public void Dipose() => _parser.Dispose();
+
+        private Lexer lexer => _parser.lexer;
+        private CSharpParseOptions Options => _parser.Options;
+
+        private SyntaxToken CurrentToken => _parser.CurrentToken;
+        private SyntaxToken EatContextualToken(SyntaxKind kind, bool reportError = true) => _parser.EatContextualToken(kind, reportError);
+        private SyntaxToken EatToken() => _parser.EatToken();
+        private SyntaxToken EatToken(SyntaxKind kind) => _parser.EatToken(kind);
+        private SyntaxToken EatToken(SyntaxKind kind, ErrorCode code, bool reportError = true) => _parser.EatToken(kind, code, reportError);
+        private SyntaxToken EatToken(SyntaxKind kind, bool reportError) => _parser.EatToken(kind, reportError);
+
+        private TNode AddError<TNode>(TNode node, ErrorCode code) where TNode : GreenNode => _parser.AddError(node, code);
+        private TNode AddError<TNode>(TNode node, int offset, int length, ErrorCode code, params object[] args) where TNode : CSharpSyntaxNode => _parser.AddError(node, offset, length, code, args);
+
+        private TNode CheckFeatureAvailability<TNode>(TNode node, MessageID feature, bool forceWarning = false) where TNode : GreenNode => _parser.CheckFeatureAvailability(node, feature, forceWarning);
 
         public CSharpSyntaxNode ParseDirective(
             bool isActive,
