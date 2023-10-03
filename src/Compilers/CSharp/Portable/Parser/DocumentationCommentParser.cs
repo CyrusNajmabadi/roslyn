@@ -42,7 +42,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
         internal DocumentationCommentParser(Lexer lexer, LexerMode modeflags)
         {
-            _parser = new SyntaxParser(lexer, LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags, oldTree: null, changes: null, allowModeReset: true);
+            _parser = new SyntaxParser(
+                lexer, LexerMode.XmlDocComment | LexerMode.XmlDocCommentLocationStart | modeflags, oldTree: null, changes: null, allowModeReset: true,
+                // Don't attach any diagnostics to syntax nodes within a documentation comment if the DocumentationMode
+                // is not at least Diagnose.
+                includeAdditionalDiagnostics: lexer.Options.DocumentationMode >= DocumentationMode.Diagnose,
+                getExpectedTokenError: GetExpectedTokenError, getExpectedTokenErrorFull: GetExpectedTokenError);
             _isDelimited = (modeflags & LexerMode.XmlDocCommentStyleDelimited) != 0;
         }
 
@@ -68,6 +73,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         private TNode AddError<TNode>(TNode node, ErrorCode code, params object[] args) where TNode : GreenNode => _parser.AddError(node, code, args);
         private TNode AddErrorAsWarning<TNode>(TNode node, ErrorCode code, params object[] args) where TNode : GreenNode => _parser.AddErrorAsWarning(node, code, args);
 
+        private TNode WithAdditionalDiagnostics<TNode>(TNode node, params DiagnosticInfo[] diagnostics) where TNode : GreenNode => _parser.WithAdditionalDiagnostics(node, diagnostics);
         private void GetDiagnosticSpanForMissingToken(out int offset, out int width) => _parser.GetDiagnosticSpanForMissingToken(out offset, out width);
 
         private TNode CheckFeatureAvailability<TNode>(TNode node, MessageID feature, bool forceWarning = false) where TNode : GreenNode => _parser.CheckFeatureAvailability(node, feature, forceWarning);
@@ -827,12 +833,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             return SyntaxFactory.XmlProcessingInstruction(startProcessingInstructionToken, name, textTokens, endProcessingInstructionToken);
         }
 
-        protected override SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual, int offset, int length)
+        private SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual, int offset, int length)
         {
             // NOTE: There are no errors in crefs - only warnings.  We accomplish this by wrapping every diagnostic in ErrorCode.WRN_ErrorOverride.
             if (InCref)
             {
-                SyntaxDiagnosticInfo rawInfo = _parser.GetExpectedTokenError(expected, actual, offset, length);
+                SyntaxDiagnosticInfo rawInfo = GetExpectedTokenErrorWorker(expected, actual, offset, length);
                 SyntaxDiagnosticInfo crefInfo = new SyntaxDiagnosticInfo(rawInfo.Offset, rawInfo.Width, ErrorCode.WRN_ErrorOverride, rawInfo, rawInfo.Code);
                 return crefInfo;
             }
@@ -847,7 +853,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             }
         }
 
-        protected override SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual)
+        private SyntaxDiagnosticInfo GetExpectedTokenError(SyntaxKind expected, SyntaxKind actual)
         {
             // NOTE: There are no errors in crefs - only warnings.  We accomplish this by wrapping every diagnostic in ErrorCode.WRN_ErrorOverride.
             if (InCref)
@@ -881,15 +887,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         private SyntaxToken WithXmlParseError(SyntaxToken node, XmlParseErrorCode code, params string[] args)
         {
             return WithAdditionalDiagnostics(node, new XmlSyntaxDiagnosticInfo(0, node.Width, code, args));
-        }
-
-        protected override TNode WithAdditionalDiagnostics<TNode>(TNode node, params DiagnosticInfo[] diagnostics)
-        {
-            // Don't attach any diagnostics to syntax nodes within a documentation comment if the DocumentationMode
-            // is not at least Diagnose.
-            return Options.DocumentationMode >= DocumentationMode.Diagnose
-                ? base.WithAdditionalDiagnostics<TNode>(node, diagnostics)
-                : node;
         }
 
         #region Cref

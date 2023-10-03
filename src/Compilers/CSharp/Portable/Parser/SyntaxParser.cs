@@ -23,6 +23,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         private readonly bool _allowModeReset;
         public readonly CancellationToken cancellationToken;
 
+        private readonly bool _includeAdditionalDiagnostics;
         private readonly Func<SyntaxKind, SyntaxKind, SyntaxDiagnosticInfo> _getExpectedTokenError;
         private readonly Func<SyntaxKind, SyntaxKind, int, int, SyntaxDiagnosticInfo> _getExpectedTokenErrorFull;
 
@@ -58,6 +59,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             IEnumerable<TextChangeRange> changes,
             bool allowModeReset,
             bool preLexIfNotIncremental = false,
+            bool includeAdditionalDiagnostics = true,
             Func<SyntaxKind, SyntaxKind, SyntaxDiagnosticInfo> getExpectedTokenError = null,
             Func<SyntaxKind, SyntaxKind, int, int, SyntaxDiagnosticInfo> getExpectedTokenErrorFull = null,
             CancellationToken cancellationToken = default(CancellationToken))
@@ -70,6 +72,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             _isIncremental = oldTree != null;
             _getExpectedTokenError = getExpectedTokenError;
             _getExpectedTokenErrorFull = getExpectedTokenErrorFull;
+            _includeAdditionalDiagnostics = includeAdditionalDiagnostics;
 
             if (this.IsIncremental || allowModeReset)
             {
@@ -666,6 +669,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             if (_getExpectedTokenErrorFull != null)
                 return _getExpectedTokenErrorFull(expected, actual, offset, width);
 
+            return GetExpectedTokenErrorWorker(expected, actual, offset, width);
+        }
+
+        public static SyntaxDiagnosticInfo GetExpectedTokenErrorWorker(SyntaxKind expected, SyntaxKind actual, int offset, int width)
+        {
             var code = GetExpectedTokenErrorCode(expected, actual);
             if (code == ErrorCode.ERR_SyntaxError)
             {
@@ -751,8 +759,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             width = ct.Width;
         }
 
-        protected virtual TNode WithAdditionalDiagnostics<TNode>(TNode node, params DiagnosticInfo[] diagnostics) where TNode : GreenNode
+        public TNode WithAdditionalDiagnostics<TNode>(TNode node, params DiagnosticInfo[] diagnostics) where TNode : GreenNode
         {
+            if (!_includeAdditionalDiagnostics)
+                return node;
+
             DiagnosticInfo[] existingDiags = node.GetDiagnostics();
             int existingLength = existingDiags.Length;
             if (existingLength == 0)
