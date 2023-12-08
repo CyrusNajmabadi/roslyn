@@ -6,11 +6,9 @@
 
 using System;
 using System.Diagnostics;
-using System.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
-    using Microsoft.CodeAnalysis.PooledObjects;
     using Microsoft.CodeAnalysis.Syntax.InternalSyntax;
 
     internal ref partial struct DirectiveParser
