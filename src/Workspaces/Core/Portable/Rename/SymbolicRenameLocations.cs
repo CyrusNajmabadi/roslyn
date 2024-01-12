@@ -3,19 +3,15 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CodeCleanup;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.PooledObjects;
-using Microsoft.CodeAnalysis.Remote;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Rename
@@ -70,8 +66,8 @@ namespace Microsoft.CodeAnalysis.Rename
                 locations.Symbol,
                 locations.Solution,
                 locations.Options,
-                Filter(locations.Locations),
-                Filter(locations.ImplicitLocations),
+                FilterLocations(locations.Locations, static loc => (loc.DocumentId, loc.Location)),
+                FilterLocations(locations.ImplicitLocations, static loc => (loc.Document.Id, loc.Location)),
                 locations.ReferencedSymbols);
 
             ImmutableArray<TLocation> FilterLocations<TLocation>(
@@ -88,42 +84,6 @@ namespace Microsoft.CodeAnalysis.Rename
                         continue;
 
                     if (options.IgnoreSpans != default && !Intersects(documentId, docLocation, options.IncludeSpans))
-                        continue;
-
-                    result.Add(location);
-                }
-
-                return result.ToImmutableAndClear();
-            }
-
-            ImmutableArray<RenameLocation> FilterLocations(ImmutableArray<RenameLocation> locations)
-            {
-                using var _ = ArrayBuilder<RenameLocation>.GetInstance(locations.Length, out var result);
-
-                foreach (var location in locations)
-                {
-                    if (options.IgnoreSpans != default && Intersects(location.DocumentId, location.Location, options.IgnoreSpans))
-                        continue;
-
-                    if (options.IgnoreSpans != default && !Intersects(location.DocumentId, location.Location, options.IncludeSpans))
-                        continue;
-
-                    result.Add(location);
-                }
-
-                return result.ToImmutableAndClear();
-            }
-
-            ImmutableArray<RenameLocation> FilterReferenceLocations(ImmutableArray<ReferenceLocation> locations)
-            {
-                using var _ = ArrayBuilder<RenameLocation>.GetInstance(locations.Length, out var result);
-
-                foreach (var location in locations)
-                {
-                    if (options.IgnoreSpans != default && Intersects(location.Document.Id, location.Location, options.IgnoreSpans))
-                        continue;
-
-                    if (options.IgnoreSpans != default && !Intersects(location.Document.Id, location.Location, options.IncludeSpans))
                         continue;
 
                     result.Add(location);
