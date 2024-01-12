@@ -173,6 +173,7 @@ namespace Microsoft.CodeAnalysis.Rename
                     var client = await RemoteHostClient.TryGetClientAsync(solution.Services, cancellationToken).ConfigureAwait(false);
                     if (client != null)
                     {
+                        var serializedOptions = SerializableSymbolRenameOptions.Dehydrate(options);
                         var result = await client.TryInvokeAsync<IRemoteRenamerService, SerializableConflictResolution?>(
                             solution,
                             (service, solutionInfo, callbackId, cancellationToken) => service.RenameSymbolAsync(
@@ -180,7 +181,7 @@ namespace Microsoft.CodeAnalysis.Rename
                                 callbackId,
                                 serializedSymbol,
                                 newName,
-                                options,
+                                serializedOptions,
                                 nonConflictSymbolKeys,
                                 cancellationToken),
                             callbackTarget: new RemoteOptionsProvider<CodeCleanupOptions>(solution.Services, fallbackOptions),

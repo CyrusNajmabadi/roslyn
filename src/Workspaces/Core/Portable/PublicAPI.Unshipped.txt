@@ -9,6 +9,15 @@ Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority.Default = 3 -> Micr
 Microsoft.CodeAnalysis.CodeAnalysisProgress
 Microsoft.CodeAnalysis.CodeAnalysisProgress.CodeAnalysisProgress() -> void
 Microsoft.CodeAnalysis.CodeFixes.FixAllContext.Progress.get -> System.IProgress<Microsoft.CodeAnalysis.CodeAnalysisProgress>
+Microsoft.CodeAnalysis.DocumentSpan
+Microsoft.CodeAnalysis.DocumentSpan.Deconstruct(out Microsoft.CodeAnalysis.Document Document, out Microsoft.CodeAnalysis.Text.TextSpan SourceSpan) -> void
+Microsoft.CodeAnalysis.DocumentSpan.Document.get -> Microsoft.CodeAnalysis.Document
+Microsoft.CodeAnalysis.DocumentSpan.Document.init -> void
+Microsoft.CodeAnalysis.DocumentSpan.DocumentSpan() -> void
+Microsoft.CodeAnalysis.DocumentSpan.DocumentSpan(Microsoft.CodeAnalysis.Document Document, Microsoft.CodeAnalysis.Text.TextSpan SourceSpan) -> void
+Microsoft.CodeAnalysis.DocumentSpan.Equals(Microsoft.CodeAnalysis.DocumentSpan other) -> bool
+Microsoft.CodeAnalysis.DocumentSpan.SourceSpan.get -> Microsoft.CodeAnalysis.Text.TextSpan
+Microsoft.CodeAnalysis.DocumentSpan.SourceSpan.init -> void
 Microsoft.CodeAnalysis.Editing.SyntaxGenerator.SetAccessorDeclaration(Microsoft.CodeAnalysis.Accessibility accessibility = Microsoft.CodeAnalysis.Accessibility.NotApplicable, System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.SyntaxNode> statements = null) -> Microsoft.CodeAnalysis.SyntaxNode
 Microsoft.CodeAnalysis.Editing.SyntaxGenerator.WithTypeConstraint(Microsoft.CodeAnalysis.SyntaxNode declaration, string typeParameterName, Microsoft.CodeAnalysis.Editing.SpecialTypeConstraintKind kinds, System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.SyntaxNode> types = null) -> Microsoft.CodeAnalysis.SyntaxNode
 Microsoft.CodeAnalysis.CodeActions.CodeAction.Priority.get -> Microsoft.CodeAnalysis.CodeActions.CodeActionPriority
@@ -23,6 +32,20 @@ Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority.Low = 2 -> Microsof
 Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority.Lowest = 1 -> Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority
 Microsoft.CodeAnalysis.CodeFixes.CodeFixProvider.RequestPriority.get -> Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority
 Microsoft.CodeAnalysis.CodeRefactorings.CodeRefactoringProvider.RequestPriority.get -> Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.Deconstruct(out bool RenameOverloads, out bool RenameInStrings, out bool RenameInComments, out bool RenameFile, out System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan> IncludeSpans, out System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan> IgnoreSpans) -> void
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.Equals(Microsoft.CodeAnalysis.Rename.SymbolRenameOptions other) -> bool
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.IgnoreSpans.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan>
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.IgnoreSpans.init -> void
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.IncludeSpans.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan>
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.IncludeSpans.init -> void
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.SymbolRenameOptions(bool RenameOverloads = false, bool RenameInStrings = false, bool RenameInComments = false, bool RenameFile = false, System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan> IncludeSpans = default(System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan>), System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan> IgnoreSpans = default(System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DocumentSpan>)) -> void
+Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.SymbolRenameOptions(bool RenameOverloads, bool RenameInStrings, bool RenameInComments, bool RenameFile) -> void
+override Microsoft.CodeAnalysis.DocumentSpan.Equals(object obj) -> bool
+override Microsoft.CodeAnalysis.DocumentSpan.GetHashCode() -> int
+override Microsoft.CodeAnalysis.DocumentSpan.ToString() -> string
+override Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.Equals(object obj) -> bool
+override Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.GetHashCode() -> int
+override Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.ToString() -> string
 static Microsoft.CodeAnalysis.CodeActions.CodeAction.Create(string title, System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.CodeActions.CodeAction> nestedActions, bool isInlinable, Microsoft.CodeAnalysis.CodeActions.CodeActionPriority priority = Microsoft.CodeAnalysis.CodeActions.CodeActionPriority.Default) -> Microsoft.CodeAnalysis.CodeActions.CodeAction
 static Microsoft.CodeAnalysis.CodeActions.CodeAction.Create(string title, System.Func<System.IProgress<Microsoft.CodeAnalysis.CodeAnalysisProgress>, System.Threading.CancellationToken, System.Threading.Tasks.Task<Microsoft.CodeAnalysis.Document>> createChangedDocument, string equivalenceKey = null, Microsoft.CodeAnalysis.CodeActions.CodeActionPriority priority = Microsoft.CodeAnalysis.CodeActions.CodeActionPriority.Default) -> Microsoft.CodeAnalysis.CodeActions.CodeAction
 static Microsoft.CodeAnalysis.CodeActions.CodeAction.Create(string title, System.Func<System.IProgress<Microsoft.CodeAnalysis.CodeAnalysisProgress>, System.Threading.CancellationToken, System.Threading.Tasks.Task<Microsoft.CodeAnalysis.Solution>> createChangedSolution, string equivalenceKey = null, Microsoft.CodeAnalysis.CodeActions.CodeActionPriority priority = Microsoft.CodeAnalysis.CodeActions.CodeActionPriority.Default) -> Microsoft.CodeAnalysis.CodeActions.CodeAction
@@ -33,6 +56,10 @@ static Microsoft.CodeAnalysis.CodeActions.CodeAction.Create(string title, System
 static Microsoft.CodeAnalysis.CodeAnalysisProgress.AddCompleteItems(int count, string description = null) -> Microsoft.CodeAnalysis.CodeAnalysisProgress
 static Microsoft.CodeAnalysis.CodeAnalysisProgress.AddIncompleteItems(int count, string description = null) -> Microsoft.CodeAnalysis.CodeAnalysisProgress
 static Microsoft.CodeAnalysis.CodeAnalysisProgress.Description(string description) -> Microsoft.CodeAnalysis.CodeAnalysisProgress
+static Microsoft.CodeAnalysis.DocumentSpan.operator !=(Microsoft.CodeAnalysis.DocumentSpan left, Microsoft.CodeAnalysis.DocumentSpan right) -> bool
+static Microsoft.CodeAnalysis.DocumentSpan.operator ==(Microsoft.CodeAnalysis.DocumentSpan left, Microsoft.CodeAnalysis.DocumentSpan right) -> bool
+static Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.operator !=(Microsoft.CodeAnalysis.Rename.SymbolRenameOptions left, Microsoft.CodeAnalysis.Rename.SymbolRenameOptions right) -> bool
+static Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.operator ==(Microsoft.CodeAnalysis.Rename.SymbolRenameOptions left, Microsoft.CodeAnalysis.Rename.SymbolRenameOptions right) -> bool
 virtual Microsoft.CodeAnalysis.CodeActions.CodeAction.ComputeOperationsAsync(System.IProgress<Microsoft.CodeAnalysis.CodeAnalysisProgress> progress, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.CodeActions.CodeActionOperation>>
 virtual Microsoft.CodeAnalysis.CodeActions.CodeAction.ComputePriority() -> Microsoft.CodeAnalysis.CodeActions.CodeActionPriority
 virtual Microsoft.CodeAnalysis.CodeActions.CodeAction.GetChangedDocumentAsync(System.IProgress<Microsoft.CodeAnalysis.CodeAnalysisProgress> progress, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Microsoft.CodeAnalysis.Document>
@@ -45,19 +72,12 @@ virtual Microsoft.CodeAnalysis.CodeFixes.CodeFixProvider.ComputeRequestPriority(
 virtual Microsoft.CodeAnalysis.CodeRefactorings.CodeRefactoringProvider.ComputeRequestPriority() -> Microsoft.CodeAnalysis.CodeActions.CodeActionRequestPriority
 Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.Deconstruct(out bool RenameMatchingTypeInStrings, out bool RenameMatchingTypeInComments) -> void
 Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.Equals(Microsoft.CodeAnalysis.Rename.DocumentRenameOptions other) -> bool
-Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.Deconstruct(out bool RenameOverloads, out bool RenameInStrings, out bool RenameInComments, out bool RenameFile) -> void
-Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.Equals(Microsoft.CodeAnalysis.Rename.SymbolRenameOptions other) -> bool
 override Microsoft.CodeAnalysis.FindSymbols.ReferenceLocation.ToString() -> string
 override Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.Equals(object obj) -> bool
 override Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.GetHashCode() -> int
 override Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.ToString() -> string
-override Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.Equals(object obj) -> bool
-override Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.GetHashCode() -> int
-override Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.ToString() -> string
 static Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.operator !=(Microsoft.CodeAnalysis.Rename.DocumentRenameOptions left, Microsoft.CodeAnalysis.Rename.DocumentRenameOptions right) -> bool
 static Microsoft.CodeAnalysis.Rename.DocumentRenameOptions.operator ==(Microsoft.CodeAnalysis.Rename.DocumentRenameOptions left, Microsoft.CodeAnalysis.Rename.DocumentRenameOptions right) -> bool
-static Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.operator !=(Microsoft.CodeAnalysis.Rename.SymbolRenameOptions left, Microsoft.CodeAnalysis.Rename.SymbolRenameOptions right) -> bool
-static Microsoft.CodeAnalysis.Rename.SymbolRenameOptions.operator ==(Microsoft.CodeAnalysis.Rename.SymbolRenameOptions left, Microsoft.CodeAnalysis.Rename.SymbolRenameOptions right) -> bool
 virtual Microsoft.CodeAnalysis.Editing.SymbolEditor.AsyncDeclarationEditAction.Invoke(Microsoft.CodeAnalysis.Editing.DocumentEditor editor, Microsoft.CodeAnalysis.SyntaxNode declaration, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
 virtual Microsoft.CodeAnalysis.Editing.SymbolEditor.DeclarationEditAction.Invoke(Microsoft.CodeAnalysis.Editing.DocumentEditor editor, Microsoft.CodeAnalysis.SyntaxNode declaration) -> void
 virtual Microsoft.CodeAnalysis.Host.HostWorkspaceServices.MetadataFilter.Invoke(System.Collections.Generic.IReadOnlyDictionary<string, object> metadata) -> bool

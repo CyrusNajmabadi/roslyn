@@ -37,7 +37,7 @@ namespace Microsoft.CodeAnalysis.Remote
             RemoteServiceCallbackId callbackId,
             SerializableSymbolAndProjectId symbolAndProjectId,
             string newName,
-            SymbolRenameOptions options,
+            SerializableSymbolRenameOptions serializableOptions,
             ImmutableArray<SymbolKey> nonConflictSymbolKeys,
             CancellationToken cancellationToken)
         {
@@ -51,6 +51,7 @@ namespace Microsoft.CodeAnalysis.Remote
 
                 var fallbackOptions = GetClientOptionsProvider(callbackId);
 
+                var options = serializableOptions.Dehydrate(solution);
                 var result = await Renamer.RenameSymbolAsync(
                     solution, symbol, newName, options, fallbackOptions, nonConflictSymbolKeys, cancellationToken).ConfigureAwait(false);
 
@@ -61,7 +62,7 @@ namespace Microsoft.CodeAnalysis.Remote
         public ValueTask<SerializableRenameLocations?> FindRenameLocationsAsync(
             Checksum solutionChecksum,
             SerializableSymbolAndProjectId symbolAndProjectId,
-            SymbolRenameOptions options,
+            SerializableSymbolRenameOptions serializableOptions,
             CancellationToken cancellationToken)
         {
             return RunServiceAsync(solutionChecksum, async solution =>
@@ -72,6 +73,7 @@ namespace Microsoft.CodeAnalysis.Remote
                 if (symbol == null)
                     return null;
 
+                var options = serializableOptions.Dehydrate(solution);
                 var renameLocations = await SymbolicRenameLocations.FindLocationsInCurrentProcessAsync(
                     symbol, solution, options, cancellationToken).ConfigureAwait(false);
 

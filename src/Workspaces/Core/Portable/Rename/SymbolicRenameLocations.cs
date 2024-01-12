@@ -62,6 +62,94 @@ namespace Microsoft.CodeAnalysis.Rename
         public static async Task<SymbolicRenameLocations> FindLocationsInCurrentProcessAsync(
             ISymbol symbol, Solution solution, SymbolRenameOptions options, CancellationToken cancellationToken)
         {
+            var locations = await FindLocationsInCurrentProcessWorkerAsync(symbol, solution, options, cancellationToken).ConfigureAwait(false);
+            if (options.IgnoreSpans == default && options.IncludeSpans == default)
+                return locations;
+
+            return new SymbolicRenameLocations(
+                locations.Symbol,
+                locations.Solution,
+                locations.Options,
+                Filter(locations.Locations),
+                Filter(locations.ImplicitLocations),
+                locations.ReferencedSymbols);
+
+            ImmutableArray<TLocation> FilterLocations<TLocation>(
+                ImmutableArray<TLocation> locations,
+                Func<TLocation, (DocumentId, Location)> getDocumentIdAndLocation)
+            {
+                using var _ = ArrayBuilder<TLocation>.GetInstance(locations.Length, out var result);
+
+                foreach (var location in locations)
+                {
+                    var (documentId, docLocation) = getDocumentIdAndLocation(location);
+
+                    if (options.IgnoreSpans != default && Intersects(documentId, docLocation, options.IgnoreSpans))
+                        continue;
+
+                    if (options.IgnoreSpans != default && !Intersects(documentId, docLocation, options.IncludeSpans))
+                        continue;
+
+                    result.Add(location);
+                }
+
+                return result.ToImmutableAndClear();
+            }
+
+            ImmutableArray<RenameLocation> FilterLocations(ImmutableArray<RenameLocation> locations)
+            {
+                using var _ = ArrayBuilder<RenameLocation>.GetInstance(locations.Length, out var result);
+
+                foreach (var location in locations)
+                {
+                    if (options.IgnoreSpans != default && Intersects(location.DocumentId, location.Location, options.IgnoreSpans))
+                        continue;
+
+                    if (options.IgnoreSpans != default && !Intersects(location.DocumentId, location.Location, options.IncludeSpans))
+                        continue;
+
+                    result.Add(location);
+                }
+
+                return result.ToImmutableAndClear();
+            }
+
+            ImmutableArray<RenameLocation> FilterReferenceLocations(ImmutableArray<ReferenceLocation> locations)
+            {
+                using var _ = ArrayBuilder<RenameLocation>.GetInstance(locations.Length, out var result);
+
+                foreach (var location in locations)
+                {
+                    if (options.IgnoreSpans != default && Intersects(location.Document.Id, location.Location, options.IgnoreSpans))
+                        continue;
+
+                    if (options.IgnoreSpans != default && !Intersects(location.Document.Id, location.Location, options.IncludeSpans))
+                        continue;
+
+                    result.Add(location);
+                }
+
+                return result.ToImmutableAndClear();
+            }
+
+            static bool Intersects(DocumentId documentId, Location location, ImmutableArray<DocumentSpan> spans)
+            {
+                foreach (var span in spans)
+                {
+                    if (documentId == span.Document.Id &&
+                        location.SourceSpan.IntersectsWith(span.SourceSpan))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        private static async Task<SymbolicRenameLocations> FindLocationsInCurrentProcessWorkerAsync(
+            ISymbol symbol, Solution solution, SymbolRenameOptions options, CancellationToken cancellationToken)
+        {
             Contract.ThrowIfNull(symbol);
             using (Logger.LogBlock(FunctionId.Rename_AllRenameLocations, cancellationToken))
             {

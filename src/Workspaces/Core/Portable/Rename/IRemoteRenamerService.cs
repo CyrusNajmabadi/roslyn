@@ -38,14 +38,14 @@ namespace Microsoft.CodeAnalysis.Rename
             RemoteServiceCallbackId callbackId,
             SerializableSymbolAndProjectId symbolAndProjectId,
             string replacementText,
-            SymbolRenameOptions options,
+            SerializableSymbolRenameOptions options,
             ImmutableArray<SymbolKey> nonConflictSymbolKeys,
             CancellationToken cancellationToken);
 
         ValueTask<SerializableRenameLocations?> FindRenameLocationsAsync(
             Checksum solutionChecksum,
             SerializableSymbolAndProjectId symbolAndProjectId,
-            SymbolRenameOptions options,
+            SerializableSymbolRenameOptions options,
             CancellationToken cancellationToken);
 
         ValueTask<SerializableConflictResolution?> ResolveConflictsAsync(

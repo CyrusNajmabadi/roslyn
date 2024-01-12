@@ -85,9 +85,10 @@ namespace Microsoft.CodeAnalysis.Rename
                     var client = await RemoteHostClient.TryGetClientAsync(solution.Services, cancellationToken).ConfigureAwait(false);
                     if (client != null)
                     {
+                        var serializableOptions = SerializableSymbolRenameOptions.Dehydrate(options);
                         var result = await client.TryInvokeAsync<IRemoteRenamerService, SerializableRenameLocations?>(
                             solution,
-                            (service, solutionInfo, cancellationToken) => service.FindRenameLocationsAsync(solutionInfo, serializedSymbol, options, cancellationToken),
+                            (service, solutionInfo, cancellationToken) => service.FindRenameLocationsAsync(solutionInfo, serializedSymbol, serializableOptions, cancellationToken),
                             cancellationToken).ConfigureAwait(false);
 
                         if (result.HasValue && result.Value != null)

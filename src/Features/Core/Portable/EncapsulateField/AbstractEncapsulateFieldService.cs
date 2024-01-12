@@ -206,7 +206,7 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                 return null;
 
             var solutionNeedingProperty = await UpdateReferencesAsync(
-                updateReferences, solution, document, field, finalFieldName, generatedPropertyName, fallbackOptions, cancellationToken).ConfigureAwait(false);
+                updateReferences, solution, document, field, finalFieldName, generatedPropertyName, cancellationToken).ConfigureAwait(false);
             document = solutionNeedingProperty.GetDocument(document.Id);
 
             var markFieldPrivate = field.DeclaredAccessibility != Accessibility.Private;
@@ -255,24 +255,23 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
         }
 
         private async Task<Solution> UpdateReferencesAsync(
-            bool updateReferences, Solution solution, Document document, IFieldSymbol field, string finalFieldName, string generatedPropertyName, CodeCleanupOptionsProvider fallbackOptions, CancellationToken cancellationToken)
+            bool updateReferences, Solution solution, Document document, IFieldSymbol field, string finalFieldName, string generatedPropertyName, CancellationToken cancellationToken)
         {
             if (!updateReferences)
             {
                 return solution;
             }
 
-            var projectId = document.Project.Id;
             if (field.IsReadOnly)
             {
                 // Inside the constructor we want to rename references the field to the final field name.
                 var constructorLocations = GetConstructorLocations(solution, field.ContainingType);
-                if (finalFieldName != field.Name && constructorLocations.Count > 0)
+                if (finalFieldName != field.Name && constructorLocations.Length > 0)
                 {
                     solution = await RenameAsync(
                         solution, field, finalFieldName,
-                        (docId, span) => IntersectsWithAny(docId, span, constructorLocations),
-                        fallbackOptions,
+                        includeSpans: constructorLocations,
+                        ignoreSpans: default,
                         cancellationToken).ConfigureAwait(false);
 
                     document = solution.GetDocument(document.Id);
@@ -285,8 +284,8 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                 // Outside the constructor we want to rename references to the field to final property name.
                 return await RenameAsync(
                     solution, field, generatedPropertyName,
-                    (documentId, span) => !IntersectsWithAny(documentId, span, constructorLocations),
-                    fallbackOptions,
+                    includeSpans: default,
+                    ignoreSpans: constructorLocations,
                     cancellationToken).ConfigureAwait(false);
             }
             else
@@ -301,43 +300,24 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             Solution solution,
             IFieldSymbol field,
             string finalName,
-            Func<DocumentId, TextSpan, bool> filter,
-            CodeCleanupOptionsProvider fallbackOptions,
+            ImmutableArray<DocumentSpan> includeSpans,
+            ImmutableArray<DocumentSpan> ignoreSpans,
             CancellationToken cancellationToken)
         {
             var options = new SymbolRenameOptions(
                 RenameOverloads: false,
                 RenameInStrings: false,
                 RenameInComments: false,
-                RenameFile: false);
+                RenameFile: false,
+                IncludeSpans: includeSpans,
+                IgnoreSpans: ignoreSpans);
 
-            var initialLocations = await Renamer.FindRenameLocationsAsync(
-                solution, field, options, cancellationToken).ConfigureAwait(false);
-
-            var resolution = await initialLocations.Filter(filter).ResolveConflictsAsync(
-                field, finalName, nonConflictSymbolKeys: default, fallbackOptions, cancellationToken).ConfigureAwait(false);
-
-            Contract.ThrowIfFalse(resolution.IsSuccessful);
-
-            return resolution.NewSolution;
+            return await Renamer.RenameSymbolAsync(
+                solution, field, options, finalName, cancellationToken).ConfigureAwait(false);
         }
 
-        private static bool IntersectsWithAny(DocumentId documentId, TextSpan span, ISet<(DocumentId documentId, TextSpan span)> constructorLocations)
-        {
-            foreach (var constructor in constructorLocations)
-            {
-                if (constructor.documentId == documentId &&
-                    span.IntersectsWith(constructor.span))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private ISet<(DocumentId documentId, TextSpan span)> GetConstructorLocations(Solution solution, INamedTypeSymbol containingType)
-            => GetConstructorNodes(containingType).Select(n => (solution.GetRequiredDocument(n.SyntaxTree).Id, n.Span)).ToSet();
+        private ImmutableArray<DocumentSpan> GetConstructorLocations(Solution solution, INamedTypeSymbol containingType)
+            => GetConstructorNodes(containingType).Select(n => new DocumentSpan(solution.GetRequiredDocument(n.SyntaxTree), n.Span)).Distinct().ToImmutableArray();
 
         internal abstract IEnumerable<SyntaxNode> GetConstructorNodes(INamedTypeSymbol containingType);
 
