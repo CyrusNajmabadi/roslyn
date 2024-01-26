@@ -29,8 +29,8 @@ internal abstract class AbstractAssetProvider
 
         var solutionAttributes = await GetAssetAsync<SolutionInfo.SolutionAttributes>(AssetHint.None, solutionChecksums.Attributes, cancellationToken).ConfigureAwait(false);
 
-        using var _ = ArrayBuilder<ProjectInfo>.GetInstance(solutionChecksums.Projects.Length, out var projects);
-        foreach (var (projectChecksum, projectId) in solutionChecksums.Projects)
+        using var _ = ArrayBuilder<ProjectInfo>.GetInstance(solutionChecksums.SyncedProjects.Length, out var projects);
+        foreach (var (projectChecksum, projectId) in solutionChecksums.SyncedProjects)
             projects.AddIfNotNull(await CreateProjectInfoAsync(projectId, projectChecksum, cancellationToken).ConfigureAwait(false));
 
         var analyzerReferences = await CreateCollectionAsync<AnalyzerReference>(AssetHint.None, solutionChecksums.AnalyzerReferences, cancellationToken).ConfigureAwait(false);
