@@ -33,6 +33,8 @@ namespace Microsoft.CodeAnalysis
         [DataMember(Order = 1)]
         private readonly string? _debugName;
 
+        private SingleInitNullable<Checksum> _lazyChecksum;
+
         private ProjectId(Guid guid, string? debugName)
         {
             this.Id = guid;
@@ -96,5 +98,11 @@ namespace Microsoft.CodeAnalysis
 
             return CreateFromSerialized(guid, debugName);
         }
+
+        /// <summary>
+        /// Checksum of the <see cref="Guid"/> and <see cref="DebugName"/> of this project id.
+        /// </summary>
+        internal Checksum Checksum
+            => _lazyChecksum.Initialize(static @this => Checksum.Create(@this, static (@this, writer) => @this.WriteTo(writer)), this);
     }
 }

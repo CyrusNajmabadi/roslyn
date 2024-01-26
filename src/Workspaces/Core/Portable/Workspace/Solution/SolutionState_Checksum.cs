@@ -170,7 +170,7 @@ internal partial class SolutionState
                 return new SolutionStateChecksums(
                     attributes: this.SolutionAttributes.Checksum,
                     syncedProjects: new(new ChecksumCollection(projectChecksums), projectIdsToSync),
-                    preservedProjects: projectsToPreserve.ToImmutableAndClear(),
+                    preservedProjects: new(new ChecksumCollection(projectsToPreserve.SelectAsArray(p => p.Checksum)), projectsToPreserve.ToImmutableAndClear()),
                     analyzerReferences: analyzerReferenceChecksums);
             }
         }

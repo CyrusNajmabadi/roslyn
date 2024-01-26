@@ -98,19 +98,28 @@ internal sealed class SolutionCompilationStateChecksums(
     }
 }
 
+/// <param name="syncedProjects">The projects to fully sync over.  The checksum for each project is the one obtained
+/// from <see cref="ProjectState.GetStateChecksumsAsync(CancellationToken)"/></param>
+/// <param name="preservedProjects">The projects present on the host side which are not being synced over.  Can be used
+/// on the remote side to preserve whatever state of those projects it has.  The checksum for these is just the checksum
+/// of the project-id itself.</param>
 internal sealed class SolutionStateChecksums(
     Checksum attributes,
     ChecksumsAndIds<ProjectId> syncedProjects,
-    ChecksumCollection analyzerReferences,
-    ImmutableArray<ProjectId> preservedProjects)
+    ChecksumsAndIds<ProjectId> preservedProjects,
+    ChecksumCollection analyzerReferences)
 {
-    public Checksum Checksum { get; } = Checksum.Create(
+    public Checksum Checksum { get; } = Checksum.Create(stackalloc[]
+    {
         attributes,
         syncedProjects.Checksum,
-        analyzerReferences.Checksum);
+        analyzerReferences.Checksum,
+        preservedProjects.Checksum
+    });
 
     public Checksum Attributes { get; } = attributes;
     public ChecksumsAndIds<ProjectId> SyncedProjects { get; } = syncedProjects;
+    public ChecksumsAndIds<ProjectId> PreservedProjects { get; } = preservedProjects;
     public ChecksumCollection AnalyzerReferences { get; } = analyzerReferences;
 
     public void AddAllTo(HashSet<Checksum> checksums)
@@ -127,30 +136,18 @@ internal sealed class SolutionStateChecksums(
         this.Checksum.WriteTo(writer);
         this.Attributes.WriteTo(writer);
         this.SyncedProjects.WriteTo(writer);
+        this.PreservedProjects.WriteTo(writer);
         this.AnalyzerReferences.WriteTo(writer);
-
-        writer.WriteInt32(preservedProjects.Length);
-        foreach (var preservedProject in preservedProjects)
-            preservedProject.WriteTo(writer);
     }
 
     public static SolutionStateChecksums Deserialize(ObjectReader reader)
     {
         var checksum = Checksum.ReadFrom(reader);
-        var attributes = Checksum.ReadFrom(reader);
-        var syncedProjects = ChecksumsAndIds<ProjectId>.ReadFrom(reader);
-        var analyzerReferences = ChecksumCollection.ReadFrom(reader);
-
-        var length = reader.ReadInt32();
-        using var _ = ArrayBuilder<ProjectId>.GetInstance(length, out var projectsToPreserve);
-        for (var i = 0; i < length; i++)
-            projectsToPreserve.Add(ProjectId.ReadFrom(reader));
-
         var result = new SolutionStateChecksums(
-            attributes,
-            syncedProjects,
-            analyzerReferences,
-            projectsToPreserve.ToImmutableAndClear());
+            attributes: Checksum.ReadFrom(reader),
+            syncedProjects: ChecksumsAndIds<ProjectId>.ReadFrom(reader),
+            preservedProjects: ChecksumsAndIds<ProjectId>.ReadFrom(reader),
+            analyzerReferences: ChecksumCollection.ReadFrom(reader));
         Contract.ThrowIfFalse(result.Checksum == checksum);
         return result;
     }
