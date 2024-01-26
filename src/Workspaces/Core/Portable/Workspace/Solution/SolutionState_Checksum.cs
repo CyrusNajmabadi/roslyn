@@ -140,8 +140,8 @@ internal partial class SolutionState
                 // requested set of projects if applicable.
                 var orderedProjectIds = GetOrCreateSortedProjectIds(this.ProjectIds);
 
+                using var _1 = ArrayBuilder<Task<ProjectStateChecksums>>.GetInstance(out var projectChecksumTasks);
                 using var _2 = ArrayBuilder<ProjectId>.GetInstance(out var projectsToPreserve);
-                using var _3 = ArrayBuilder<Task<ProjectStateChecksums>>.GetInstance(out var projectChecksumTasks);
 
                 foreach (var projectId in orderedProjectIds)
                 {
@@ -169,7 +169,8 @@ internal partial class SolutionState
 
                 return new SolutionStateChecksums(
                     attributes: this.SolutionAttributes.Checksum,
-                    projects: new(new ChecksumCollection(projectChecksums), projectIdsToSync),
+                    syncedProjects: new(new ChecksumCollection(projectChecksums), projectIdsToSync),
+                    preservedProjects: projectsToPreserve.ToImmutableAndClear(),
                     analyzerReferences: analyzerReferenceChecksums);
             }
         }

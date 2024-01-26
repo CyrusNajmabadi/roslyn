@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -99,23 +100,24 @@ internal sealed class SolutionCompilationStateChecksums(
 
 internal sealed class SolutionStateChecksums(
     Checksum attributes,
-    ChecksumsAndIds<ProjectId> projects,
-    ChecksumCollection analyzerReferences)
+    ChecksumsAndIds<ProjectId> syncedProjects,
+    ChecksumCollection analyzerReferences,
+    ImmutableArray<ProjectId> preservedProjects)
 {
     public Checksum Checksum { get; } = Checksum.Create(
         attributes,
-        projects.Checksum,
+        syncedProjects.Checksum,
         analyzerReferences.Checksum);
 
     public Checksum Attributes { get; } = attributes;
-    public ChecksumsAndIds<ProjectId> Projects { get; } = projects;
+    public ChecksumsAndIds<ProjectId> SyncedProjects { get; } = syncedProjects;
     public ChecksumCollection AnalyzerReferences { get; } = analyzerReferences;
 
     public void AddAllTo(HashSet<Checksum> checksums)
     {
         checksums.AddIfNotNullChecksum(this.Checksum);
         checksums.AddIfNotNullChecksum(this.Attributes);
-        this.Projects.Checksums.AddAllTo(checksums);
+        this.SyncedProjects.Checksums.AddAllTo(checksums);
         this.AnalyzerReferences.AddAllTo(checksums);
     }
 
@@ -124,17 +126,31 @@ internal sealed class SolutionStateChecksums(
         // Writing this is optional, but helps ensure checksums are being computed properly on both the host and oop side.
         this.Checksum.WriteTo(writer);
         this.Attributes.WriteTo(writer);
-        this.Projects.WriteTo(writer);
+        this.SyncedProjects.WriteTo(writer);
         this.AnalyzerReferences.WriteTo(writer);
+
+        writer.WriteInt32(preservedProjects.Length);
+        foreach (var preservedProject in preservedProjects)
+            preservedProject.WriteTo(writer);
     }
 
     public static SolutionStateChecksums Deserialize(ObjectReader reader)
     {
         var checksum = Checksum.ReadFrom(reader);
+        var attributes = Checksum.ReadFrom(reader);
+        var syncedProjects = ChecksumsAndIds<ProjectId>.ReadFrom(reader);
+        var analyzerReferences = ChecksumCollection.ReadFrom(reader);
+
+        var length = reader.ReadInt32();
+        using var _ = ArrayBuilder<ProjectId>.GetInstance(length, out var projectsToPreserve);
+        for (var i = 0; i < length; i++)
+            projectsToPreserve.Add(ProjectId.ReadFrom(reader));
+
         var result = new SolutionStateChecksums(
-            attributes: Checksum.ReadFrom(reader),
-            projects: ChecksumsAndIds<ProjectId>.ReadFrom(reader),
-            analyzerReferences: ChecksumCollection.ReadFrom(reader));
+            attributes,
+            syncedProjects,
+            analyzerReferences,
+            projectsToPreserve.ToImmutableAndClear());
         Contract.ThrowIfFalse(result.Checksum == checksum);
         return result;
     }
