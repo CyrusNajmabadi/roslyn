@@ -15,6 +15,7 @@ using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Serialization;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis;
@@ -138,49 +139,38 @@ internal partial class SolutionState
                 // get states by id order to have deterministic checksum.  Limit expensive computation to the
                 // requested set of projects if applicable.
                 var orderedProjectIds = GetOrCreateSortedProjectIds(this.ProjectIds);
-                var projectChecksumTasks = orderedProjectIds
-                    .Select(id => (state: this.ProjectStates[id], mustCompute: projectsToInclude == null || projectsToInclude.Contains(id)))
-                    .Where(t => RemoteSupportedLanguages.IsSupported(t.state.Language))
-                    .Select(async t =>
-                    {
-                        // if it's a project that's specifically in the sync'ed cone, include this checksum so that
-                        // this project definitely syncs over.
-                        if (t.mustCompute)
-                            return await t.state.GetStateChecksumsAsync(cancellationToken).ConfigureAwait(false);
 
-                        // If it's a project that is not in the cone, still try to get the latest checksum for it if
-                        // we have it.  That way we don't send over a checksum *without* that project, causing the
-                        // OOP side to throw that project away (along with all the compilation info stored with it).
-                        if (t.state.TryGetStateChecksums(out var stateChecksums))
-                            return stateChecksums;
+                using var _2 = ArrayBuilder<ProjectId>.GetInstance(out var projectsToPreserve);
+                using var _3 = ArrayBuilder<Task<ProjectStateChecksums>>.GetInstance(out var projectChecksumTasks);
 
-                        // We have never computed the checksum for this project.  Don't send anything for it.
-                        return null;
-                    })
-                    .ToArray();
-
-                var serializer = this.Services.GetRequiredService<ISerializerService>();
-                var attributesChecksum = this.SolutionAttributes.Checksum;
-
-                var analyzerReferenceChecksums = ChecksumCache.GetOrCreateChecksumCollection(
-                    this.AnalyzerReferences, serializer, cancellationToken);
-
-                var allResults = await Task.WhenAll(projectChecksumTasks).ConfigureAwait(false);
-                using var _1 = ArrayBuilder<ProjectId>.GetInstance(allResults.Length, out var projectIds);
-                using var _2 = ArrayBuilder<Checksum>.GetInstance(allResults.Length, out var projectChecksums);
-                foreach (var projectStateChecksums in allResults)
+                foreach (var projectId in orderedProjectIds)
                 {
-                    if (projectStateChecksums != null)
+                    var projectState = this.ProjectStates[projectId];
+                    if (!RemoteSupportedLanguages.IsSupported(projectState.Language))
+                        continue;
+
+                    if (projectsToInclude is null || projectsToInclude.Contains(projectId))
                     {
-                        projectIds.Add(projectStateChecksums.ProjectId);
-                        projectChecksums.Add(projectStateChecksums.Checksum);
+                        projectChecksumTasks.Add(projectState.GetStateChecksumsAsync(cancellationToken));
+                    }
+                    else
+                    {
+                        projectsToPreserve.Add(projectId);
                     }
                 }
 
+                var projectStateChecksums = await Task.WhenAll(projectChecksumTasks).ConfigureAwait(false);
+
+                var projectChecksums = projectStateChecksums.SelectAsArray(static p => p.Checksum);
+                var projectIdsToSync = projectStateChecksums.SelectAsArray(static p => p.ProjectId);
+
+                var analyzerReferenceChecksums = ChecksumCache.GetOrCreateChecksumCollection(
+                    this.AnalyzerReferences, this.Services.GetRequiredService<ISerializerService>(), cancellationToken);
+
                 return new SolutionStateChecksums(
-                    attributesChecksum,
-                    new(new ChecksumCollection(projectChecksums.ToImmutableAndClear()), projectIds.ToImmutableAndClear()),
-                    analyzerReferenceChecksums);
+                    attributes: this.SolutionAttributes.Checksum,
+                    projects: new(new ChecksumCollection(projectChecksums), projectIdsToSync),
+                    analyzerReferences: analyzerReferenceChecksums);
             }
         }
         catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
