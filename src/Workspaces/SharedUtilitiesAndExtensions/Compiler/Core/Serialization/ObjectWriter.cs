@@ -32,6 +32,11 @@ namespace Roslyn.Utilities
     /// </summary>
     internal sealed partial class ObjectWriter : IDisposable
     {
+        private static class PooledArrays<T>
+        {
+            public static readonly ObjectPool<T[]> Instance = new(() => new T[8192], 512);
+        }
+
         private readonly BinaryWriter _writer;
         private readonly CancellationToken _cancellationToken;
 
@@ -263,9 +268,8 @@ namespace Roslyn.Utilities
             _writer.Write(span);
 #else
             // BinaryWriter in .NET Framework does not support ReadOnlySpan<byte>, so we use a temporary buffer to write
-            // arrays of data. The buffer is chosen to be no larger than 8K, which avoids allocations in the large
-            // object heap.
-            WriteSpanPieces(span, 8192, static (writer, buffer, length) => writer.Write(buffer, 0, length));
+            // arrays of data.
+            WriteSpanPieces(span, static (writer, buffer, length) => writer.Write(buffer, 0, length));
 #endif
         }
 
@@ -282,9 +286,8 @@ namespace Roslyn.Utilities
             _writer.Write(span);
 #else
             // BinaryWriter in .NET Framework does not support ReadOnlySpan<char>, so we use a temporary buffer to write
-            // arrays of data. The buffer is chosen to be no larger than 4K chars, which avoids allocations in the large
-            // object heap.
-            WriteSpanPieces(span, 4096, static (writer, buffer, length) => writer.Write(buffer, 0, length));
+            // arrays of data.
+            WriteSpanPieces(span, static (writer, buffer, length) => writer.Write(buffer, 0, length));
 #endif
         }
 
@@ -320,23 +323,17 @@ namespace Roslyn.Utilities
 
         private void WriteSpanPieces<T>(
             ReadOnlySpan<T> span,
-            int rentLength,
             Action<BinaryWriter, T[], int> write)
         {
+            using var pooledObject = PooledArrays<T>.Instance.GetPooledObject();
+            var buffer = pooledObject.Object;
+
             var spanLength = span.Length;
-            var buffer = System.Buffers.ArrayPool<T>.Shared.Rent(Math.Min(spanLength, rentLength));
-            try
+            for (var offset = 0; offset < spanLength; offset += buffer.Length)
             {
-                for (var offset = 0; offset < spanLength; offset += buffer.Length)
-                {
-                    var segmentLength = Math.Min(buffer.Length, spanLength - offset);
-                    span.Slice(offset, segmentLength).CopyTo(buffer.AsSpan());
-                    write(_writer, buffer, segmentLength);
-                }
-            }
-            finally
-            {
-                System.Buffers.ArrayPool<T>.Shared.Return(buffer);
+                var segmentLength = Math.Min(buffer.Length, spanLength - offset);
+                span.Slice(offset, segmentLength).CopyTo(buffer.AsSpan());
+                write(_writer, buffer, segmentLength);
             }
         }
 
