@@ -251,7 +251,7 @@ namespace Roslyn.Utilities
         }
 
         /// <summary>
-        /// Write an array of bytes. The array data is provided as a <see
+        /// Write an array of <see cref="byte"/>s. The array data is provided as a <see
         /// cref="ReadOnlySpan{T}">ReadOnlySpan</see>&lt;<see cref="byte"/>&gt;, and deserialized to a byte array.
         /// </summary>
         /// <param name="span">The array data.</param>
@@ -270,7 +270,7 @@ namespace Roslyn.Utilities
         }
 
         /// <summary>
-        /// Write an array of bytes. The array data is provided as a <see
+        /// Write an array of <see cref="char"/>s. The array data is provided as a <see
         /// cref="ReadOnlySpan{T}">ReadOnlySpan</see>&lt;<see cref="char"/>&gt;, and deserialized to a char array.
         /// </summary>
         /// <param name="span">The array data.</param>
