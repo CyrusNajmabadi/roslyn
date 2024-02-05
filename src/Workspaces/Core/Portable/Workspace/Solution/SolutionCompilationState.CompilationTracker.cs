@@ -463,7 +463,7 @@ namespace Microsoft.CodeAnalysis
 
                         // Try to get the built compilation.  If it exists, then we can just return that.
                         if (state is FinalState finalState)
-                            return new CompilationInfo(finalState.FinalCompilationWithGeneratedDocuments, finalState.HasSuccessfullyLoaded, state.GeneratorInfo);
+                            return new CompilationInfo(finalState.FinalCompilationWithGeneratedDocuments, finalState.HasSuccessfullyLoaded, finalState.GeneratorInfo);
 
                         // Otherwise, we actually have to build it.  Ensure that only one thread is trying to
                         // build this compilation at a time.
@@ -501,7 +501,7 @@ namespace Microsoft.CodeAnalysis
                 // if we already have a compilation, we must be already done!  This can happen if two
                 // threads were waiting to build, and we came in after the other succeeded.
                 if (state is FinalState finalState)
-                    return new CompilationInfo(finalState.FinalCompilationWithGeneratedDocuments, finalState.HasSuccessfullyLoaded, state.GeneratorInfo);
+                    return new CompilationInfo(finalState.FinalCompilationWithGeneratedDocuments, finalState.HasSuccessfullyLoaded, finalState.GeneratorInfo);
 
                 var compilation = state.CompilationWithoutGeneratedDocuments;
                 if (compilation == null)
