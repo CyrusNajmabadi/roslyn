@@ -529,57 +529,78 @@ namespace Microsoft.CodeAnalysis
                     return await BuildFinalStateFromInProgressStateAsync(
                         compilationState, (InProgressState)state, compilation, cancellationToken).ConfigureAwait(false);
                 }
-            }
 
-            private async Task<FinalState> BuildFinalStateFromScratchAsync(
-                SolutionCompilationState compilationState,
-                CompilationTrackerGeneratorInfo? generatorInfo,
-                CancellationToken cancellationToken)
-            {
-                try
+                async Task<FinalState> BuildFinalStateFromScratchAsync(
+                    SolutionCompilationState compilationState,
+                    CompilationTrackerGeneratorInfo? generatorInfo,
+                    CancellationToken cancellationToken)
                 {
-                    var compilation = await BuildDeclarationCompilationFromScratchAsync(
-                        generatorInfo, cancellationToken).ConfigureAwait(false);
-
-                    return await FinalizeCompilationAsync(
-                        compilationState,
-                        compilation,
-                        generatorInfo,
-                        compilationWithStaleGeneratedTrees: null,
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken, ErrorSeverity.Critical))
-                {
-                    throw ExceptionUtilities.Unreachable();
-                }
-            }
-
-            [PerformanceSensitive(
-                "https://github.com/dotnet/roslyn/issues/23582",
-                Constraint = "Avoid calling " + nameof(Compilation.AddSyntaxTrees) + " in a loop due to allocation overhead.")]
-            private async Task<Compilation> BuildDeclarationCompilationFromScratchAsync(
-                CompilationTrackerGeneratorInfo? generatorInfo,
-                CancellationToken cancellationToken)
-            {
-                try
-                {
-                    var compilation = CreateEmptyCompilation();
-
-                    using var _ = ArrayBuilder<SyntaxTree>.GetInstance(ProjectState.DocumentStates.Count, out var trees);
-                    foreach (var documentState in ProjectState.DocumentStates.GetStatesInCompilationOrder())
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        // Include the tree even if the content of the document failed to load.
-                        trees.Add(await documentState.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false));
-                    }
+                        var compilation = await BuildDeclarationCompilationFromScratchAsync(
+                            generatorInfo, cancellationToken).ConfigureAwait(false);
 
-                    compilation = compilation.AddSyntaxTrees(trees);
-                    WriteState(new AllSyntaxTreesParsedState(compilation, generatorInfo));
-                    return compilation;
+                        return await FinalizeCompilationAsync(
+                            compilationState,
+                            compilation,
+                            generatorInfo,
+                            compilationWithStaleGeneratedTrees: null,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken, ErrorSeverity.Critical))
+                    {
+                        throw ExceptionUtilities.Unreachable();
+                    }
                 }
-                catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken, ErrorSeverity.Critical))
+
+                [PerformanceSensitive(
+                    "https://github.com/dotnet/roslyn/issues/23582",
+                    Constraint = "Avoid calling " + nameof(Compilation.AddSyntaxTrees) + " in a loop due to allocation overhead.")]
+                async Task<Compilation> BuildDeclarationCompilationFromScratchAsync(
+                    CompilationTrackerGeneratorInfo? generatorInfo,
+                    CancellationToken cancellationToken)
                 {
-                    throw ExceptionUtilities.Unreachable();
+                    try
+                    {
+                        var compilation = CreateEmptyCompilation();
+
+                        using var _ = ArrayBuilder<SyntaxTree>.GetInstance(ProjectState.DocumentStates.Count, out var trees);
+                        foreach (var documentState in ProjectState.DocumentStates.GetStatesInCompilationOrder())
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            // Include the tree even if the content of the document failed to load.
+                            trees.Add(await documentState.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false));
+                        }
+
+                        compilation = compilation.AddSyntaxTrees(trees);
+                        WriteState(new AllSyntaxTreesParsedState(compilation, generatorInfo));
+                        return compilation;
+                    }
+                    catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken, ErrorSeverity.Critical))
+                    {
+                        throw ExceptionUtilities.Unreachable();
+                    }
+                }
+
+                async Task<FinalState> BuildFinalStateFromInProgressStateAsync(
+                    SolutionCompilationState compilationState, InProgressState state, Compilation inProgressCompilation, CancellationToken cancellationToken)
+                {
+                    try
+                    {
+                        var (compilationWithoutGenerators, compilationWithGenerators, generatorDriver) = await BuildDeclarationCompilationFromInProgressAsync(
+                            state, inProgressCompilation, cancellationToken).ConfigureAwait(false);
+
+                        return await FinalizeCompilationAsync(
+                            compilationState,
+                            compilationWithoutGenerators,
+                            state.GeneratorInfo.WithDriver(generatorDriver),
+                            compilationWithGenerators,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
+                    {
+                        throw ExceptionUtilities.Unreachable();
+                    }
                 }
             }
 
@@ -599,27 +620,6 @@ namespace Microsoft.CodeAnalysis
                     return compilationFactory.CreateCompilation(
                         this.ProjectState.AssemblyName,
                         this.ProjectState.CompilationOptions!);
-                }
-            }
-
-            private async Task<FinalState> BuildFinalStateFromInProgressStateAsync(
-                SolutionCompilationState compilationState, InProgressState state, Compilation inProgressCompilation, CancellationToken cancellationToken)
-            {
-                try
-                {
-                    var (compilationWithoutGenerators, compilationWithGenerators, generatorDriver) = await BuildDeclarationCompilationFromInProgressAsync(
-                        state, inProgressCompilation, cancellationToken).ConfigureAwait(false);
-
-                    return await FinalizeCompilationAsync(
-                        compilationState,
-                        compilationWithoutGenerators,
-                        state.GeneratorInfo.WithDriver(generatorDriver),
-                        compilationWithGenerators,
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
-                {
-                    throw ExceptionUtilities.Unreachable();
                 }
             }
 
