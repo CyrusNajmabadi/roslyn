@@ -533,7 +533,7 @@ namespace Microsoft.CodeAnalysis
 
             private async Task<FinalState> BuildFinalStateFromScratchAsync(
                 SolutionCompilationState compilationState,
-                CompilationTrackerGeneratorInfo generatorInfo,
+                CompilationTrackerGeneratorInfo? generatorInfo,
                 CancellationToken cancellationToken)
             {
                 try
@@ -558,7 +558,7 @@ namespace Microsoft.CodeAnalysis
                 "https://github.com/dotnet/roslyn/issues/23582",
                 Constraint = "Avoid calling " + nameof(Compilation.AddSyntaxTrees) + " in a loop due to allocation overhead.")]
             private async Task<Compilation> BuildDeclarationCompilationFromScratchAsync(
-                CompilationTrackerGeneratorInfo generatorInfo,
+                CompilationTrackerGeneratorInfo? generatorInfo,
                 CancellationToken cancellationToken)
             {
                 try
