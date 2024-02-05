@@ -89,7 +89,7 @@ namespace Microsoft.CodeAnalysis
                 get
                 {
                     var state = this.ReadState();
-                    return state.GeneratorInfo.Driver;
+                    return state.GeneratorInfo?.Driver;
                 }
             }
 
@@ -172,11 +172,9 @@ namespace Microsoft.CodeAnalysis
                     {
                         // We may still have a cached generator; we'll have to remember to run generators again since we are making some
                         // change here. We'll also need to update the other state of the driver if appropriate.
-                        var generatorInfo = state.GeneratorInfo.WithDocumentsAreFinal(false);
-                        if (generatorInfo.Driver != null && translate != null)
-                        {
-                            generatorInfo = generatorInfo.WithDriver(translate.TransformGeneratorDriver(generatorInfo.Driver));
-                        }
+                        var generatorInfo = state.GeneratorInfo?.WithDocumentsAreFinal(false);
+                        if (generatorInfo?.Driver != null && translate != null)
+                            generatorInfo = generatorInfo.Value.WithDriver(translate.TransformGeneratorDriver(generatorInfo.Value.Driver));
 
                         return new NoCompilationState(generatorInfo);
                     }
