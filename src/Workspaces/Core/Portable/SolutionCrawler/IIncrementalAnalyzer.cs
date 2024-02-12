@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#if false
 #nullable disable
 
 using System.Threading;
@@ -45,3 +46,5 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
         void Shutdown();
     }
 }
+
+#endif

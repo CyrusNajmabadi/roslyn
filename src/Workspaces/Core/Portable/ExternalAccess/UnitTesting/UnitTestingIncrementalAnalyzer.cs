@@ -12,7 +12,10 @@ using Microsoft.CodeAnalysis.SolutionCrawler;
 
 namespace Microsoft.CodeAnalysis.ExternalAccess.UnitTesting
 {
-    internal class UnitTestingIncrementalAnalyzer(IUnitTestingIncrementalAnalyzerImplementation implementation) : IIncrementalAnalyzer
+    internal class UnitTestingIncrementalAnalyzer(IUnitTestingIncrementalAnalyzerImplementation implementation)
+#if false
+        : IIncrementalAnalyzer
+#endif
     {
         public Task AnalyzeDocumentAsync(Document document, SyntaxNode bodyOpt, InvocationReasons reasons, CancellationToken cancellationToken)
             => implementation.AnalyzeDocumentAsync(document, bodyOpt, new UnitTestingInvocationReasonsWrapper(reasons), cancellationToken);
