@@ -295,6 +295,29 @@ namespace Microsoft.CodeAnalysis
                 CancellationToken cancellationToken)
             {
                 var state = ReadState();
+
+                // if we already have a final compilation we are done.
+                if (state is FinalCompilationTrackerState finalState)
+                {
+                    Contract.ThrowIfNull(finalState.CompilationWithoutGeneratedDocuments, "We have a FinalState, so we must have a non-null initial compilation");
+                    Contract.ThrowIfNull(finalState.FinalCompilationWithGeneratedDocuments, "We have a FinalState, so we must have a non-null final compilation");
+
+                    compilations = new CompilationPair(finalState.CompilationWithoutGeneratedDocuments, finalState.FinalCompilationWithGeneratedDocuments);
+
+                    // This should hopefully be safe to return as null.  Because we already reached the 'FinalState'
+                    // before, we should have already recorded the assembly symbols for it.  So not recording them
+                    // again is likely ok (as long as compilations continue to return the same IAssemblySymbols for
+                    // the same references across source edits).
+                    metadataReferenceToProjectId = null;
+
+                    inProgressProject = this.ProjectState;
+                    generatorInfo = finalState.GeneratorInfo;
+
+                    return;
+                }
+
+                Contract.ThrowIfFalse(state is null or InProgressState);
+
                 var compilationWithoutGeneratedDocuments = state?.CompilationWithoutGeneratedDocuments;
 
                 generatorInfo = state?.GeneratorInfo ?? CompilationTrackerGeneratorInfo.Empty;
@@ -321,22 +344,6 @@ namespace Microsoft.CodeAnalysis
 
                     // This is likely a bug.  It seems possible to pass out a partial compilation state that we don't
                     // properly record assembly symbols for.
-                    metadataReferenceToProjectId = null;
-                    return;
-                }
-
-                // if we already have a final compilation we are done.
-                if (compilationWithoutGeneratedDocuments != null && state is FinalCompilationTrackerState finalState)
-                {
-                    var finalCompilation = finalState.FinalCompilationWithGeneratedDocuments;
-                    Contract.ThrowIfNull(finalCompilation, "We have a FinalState, so we must have a non-null final compilation");
-
-                    compilations = new CompilationPair(compilationWithoutGeneratedDocuments, finalCompilation);
-
-                    // This should hopefully be safe to return as null.  Because we already reached the 'FinalState'
-                    // before, we should have already recorded the assembly symbols for it.  So not recording them
-                    // again is likely ok (as long as compilations continue to return the same IAssemblySymbols for
-                    // the same references across source edits).
                     metadataReferenceToProjectId = null;
                     return;
                 }
