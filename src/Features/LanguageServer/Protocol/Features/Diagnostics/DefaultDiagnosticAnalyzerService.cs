@@ -20,8 +20,14 @@ using Roslyn.Utilities;
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
     [Shared]
+#if false
     [ExportIncrementalAnalyzerProvider(WellKnownSolutionCrawlerAnalyzers.Diagnostic, workspaceKinds: null)]
-    internal partial class DefaultDiagnosticAnalyzerService : IIncrementalAnalyzerProvider, IDiagnosticUpdateSource
+#endif
+    internal partial class DefaultDiagnosticAnalyzerService :
+#if false
+        IIncrementalAnalyzerProvider, 
+#endif
+        IDiagnosticUpdateSource
     {
         private readonly DiagnosticAnalyzerInfoCache _analyzerInfoCache = new();
         private readonly IGlobalOptionService _globalOptions;
@@ -37,6 +43,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             _globalOptions = globalOptions;
         }
 
+#if false
         public IIncrementalAnalyzer CreateIncrementalAnalyzer(Workspace workspace)
         {
             if (_globalOptions.IsLspPullDiagnostics())
@@ -48,6 +55,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
             return new DefaultDiagnosticIncrementalAnalyzer(this, workspace);
         }
+#endif
 
         public event EventHandler<ImmutableArray<DiagnosticsUpdatedArgs>> DiagnosticsUpdated;
         public event EventHandler DiagnosticsCleared { add { } remove { } }
@@ -64,6 +72,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         internal void RaiseDiagnosticsUpdated(ImmutableArray<DiagnosticsUpdatedArgs> state)
             => DiagnosticsUpdated?.Invoke(this, state);
 
+#if false
         private sealed class DefaultDiagnosticIncrementalAnalyzer : IIncrementalAnalyzer
         {
             private readonly DefaultDiagnosticAnalyzerService _service;
@@ -274,5 +283,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     => Hash.Combine(_workspaceKind.GetHashCode(), base.GetHashCode());
             }
         }
+#endif
     }
 }
