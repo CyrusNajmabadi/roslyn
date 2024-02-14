@@ -8,6 +8,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Microsoft.CodeAnalysis.FindSymbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -24,10 +25,10 @@ namespace Microsoft.CodeAnalysis
             private abstract class CompilationTrackerState
             {
                 /// <summary>
-                /// Whether the generated documents in <see cref="GeneratorInfo"/> are frozen and generators should
-                /// never be ran again, ever, even if a document is later changed. This is used to ensure that when we
-                /// produce a frozen solution for partial semantics, further downstream forking of that solution won't
-                /// rerun generators. This is because of two reasons:
+                /// Whether the generated documents in <see cref="WithCompilationTrackerState.GeneratorInfo"/> are
+                /// frozen and generators should never be ran again, ever, even if a document is later changed. This is
+                /// used to ensure that when we produce a frozen solution for partial semantics, further downstream
+                /// forking of that solution won't rerun generators. This is because of two reasons:
                 /// <list type="number">
                 /// <item>Generally once we've produced a frozen solution with partial semantics, we now want speed rather
                 /// than accuracy; a generator running in a later path will still cause issues there.</item>
@@ -38,6 +39,25 @@ namespace Microsoft.CodeAnalysis
                 /// </summary>
                 public readonly bool IsFrozen;
 
+                protected CompilationTrackerState(bool isFrozen)
+                {
+                    IsFrozen = isFrozen;
+                }
+            }
+
+            private sealed class NoCompilationState : CompilationTrackerState
+            {
+                public static readonly NoCompilationState FrozenState = new NoCompilationState(isFrozen: true);
+                public static readonly NoCompilationState NotFrozenState = new NoCompilationState(isFrozen: false);
+
+                private NoCompilationState(bool isFrozen)
+                    : base(isFrozen)
+                {
+                }
+            }
+
+            private abstract class WithCompilationTrackerState : CompilationTrackerState
+            {
                 /// <summary>
                 /// The best compilation that is available that source generators have not ran on. May be an
                 /// in-progress, full declaration, a final compilation.
@@ -46,12 +66,12 @@ namespace Microsoft.CodeAnalysis
 
                 public CompilationTrackerGeneratorInfo GeneratorInfo { get; }
 
-                protected CompilationTrackerState(
+                protected WithCompilationTrackerState(
                     bool isFrozen,
                     Compilation compilationWithoutGeneratedDocuments,
                     CompilationTrackerGeneratorInfo generatorInfo)
+                    : base(isFrozen)
                 {
-                    IsFrozen = isFrozen;
                     CompilationWithoutGeneratedDocuments = compilationWithoutGeneratedDocuments;
                     GeneratorInfo = generatorInfo;
 
@@ -75,7 +95,7 @@ namespace Microsoft.CodeAnalysis
             /// A state where we are holding onto a previously built compilation, and have a known set of transformations
             /// that could get us to a more final state.
             /// </summary>
-            private sealed class InProgressState : CompilationTrackerState
+            private sealed class InProgressState : WithCompilationTrackerState
             {
                 /// <summary>
                 /// The list of changes that have happened since we last computed a compilation. The oldState corresponds to
@@ -140,7 +160,7 @@ namespace Microsoft.CodeAnalysis
             /// cref="Compilation"/>s from other <see cref="CompilationTrackerState"/>s are passed out, then these other
             /// APIs will not function correctly.
             /// </summary>
-            private sealed class FinalCompilationTrackerState : CompilationTrackerState
+            private sealed class FinalCompilationTrackerState : WithCompilationTrackerState
             {
                 /// <summary>
                 /// Specifies whether <see cref="FinalCompilationWithGeneratedDocuments"/> and all compilations it

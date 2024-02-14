@@ -37,7 +37,7 @@ namespace Microsoft.CodeAnalysis
             /// <summary>
             /// Access via the <see cref="ReadState"/> and <see cref="WriteState"/> methods.
             /// </summary>
-            private CompilationTrackerState? _stateDoNotAccessDirectly;
+            private CompilationTrackerState _stateDoNotAccessDirectly;
 
             // guarantees only one thread is building at a time
             private readonly SemaphoreSlim _buildLock = new(initialCount: 1);
@@ -52,7 +52,7 @@ namespace Microsoft.CodeAnalysis
 
             private CompilationTracker(
                 ProjectState project,
-                CompilationTrackerState? state,
+                CompilationTrackerState state,
                 SkeletonReferenceCache cachedSkeletonReferences)
             {
                 Contract.ThrowIfNull(project);
@@ -71,11 +71,11 @@ namespace Microsoft.CodeAnalysis
             /// and will have no extra information beyond the project itself.
             /// </summary>
             public CompilationTracker(ProjectState project)
-                : this(project, state: null, cachedSkeletonReferences: new())
+                : this(project, state: NoCompilationState.NotFrozenState, cachedSkeletonReferences: new())
             {
             }
 
-            private CompilationTrackerState? ReadState()
+            private CompilationTrackerState ReadState()
                 => Volatile.Read(ref _stateDoNotAccessDirectly);
 
             private void WriteState(CompilationTrackerState state)
@@ -89,7 +89,9 @@ namespace Microsoft.CodeAnalysis
                 get
                 {
                     var state = this.ReadState();
-                    return state?.GeneratorInfo.Driver;
+                    return state is WithCompilationTrackerState withCompilation
+                        ? withCompilation.GeneratorInfo.Driver
+                        : null;
                 }
             }
 
@@ -124,20 +126,19 @@ namespace Microsoft.CodeAnalysis
 
                 // We should never fork into a FinalCompilationTrackerState.  We must always be at some state prior to
                 // it since some change has happened, and we may now need to run generators.
-                Contract.ThrowIfTrue(forkedTrackerState is FinalCompilationTrackerState);
-                Contract.ThrowIfFalse(forkedTrackerState is null or InProgressState);
+                Contract.ThrowIfTrue(forkedTrackerState is null);
                 return new CompilationTracker(
                     newProjectState,
                     forkedTrackerState,
                     this.SkeletonReferenceCache.Clone());
 
-                CompilationTrackerState? ForkTrackerState()
+                CompilationTrackerState ForkTrackerState()
                 {
                     var state = this.ReadState();
-                    if (state is null)
-                        return null;
+                    if (state is not WithCompilationTrackerState withCompilationTrackerState)
+                        return state;
 
-                    var (compilationWithoutGeneratedDocuments, staleCompilationWithGeneratedDocuments) = state switch
+                    var (compilationWithoutGeneratedDocuments, staleCompilationWithGeneratedDocuments) = withCompilationTrackerState switch
                     {
                         InProgressState inProgressState => (inProgressState.CompilationWithoutGeneratedDocuments, inProgressState.StaleCompilationWithGeneratedDocuments),
                         FinalCompilationTrackerState finalState => (finalState.CompilationWithoutGeneratedDocuments, finalState.FinalCompilationWithGeneratedDocuments),
@@ -145,7 +146,7 @@ namespace Microsoft.CodeAnalysis
                     };
 
                     var finalSteps = UpdatePendingTranslationSteps(
-                        state switch
+                        withCompilationTrackerState switch
                         {
                             InProgressState { PendingTranslationSteps: var pendingTranslationSteps } => pendingTranslationSteps,
                             FinalCompilationTrackerState => [],
@@ -153,9 +154,9 @@ namespace Microsoft.CodeAnalysis
                         });
 
                     var newState = InProgressState.Create(
-                        state.IsFrozen,
+                        withCompilationTrackerState.IsFrozen,
                         compilationWithoutGeneratedDocuments,
-                        state.GeneratorInfo,
+                        withCompilationTrackerState.GeneratorInfo,
                         staleCompilationWithGeneratedDocuments,
                         finalSteps);
 
@@ -314,7 +315,7 @@ namespace Microsoft.CodeAnalysis
             /// compilation or any known old compilation in that order of preference. The compilation state that is
             /// returned will have a compilation that is retained so that it cannot disappear.
             /// </summary>
-            private void GetPartialCompilationState(
+            private void S(
                 SolutionCompilationState compilationState,
                 DocumentId? documentId,
                 out ProjectState inProgressProject,
@@ -537,10 +538,12 @@ namespace Microsoft.CodeAnalysis
                     // Transition from wherever we're currently at to the 'all trees parsed' state.
                     var expandedInProgressState = state switch
                     {
-                        InProgressState inProgressState => inProgressState,
+                        InProgressState inProgressState
+                            => inProgressState,
 
                         // We've got nothing.  Build it from scratch :(
-                        null => await BuildInProgressStateFromNoCompilationStateAsync().ConfigureAwait(false),
+                        NoCompilationState noCompilationState
+                            => await BuildInProgressStateFromNoCompilationStateAsync(noCompilationState).ConfigureAwait(false),
 
                         _ => throw ExceptionUtilities.UnexpectedValue(state.GetType())
                     };
@@ -554,7 +557,8 @@ namespace Microsoft.CodeAnalysis
                     "https://github.com/dotnet/roslyn/issues/23582",
                     Constraint = "Avoid calling " + nameof(Compilation.AddSyntaxTrees) + " in a loop due to allocation overhead.")]
 
-                async Task<InProgressState> BuildInProgressStateFromNoCompilationStateAsync()
+                async Task<InProgressState> BuildInProgressStateFromNoCompilationStateAsync(
+                    NoCompilationState noCompilationState)
                 {
                     try
                     {
@@ -570,12 +574,11 @@ namespace Microsoft.CodeAnalysis
 
                         compilation = compilation.AddSyntaxTrees(trees);
 
-                        // We only got here when we had no compilation state at all.  So we couldn't have gotten
-                        // here from a frozen state (as a frozen state always ensures we have a
-                        // WithCompilationTrackerState).  As such, we can safely still preserve that we're not
-                        // frozen here.
                         var allSyntaxTreesParsedState = InProgressState.Create(
-                            isFrozen: false, compilation, CompilationTrackerGeneratorInfo.Empty, staleCompilationWithGeneratedDocuments: null,
+                            noCompilationState.IsFrozen,
+                            compilation,
+                            CompilationTrackerGeneratorInfo.Empty,
+                            staleCompilationWithGeneratedDocuments: null,
                             pendingTranslationSteps: []);
 
                         WriteState(allSyntaxTreesParsedState);
@@ -832,7 +835,7 @@ namespace Microsoft.CodeAnalysis
                 {
                     // if we have a compilation and its the correct language, use a simple compilation reference in any
                     // state it happens to be in right now
-                    if (ReadState() is CompilationTrackerState compilationState)
+                    if (ReadState() is WithCompilationTrackerState compilationState)
                         return compilationState.CompilationWithoutGeneratedDocuments.ToMetadataReference(projectReference.Aliases, projectReference.EmbedInteropTypes);
                 }
                 else
