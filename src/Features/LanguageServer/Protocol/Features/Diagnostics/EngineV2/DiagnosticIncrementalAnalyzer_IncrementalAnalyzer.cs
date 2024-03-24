@@ -50,7 +50,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics.EngineV2
                 var result = await GetProjectAnalysisDataAsync(compilationWithAnalyzers, project, ideOptions, stateSets, forceAnalyzerRun, cancellationToken).ConfigureAwait(false);
 
                 // no cancellation after this point.
-                using var _ = ArrayBuilder<StateSet>.GetInstance(out var analyzedStateSetsBuilder);
                 foreach (var stateSet in stateSets)
                 {
                     var state = stateSet.GetOrCreateProjectState(project.Id);
@@ -58,14 +57,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics.EngineV2
                     if (result.TryGetResult(stateSet.Analyzer, out var analyzerResult))
                     {
                         await state.SaveToInMemoryStorageAsync(project, analyzerResult).ConfigureAwait(false);
-                        analyzedStateSetsBuilder.Add(stateSet);
                     }
-                }
-
-                if (analyzedStateSetsBuilder.Count > 0)
-                {
-                    var oldResult = result.OldResult ?? ImmutableDictionary<DiagnosticAnalyzer, DiagnosticAnalysisResult>.Empty;
-                    RaiseProjectDiagnosticsIfNeeded(project, analyzedStateSetsBuilder.ToImmutable(), oldResult, result.Result);
                 }
             }
             catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
@@ -161,77 +153,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics.EngineV2
             var analyzerConfigOptions = project.GetAnalyzerConfigOptions();
 
             return descriptors.Any(static (d, arg) => d.GetEffectiveSeverity(arg.CompilationOptions, arg.analyzerConfigOptions?.AnalyzerOptions, arg.analyzerConfigOptions?.TreeOptions) != ReportDiagnostic.Hidden, (project.CompilationOptions, analyzerConfigOptions));
-        }
-
-        private void RaiseProjectDiagnosticsIfNeeded(
-            Project project,
-            IEnumerable<StateSet> stateSets,
-            ImmutableDictionary<DiagnosticAnalyzer, DiagnosticAnalysisResult> result)
-        {
-            RaiseProjectDiagnosticsIfNeeded(project, stateSets, ImmutableDictionary<DiagnosticAnalyzer, DiagnosticAnalysisResult>.Empty, result);
-        }
-
-        private void RaiseProjectDiagnosticsIfNeeded(
-            Project project,
-            IEnumerable<StateSet> stateSets,
-            ImmutableDictionary<DiagnosticAnalyzer, DiagnosticAnalysisResult> oldResult,
-            ImmutableDictionary<DiagnosticAnalyzer, DiagnosticAnalysisResult> newResult)
-        {
-            if (oldResult.Count == 0 && newResult.Count == 0)
-            {
-                // there is nothing to update
-                return;
-            }
-
-            AnalyzerService.RaiseBulkDiagnosticsUpdated(async raiseEvents =>
-            {
-                using var argsBuilder = TemporaryArray<DiagnosticsUpdatedArgs>.Empty;
-                foreach (var stateSet in stateSets)
-                {
-                    var analyzer = stateSet.Analyzer;
-
-                    var oldAnalysisResult = GetResultOrEmpty(oldResult, analyzer, project.Id, VersionStamp.Default);
-                    var newAnalysisResult = GetResultOrEmpty(newResult, analyzer, project.Id, VersionStamp.Default);
-
-                    // Perf - 4 different cases.
-                    // upper 3 cases can be removed and it will still work. but this is hot path so if we can bail out
-                    // without any allocations, that's better.
-                    if (oldAnalysisResult.IsEmpty && newAnalysisResult.IsEmpty)
-                    {
-                        // nothing to do
-                        continue;
-                    }
-
-                    if (!oldAnalysisResult.IsEmpty && newAnalysisResult.IsEmpty)
-                    {
-                        RoslynDebug.Assert(oldAnalysisResult.DocumentIds != null);
-
-                        // remove old diagnostics
-                        AddProjectDiagnosticsRemovedArgs(ref argsBuilder.AsRef(), stateSet, oldAnalysisResult.ProjectId, oldAnalysisResult.DocumentIds, handleActiveFile: false);
-                        continue;
-                    }
-
-                    if (oldAnalysisResult.IsEmpty && !newAnalysisResult.IsEmpty)
-                    {
-                        // add new diagnostics
-                        argsBuilder.AddRange(await CreateProjectDiagnosticsCreatedArgsAsync(project, stateSet, oldAnalysisResult, newAnalysisResult, CancellationToken.None).ConfigureAwait(false));
-                        continue;
-                    }
-
-                    // both old and new has items in them. update existing items
-                    RoslynDebug.Assert(oldAnalysisResult.DocumentIds != null);
-                    RoslynDebug.Assert(newAnalysisResult.DocumentIds != null);
-
-                    // first remove ones no longer needed.
-                    var documentsToRemove = oldAnalysisResult.DocumentIds.Except(newAnalysisResult.DocumentIds);
-                    AddProjectDiagnosticsRemovedArgs(ref argsBuilder.AsRef(), stateSet, oldAnalysisResult.ProjectId, documentsToRemove, handleActiveFile: false);
-
-                    // next update or create new ones
-                    argsBuilder.AddRange(await CreateProjectDiagnosticsCreatedArgsAsync(project, stateSet, oldAnalysisResult, newAnalysisResult, CancellationToken.None).ConfigureAwait(false));
-                }
-
-                raiseEvents(argsBuilder.ToImmutableAndClear());
-            });
         }
 
         private void AddDocumentDiagnosticsArgsIfNeeded(

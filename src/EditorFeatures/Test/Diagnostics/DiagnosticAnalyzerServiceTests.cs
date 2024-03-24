@@ -78,15 +78,9 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
             var analyzer = service.CreateIncrementalAnalyzer(workspace);
             var globalOptions = exportProvider.GetExportedValue<IGlobalOptionService>();
 
-            // listen to events
-            // check empty since this could be called to clear up existing diagnostics
-            service.DiagnosticsUpdated += (s, a) =>
-            {
-                Assert.All(a, e => Assert.Empty(e.Diagnostics));
-            };
-
-            await analyzer.GetDiagnosticsAsync(
+            var diagnostics = await analyzer.GetDiagnosticsAsync(
                 workspace.CurrentSolution, projectId: null, documentId: null, includeSuppressedDiagnostics: true, includeNonLocalDocumentDiagnostics: true, CancellationToken.None);
+            Assert.Empty(diagnostics);
 
             // wait for all events to raised
             await ((AsynchronousOperationListener)service.Listener).ExpeditedWaitAsync().ConfigureAwait(false);
@@ -200,44 +194,24 @@ dotnet_diagnostic.{DisabledByDefaultAnalyzer.s_compilationRule.Id}.severity = wa
             var service = Assert.IsType<DiagnosticAnalyzerService>(exportProvider.GetExportedValue<IDiagnosticAnalyzerService>());
             var analyzer = service.CreateIncrementalAnalyzer(workspace);
 
-            // listen to events
-            var syntaxDiagnostic = false;
-            var semanticDiagnostic = false;
-            var compilationDiagnostic = false;
-            service.DiagnosticsUpdated += (s, aCollection) =>
-            {
-                foreach (var a in aCollection)
-                {
-                    var diagnostics = a.Diagnostics;
-                    var diagnostic = Assert.Single(diagnostics);
-                    Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-
-                    if (diagnostic.Id == DisabledByDefaultAnalyzer.s_syntaxRule.Id)
-                    {
-                        syntaxDiagnostic = true;
-                    }
-                    else if (diagnostic.Id == DisabledByDefaultAnalyzer.s_semanticRule.Id)
-                    {
-                        semanticDiagnostic = true;
-                    }
-                    else if (diagnostic.Id == DisabledByDefaultAnalyzer.s_compilationRule.Id)
-                    {
-                        compilationDiagnostic = true;
-                    }
-                }
-            };
-
             // open document
             workspace.OpenDocument(document.Id);
 
             await analyzer.ForceAnalyzeProjectAsync(document.Project, CancellationToken.None);
 
+            var diagnostics = await analyzer.GetDiagnosticsAsync(document.Project.Solution,
+                document.Project.Id,
+                document.Id,
+                includeSuppressedDiagnostics: true,
+                includeNonLocalDocumentDiagnostics: true,
+                CancellationToken.None);
+
             // wait for all events to raised
             await ((AsynchronousOperationListener)service.Listener).ExpeditedWaitAsync().ConfigureAwait(false);
 
-            Assert.Equal(enabledWithEditorconfig, syntaxDiagnostic);
-            Assert.Equal(enabledWithEditorconfig, semanticDiagnostic);
-            Assert.Equal(enabledWithEditorconfig, compilationDiagnostic);
+            Assert.True(diagnostics.Contains(d => d.Id == DisabledByDefaultAnalyzer.s_syntaxRule.Id));
+            Assert.True(diagnostics.Contains(d => d.Id == DisabledByDefaultAnalyzer.s_semanticRule.Id));
+            Assert.True(diagnostics.Contains(d => d.Id == DisabledByDefaultAnalyzer.s_compilationRule.Id));
         }
 
         private static async Task TestAnalyzerAsync(
@@ -300,34 +274,32 @@ dotnet_diagnostic.{DisabledByDefaultAnalyzer.s_compilationRule.Id}.severity = wa
             var service = Assert.IsType<DiagnosticAnalyzerService>(exportProvider.GetExportedValue<IDiagnosticAnalyzerService>());
             var analyzer = service.CreateIncrementalAnalyzer(workspace);
 
-            // listen to events
-            service.DiagnosticsUpdated += (s, aCollection) =>
-            {
-                foreach (var a in aCollection)
-                {
-                    if (workspace.IsDocumentOpen(a.DocumentId))
-                    {
-                        var diagnostics = a.Diagnostics;
-                        // check the diagnostics are reported
-                        Assert.Equal(document.Id, a.DocumentId);
-                        Assert.Equal(1, diagnostics.Length);
-                        Assert.Equal(OpenFileOnlyAnalyzer.s_syntaxRule.Id, diagnostics[0].Id);
-                    }
-
-                    if (a.DocumentId == document.Id && !workspace.IsDocumentOpen(a.DocumentId))
-                    {
-                        // check the diagnostics reported are cleared
-                        var diagnostics = a.Diagnostics;
-                        Assert.Equal(0, diagnostics.Length);
-                    }
-                }
-            };
-
             // open document
             workspace.OpenDocument(document.Id);
 
+            var diagnostics = await service.GetDiagnosticsAsync(
+                document.Project.Solution,
+                document.Project.Id,
+                document.Id,
+                includeSuppressedDiagnostics: true,
+                includeNonLocalDocumentDiagnostics: true,
+                CancellationToken.None);
+
+            Assert.Equal(1, diagnostics.Length);
+            Assert.Equal(OpenFileOnlyAnalyzer.s_syntaxRule.Id, diagnostics[0].Id);
+
             // close document
             workspace.CloseDocument(document.Id);
+
+            await service.ForceAnalyzeProjectAsync(document.Project, CancellationToken.None);
+            diagnostics = await service.GetDiagnosticsAsync(
+                document.Project.Solution,
+                document.Project.Id,
+                document.Id,
+                includeSuppressedDiagnostics: true,
+                includeNonLocalDocumentDiagnostics: true,
+                CancellationToken.None);
+            Assert.Equal(0, diagnostics.Length);
 
             // wait for all events to raised
             await ((AsynchronousOperationListener)service.Listener).ExpeditedWaitAsync().ConfigureAwait(false);

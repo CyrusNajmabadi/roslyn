@@ -59,16 +59,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics.EngineV2
 
                         await state.SaveToInMemoryStorageAsync(project, result).ConfigureAwait(false);
                     }
-
-                    // Raise diagnostic updated events after the new diagnostics have been stored into the in-memory cache.
-                    if (diagnostics.IsEmpty)
-                    {
-                        ClearAllDiagnostics(stateSets, projectId);
-                    }
-                    else
-                    {
-                        RaiseProjectDiagnosticsIfNeeded(project, stateSets, newResult);
-                    }
                 }
 
                 // Refresh live diagnostics after solution build completes.
