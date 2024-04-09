@@ -133,7 +133,7 @@ public sealed class SolutionInfo
             return new SolutionAttributes(Id, newVersion, newFilePath, newTelemetryId);
         }
 
-        public void WriteTo(ObjectWriter writer)
+        public void WriteTo(ObjectPipeWriter writer)
         {
             Id.WriteTo(writer);
 

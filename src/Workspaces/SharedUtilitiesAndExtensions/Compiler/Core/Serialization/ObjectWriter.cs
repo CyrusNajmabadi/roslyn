@@ -521,6 +521,8 @@ internal sealed partial class ObjectWriter : IDisposable
 
 internal sealed class ObjectPipeWriter
 {
+    private delegate void WriteCallback<T>(T value, Span<byte> span);
+
     private readonly PipeWriter _writer;
 
     public async ValueTask FlushAsync(CancellationToken cancellationToken)
@@ -528,11 +530,19 @@ internal sealed class ObjectPipeWriter
         throw new NotImplementedException();
     }
 
-    public void WriteInt32(int value)
+    private void WriteData<T>(T data, int dataSizeInBytes, WriteCallback<T> callback)
     {
-        var span = _writer.GetSpan(sizeof(int));
-        BinaryPrimitives.WriteInt32LittleEndian(span, value);
-        _writer.Advance(sizeof(int));
+        var span = _writer.GetSpan(dataSizeInBytes);
+        callback(data, span);
+        _writer.Advance(dataSizeInBytes);
+    }
+
+    public void WriteInt32(int value)
+        => WriteData(value, sizeof(int), static (value, span) => BinaryPrimitives.WriteInt32LittleEndian(span, value));
+
+    public void WriteGuid(Guid guid)
+    {
+        throw new NotImplementedException();
     }
 }
 
