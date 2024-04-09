@@ -541,9 +541,7 @@ internal sealed class ObjectPipeWriter
         => WriteData(value, sizeof(int), static (value, span) => BinaryPrimitives.WriteInt32LittleEndian(span, value));
 
     public void WriteGuid(Guid guid)
-    {
-        throw new NotImplementedException();
-    }
+        => WriteData(guid, dataSizeInBytes: 16, static (value, span) => Contract.ThrowIfTrue(value.TryWriteBytes(span)));
 }
 
 internal sealed class ObjectPipeReader
