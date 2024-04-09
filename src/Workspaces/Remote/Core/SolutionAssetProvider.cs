@@ -79,9 +79,9 @@ namespace Microsoft.CodeAnalysis.Remote
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            using var stream = new PipeWriterStream(pipeWriter);
+            using var objectWriter = new ObjectPipeWriter(pipeWriter);
             await RemoteHostAssetSerialization.WriteDataAsync(
-                stream, resultMap, serializer, scope.ReplicationContext,
+                objectWriter, resultMap, serializer, scope.ReplicationContext,
                 solutionChecksum, checksums, cancellationToken).ConfigureAwait(false);
         }
 

@@ -21,7 +21,7 @@ namespace Microsoft.CodeAnalysis.Remote
     internal static class RemoteHostAssetSerialization
     {
         public static async ValueTask WriteDataAsync(
-            Stream stream,
+            ObjectPipeWriter writer,
             Dictionary<Checksum, object> assetMap,
             ISerializerService serializer,
             SolutionReplicationContext context,
@@ -29,8 +29,6 @@ namespace Microsoft.CodeAnalysis.Remote
             ReadOnlyMemory<Checksum> checksums,
             CancellationToken cancellationToken)
         {
-            using var writer = new ObjectWriter(stream, leaveOpen: true, cancellationToken);
-
             // This information is not actually needed on the receiving end.  However, we still send it so that the
             // receiver can assert that both sides are talking about the same solution snapshot and no weird invariant
             // breaks have occurred.
@@ -52,12 +50,12 @@ namespace Microsoft.CodeAnalysis.Remote
                 // synchronous without any blocking on async flushing, while also ensuring that we're not buffering the
                 // entire stream of data into the pipe before it gets sent to the other side.
                 WriteAsset(writer, serializer, context, asset, cancellationToken);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
             return;
 
-            static void WriteAsset(ObjectWriter writer, ISerializerService serializer, SolutionReplicationContext context, object asset, CancellationToken cancellationToken)
+            static void WriteAsset(ObjectPipeWriter writer, ISerializerService serializer, SolutionReplicationContext context, object asset, CancellationToken cancellationToken)
             {
                 Contract.ThrowIfNull(asset);
                 var kind = asset.GetWellKnownSynchronizationKind();
@@ -88,10 +86,8 @@ namespace Microsoft.CodeAnalysis.Remote
         }
 
         public static void ReadData<T>(
-            Stream stream, Checksum solutionChecksum, int objectCount, ISerializerService serializerService, Action<int, T> callback, CancellationToken cancellationToken)
+            ObjectPipeReader reader, Checksum solutionChecksum, int objectCount, ISerializerService serializerService, Action<int, T> callback, CancellationToken cancellationToken)
         {
-            using var reader = ObjectReader.GetReader(stream, leaveOpen: true, cancellationToken);
-
             // Ensure that no invariants were broken and that both sides of the communication channel are talking about
             // the same pinned solution.
             var responseSolutionChecksum = Checksum.ReadFrom(reader);
@@ -102,7 +98,7 @@ namespace Microsoft.CodeAnalysis.Remote
                 var kind = (WellKnownSynchronizationKind)reader.ReadInt32();
 
                 // in service hub, cancellation means simply closed stream
-                var result = serializerService.Deserialize(kind, reader, cancellationToken);
+                var result = serializerService.Deserialize(kind, pipeReader, cancellationToken);
                 Contract.ThrowIfNull(result);
                 callback(i, (T)result);
             }

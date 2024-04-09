@@ -3,12 +3,16 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipelines;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.PooledObjects;
 using EncodingExtensions = Microsoft.CodeAnalysis.EncodingExtensions;
@@ -514,3 +518,43 @@ internal sealed partial class ObjectWriter : IDisposable
         }
     }
 }
+
+internal sealed class ObjectPipeWriter
+{
+    private readonly PipeWriter _writer;
+
+    public async ValueTask FlushAsync(CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void WriteInt32(int value)
+    {
+        var span = _writer.GetSpan(sizeof(int));
+        BinaryPrimitives.WriteInt32LittleEndian(span, value);
+        _writer.Advance(sizeof(int));
+    }
+}
+
+internal sealed class ObjectPipeReader
+{
+    private readonly PipeReader _reader;
+
+    public async ValueTask<int> ReadInt32Async(CancellationToken cancellationToken)
+    {
+        var readResult = await _reader.ReadAtLeastAsync(sizeof(int), cancellationToken).ConfigureAwait(false);
+        var result = ReadInt32(readResult);
+        _reader.AdvanceTo(readResult.Buffer.GetPosition(sizeof(int)));
+        return result;
+
+        static int ReadInt32(ReadResult readResult)
+        {
+            var sequence = new SequenceReader<byte>(readResult.Buffer);
+            Span<byte> destination = stackalloc byte[4];
+            Contract.ThrowIfFalse(sequence.TryCopyTo(destination));
+
+            return BinaryPrimitives.ReadInt32LittleEndian(destination);
+        }
+    }
+}
+

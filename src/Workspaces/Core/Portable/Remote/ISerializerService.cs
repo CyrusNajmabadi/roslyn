@@ -10,11 +10,11 @@ namespace Microsoft.CodeAnalysis.Serialization;
 
 internal interface ISerializerService : IWorkspaceService
 {
-    void Serialize(object value, ObjectWriter writer, SolutionReplicationContext context, CancellationToken cancellationToken);
+    void Serialize(object value, ObjectPipeWriter writer, SolutionReplicationContext context, CancellationToken cancellationToken);
 
     void SerializeParseOptions(ParseOptions options, ObjectWriter writer);
 
-    object Deserialize(WellKnownSynchronizationKind kind, ObjectReader reader, CancellationToken cancellationToken);
+    object Deserialize(WellKnownSynchronizationKind kind, ObjectPipeReader reader, CancellationToken cancellationToken);
 
     Checksum CreateChecksum(object value, CancellationToken cancellationToken);
     Checksum CreateParseOptionsChecksum(ParseOptions value);
