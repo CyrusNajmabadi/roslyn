@@ -565,10 +565,11 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         private readonly AnalyzerOptions _options;
         private readonly CancellationToken _cancellationToken;
 
+        /// <summary>Semantic model that is the subject of analysis</summary>
+        public SemanticModel SemanticModel => _semanticModel;
+
         /// <inheritdoc cref="CompilationStartAnalysisContext.Compilation"/>
         public Compilation Compilation => _semanticModel.Compilation;
-
-        public SemanticModel SemanticModel => _semanticModel;
 
         /// <inheritdoc cref="CompilationStartAnalysisContext.Options"/>
         public AnalyzerOptions Options => _options;
