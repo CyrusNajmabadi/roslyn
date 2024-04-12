@@ -60,6 +60,14 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         public abstract void RegisterCompilationAction(Action<CompilationAnalysisContext> action);
 
         /// <summary>
+        /// Register an action to be executed at semantic model start. A semantic model start action can register other
+        /// actions and/or collect state information to be used in diagnostic analysis, but cannot itself report any
+        /// <see cref="Diagnostic"/>s.
+        /// </summary>
+        /// <param name="action">Action to be executed at compilation start.</param>
+        public abstract void RegisterSemanticModelStartAction(Action<SemanticModelStartAnalysisContext> action);
+
+        /// <summary>
         /// Register an action to be executed at completion of semantic analysis of a document,
         /// which will operate on the <see cref="SemanticModel"/> of the document. A semantic model action
         /// reports <see cref="Diagnostic"/>s about the model.
@@ -546,6 +554,70 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
         internal virtual bool TryGetValueCore<TKey, TValue>(TKey key, AnalysisValueProvider<TKey, TValue> valueProvider, [MaybeNullWhen(false)] out TValue value)
             where TKey : class
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public abstract class SemanticModelStartAnalysisContext
+    {
+        private readonly SemanticModel _semanticModel;
+        private readonly AnalyzerOptions _options;
+        private readonly CancellationToken _cancellationToken;
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.Compilation"/>
+        public Compilation Compilation => _semanticModel.Compilation;
+
+        public SemanticModel SemanticModel => _semanticModel;
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.Options"/>
+        public AnalyzerOptions Options => _options;
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.CancellationToken"/>
+        public CancellationToken CancellationToken => _cancellationToken;
+
+        protected SemanticModelStartAnalysisContext(SemanticModel semanticModel, AnalyzerOptions options, CancellationToken cancellationToken)
+        {
+            _semanticModel = semanticModel;
+            _options = options;
+            _cancellationToken = cancellationToken;
+        }
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterCodeBlockStartAction{TLanguageKindEnum}(Action{CodeBlockStartAnalysisContext{TLanguageKindEnum}})"/>
+        public abstract void RegisterCodeBlockStartAction<TLanguageKindEnum>(Action<CodeBlockStartAnalysisContext<TLanguageKindEnum>> action) where TLanguageKindEnum : struct;
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterCodeBlockAction"/>
+        public abstract void RegisterCodeBlockAction(Action<CodeBlockAnalysisContext> action);
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterOperationBlockStartAction"/>
+        public virtual void RegisterOperationBlockStartAction(Action<OperationBlockStartAnalysisContext> action)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterOperationBlockAction"/>
+        public virtual void RegisterOperationBlockAction(Action<OperationBlockAnalysisContext> action)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterSyntaxNodeAction{TLanguageKindEnum}(Action{SyntaxNodeAnalysisContext}, TLanguageKindEnum[])"/>
+        public void RegisterSyntaxNodeAction<TLanguageKindEnum>(Action<SyntaxNodeAnalysisContext> action, params TLanguageKindEnum[] syntaxKinds) where TLanguageKindEnum : struct
+        {
+            this.RegisterSyntaxNodeAction(action, syntaxKinds.AsImmutableOrEmpty());
+        }
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterSyntaxNodeAction{TLanguageKindEnum}(Action{SyntaxNodeAnalysisContext}, ImmutableArray{TLanguageKindEnum})"/>
+        public abstract void RegisterSyntaxNodeAction<TLanguageKindEnum>(Action<SyntaxNodeAnalysisContext> action, ImmutableArray<TLanguageKindEnum> syntaxKinds) where TLanguageKindEnum : struct;
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterOperationAction(Action{OperationAnalysisContext}, OperationKind[])"/>
+        public void RegisterOperationAction(Action<OperationAnalysisContext> action, params OperationKind[] operationKinds)
+        {
+            this.RegisterOperationAction(action, operationKinds.AsImmutableOrEmpty());
+        }
+
+        /// <inheritdoc cref="CompilationStartAnalysisContext.RegisterSyntaxNodeAction{TLanguageKindEnum}(Action{SyntaxNodeAnalysisContext}, ImmutableArray{TLanguageKindEnum})"/>
+        public virtual void RegisterOperationAction(Action<OperationAnalysisContext> action, ImmutableArray<OperationKind> operationKinds)
         {
             throw new NotImplementedException();
         }
