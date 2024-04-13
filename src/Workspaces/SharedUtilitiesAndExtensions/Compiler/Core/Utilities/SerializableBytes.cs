@@ -6,10 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -95,7 +92,7 @@ internal static class SerializableBytes
     internal static PooledStream CreateWritableStream()
         => new ReadWriteStream();
 
-    public class PooledStream : Stream
+    public abstract class PooledStream : Stream
     {
         protected List<byte[]> chunks;
 
@@ -176,16 +173,9 @@ internal static class SerializableBytes
         public override int ReadByte()
         {
             if (position >= length)
-            {
                 return -1;
-            }
 
-            var currentIndex = CurrentChunkIndex;
-            var chunk = chunks[currentIndex];
-
-            var currentOffset = CurrentChunkOffset;
-            var result = chunk[currentOffset];
-
+            var result = chunks[CurrentChunkIndex][CurrentChunkOffset];
             this.position++;
             return result;
         }
@@ -222,20 +212,6 @@ internal static class SerializableBytes
             }
 
             return (int)(position - oldPosition);
-        }
-
-        public byte[] ToArray()
-        {
-            if (this.Length == 0)
-            {
-                return [];
-            }
-
-            var array = new byte[this.Length];
-
-            // read entire array
-            Read(this.chunks, 0, this.length, array, 0, array.Length);
-            return array;
         }
 
         public ImmutableArray<byte> ToImmutableArray()
