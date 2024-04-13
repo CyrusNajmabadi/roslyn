@@ -106,13 +106,7 @@ internal static class SerializableBytes
             this.chunks = chunks;
         }
 
-        public override long Length
-        {
-            get
-            {
-                return this.length;
-            }
-        }
+        public override long Length => this.length;
 
         public override bool CanRead => true;
 
@@ -236,8 +230,8 @@ internal static class SerializableBytes
             return builder.MoveToImmutable();
         }
 
-        protected int CurrentChunkIndex { get { return GetChunkIndex(this.position); } }
-        protected int CurrentChunkOffset { get { return GetChunkOffset(this.position); } }
+        protected int CurrentChunkIndex => GetChunkIndex(this.position);
+        protected int CurrentChunkOffset => GetChunkOffset(this.position);
 
         protected static int GetChunkIndex(long value)
             => (int)(value / ChunkSize);
