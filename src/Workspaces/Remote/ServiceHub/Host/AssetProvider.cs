@@ -5,12 +5,15 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Serialization;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Shared.Utilities;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Remote;
@@ -21,6 +24,23 @@ namespace Microsoft.CodeAnalysis.Remote;
 internal sealed partial class AssetProvider(Checksum solutionChecksum, SolutionAssetCache assetCache, IAssetSource assetSource, ISerializerService serializerService)
     : AbstractAssetProvider
 {
+    private const string s_logFile = @"c:\temp\sync\synclog.txt";
+    private static readonly SharedStopwatch s_start = SharedStopwatch.StartNew();
+    private static readonly AsyncBatchingWorkQueue<string> s_logQueue = new(
+        TimeSpan.Zero,
+        async static (list, _) =>
+        {
+            var totalString = string.Join("", list);
+            IOUtilities.PerformIO(() => File.AppendAllText(s_logFile, totalString));
+        },
+        AsynchronousOperationListenerProvider.NullListener,
+        CancellationToken.None);
+
+    static AssetProvider()
+    {
+        IOUtilities.PerformIO(() => File.Delete(s_logFile));
+    }
+
     private const int PooledChecksumArraySize = 1024;
     private static readonly ObjectPool<Checksum[]> s_checksumPool = new(() => new Checksum[PooledChecksumArraySize], 16);
 
@@ -292,6 +312,8 @@ internal sealed partial class AssetProvider(Checksum solutionChecksum, SolutionA
                     Contract.ThrowIfTrue(missingChecksumsMemory.Span.IndexOf(Checksum.Null) >= 0);
 #endif
 
+                    var stopwatch = SharedStopwatch.StartNew();
+
                     await _assetSource.GetAssetsAsync(
                         _solutionChecksum, assetPath, missingChecksumsMemory, _serializerService,
                         static (
@@ -307,6 +329,11 @@ internal sealed partial class AssetProvider(Checksum solutionChecksum, SolutionA
                         },
                         (this, missingChecksums, callback, arg),
                         cancellationToken).ConfigureAwait(false);
+
+                    var time = stopwatch.Elapsed;
+                    var totalTime = s_start.Elapsed;
+
+                    s_logQueue.AddWork($"{missingChecksumsCount},{checksums.Count},{time},{totalTime},{typeof(T).Name}\r\n");
                 }
             }
             finally

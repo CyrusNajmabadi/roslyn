@@ -5,11 +5,14 @@
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Shared.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using static Microsoft.CodeAnalysis.Host.TemporaryStorageService;
@@ -25,6 +28,28 @@ namespace Microsoft.CodeAnalysis.Serialization;
 /// </summary>
 internal sealed class SerializableSourceText
 {
+    private static readonly string s_logFile = $@"c:\temp\sync\textlog-{Process.GetCurrentProcess().Id}.txt";
+    private static readonly SharedStopwatch s_start = SharedStopwatch.StartNew();
+
+    private static int s_textLoaderReadCount = 0;
+    private static int s_textLoaderCreatedCount = 0;
+
+    private static readonly AsyncBatchingWorkQueue s_logQueue = new(
+        TimeSpan.FromSeconds(1),
+        async static (cancellationToken) =>
+        {
+            File.AppendAllText(s_logFile, $"{s_textLoaderReadCount}/{s_textLoaderCreatedCount}\r\n");
+        }, AsynchronousOperationListenerProvider.NullListener, CancellationToken.None);
+
+    static SerializableSourceText()
+    {
+        IOUtilities.PerformIO(() =>
+        {
+            File.Delete(s_logFile);
+            File.AppendAllText(s_logFile, $"Created: {Process.GetCurrentProcess().ProcessName}\r\n");
+        });
+    }
+
     /// <summary>
     /// The storage location for <see cref="SourceText"/>.
     /// </summary>
@@ -200,14 +225,24 @@ internal sealed class SerializableSourceText
             SerializableSourceText text,
             string? filePath)
         {
+            Interlocked.Increment(ref s_textLoaderCreatedCount);
+            s_logQueue.AddWork();
             var version = VersionStamp.Create();
 
             this.FilePath = filePath;
             _lazyTextAndVersion = AsyncLazy.Create(
                 async static (tuple, cancellationToken) =>
-                    TextAndVersion.Create(await tuple.text.GetTextAsync(cancellationToken).ConfigureAwait(false), tuple.version, tuple.filePath),
+                {
+                    Interlocked.Increment(ref s_textLoaderReadCount);
+                    s_logQueue.AddWork();
+                    return TextAndVersion.Create(await tuple.text.GetTextAsync(cancellationToken).ConfigureAwait(false), tuple.version, tuple.filePath);
+                },
                 static (tuple, cancellationToken) =>
-                    TextAndVersion.Create(tuple.text.GetText(cancellationToken), tuple.version, tuple.filePath),
+                {
+                    Interlocked.Increment(ref s_textLoaderReadCount);
+                    s_logQueue.AddWork();
+                    return TextAndVersion.Create(tuple.text.GetText(cancellationToken), tuple.version, tuple.filePath);
+                },
                 (text, version, filePath));
         }
 
