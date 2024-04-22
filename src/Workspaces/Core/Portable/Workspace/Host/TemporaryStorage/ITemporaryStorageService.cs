@@ -5,6 +5,8 @@
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Host;
 
@@ -53,5 +55,8 @@ internal interface ITemporaryStorageServiceInternal : IWorkspaceService
     /// </summary>
     Stream ReadFromTemporaryStorageService(TemporaryStorageIdentifier storageIdentifier, CancellationToken cancellationToken);
 
-    ITemporaryTextStorageInternal CreateTemporaryTextStorage();
+    TemporaryStorageTextHandle WriteTextToTemporaryStorage(SourceText text, CancellationToken cancellationToken);
+    Task<TemporaryStorageTextHandle> WriteTextToTemporaryStorageAsync(SourceText text, CancellationToken cancellationToken);
+    SourceText ReadTextFromTemporaryStorageService(TemporaryStorageTextIdentifier storageIdentifier, CancellationToken cancellationToken);
+    Task<SourceText> ReadTextFromTemporaryStorageServiceAsync(TemporaryStorageTextIdentifier storageIdentifier, CancellationToken cancellationToken);
 }

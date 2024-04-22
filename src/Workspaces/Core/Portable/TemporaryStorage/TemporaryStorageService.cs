@@ -94,12 +94,39 @@ internal sealed partial class TemporaryStorageService : ITemporaryStorageService
         _textFactory = textFactory;
     }
 
-    public ITemporaryTextStorageInternal CreateTemporaryTextStorage()
-        => new TemporaryTextStorage(this);
+    //public ITemporaryTextStorageInternal CreateTemporaryTextStorage()
+    //    => new TemporaryTextStorage(this);
 
-    public TemporaryTextStorage AttachTemporaryTextStorage(
-        string storageName, long offset, long size, SourceHashAlgorithm checksumAlgorithm, Encoding? encoding, ImmutableArray<byte> contentHash)
-        => new(this, storageName, offset, size, checksumAlgorithm, encoding, contentHash);
+    //public TemporaryTextStorage AttachTemporaryTextStorage(
+    //    string storageName, long offset, long size, SourceHashAlgorithm checksumAlgorithm, Encoding? encoding, ImmutableArray<byte> contentHash)
+    //    => new(this, storageName, offset, size, checksumAlgorithm, encoding, contentHash);
+
+    public TemporaryStorageHandle WriteTextToTemporaryStorage(SourceText text, CancellationToken cancellationToken)
+    {
+        var storage = new TemporaryTextStorage(this);
+        storage.WriteText(text, cancellationToken);
+        var identifier = new TemporaryStorageIdentifier(storage.Name, storage.Offset, storage.Size);
+        return new(storage, identifier);
+    }
+
+    public async Task<TemporaryStorageHandle> WriteTextToTemporaryStorageAsync(SourceText text, CancellationToken cancellationToken)
+    {
+        var storage = new TemporaryTextStorage(this);
+        await storage.WriteTextAsync(text, cancellationToken).ConfigureAwait(false);
+        var identifier = new TemporaryStorageIdentifier(storage.Name, storage.Offset, storage.Size);
+        return new(storage, identifier);
+    }
+
+    public SourceText ReadTextFromTemporaryStorageService(TemporaryStorageIdentifier storageIdentifier, CancellationToken cancellationToken)
+    {
+        var storage = new TemporaryTextStorage(this, );
+        await storage.WriteTextAsync(text, cancellationToken).ConfigureAwait(false);
+        var identifier = new TemporaryStorageIdentifier(storage.Name, storage.Offset, storage.Size);
+        return new(storage, identifier);
+
+    }
+    Task<SourceText> ReadTextFromTemporaryStorageServiceAsync(TemporaryStorageIdentifier storageIdentifier, CancellationToken cancellationToken);
+
 
     public TemporaryStorageHandle WriteToTemporaryStorage(Stream stream, CancellationToken cancellationToken)
     {
@@ -202,9 +229,7 @@ internal sealed partial class TemporaryStorageService : ITemporaryStorageService
             _memoryMappedInfo = new MemoryMappedInfo(storageName, offset, size);
         }
 
-        // TODO: cleanup https://github.com/dotnet/roslyn/issues/43037
-        // Offset, Size not accessed if Name is null
-        public string? Name => _memoryMappedInfo?.Name;
+        public string Name => _memoryMappedInfo!.Name;
         public long Offset => _memoryMappedInfo!.Offset;
         public long Size => _memoryMappedInfo!.Size;
 

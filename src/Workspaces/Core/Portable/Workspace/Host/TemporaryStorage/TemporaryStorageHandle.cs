@@ -28,3 +28,18 @@ internal sealed class TemporaryStorageHandle(IDisposable underlyingData, Tempora
         _identifier = null;
     }
 }
+
+internal sealed class TemporaryStorageTextHandle(IDisposable underlyingData, TemporaryStorageTextIdentifier identifier) : IDisposable
+{
+    private IDisposable? _underlyingData = underlyingData;
+    private TemporaryStorageTextIdentifier? _identifier = identifier;
+
+    public TemporaryStorageTextIdentifier Identifier => _identifier ?? throw new InvalidOperationException("Handle has already been disposed");
+
+    public void Dispose()
+    {
+        var data = Interlocked.Exchange(ref _underlyingData, null);
+        data?.Dispose();
+        _identifier = null;
+    }
+}
