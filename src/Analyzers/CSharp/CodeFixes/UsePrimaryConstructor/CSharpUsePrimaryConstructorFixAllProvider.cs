@@ -44,20 +44,25 @@ internal partial class CSharpUsePrimaryConstructorCodeFixProvider
 
             foreach (var currentContext in contexts)
             {
-                // await ProducerConsumer<(Document document, ImmutableArray<Diagnostic> diagnostics)>
-
-                var documentToDiagnostics = await FixAllContextHelper.GetDocumentDiagnosticsToFixAsync(currentContext).ConfigureAwait(false);
-                foreach (var (document, diagnostics) in documentToDiagnostics)
-                {
-                    foreach (var diagnostic in diagnostics.OrderByDescending(d => d.Location.SourceSpan.Start))
+                await ProducerConsumer<(Document document, ImmutableArray<Diagnostic> diagnostics)>.RunAsync(
+                    ProducerConsumerOptions.MultipleReaderMultipleWriter,
+                    produceItems: static (callback, args, cancellationToken) => FixAllContextHelper.GetDocumentDiagnosticsToFixAsync(args.currentContext, callback),
+                    consumeItems: static async (stream, args, cancellationToken) =>
                     {
-                        if (diagnostic.Location.FindNode(cancellationToken) is not ConstructorDeclarationSyntax constructorDeclaration)
-                            continue;
+                        await foreach (var (document, diagnostics) in stream)
+                        {
+                            foreach (var diagnostic in diagnostics.OrderByDescending(d => d.Location.SourceSpan.Start))
+                            {
+                                if (diagnostic.Location.FindNode(cancellationToken) is not ConstructorDeclarationSyntax constructorDeclaration)
+                                    continue;
 
-                        await UsePrimaryConstructorAsync(
-                            solutionEditor, document, constructorDeclaration, diagnostic.Properties, removeMembers, cancellationToken).ConfigureAwait(false);
-                    }
-                }
+                                await UsePrimaryConstructorAsync(
+                                    args.solutionEditor, document, constructorDeclaration, diagnostic.Properties, args.removeMembers, cancellationToken).ConfigureAwait(false);
+                            }
+                        }
+                    },
+                    args: (solutionEditor, removeMembers, currentContext),
+                    cancellationToken).ConfigureAwait(false);
             }
 
             return solutionEditor.GetChangedSolution();

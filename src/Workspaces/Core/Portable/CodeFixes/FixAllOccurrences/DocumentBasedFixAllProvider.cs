@@ -79,7 +79,7 @@ public abstract class DocumentBasedFixAllProvider(ImmutableArray<FixAllScope> su
         var cancellationToken = fixAllContext.CancellationToken;
 
         await ProducerConsumer<(Document document, ImmutableArray<Diagnostic> diagnostics)>.RunAsync(
-            ProducerConsumerOptions.SingleReaderWriterOptions,
+            ProducerConsumerOptions.MultipleReaderMultipleWriter,
             // First, determine the diagnostics to fix.
             produceItems: static (innerCallback, args, cancellationToken) => FixAllContextHelper.GetDocumentDiagnosticsToFixAsync(args.fixAllContext, innerCallback),
             // Second, get the fixes for each document+diagnostics pair in parallel, and apply them to determine the new

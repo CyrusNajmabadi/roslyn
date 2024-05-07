@@ -28,6 +28,12 @@ internal readonly record struct ProducerConsumerOptions
     /// </summary>
     public static readonly ProducerConsumerOptions SingleReaderWriterOptions = new() { SingleReader = true, SingleWriter = true };
 
+    /// <summary>
+    /// Used when the consumeItems routine may pull on items concurrently and when the produceItems callback may be
+    /// called on a multiple threads.
+    /// </summary>
+    public static readonly ProducerConsumerOptions MultipleReaderMultipleWriter = default;
+
     /// <inheritdoc cref="ChannelOptions.SingleWriter"/>
     public bool SingleWriter { get; init; }
 
