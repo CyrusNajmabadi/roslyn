@@ -158,7 +158,7 @@ class Class
         Goo();
     }
 }",
-testHost, index: 1);
+index: 1);
         }
 
         [Fact]
@@ -1361,8 +1361,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1411,8 +1410,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1439,8 +1437,7 @@ class Class
     {
         Console.Write(1);
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1491,8 +1488,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1541,8 +1537,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1569,8 +1564,7 @@ class Class
     {
         Console.Write(1);
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1595,8 +1589,7 @@ class Class
     {
         Console.Write(1);
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1621,8 +1614,7 @@ class Class
     {
         Console.Write(1);
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1647,8 +1639,7 @@ class Class
     {
         Console.Write(1);
     }
-}",
-testHost);
+}");
         }
 
         // System Not on top cases
@@ -1700,8 +1691,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1748,8 +1738,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -1777,7 +1766,7 @@ class Class
         Console.Write(1);
     }
 }",
-testHost, options: Option(GenerationOptions.PlaceSystemNamespaceFirst, false));
+options: Option(GenerationOptions.PlaceSystemNamespaceFirst, false));
         }
 
         [Fact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538136")]
@@ -2288,8 +2277,7 @@ class C
     static void Main(string[] args)
     {
         Log }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -4320,8 +4308,7 @@ static void Main(string[] args)
             await TestAsync(initialText, expectedText);
         }
 
-        [Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/860648")]
-        [CombinatorialData]
+        [Fact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/860648")]
         [WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/902014")]
         public async Task TestIncompleteParenthesizedLambdaExpression()
         {
@@ -4703,7 +4690,7 @@ namespace N
     {
         SomeClass c;
     }
-}", testHost, index: 1);
+}", index: 1);
         }
 
         [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/18275")]
@@ -4855,8 +4842,7 @@ namespace A
         {
         }
     }
-}",
-testHost);
+}");
         }
 
         [Fact]
@@ -6365,17 +6351,16 @@ class Program
 </Workspace>";
 
             await TestMissingAsync(initialWorkspace, new TestParameters(
-                globalOptions: Option(CompletionOptionsStorage.HideAdvancedMembers, true),
-                ));
+                globalOptions: Option(CompletionOptionsStorage.HideAdvancedMembers, true)));
         }
 
         /// <summary>
         /// Note that this test verifies the current end of line sequence in using directives is preserved regardless of
         /// whether this matches the end_of_line value in .editorconfig or not.
         /// </summary>
-        [Fact]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/roslyn/issues/62976")]
-        public async Task TestAddUsingPreservesNewlines1(TestHost testHost, [CombinatorialValues("\n", "\r\n")] string sourceNewLine, [CombinatorialValues("\n", "\r\n")] string configuredNewLine)
+        public async Task TestAddUsingPreservesNewlines1([CombinatorialValues("\n", "\r\n")] string sourceNewLine, [CombinatorialValues("\n", "\r\n")] string configuredNewLine)
         {
             await TestInRegularAndScript1Async(
                 """
@@ -6409,16 +6394,16 @@ class Program
                 }
                 """.ReplaceLineEndings(sourceNewLine),
                 index: 0,
-                parameters: new TestParameters(options: Option(FormattingOptions2.NewLine, configuredNewLine), ));
+                parameters: new TestParameters(options: Option(FormattingOptions2.NewLine, configuredNewLine)));
         }
 
         /// <summary>
         /// Note that this test verifies the current end of line sequence in using directives is preserved regardless of
         /// whether this matches the end_of_line value in .editorconfig or not.
         /// </summary>
-        [Fact]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/roslyn/issues/62976")]
-        public async Task TestAddUsingPreservesNewlines2(TestHost testHost, [CombinatorialValues("\n", "\r\n")] string sourceNewLine, [CombinatorialValues("\n", "\r\n")] string configuredNewLine)
+        public async Task TestAddUsingPreservesNewlines2([CombinatorialValues("\n", "\r\n")] string sourceNewLine, [CombinatorialValues("\n", "\r\n")] string configuredNewLine)
         {
             await TestInRegularAndScript1Async(
                 """
@@ -6467,12 +6452,12 @@ class Program
                 }
                 """.ReplaceLineEndings(sourceNewLine),
                 index: 0,
-                parameters: new TestParameters(options: Option(FormattingOptions2.NewLine, configuredNewLine), ));
+                parameters: new TestParameters(options: Option(FormattingOptions2.NewLine, configuredNewLine)));
         }
 
-        [Fact]
+        [Theory, CombinatorialData]
         [WorkItem("https://github.com/dotnet/roslyn/issues/62976")]
-        public async Task TestAddUsingPreservesNewlines3(TestHost testHost, [CombinatorialValues("\n", "\r\n")] string sourceNewLine, [CombinatorialValues("\n", "\r\n")] string configuredNewLine)
+        public async Task TestAddUsingPreservesNewlines3([CombinatorialValues("\n", "\r\n")] string sourceNewLine, [CombinatorialValues("\n", "\r\n")] string configuredNewLine)
         {
             await TestInRegularAndScript1Async(
                 """
@@ -6521,7 +6506,7 @@ class Program
                 }
                 """.ReplaceLineEndings(sourceNewLine),
                 index: 0,
-                parameters: new TestParameters(options: Option(FormattingOptions2.NewLine, configuredNewLine), ));
+                parameters: new TestParameters(options: Option(FormattingOptions2.NewLine, configuredNewLine)));
         }
 
         [Fact]

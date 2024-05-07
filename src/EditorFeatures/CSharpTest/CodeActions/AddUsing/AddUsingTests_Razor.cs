@@ -14,8 +14,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AddUsing
     [Trait(Traits.Feature, Traits.Features.CodeActionsAddImport)]
     public partial class AddUsingTests_Razor : AbstractAddUsingTests
     {
-        [Theory, CombinatorialData]
-        public async Task TestAddIntoHiddenRegionWithModernSpanMapper(TestHost host)
+        [Fact]
+        public async Task TestAddIntoHiddenRegionWithModernSpanMapper()
         {
             await TestAsync(
     @"#line hidden
@@ -40,7 +40,7 @@ class Program
     {
         DateTime d;
     }
-}", host);
+}");
         }
 
         private protected override IDocumentServiceProvider GetDocumentServiceProvider()

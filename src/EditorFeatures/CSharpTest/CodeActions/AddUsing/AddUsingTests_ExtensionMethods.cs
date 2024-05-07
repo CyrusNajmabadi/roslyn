@@ -1107,9 +1107,8 @@ namespace N
 parseOptions: null);
         }
 
-        [Theory, CombinatorialData]
-        [WorkItem("https://github.com/dotnet/roslyn/issues/16547")]
-        public async Task TestAddUsingForAddExtensionMethodWithSameNameAsProperty(TestHost testHost)
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/16547")]
+        public async Task TestAddUsingForAddExtensionMethodWithSameNameAsProperty()
         {
             await TestAsync(
 @"
@@ -1167,12 +1166,11 @@ namespace A.Extensions
             return foo;
         }
     }
-}", testHost);
+}");
         }
 
-        [Theory, CombinatorialData]
-        [WorkItem("https://github.com/dotnet/roslyn/issues/39155")]
-        public async Task TestExtensionGetAwaiterOverload(TestHost testHost)
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/39155")]
+        public async Task TestExtensionGetAwaiterOverload()
         {
             await TestAsync(
 @"
@@ -1257,12 +1255,11 @@ namespace A.Extension
         }
     }
 }
-", testHost);
+");
         }
 
-        [Theory, CombinatorialData]
-        [WorkItem("https://github.com/dotnet/roslyn/issues/39155")]
-        public async Task TestExtensionSelectOverload(TestHost testHost)
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/39155")]
+        public async Task TestExtensionSelectOverload()
         {
             await TestAsync(
 @"
@@ -1321,7 +1318,7 @@ namespace A.Extension
         public static IEnumerable<int> Select(this Foo foo, Func<int, int> f) => null;
     }
 }
-", testHost);
+");
         }
 
         [Fact]
