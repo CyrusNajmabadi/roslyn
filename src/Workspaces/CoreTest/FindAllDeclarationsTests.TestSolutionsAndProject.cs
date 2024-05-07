@@ -74,24 +74,21 @@ namespace Microsoft.CodeAnalysis.UnitTests
             }
         }
 
-        private Workspace CreateWorkspace(TestHost testHost = TestHost.OutOfProcess)
+        private Workspace CreateWorkspace()
         {
-            var composition = FeaturesTestCompositions.Features.WithTestHostParts(testHost);
+            var composition = FeaturesTestCompositions.Features.WithTestHostParts(TestHost.OutOfProcess);
             var workspace = new AdhocWorkspace(composition.GetHostServices());
 
-            if (testHost == TestHost.OutOfProcess)
-            {
-                var remoteHostProvider = (InProcRemoteHostClientProvider)workspace.Services.GetRequiredService<IRemoteHostClientProvider>();
-                remoteHostProvider.TraceListener = new XunitTraceListener(_logger);
-            }
+            var remoteHostProvider = (InProcRemoteHostClientProvider)workspace.Services.GetRequiredService<IRemoteHostClientProvider>();
+            remoteHostProvider.TraceListener = new XunitTraceListener(_logger);
 
             return workspace;
         }
 
-        private Workspace CreateWorkspaceWithSingleProjectSolution(TestHost testHost, string[] sourceTexts, out Solution solution)
+        private Workspace CreateWorkspaceWithSingleProjectSolution(string[] sourceTexts, out Solution solution)
         {
             var pid = ProjectId.CreateNewId();
-            var workspace = CreateWorkspace(testHost);
+            var workspace = CreateWorkspace();
 
             solution = workspace.CurrentSolution
                     .AddProject(pid, "TestCases", "TestCases", LanguageNames.CSharp)
@@ -105,9 +102,9 @@ namespace Microsoft.CodeAnalysis.UnitTests
             return workspace;
         }
 
-        private Workspace CreateWorkspaceWithMultipleProjectSolution(TestHost testHost, string[] sourceTexts, out Solution solution)
+        private Workspace CreateWorkspaceWithMultipleProjectSolution(string[] sourceTexts, out Solution solution)
         {
-            var workspace = CreateWorkspace(testHost);
+            var workspace = CreateWorkspace();
             solution = workspace.CurrentSolution;
             for (var i = 0; i < sourceTexts.Length; i++)
             {
@@ -122,24 +119,24 @@ namespace Microsoft.CodeAnalysis.UnitTests
             return workspace;
         }
 
-        private Workspace CreateWorkspaceWithSolution(SolutionKind solutionKind, out Solution solution, TestHost testHost = TestHost.OutOfProcess)
+        private Workspace CreateWorkspaceWithSolution(SolutionKind solutionKind, out Solution solution)
             => solutionKind switch
             {
-                SolutionKind.SingleClass => CreateWorkspaceWithSingleProjectSolution(testHost, [SingleClass], out solution),
-                SolutionKind.SingleClassWithSingleMethod => CreateWorkspaceWithSingleProjectSolution(testHost, [SingleClassWithSingleMethod], out solution),
-                SolutionKind.SingleClassWithSingleProperty => CreateWorkspaceWithSingleProjectSolution(testHost, [SingleClassWithSingleProperty], out solution),
-                SolutionKind.SingleClassWithSingleField => CreateWorkspaceWithSingleProjectSolution(testHost, [SingleClassWithSingleField], out solution),
-                SolutionKind.TwoProjectsEachWithASingleClassWithSingleMethod => CreateWorkspaceWithMultipleProjectSolution(testHost, [SingleClassWithSingleMethod, SingleClassWithSingleMethod], out solution),
-                SolutionKind.TwoProjectsEachWithASingleClassWithSingleProperty => CreateWorkspaceWithMultipleProjectSolution(testHost, [SingleClassWithSingleProperty, SingleClassWithSingleProperty], out solution),
-                SolutionKind.TwoProjectsEachWithASingleClassWithSingleField => CreateWorkspaceWithMultipleProjectSolution(testHost, [SingleClassWithSingleField, SingleClassWithSingleField], out solution),
-                SolutionKind.NestedClass => CreateWorkspaceWithSingleProjectSolution(testHost, [NestedClass], out solution),
-                SolutionKind.TwoNamespacesWithIdenticalClasses => CreateWorkspaceWithSingleProjectSolution(testHost, [Namespace1, Namespace2], out solution),
+                SolutionKind.SingleClass => CreateWorkspaceWithSingleProjectSolution([SingleClass], out solution),
+                SolutionKind.SingleClassWithSingleMethod => CreateWorkspaceWithSingleProjectSolution([SingleClassWithSingleMethod], out solution),
+                SolutionKind.SingleClassWithSingleProperty => CreateWorkspaceWithSingleProjectSolution([SingleClassWithSingleProperty], out solution),
+                SolutionKind.SingleClassWithSingleField => CreateWorkspaceWithSingleProjectSolution([SingleClassWithSingleField], out solution),
+                SolutionKind.TwoProjectsEachWithASingleClassWithSingleMethod => CreateWorkspaceWithMultipleProjectSolution([SingleClassWithSingleMethod, SingleClassWithSingleMethod], out solution),
+                SolutionKind.TwoProjectsEachWithASingleClassWithSingleProperty => CreateWorkspaceWithMultipleProjectSolution([SingleClassWithSingleProperty, SingleClassWithSingleProperty], out solution),
+                SolutionKind.TwoProjectsEachWithASingleClassWithSingleField => CreateWorkspaceWithMultipleProjectSolution([SingleClassWithSingleField, SingleClassWithSingleField], out solution),
+                SolutionKind.NestedClass => CreateWorkspaceWithSingleProjectSolution([NestedClass], out solution),
+                SolutionKind.TwoNamespacesWithIdenticalClasses => CreateWorkspaceWithSingleProjectSolution([Namespace1, Namespace2], out solution),
                 _ => throw ExceptionUtilities.UnexpectedValue(solutionKind),
             };
 
-        private Workspace CreateWorkspaceWithProject(SolutionKind solutionKind, out Project project, TestHost testHost = TestHost.OutOfProcess)
+        private Workspace CreateWorkspaceWithProject(SolutionKind solutionKind, out Project project)
         {
-            var workspace = CreateWorkspaceWithSolution(solutionKind, out var solution, testHost);
+            var workspace = CreateWorkspaceWithSolution(solutionKind, out var solution);
             project = solution.Projects.First();
             return workspace;
         }

@@ -115,21 +115,20 @@ namespace Microsoft.CodeAnalysis.UnitTests
             });
         }
 
-        [Theory, CombinatorialData]
-        public async Task FindDeclarationsAsync_Test_Cancellation(TestHost testHost)
+        [Fact]
+        public async Task FindDeclarationsAsync_Test_Cancellation()
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             {
-                var workspace = CreateWorkspaceWithProject(SolutionKind.SingleClass, out var project, testHost);
+                var workspace = CreateWorkspaceWithProject(SolutionKind.SingleClass, out var project);
                 var declarations = await SymbolFinder.FindDeclarationsAsync(project, "Test", true, SymbolFilter.All, new CancellationToken(true));
             });
         }
 
-        [Theory, CombinatorialData]
-        [WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1094411")]
-        public async Task FindDeclarationsAsync_Metadata(TestHost testHost)
+        [Fact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1094411")]
+        public async Task FindDeclarationsAsync_Metadata()
         {
-            using var workspace = CreateWorkspace(testHost);
+            using var workspace = CreateWorkspace();
             var solution = workspace.CurrentSolution;
             var csharpId = ProjectId.CreateNewId();
             solution = solution
@@ -148,11 +147,10 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.True(vbResult.Count() > 0);
         }
 
-        [Theory, CombinatorialData]
-        [WorkItem("https://github.com/dotnet/roslyn/issues/6616")]
-        public async Task FindDeclarationsAsync_PreviousSubmission(TestHost testHost)
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/6616")]
+        public async Task FindDeclarationsAsync_PreviousSubmission()
         {
-            using var workspace = CreateWorkspace(testHost);
+            using var workspace = CreateWorkspace();
             var solution = workspace.CurrentSolution;
 
             var submission0Id = ProjectId.CreateNewId();
