@@ -18,8 +18,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.AddImp
             Return (Nothing, New VisualBasicAddImportCodeFixProvider())
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestSimpleImportFromSameFile(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestSimpleImportFromSameFile() As Task
             Await TestAsync(
 "Class Class1
     Dim v As [|SomeClass1|]
@@ -36,13 +36,13 @@ End Class
 Namespace SomeNamespace
     Public Class SomeClass1
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory(Skip:="https://github.com/dotnet/roslyn/issues/41484")>
         <CombinatorialData>
         <WorkItem("https://github.com/dotnet/roslyn/issues/11241")>
-        Public Async Function TestAddImportWithCaseChange(testHost As TestHost) As Task
+        Public Async Function TestAddImportWithCaseChange() As Task
             Await TestAsync(
 "Namespace N1
     Public Class TextBox
@@ -63,11 +63,11 @@ End Namespace
 Class Class1
     Inherits TextBox
 
-End Class", testHost, priority:=CodeActionPriority.Default)
+End Class", priority:=CodeActionPriority.Default)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestSimpleImportFromReference(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestSimpleImportFromReference() As Task
             Await TestAsync(
 "Class Class1
     Dim v As [|Thread|]
@@ -76,7 +76,7 @@ End Class",
 
 Class Class1
     Dim v As Thread
-End Class", testHost)
+End Class")
         End Function
 
         <ConditionalFact>
@@ -88,8 +88,8 @@ End Class",
 "Imports System.Threading")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericClassDefinitionAsClause(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericClassDefinitionAsClause() As Task
             Await TestAsync(
 "Namespace SomeNamespace
     Class Base
@@ -104,11 +104,11 @@ Namespace SomeNamespace
     End Class
 End Namespace
 Class SomeClass(Of x As Base)
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericClassInstantiationOfClause(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericClassInstantiationOfClause() As Task
             Await TestAsync(
 "Namespace SomeNamespace
     Class SomeClass
@@ -133,11 +133,11 @@ Class Goo
     Sub Method1()
         Dim q As GenericClass(Of SomeClass)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericMethodDefinitionAsClause(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericMethodDefinitionAsClause() As Task
             Await TestAsync(
 "Namespace SomeNamespace
     Class SomeClass
@@ -156,11 +156,11 @@ End Namespace
 Class Goo
     Sub Method1(Of T As SomeClass)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericMethodInvocationOfClause(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericMethodInvocationOfClause() As Task
             Await TestAsync(
 "Namespace SomeNamespace
     Class SomeClass
@@ -185,11 +185,11 @@ Class Goo
     Sub Method2()
         Method1(Of SomeClass)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestAttributeApplication(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestAttributeApplication() As Task
             Await TestAsync(
 "<[|Something|]()>
 Class Goo
@@ -208,11 +208,11 @@ Namespace SomeNamespace
     Class SomethingAttribute
         Inherits System.Attribute
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestMultipleAttributeApplicationBelow(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestMultipleAttributeApplicationBelow() As Task
             Await TestAsync(
 "<Existing()>
 <[|Something|]()>
@@ -239,11 +239,11 @@ Namespace SomeNamespace
     Class SomethingAttribute
         Inherits System.Attribute
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestMultipleAttributeApplicationAbove(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestMultipleAttributeApplicationAbove() As Task
             Await TestAsync(
 "<[|Something|]()>
 <Existing()>
@@ -270,11 +270,11 @@ Namespace SomeNamespace
     Class SomethingAttribute
         Inherits System.Attribute
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestImportsIsEscapedWhenNamespaceMatchesKeyword(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestImportsIsEscapedWhenNamespaceMatchesKeyword() As Task
             Await TestAsync(
 "Class SomeClass
     Dim x As [|Something|]
@@ -291,11 +291,11 @@ End Class
 Namespace [Namespace]
     Class Something
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestImportsIsNOTEscapedWhenNamespaceMatchesKeywordButIsNested(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestImportsIsNOTEscapedWhenNamespaceMatchesKeywordButIsNested() As Task
             Await TestAsync(
 "Class SomeClass
     Dim x As [|Something|]
@@ -316,7 +316,7 @@ Namespace Outer
         Class Something
         End Class
     End Namespace
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <ConditionalFact>
@@ -359,7 +359,7 @@ End Namespace")
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540543")>
         <CombinatorialData>
-        Public Async Function TestCaseSensitivity1(testHost As TestHost) As Task
+        Public Async Function TestCaseSensitivity1() As Task
             Await TestAsync(
 "Class Goo
     Dim x As [|someclass|]
@@ -376,11 +376,11 @@ End Class
 Namespace SomeNamespace
     Class SomeClass
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestTypeFromMultipleNamespaces1(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestTypeFromMultipleNamespaces1() As Task
             Await TestAsync(
 "Class Goo
     Function F() As [|IDictionary|]
@@ -391,11 +391,11 @@ End Class",
 Class Goo
     Function F() As IDictionary
     End Function
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestTypeFromMultipleNamespaces2(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestTypeFromMultipleNamespaces2() As Task
             Await TestAsync(
 "Class Goo
     Function F() As [|IDictionary|]
@@ -406,12 +406,11 @@ End Class",
 Class Goo
     Function F() As IDictionary
     End Function
-End Class",
-                testHost, index:=1)
+End Class", index:=1)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericWithNoArgs(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericWithNoArgs() As Task
             Await TestAsync(
 "Class Goo
     Function F() As [|List|]
@@ -422,11 +421,11 @@ End Class",
 Class Goo
     Function F() As List
     End Function
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericWithCorrectArgs(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericWithCorrectArgs() As Task
             Await TestAsync(
 "Class Goo
     Function F() As [|List(Of Integer)|]
@@ -437,7 +436,7 @@ End Class",
 Class Goo
     Function F() As List(Of Integer)
     End Function
-End Class", testHost)
+End Class")
         End Function
 
         <ConditionalFact>
@@ -458,8 +457,8 @@ End Class")
 End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericInLocalDeclaration(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericInLocalDeclaration() As Task
             Await TestAsync(
 "Class Goo
     Sub Test()
@@ -472,11 +471,11 @@ Class Goo
     Sub Test()
         Dim x As New List(Of Integer)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenericItemType(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenericItemType() As Task
             Await TestAsync(
 "Class Goo
     Sub Test()
@@ -489,11 +488,11 @@ Class Goo
     Sub Test()
         Dim x As New List(Of Int32)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenerateWithExistingUsings(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenerateWithExistingUsings() As Task
             Await TestAsync(
 "Imports System
 Class Goo
@@ -507,11 +506,11 @@ Class Goo
     Sub Test()
         Dim x As New List(Of Integer)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestGenerateInNamespace(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestGenerateInNamespace() As Task
             Await TestAsync(
 "Imports System
 Namespace NS
@@ -529,7 +528,7 @@ Namespace NS
             Dim x As New List(Of Integer)
         End Sub
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Fact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540519")>
@@ -547,7 +546,7 @@ count:=1)
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540519")>
         <CombinatorialData>
-        Public Async Function TestFixInExistingUsing(testHost As TestHost) As Task
+        Public Async Function TestFixInExistingUsing() As Task
             Await TestAsync(
 "Imports System.Collections.Generic
 Namespace NS
@@ -563,12 +562,12 @@ Namespace NS
         Function Test() As IDictionary
         End Function
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541731")>
         <CombinatorialData>
-        Public Async Function TestGenericExtensionMethod(testHost As TestHost) As Task
+        Public Async Function TestGenericExtensionMethod() As Task
             Await TestAsync(
 "Imports System.Collections.Generic
 Class Test
@@ -582,11 +581,11 @@ Class Test
     Private Sub Method(args As IList(Of Integer))
         args.Where()
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestParameterType(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestParameterType() As Task
             Await TestAsync(
 "Imports System
 Imports System.Collections.Generic
@@ -602,12 +601,12 @@ Imports System.Linq
 Module Program
     Sub Main(args As String(), f As FileMode)
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540519")>
         <CombinatorialData>
-        Public Async Function TestAddWithExistingConflictWithDifferentArity(testHost As TestHost) As Task
+        Public Async Function TestAddWithExistingConflictWithDifferentArity() As Task
             Await TestAsync(
 "Imports System.Collections.Generic
 Namespace NS
@@ -623,12 +622,12 @@ Namespace NS
         Function Test() As IDictionary
         End Function
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540673")>
         <CombinatorialData>
-        Public Async Function TestImportNamespace(testHost As TestHost) As Task
+        Public Async Function TestImportNamespace() As Task
             Await TestAsync(
 "Class GOo
     Sub bar()
@@ -653,11 +652,11 @@ Namespace SomeNamespace
         Class SomeClass
         End Class
     End Namespace
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestCaseSensitivity2(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestCaseSensitivity2() As Task
             Await TestAsync(
 "Class GOo
     Sub bar()
@@ -682,12 +681,12 @@ Namespace SomeNamespace
         Class SomeClass
         End Class
     End Namespace
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540745")>
         <CombinatorialData>
-        Public Async Function TestCaseSensitivity3(testHost As TestHost) As Task
+        Public Async Function TestCaseSensitivity3() As Task
             Await TestAsync(
 "Module Program
     Sub Main(args As String())
@@ -712,12 +711,12 @@ Namespace OUTER
         Friend Class GOO
         End Class
     End Namespace
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541746")>
         <CombinatorialData>
-        Public Async Function TestAddBlankLineAfterLastImports(testHost As TestHost) As Task
+        Public Async Function TestAddBlankLineAfterLastImports() As Task
             Await TestAsync(
 <Text>Imports System
 Imports System.Collections.Generic
@@ -753,11 +752,11 @@ Namespace SomeNamespace
     Friend Class SomeAttrAttribute
         Inherits Attribute
     End Class
-End Namespace</Text>.Value.Replace(vbLf, vbCrLf), testHost)
+End Namespace</Text>.Value.Replace(vbLf, vbCrLf))
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestSimpleWhereClause(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestSimpleWhereClause() As Task
             Await TestAsync(
 "Class Program
     Public Sub Linq1()
@@ -776,11 +775,11 @@ Class Program
                       Where n < 5 _
                       Select n
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestAggregateClause(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestAggregateClause() As Task
             Await TestAsync(
 "Imports System.Collections.Generic
 Class Program
@@ -798,7 +797,7 @@ Class Program
         Dim greaterNums = Aggregate n In numbers
         Into greaterThan5 = All(n > 5)
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
         <Fact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543107")>
@@ -814,7 +813,7 @@ End Class")
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544335")>
         <CombinatorialData>
-        Public Async Function TestOnCallWithoutArgumentList(testHost As TestHost) As Task
+        Public Async Function TestOnCallWithoutArgumentList() As Task
             Await TestAsync(
 "Module Program
     Sub Main(args As String())
@@ -827,11 +826,11 @@ Module Program
     Sub Main(args As String())
         File
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestAddToVisibleRegion(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestAddToVisibleRegion() As Task
             Await TestAsync(
 "#ExternalSource (""Default.aspx"", 1) 
 Imports System
@@ -853,7 +852,7 @@ Class C
         Dim x As New [|StreamReader|]
 #End ExternalSource
     End Sub
-End Class", testHost)
+End Class")
         End Function
 
         <ConditionalFact>
@@ -871,7 +870,7 @@ End Class")
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546369")>
         <CombinatorialData>
-        Public Async Function TestFormattingAfterImports(testHost As TestHost) As Task
+        Public Async Function TestFormattingAfterImports() As Task
             Await TestAsync(
 <Text>Imports B
 Imports A
@@ -889,12 +888,12 @@ Module Program
         Debug
     End Sub
 End Module
-</Text>.Value.Replace(vbLf, vbCrLf), testHost)
+</Text>.Value.Replace(vbLf, vbCrLf))
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/775448")>
         <CombinatorialData>
-        Public Async Function TestShouldTriggerOnBC32045(testHost As TestHost) As Task
+        Public Async Function TestShouldTriggerOnBC32045() As Task
             ' BC32045: 'A' has no type parameters and so cannot have type arguments.
             Await TestAsync(
 <Text>Imports System.Collections
@@ -911,12 +910,12 @@ Module Program
     Sub Main(args As String())
         Dim x As IEnumerable(Of Integer)
     End Sub
-End Module</Text>.Value.Replace(vbLf, vbCrLf), testHost)
+End Module</Text>.Value.Replace(vbLf, vbCrLf))
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/867425")>
         <CombinatorialData>
-        Public Async Function TestUnknownIdentifierInModule(testHost As TestHost) As Task
+        Public Async Function TestUnknownIdentifierInModule() As Task
             Await TestAsync(
 "Module Goo
     Sub Bar(args As String())
@@ -931,12 +930,12 @@ Module Goo
         Dim a = From f In args
                 Let ext = Path
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/872908")>
         <CombinatorialData>
-        Public Async Function TestConflictedGenericName(testHost As TestHost) As Task
+        Public Async Function TestConflictedGenericName() As Task
             Await TestAsync(
 "Module Goo
     Sub Bar(args As String())
@@ -951,12 +950,12 @@ Module Goo
         Dim a = From f In args
                 Let ext = Path
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/838253")>
         <CombinatorialData>
-        Public Async Function TestConflictedInaccessibleType(testHost As TestHost) As Task
+        Public Async Function TestConflictedInaccessibleType() As Task
             Await TestAsync(
 "Imports System.Diagnostics
 Namespace N
@@ -978,24 +977,24 @@ Class C
     Public Function Goo()
         Log
     End Function
-End Class", testHost, index:=1)
+End Class", index:=1)
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/858085")>
         <CombinatorialData>
-        Public Async Function TestConflictedAttributeName(testHost As TestHost) As Task
+        Public Async Function TestConflictedAttributeName() As Task
             Await TestAsync(
 "<[|Description|]> Public Class Description
 End Class",
                 "Imports System.ComponentModel
 
 <[|Description|]> Public Class Description
-End Class", testHost)
+End Class")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/772321")>
         <CombinatorialData>
-        Public Async Function TestExtensionWithThePresenceOfTheSameNameNonExtensionMethod(testHost As TestHost) As Task
+        Public Async Function TestExtensionWithThePresenceOfTheSameNameNonExtensionMethod() As Task
             Await TestAsync(
 "Option Strict On
 Imports System.Runtime.CompilerServices
@@ -1039,13 +1038,13 @@ Namespace NS2
         Sub Goo(ByVal ec As NS1.C, ByVal n As Integer)
         End Sub
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/772321")>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/920398")>
         <CombinatorialData>
-        Public Async Function TestExtensionWithThePresenceOfTheSameNameNonExtensionPrivateMethod(testHost As TestHost) As Task
+        Public Async Function TestExtensionWithThePresenceOfTheSameNameNonExtensionPrivateMethod() As Task
             Await TestAsync(
 "Option Strict On
 Imports System.Runtime.CompilerServices
@@ -1089,13 +1088,13 @@ Namespace NS2
         Sub Goo(ByVal ec As NS1.C, ByVal n As Integer)
         End Sub
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/772321")>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/920398")>
         <CombinatorialData>
-        Public Async Function TestExtensionWithThePresenceOfTheSameNameExtensionPrivateMethod(testHost As TestHost) As Task
+        Public Async Function TestExtensionWithThePresenceOfTheSameNameExtensionPrivateMethod() As Task
             Await TestAsync(
 "Option Strict On
 Imports System.Runtime.CompilerServices
@@ -1157,7 +1156,7 @@ Namespace NS3
         Sub Goo(ByVal ec As NS1.C, ByVal n As Integer)
         End Sub
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Fact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/916368")>
@@ -1354,7 +1353,7 @@ End Class
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/772321")>
         <CombinatorialData>
-        Public Async Function TestExtensionMethodNoMemberAccessOverload(testHost As TestHost) As Task
+        Public Async Function TestExtensionMethodNoMemberAccessOverload() As Task
             Await TestAsync(
 "Option Strict On
 Imports System.Runtime.CompilerServices
@@ -1392,12 +1391,12 @@ Namespace NS2
         Sub Goo(ByVal ec As NS1.C, ByVal n As Integer)
         End Sub
     End Module
-End Namespace", testHost, )
+End Namespace", )
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/772321")>
         <CombinatorialData>
-        Public Async Function TestExtensionMethodNoMemberAccess(testHost As TestHost) As Task
+        Public Async Function TestExtensionMethodNoMemberAccess() As Task
             Await TestAsync(
 "Option Strict On
 Imports System.Runtime.CompilerServices
@@ -1431,12 +1430,12 @@ Namespace NS2
         Sub Test(ByVal ec As NS1.C, ByVal n As Integer)
         End Sub
     End Module
-End Namespace", testHost, )
+End Namespace", )
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1003618")>
         <CombinatorialData>
-        Public Async Function TestAddImportsTypeParsedAsNamespace(testHost As TestHost) As Task
+        Public Async Function TestAddImportsTypeParsedAsNamespace() As Task
             Await TestAsync(
 "Imports System
 
@@ -1470,12 +1469,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.AutomaticCompletion
     <ContentType>
     Public Class A
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/773614")>
         <CombinatorialData>
-        Public Async Function TestAddImportsForTypeAttribute(testHost As TestHost) As Task
+        Public Async Function TestAddImportsForTypeAttribute() As Task
             Await TestAsync(
 "Imports System
 
@@ -1501,12 +1500,12 @@ Namespace N
     <My()>
     Class Test
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/773614")>
         <CombinatorialData>
-        Public Async Function TestAddImportsForTypeAttributeMultipleNestedClasses(testHost As TestHost) As Task
+        Public Async Function TestAddImportsForTypeAttributeMultipleNestedClasses() As Task
             Await TestAsync(
 "Imports System
 
@@ -1536,12 +1535,12 @@ Namespace N
     <My()>
     Class Test
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/773614")>
         <CombinatorialData>
-        Public Async Function TestAddImportsForTypeAttributePartiallyQualified(testHost As TestHost) As Task
+        Public Async Function TestAddImportsForTypeAttributePartiallyQualified() As Task
             Await TestAsync(
 "Imports System
 
@@ -1571,12 +1570,12 @@ Namespace N
     <Inner.My()>
     Class Test
     End Class
-End Namespace", testHost)
+End Namespace")
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064815")>
         <CombinatorialData>
-        Public Async Function TestConditionalAccessExtensionMethod(testHost As TestHost) As Task
+        Public Async Function TestConditionalAccessExtensionMethod() As Task
             Dim initial = <Workspace>
                               <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
                                   <Document FilePath="Program">
@@ -1608,12 +1607,12 @@ Public Class C
     End Sub
 End Class
 "
-            Await TestAsync(initial, expected, testHost)
+            Await TestAsync(initial, expected)
         End Function
 
         <Theory, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064815")>
         <CombinatorialData>
-        Public Async Function TestConditionalAccessExtensionMethod2(testHost As TestHost) As Task
+        Public Async Function TestConditionalAccessExtensionMethod2() As Task
             Dim initial = <Workspace>
                               <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
                                   <Document FilePath="Program">
@@ -1661,11 +1660,11 @@ Public Class C
     End Class
 End Class
 "
-            Await TestAsync(initial, expected, testHost)
+            Await TestAsync(initial, expected)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestAddUsingInDirective(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestAddUsingInDirective() As Task
             Await TestAsync(
 "#Const Debug
 Imports System
@@ -1690,11 +1689,11 @@ Module Program
     Sub Main(args As String())
         Dim a = File.OpenRead("""")
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestAddUsingInDirective2(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestAddUsingInDirective2() As Task
             Await TestAsync(
 "#Const Debug
 #If Debug Then
@@ -1718,11 +1717,11 @@ Module Program
     Sub Main(args As String())
         Dim a = File.OpenRead("""")
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestAddUsingInDirective3(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestAddUsingInDirective3() As Task
             Await TestAsync(
 "#Const Debug
 #If Debug Then
@@ -1746,11 +1745,11 @@ Module Program
     Sub Main(args As String())
         Dim a = File.OpenRead("""")
     End Sub
-End Module", testHost)
+End Module")
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestInaccessibleExtensionMethod(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestInaccessibleExtensionMethod() As Task
             Dim initial = <Workspace>
                               <Project Language="Visual Basic" AssemblyName="lib" CommonReferences="true">
                                   <Document FilePath="Extension">
@@ -1791,11 +1790,11 @@ Module Module1
 
 End Module
 "
-            Await TestAsync(initial, expected, testHost)
+            Await TestAsync(initial, expected)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestInaccessibleExtensionMethod2(testHost As TestHost) As Task
+        <Fact>
+        Public Async Function TestInaccessibleExtensionMethod2() As Task
             Dim initial = <Workspace>
                               <Project Language="Visual Basic" AssemblyName="lib" CommonReferences="true">
                                   <Document FilePath="Extension">
@@ -2144,9 +2143,9 @@ index:=1,
 parseOptions:=Nothing)
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("https://github.com/dotnet/roslyn/issues/935")>
-        Public Async Function TestAddUsingWithOtherExtensionsInScope(testHost As TestHost) As Task
+        Public Async Function TestAddUsingWithOtherExtensionsInScope() As Task
             Await TestAsync(
 "Imports System.Linq
 Imports System.Runtime.CompilerServices
@@ -2178,12 +2177,12 @@ Namespace X
             Return a
         End Function
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("https://github.com/dotnet/roslyn/issues/935")>
-        Public Async Function TestAddUsingWithOtherExtensionsInScope2(testHost As TestHost) As Task
+        Public Async Function TestAddUsingWithOtherExtensionsInScope2() As Task
             Await TestAsync(
 "Imports System.Linq
 Imports System.Runtime.CompilerServices
@@ -2217,12 +2216,12 @@ Namespace X
             Return 0
         End Function
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("https://github.com/dotnet/roslyn/issues/562")>
-        Public Async Function TestAddUsingWithOtherExtensionsInScope3(testHost As TestHost) As Task
+        Public Async Function TestAddUsingWithOtherExtensionsInScope3() As Task
             Await TestAsync(
 "Imports System.Runtime.CompilerServices 
 Imports X 
@@ -2272,12 +2271,12 @@ Namespace Y
             Return a
         End Function
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("https://github.com/dotnet/roslyn/issues/562")>
-        Public Async Function TestAddUsingWithOtherExtensionsInScope4(testHost As TestHost) As Task
+        Public Async Function TestAddUsingWithOtherExtensionsInScope4() As Task
             Await TestAsync(
 "Imports System.Runtime.CompilerServices
 Imports X
@@ -2327,12 +2326,12 @@ Namespace Y
             Return 0
         End Function
     End Module
-End Namespace", testHost)
+End Namespace")
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("https://github.com/dotnet/roslyn/issues/19796")>
-        Public Async Function TestWhenInRome1(testHost As TestHost) As Task
+        Public Async Function TestWhenInRome1() As Task
             Await TestAsync(
 "
 Imports System
@@ -2356,12 +2355,12 @@ End Class
 Namespace A
     Public Class AType
     End Class
-End Namespace", testHost, placeSystemFirst:=False)
+End Namespace", placeSystemFirst:=False)
         End Function
 
         <Theory, WorkItem("https://github.com/dotnet/roslyn/issues/19796")>
         <CombinatorialData>
-        Public Async Function TestWhenInRome2(testHost As TestHost) As Task
+        Public Async Function TestWhenInRome2() As Task
             Await TestAsync(
 "
 Imports B
@@ -2385,7 +2384,7 @@ End Class
 Namespace A
     Public Class AType
     End Class
-End Namespace", testHost, placeSystemFirst:=True)
+End Namespace", placeSystemFirst:=True)
         End Function
 
         <Fact, WorkItem("https://github.com/dotnet/roslyn/issues/1744")>
