@@ -18,8 +18,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeRefactorings.E
             Return New EncapsulateFieldRefactoringProvider()
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulatePrivateFieldAndUpdateReferences(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulatePrivateFieldAndUpdateReferences() As Task
             Dim text = <File>
 Class C
     Private ReadOnly x[||] As Integer
@@ -52,11 +52,11 @@ Class C
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateDimField(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateDimField() As Task
             Dim text = <File>
 Class C
     Dim x[||] As Integer
@@ -84,12 +84,12 @@ Class C
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
 
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateGenericField(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateGenericField() As Task
             Dim text = <File>
 Class C(Of T)
     Dim x[||] As T
@@ -117,12 +117,12 @@ Class C(Of T)
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
 
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulatePublicFieldIgnoringReferences(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulatePublicFieldIgnoringReferences() As Task
             Dim text = <File>
 Class C
     Public [|x|] As Integer
@@ -150,11 +150,11 @@ Class C
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, index:=1, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected, index:=1)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulatePublicFieldUpdatingReferences(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulatePublicFieldUpdatingReferences() As Task
             Dim text = <File>
 Class C
     Public [|x|] As Integer
@@ -182,11 +182,11 @@ Class C
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateMultiplePrivateFieldsWithReferences(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateMultiplePrivateFieldsWithReferences() As Task
             Dim text = <File>
 Class C
     Private [|x, y|] As Integer
@@ -225,11 +225,11 @@ Class C
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateMultiplePublicFieldsWithReferences(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateMultiplePublicFieldsWithReferences() As Task
             Dim text = <File>
 Class C
     [|Public x As String
@@ -270,11 +270,11 @@ Class C
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, index:=1, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected, index:=1)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestNoSetterForConstField(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestNoSetterForConstField() As Task
             Dim text = <File>
 Class Program
     Private Const [|goo|] As Integer = 3
@@ -291,12 +291,12 @@ Class Program
     End Property
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
 
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateEscapedIdentifier(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateEscapedIdentifier() As Task
             Dim text = <File>
 Class C
     Private [|[Class]|] As String
@@ -316,12 +316,12 @@ Class C
     End Property
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
 
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateEscapedIdentifierWithQualifiedAccess(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateEscapedIdentifierWithQualifiedAccess() As Task
             Dim text = <File>
 Class C
     Private [|[Class]|] As String
@@ -345,11 +345,11 @@ End Class</File>.ConvertTestSourceTag()
                 text, expected,
                 options:=New OptionsCollection(GetLanguage()) From {
                     {CodeStyleOptions2.QualifyFieldAccess, True, NotificationOption2.Error}
-                }, testHost:=host)
+                })
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateFieldNamedValue(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateFieldNamedValue() As Task
             Dim text = <File>
 Class C
     Private [|value|] As Integer = 3
@@ -369,12 +369,12 @@ Class C
     End Property
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
 
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateFieldName__(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateFieldName__() As Task
             Dim text = <File>
 Class D
     Public [|__|] As Integer
@@ -396,12 +396,12 @@ Class D
 End Class
 </File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/694262")>
-        Public Async Function TestPreserveTrivia(host As TestHost) As Task
+        Public Async Function TestPreserveTrivia() As Task
             Dim text = <File>
 Class AA
     Private name As String : Public [|dsds|] As Integer
@@ -423,12 +423,12 @@ Class AA
 End Class
 </File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/694241")>
-        Public Async Function TestNewPropertyNameIsUnique(host As TestHost) As Task
+        Public Async Function TestNewPropertyNameIsUnique() As Task
             Dim text = <File>
 Class AA
     Private [|name|] As String
@@ -466,23 +466,23 @@ Class AA
 End Class
 </File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/695046")>
-        Public Async Function TestAvailableNotJustOnVariableName(host As TestHost) As Task
+        Public Async Function TestAvailableNotJustOnVariableName() As Task
             Dim text = <File>
 Class C
     Private [||] ReadOnly x As Integer
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestActionCountAsync(text, 2, New TestParameters(testHost:=host))
+            Await TestActionCountAsync(text, 2, New TestParameters())
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/705898")>
-        Public Async Function TestCopyAccessibility(host As TestHost) As Task
+        Public Async Function TestCopyAccessibility() As Task
             Dim text = <File>
 Class C
     Protected [|x|] As Integer
@@ -502,12 +502,12 @@ Class C
     End Property
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/707080")>
-        Public Async Function TestBackingFieldStartsWithUnderscore(host As TestHost) As Task
+        Public Async Function TestBackingFieldStartsWithUnderscore() As Task
             Dim text = <File>
 Public Class Class1
     Public [|Name|] As String
@@ -536,11 +536,11 @@ Public Class Class1
 End Class
 </File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
-        Public Async Function TestEncapsulateShadowingField(host As TestHost) As Task
+        <Fact>
+        Public Async Function TestEncapsulateShadowingField() As Task
             Dim text = <File>
 Class C
     Protected _goo As Integer
@@ -590,36 +590,36 @@ Class D
     End Property
 End Class</File>.ConvertTestSourceTag()
 
-            Await TestInRegularAndScriptAsync(text, expected, testHost:=host)
+            Await TestInRegularAndScriptAsync(text, expected)
         End Function
 
-        <Theory, CombinatorialData>
+        <Fact>
         <WorkItem(1096007, "https://github.com/dotnet/roslyn/issues/282")>
-        Public Async Function TestDoNotEncapsulateOutsideTypeDeclaration(host As TestHost) As Task
+        Public Async Function TestDoNotEncapsulateOutsideTypeDeclaration() As Task
             Dim globalField = <File>
 Dim [|x|] = 1
 </File>.ConvertTestSourceTag()
-            Await TestMissingInRegularAndScriptAsync(globalField, New TestParameters(testHost:=host))
+            Await TestMissingInRegularAndScriptAsync(globalField, New TestParameters())
 
             Dim namespaceField = <File>
 Namespace N
     Dim [|x|] = 1
 End Namespace            
 </File>.ConvertTestSourceTag()
-            Await TestMissingInRegularAndScriptAsync(namespaceField, New TestParameters(testHost:=host))
+            Await TestMissingInRegularAndScriptAsync(namespaceField, New TestParameters())
 
             Dim enumField = <File>
 Enum E
      [|x|] = 1
 End Enum
 </File>.ConvertTestSourceTag()
-            Await TestMissingInRegularAndScriptAsync(enumField, New TestParameters(testHost:=host))
+            Await TestMissingInRegularAndScriptAsync(enumField, New TestParameters())
 
         End Function
 
         <WorkItem("https://github.com/dotnet/roslyn/issues/7090")>
-        <Theory, CombinatorialData>
-        Public Async Function ApplyCurrentMePrefixStyle(host As TestHost) As Task
+        <Fact>
+        Public Async Function ApplyCurrentMePrefixStyle() As Task
             Await TestInRegularAndScriptAsync("
 Class C
     Dim [|i|] As Integer
@@ -640,7 +640,7 @@ End Class
 ",
 options:=New OptionsCollection(GetLanguage()) From {
     {CodeStyleOptions2.QualifyFieldAccess, True, NotificationOption2.Error}
-}, testHost:=host)
+})
         End Function
     End Class
 End Namespace

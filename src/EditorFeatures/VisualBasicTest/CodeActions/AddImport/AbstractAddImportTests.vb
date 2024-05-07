@@ -13,7 +13,6 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.AddImp
 
         Friend Overloads Async Function TestAsync(initialMarkup As String,
                 expectedMarkup As String,
-                testHost As TestHost,
                 Optional index As Integer = 0,
                 Optional priority As CodeActionPriority? = Nothing,
                 Optional placeSystemFirst As Boolean = True) As Task
@@ -22,7 +21,6 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.AddImp
                 initialMarkup, expectedMarkup, index,
                 parameters:=New TestParameters(
                     options:=[Option](GenerationOptions.PlaceSystemNamespaceFirst, placeSystemFirst),
-                    testHost:=testHost,
                     priority:=priority))
         End Function
     End Class

@@ -32,7 +32,6 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AddUsing
         internal async Task TestAsync(
             string initialMarkup,
             string expectedMarkup,
-            TestHost testHost,
             int index = 0,
             CodeActionPriority? priority = null,
             OptionsCollection options = null)
@@ -41,7 +40,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AddUsing
                 initialMarkup,
                 expectedMarkup,
                 index,
-                parameters: new TestParameters(options: options, testHost: testHost, priority: priority));
+                parameters: new TestParameters(options: options, priority: priority));
         }
     }
 }
