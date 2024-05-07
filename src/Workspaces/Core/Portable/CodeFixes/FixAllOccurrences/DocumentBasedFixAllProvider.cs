@@ -74,34 +74,43 @@ public abstract class DocumentBasedFixAllProvider(ImmutableArray<FixAllScope> su
             DetermineDiagnosticsAndGetFixedDocumentsAsync);
 
     private async Task DetermineDiagnosticsAndGetFixedDocumentsAsync(
-        FixAllContext fixAllContext, Action<(DocumentId documentId, (SyntaxNode? node, SourceText? text))> callback)
+        FixAllContext fixAllContext, Action<(DocumentId documentId, (SyntaxNode? node, SourceText? text))> outerCallback)
     {
         var cancellationToken = fixAllContext.CancellationToken;
 
-        // First, determine the diagnostics to fix.
-        var documentToDiagnostics = await FixAllContextHelper.GetDocumentDiagnosticsToFixAsync(fixAllContext).ConfigureAwait(false);
-
-        // Second, get the fixes for each document+diagnostics pair in parallel, and apply them to determine the new
-        // root/text for each doc.
-        await RoslynParallel.ForEachAsync(
-            source: documentToDiagnostics,
-            cancellationToken,
-            async (kvp, cancellationToken) =>
+        await ProducerConsumer<(Document document, ImmutableArray<Diagnostic> diagnostics)>.RunAsync(
+            ProducerConsumerOptions.SingleReaderWriterOptions,
+            // First, determine the diagnostics to fix.
+            produceItems: static (innerCallback, args, cancellationToken) => FixAllContextHelper.GetDocumentDiagnosticsToFixAsync(args.fixAllContext, innerCallback),
+            // Second, get the fixes for each document+diagnostics pair in parallel, and apply them to determine the new
+            // root/text for each doc.
+            consumeItems: static (stream, args, cancellationToken) =>
             {
-                var (document, documentDiagnostics) = kvp;
-                if (documentDiagnostics.IsDefaultOrEmpty)
-                    return;
+                // This case prevents an ambiguity warning where the lang doesn't know if we want the array codepath or
+                // the IAsyncEnumerable codepath.
+                var enumerable = (IAsyncEnumerable<(Document document, ImmutableArray<Diagnostic> diagnostics)>)stream;
+                return RoslynParallel.ForEachAsync(
+                    source: enumerable,
+                    cancellationToken,
+                    async (kvp, cancellationToken) =>
+                    {
+                        var (document, documentDiagnostics) = kvp;
+                        if (documentDiagnostics.IsDefaultOrEmpty)
+                            return;
 
-                var newDocument = await this.FixAllAsync(fixAllContext, document, documentDiagnostics).ConfigureAwait(false);
-                if (newDocument == null || newDocument == document)
-                    return;
+                        var newDocument = await args.@this.FixAllAsync(args.fixAllContext, document, documentDiagnostics).ConfigureAwait(false);
+                        if (newDocument == null || newDocument == document)
+                            return;
 
-                // For documents that support syntax, grab the tree so that we can clean it up later.  If it's a
-                // language that doesn't support that, then just grab the text.
-                var node = newDocument.SupportsSyntaxTree ? await newDocument.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false) : null;
-                var text = newDocument.SupportsSyntaxTree ? null : await newDocument.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
+                        // For documents that support syntax, grab the tree so that we can clean it up later.  If it's a
+                        // language that doesn't support that, then just grab the text.
+                        var node = newDocument.SupportsSyntaxTree ? await newDocument.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false) : null;
+                        var text = newDocument.SupportsSyntaxTree ? null : await newDocument.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
 
-                callback((document.Id, (node, text)));
-            }).ConfigureAwait(false);
+                        args.outerCallback((document.Id, (node, text)));
+                    });
+            },
+            args: (@this: this, fixAllContext, outerCallback),
+            cancellationToken).ConfigureAwait(false);
     }
 }

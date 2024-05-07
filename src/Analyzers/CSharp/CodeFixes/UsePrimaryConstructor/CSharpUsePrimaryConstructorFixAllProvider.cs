@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Shared.Utilities;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.UsePrimaryConstructor;
@@ -43,6 +44,8 @@ internal partial class CSharpUsePrimaryConstructorCodeFixProvider
 
             foreach (var currentContext in contexts)
             {
+                // await ProducerConsumer<(Document document, ImmutableArray<Diagnostic> diagnostics)>
+
                 var documentToDiagnostics = await FixAllContextHelper.GetDocumentDiagnosticsToFixAsync(currentContext).ConfigureAwait(false);
                 foreach (var (document, diagnostics) in documentToDiagnostics)
                 {
