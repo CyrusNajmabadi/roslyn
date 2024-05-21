@@ -13,7 +13,7 @@ namespace Roslyn.Utilities;
 
 /// <inheritdoc cref="AsyncBatchingWorkQueue{TItem, TResult}"/>
 internal class AsyncBatchingWorkQueue<TItem>(
-    TimeSpan delay,
+    IAsyncWorkQueueDelay delay,
     Func<ImmutableSegmentedList<TItem>, CancellationToken, ValueTask> processBatchAsync,
     IEqualityComparer<TItem>? equalityComparer,
     IAsynchronousOperationListener asyncListener,
@@ -24,11 +24,33 @@ internal class AsyncBatchingWorkQueue<TItem>(
         Func<ImmutableSegmentedList<TItem>, CancellationToken, ValueTask> processBatchAsync,
         IAsynchronousOperationListener asyncListener,
         CancellationToken cancellationToken)
+        : this(new ConstantWorkQueueDelay(delay),
+               processBatchAsync,
+               asyncListener,
+               cancellationToken)
+    {
+    }
+
+    public AsyncBatchingWorkQueue(
+        IAsyncWorkQueueDelay delay,
+        Func<ImmutableSegmentedList<TItem>, CancellationToken, ValueTask> processBatchAsync,
+        IAsynchronousOperationListener asyncListener,
+        CancellationToken cancellationToken)
         : this(delay,
                processBatchAsync,
                equalityComparer: null,
                asyncListener,
                cancellationToken)
+    {
+    }
+
+    public AsyncBatchingWorkQueue(
+        TimeSpan delay,
+        Func<ImmutableSegmentedList<TItem>, CancellationToken, ValueTask> processBatchAsync,
+        IEqualityComparer<TItem>? equalityComparer,
+        IAsynchronousOperationListener asyncListener,
+        CancellationToken cancellationToken)
+        : this(new ConstantWorkQueueDelay(delay), processBatchAsync, equalityComparer, asyncListener, cancellationToken)
     {
     }
 

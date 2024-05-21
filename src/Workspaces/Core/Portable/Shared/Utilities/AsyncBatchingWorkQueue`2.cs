@@ -6,12 +6,38 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 
 namespace Roslyn.Utilities;
+
+internal interface IAsyncWorkQueueDelay
+{
+    TimeSpan ComputeDelay(TimeSpan timeSinceFirstItemAdded);
+}
+
+internal sealed class ProgressiveDelayComputer : IAsyncWorkQueueDelay
+{
+    public static readonly ProgressiveDelayComputer Instance = new();
+
+    private ProgressiveDelayComputer()
+    {
+    }
+
+    public TimeSpan ComputeDelay(TimeSpan timeSinceFirstItemAdded)
+    {
+        if (timeSinceFirstItemAdded < TimeSpan.FromSeconds(1))
+            return DelayTimeSpan.NearImmediate;
+
+        if (timeSinceFirstItemAdded < TimeSpan.FromSeconds(5))
+            return DelayTimeSpan.Short;
+
+        return DelayTimeSpan.Medium;
+    }
+}
 
 /// <summary>
 /// A queue where items can be added to to be processed in batches after some delay has passed. When processing
@@ -26,10 +52,16 @@ namespace Roslyn.Utilities;
 /// </summary>
 internal class AsyncBatchingWorkQueue<TItem, TResult>
 {
+    private protected sealed class ConstantWorkQueueDelay(TimeSpan delay) : IAsyncWorkQueueDelay
+    {
+        public TimeSpan ComputeDelay(TimeSpan timeSinceFirstItemAdded)
+            => delay;
+    }
+
     /// <summary>
     /// Delay we wait after finishing the processing of one batch and starting up on then.
     /// </summary>
-    private readonly TimeSpan _delay;
+    private readonly IAsyncWorkQueueDelay _delay;
 
     /// <summary>
     /// Equality comparer uses to dedupe items if present.
@@ -67,6 +99,8 @@ internal class AsyncBatchingWorkQueue<TItem, TResult>
     /// </summary>
     private readonly object _gate = new();
 
+    private DateTime? _firstItemTime;
+
     /// <summary>
     /// Data added that we want to process in our next update task.
     /// </summary>
@@ -102,6 +136,18 @@ internal class AsyncBatchingWorkQueue<TItem, TResult>
     /// guaranteed to always be non-empty.</param>
     public AsyncBatchingWorkQueue(
         TimeSpan delay,
+        Func<ImmutableSegmentedList<TItem>, CancellationToken, ValueTask<TResult>> processBatchAsync,
+        IEqualityComparer<TItem>? equalityComparer,
+        IAsynchronousOperationListener asyncListener,
+        CancellationToken cancellationToken)
+        : this(new ConstantWorkQueueDelay(delay), processBatchAsync, equalityComparer, asyncListener, cancellationToken)
+    {
+    }
+
+    /// <param name="processBatchAsync">Callback to process queued work items.  The list of items passed in is
+    /// guaranteed to always be non-empty.</param>
+    public AsyncBatchingWorkQueue(
+        IAsyncWorkQueueDelay delay,
         Func<ImmutableSegmentedList<TItem>, CancellationToken, ValueTask<TResult>> processBatchAsync,
         IEqualityComparer<TItem>? equalityComparer,
         IAsynchronousOperationListener asyncListener,
@@ -153,6 +199,9 @@ internal class AsyncBatchingWorkQueue<TItem, TResult>
 
         lock (_gate)
         {
+            var now = DateTime.UtcNow;
+            _firstItemTime ??= now;
+
             // if we were asked to cancel the prior set of items, do so now.
             if (cancelExistingWork)
                 CancelExistingWork();
@@ -165,7 +214,8 @@ internal class AsyncBatchingWorkQueue<TItem, TResult>
                 // No in-flight task.  Kick one off to process these messages a second from now.
                 // We always attach the task to the previous one so that notifications to the ui
                 // follow the same order as the notification the OOP server sent to us.
-                _updateTask = ContinueAfterDelayAsync(_updateTask);
+                var delay = _delay.ComputeDelay(now - _firstItemTime.Value);
+                _updateTask = ContinueAfterDelayAsync(_updateTask, delay);
                 _taskInFlight = true;
             }
         }
@@ -189,7 +239,7 @@ internal class AsyncBatchingWorkQueue<TItem, TResult>
             }
         }
 
-        async Task<TResult?> ContinueAfterDelayAsync(Task lastTask)
+        async Task<TResult?> ContinueAfterDelayAsync(Task lastTask, TimeSpan delay)
         {
             using var _ = _asyncListener.BeginAsyncOperation(nameof(AddWork));
 
@@ -205,7 +255,7 @@ internal class AsyncBatchingWorkQueue<TItem, TResult>
             // must be on another thread that runs afterwards, can only grab the thread once we release it and will
             // then reset that bool back to false
             await Task.Yield().ConfigureAwait(false);
-            await _asyncListener.Delay(_delay, _entireQueueCancellationToken).ConfigureAwait(false);
+            await _asyncListener.Delay(delay, _entireQueueCancellationToken).ConfigureAwait(false);
             return await ProcessNextBatchAsync().ConfigureAwait(false);
         }
     }
