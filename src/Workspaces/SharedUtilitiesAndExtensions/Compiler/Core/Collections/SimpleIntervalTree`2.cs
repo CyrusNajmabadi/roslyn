@@ -56,7 +56,7 @@ internal class SimpleIntervalTree<T, TIntrospector> : IntervalTree<T>
         => FillWithIntervalsThatOverlapWith(start, length, ref builder, in _introspector);
 
     public void FillWithIntervalsThatIntersectWith(int start, int length, ref TemporaryArray<T> builder)
-        => FillWithIntervalsThatIntersectWith(start, length, ref builder, in _introspector);
+        => FillWithIntervalsThatIntersectWith(start, length, ref builder, in _introspector, ordered: true);
 
     public void FillWithIntervalsThatContain(int start, int length, ref TemporaryArray<T> builder)
         => FillWithIntervalsThatContain(start, length, ref builder, in _introspector);

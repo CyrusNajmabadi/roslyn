@@ -112,15 +112,15 @@ internal partial class IntervalTree<T> : IEnumerable<T>
 
     public void FillWithIntervalsThatOverlapWith<TIntrospector>(int start, int length, ref TemporaryArray<T> builder, in TIntrospector introspector)
         where TIntrospector : struct, IIntervalIntrospector<T>
-        => this.FillWithIntervalsThatMatch(start, length, Tests<TIntrospector>.OverlapsWithTest, ref builder, in introspector, stopAfterFirst: false);
+        => this.FillWithIntervalsThatMatch(start, length, Tests<TIntrospector>.OverlapsWithTest, ref builder, in introspector, stopAfterFirst: false, ordered: true);
 
-    public void FillWithIntervalsThatIntersectWith<TIntrospector>(int start, int length, ref TemporaryArray<T> builder, in TIntrospector introspector)
+    public void FillWithIntervalsThatIntersectWith<TIntrospector>(int start, int length, ref TemporaryArray<T> builder, in TIntrospector introspector, bool ordered)
         where TIntrospector : struct, IIntervalIntrospector<T>
-        => this.FillWithIntervalsThatMatch(start, length, Tests<TIntrospector>.IntersectsWithTest, ref builder, in introspector, stopAfterFirst: false);
+        => this.FillWithIntervalsThatMatch(start, length, Tests<TIntrospector>.IntersectsWithTest, ref builder, in introspector, stopAfterFirst: false, ordered);
 
     public void FillWithIntervalsThatContain<TIntrospector>(int start, int length, ref TemporaryArray<T> builder, in TIntrospector introspector)
         where TIntrospector : struct, IIntervalIntrospector<T>
-        => this.FillWithIntervalsThatMatch(start, length, Tests<TIntrospector>.ContainsTest, ref builder, in introspector, stopAfterFirst: false);
+        => this.FillWithIntervalsThatMatch(start, length, Tests<TIntrospector>.ContainsTest, ref builder, in introspector, stopAfterFirst: false, ordered: true);
 
     public bool HasIntervalThatIntersectsWith<TIntrospector>(int position, in TIntrospector introspector)
         where TIntrospector : struct, IIntervalIntrospector<T>
@@ -175,12 +175,25 @@ internal partial class IntervalTree<T> : IEnumerable<T>
         where TIntrospector : struct, IIntervalIntrospector<T>
     {
         using var result = TemporaryArray<T>.Empty;
-        FillWithIntervalsThatMatch(start, length, testInterval, ref result.AsRef(), in introspector, stopAfterFirst: false);
+        FillWithIntervalsThatMatch(start, length, testInterval, ref result.AsRef(), in introspector, stopAfterFirst: false, ordered: true);
         return result.ToImmutableAndClear();
     }
 
     /// <returns>The number of matching intervals found by the method.</returns>
     private int FillWithIntervalsThatMatch<TIntrospector>(
+        int start, int length, TestInterval<TIntrospector> testInterval,
+        ref TemporaryArray<T> builder, in TIntrospector introspector,
+        bool stopAfterFirst,
+        bool ordered)
+        where TIntrospector : struct, IIntervalIntrospector<T>
+    {
+        return ordered
+            ? FillWithIntervalsThatMatchInOrder(start, length, testInterval, ref builder, in introspector, stopAfterFirst)
+            : FillWithIntervalsThatMatchWithoutOrder(start, length, testInterval, ref builder, in introspector, stopAfterFirst);
+    }
+
+    /// <returns>The number of matching intervals found by the method.</returns>
+    private int FillWithIntervalsThatMatchInOrder<TIntrospector>(
         int start, int length, TestInterval<TIntrospector> testInterval,
         ref TemporaryArray<T> builder, in TIntrospector introspector,
         bool stopAfterFirst)
@@ -228,6 +241,50 @@ internal partial class IntervalTree<T> : IEnumerable<T>
                 if (ShouldExamineLeft(start, currentNode, in introspector, out var left))
                     candidates.Push((left, firstTime: true));
             }
+        }
+
+        return matches;
+    }
+
+    private int FillWithIntervalsThatMatchWithoutOrder<TIntrospector>(
+        int start, int length, TestInterval<TIntrospector> testInterval,
+        ref TemporaryArray<T> builder, in TIntrospector introspector,
+        bool stopAfterFirst)
+        where TIntrospector : struct, IIntervalIntrospector<T>
+    {
+        if (root == null)
+            return 0;
+
+        using var pooledObject = s_nodePool.GetPooledObject();
+        var candidates = pooledObject.Object;
+
+        var matches = 0;
+        var end = start + length;
+
+        candidates.Push(root);
+
+        while (candidates.TryPop(out var currentNode))
+        {
+            // We're seeing this node for the second time (as we walk back up the left
+            // side of it).  Now see if it matches our test, and if so return it out.
+            if (testInterval(currentNode.Value, start, length, in introspector))
+            {
+                matches++;
+                builder.Add(currentNode.Value);
+
+                if (stopAfterFirst)
+                    return 1;
+            }
+
+            // First time we're seeing this node.  In order to see the node 'in-order', we push the right side, then
+            // the node again, then the left side.  This time we mark the current node with 'false' to indicate that
+            // it's the second time we're seeing it the next time it comes around.
+
+            if (ShouldExamineRight(start, end, currentNode, in introspector, out var right))
+                candidates.Push(right);
+
+            if (ShouldExamineLeft(start, currentNode, in introspector, out var left))
+                candidates.Push(left);
         }
 
         return matches;

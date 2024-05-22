@@ -53,7 +53,7 @@ internal partial class TagSpanIntervalTree<TTag> where TTag : ITag
 
     public IList<TagSpan<TTag>> GetIntersectingSpans(SnapshotSpan snapshotSpan)
         => SegmentedListPool<TagSpan<TTag>>.ComputeList(
-            static (args, tags) => args.@this.AppendIntersectingSpansInSortedOrder(args.snapshotSpan, tags),
+            static (args, tags) => args.@this.AppendIntersectingSpans(args.snapshotSpan, tags, ordered: false),
             (@this: this, snapshotSpan));
 
     /// <summary>
@@ -61,14 +61,14 @@ internal partial class TagSpanIntervalTree<TTag> where TTag : ITag
     /// <paramref name="result"/>.  Note the sorted chunk of items are appended to <paramref name="result"/>.  This
     /// means that <paramref name="result"/> may not be sorted if there were already items in them.
     /// </summary>
-    private void AppendIntersectingSpansInSortedOrder(SnapshotSpan snapshotSpan, SegmentedList<TagSpan<TTag>> result)
+    private void AppendIntersectingSpans(SnapshotSpan snapshotSpan, SegmentedList<TagSpan<TTag>> result, bool ordered)
     {
         var snapshot = snapshotSpan.Snapshot;
         Debug.Assert(snapshot.TextBuffer == _textBuffer);
 
         using var intersectingIntervals = TemporaryArray<TagNode>.Empty;
         _tree.FillWithIntervalsThatIntersectWith(
-            snapshotSpan.Start, snapshotSpan.Length, ref intersectingIntervals.AsRef(), new IntervalIntrospector(snapshot));
+            snapshotSpan.Start, snapshotSpan.Length, ref intersectingIntervals.AsRef(), new IntervalIntrospector(snapshot), ordered);
 
         foreach (var tagNode in intersectingIntervals)
             result.Add(new TagSpan<TTag>(tagNode.Span.GetSpan(snapshot), tagNode.Tag));
@@ -114,7 +114,7 @@ internal partial class TagSpanIntervalTree<TTag> where TTag : ITag
         // Special case the case where there is only one requested span.  In that case, we don't
         // need to allocate any intermediate collections
         if (requestedSpans.Count == 1)
-            AppendIntersectingSpansInSortedOrder(requestedSpans[0], tags);
+            AppendIntersectingSpans(requestedSpans[0], tags, ordered: false);
         else if (requestedSpans.Count < MaxNumberOfRequestedSpans)
             AddTagsForSmallNumberOfSpans(requestedSpans, tags);
         else
@@ -126,7 +126,7 @@ internal partial class TagSpanIntervalTree<TTag> where TTag : ITag
         SegmentedList<TagSpan<TTag>> tags)
     {
         foreach (var span in requestedSpans)
-            AppendIntersectingSpansInSortedOrder(span, tags);
+            AppendIntersectingSpans(span, tags, ordered: false);
     }
 
     private void AddTagsForLargeNumberOfSpans(NormalizedSnapshotSpanCollection requestedSpans, SegmentedList<TagSpan<TTag>> tags)
@@ -138,11 +138,11 @@ internal partial class TagSpanIntervalTree<TTag> where TTag : ITag
 
         using var _1 = SegmentedListPool.GetPooledList<TagSpan<TTag>>(out var tempList);
 
-        AppendIntersectingSpansInSortedOrder(mergedSpan, tempList);
+        AppendIntersectingSpans(mergedSpan, tempList, ordered: true);
         if (tempList.Count == 0)
             return;
 
-        // Note: both 'requstedSpans' and 'tempList' are in sorted order.
+        // Note: both 'requestedSpans' and 'tempList' are in sorted order.
 
         using var enumerator = tempList.GetEnumerator();
 
