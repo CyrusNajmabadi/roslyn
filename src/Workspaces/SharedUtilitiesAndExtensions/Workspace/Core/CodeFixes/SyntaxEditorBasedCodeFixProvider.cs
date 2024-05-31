@@ -4,11 +4,13 @@
 
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 
 namespace Microsoft.CodeAnalysis.CodeFixes;
@@ -26,23 +28,49 @@ internal abstract partial class SyntaxEditorBasedCodeFixProvider(bool supportsFi
             return null;
 
         return FixAllProvider.Create(
-            async (fixAllContext, document, diagnostics) =>
-            {
-                // Ensure that diagnostics for this document are always in document location order.  This provides a
-                // consistent and deterministic order for fixers that want to update a document.
-                //
-                // Also ensure that we do not pass in duplicates by invoking Distinct.  See
-                // https://github.com/dotnet/roslyn/issues/31381, that seems to be causing duplicate diagnostics.
-                var filteredDiagnostics = diagnostics.Distinct()
-                                                     .WhereAsArray(d => this.IncludeDiagnosticDuringFixAll(d, document, fixAllContext.CodeActionEquivalenceKey, fixAllContext.CancellationToken))
-                                                     .Sort((d1, d2) => d1.Location.SourceSpan.Start - d2.Location.SourceSpan.Start);
-
-                if (filteredDiagnostics.Length == 0)
-                    return document;
-
-                return await FixAllAsync(document, filteredDiagnostics, fixAllContext.GetOptionsProvider(), fixAllContext.CancellationToken).ConfigureAwait(false);
-            },
+            FixDocumentAsync,
             s_defaultSupportedFixAllScopes);
+    }
+
+    public async Task<Document?> FixDocumentAsync(FixAllContext fixAllContext, Document document, ImmutableArray<Diagnostic> diagnostics)
+    {
+        var cancellationToken = fixAllContext.CancellationToken;
+        var options = fixAllContext.GetOptionsProvider().GetOptions(document.Project.GetExtendedLanguageServices().LanguageServices);
+
+#if !CODE_STYLE
+        var attribute = this.GetType().CustomAttributes.FirstOrDefault(a => a.AttributeType == typeof(ExportCodeFixProviderAttribute));
+        if (attribute != null)
+        {
+            var client = await RemoteHostClient.TryGetClientAsync(document.Project.Solution.Services, cancellationToken).ConfigureAwait(false);
+            await 
+        }
+#endif
+
+        return await FixDocumentInCurrentProcessAsync(
+            document, diagnostics, fixAllContext.CodeActionEquivalenceKey, options, ).ConfigureAwait(false);
+    }
+
+    private async Task<Document?> FixDocumentInCurrentProcessAsync(
+        Document document,
+        ImmutableArray<Diagnostic> diagnostics,
+        string? codeActionEquivalenceKey,
+        CodeActionOptions codeActionOptions,
+        CancellationToken cancellationToken)
+    {
+        // Ensure that diagnostics for this document are always in document location order.  This provides a
+        // consistent and deterministic order for fixers that want to update a document.
+        //
+        // Also ensure that we do not pass in duplicates by invoking Distinct.  See
+        // https://github.com/dotnet/roslyn/issues/31381, that seems to be causing duplicate diagnostics.
+        var filteredDiagnostics = diagnostics
+            .Distinct()
+            .WhereAsArray(d => this.IncludeDiagnosticDuringFixAll(d, document, codeActionEquivalenceKey, cancellationToken))
+            .Sort((d1, d2) => d1.Location.SourceSpan.Start - d2.Location.SourceSpan.Start);
+
+        if (filteredDiagnostics.Length == 0)
+            return document;
+
+        return await FixAllAsync(document, filteredDiagnostics, codeActionOptions, cancellationToken).ConfigureAwait(false);
     }
 
     protected void RegisterCodeFix(CodeFixContext context, string title, string equivalenceKey, Diagnostic? diagnostic = null)
@@ -54,11 +82,13 @@ internal abstract partial class SyntaxEditorBasedCodeFixProvider(bool supportsFi
     protected Func<CancellationToken, Task<Document>> GetDocumentUpdater(CodeFixContext context, Diagnostic? diagnostic = null)
     {
         var diagnostics = ImmutableArray.Create(diagnostic ?? context.Diagnostics[0]);
-        return cancellationToken => FixAllAsync(context.Document, diagnostics, context.GetOptionsProvider(), cancellationToken);
+        var options = context.GetOptionsProvider().GetOptions(context.TextDocument.Project.GetExtendedLanguageServices().LanguageServices);
+
+        return cancellationToken => FixAllAsync(context.Document, diagnostics, options, cancellationToken);
     }
 
     private Task<Document> FixAllAsync(
-        Document document, ImmutableArray<Diagnostic> diagnostics, CodeActionOptionsProvider options, CancellationToken cancellationToken)
+        Document document, ImmutableArray<Diagnostic> diagnostics, CodeActionOptions options, CancellationToken cancellationToken)
     {
         return FixAllWithEditorAsync(
             document,
@@ -84,10 +114,11 @@ internal abstract partial class SyntaxEditorBasedCodeFixProvider(bool supportsFi
     /// Fixes all <paramref name="diagnostics"/> in the specified <paramref name="editor"/>.
     /// The fixes are applied to the <paramref name="document"/>'s syntax tree via <paramref name="editor"/>.
     /// The implementation may query options of any document in the <paramref name="document"/>'s solution
-    /// with <paramref name="fallbackOptions"/> providing default values for options not specified explicitly in the corresponding editorconfig.
+    /// with <paramref name="options"/> providing default values for options not specified explicitly in the
+    /// corresponding editorconfig.
     /// </summary>
     protected abstract Task FixAllAsync(
-        Document document, ImmutableArray<Diagnostic> diagnostics, SyntaxEditor editor, CodeActionOptionsProvider fallbackOptions, CancellationToken cancellationToken);
+        Document document, ImmutableArray<Diagnostic> diagnostics, SyntaxEditor editor, CodeActionOptions options, CancellationToken cancellationToken);
 
     /// <summary>
     /// Whether or not this diagnostic should be included when performing a FixAll.  This is useful for providers that
