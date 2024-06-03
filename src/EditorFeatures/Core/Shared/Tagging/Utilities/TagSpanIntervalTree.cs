@@ -32,13 +32,13 @@ internal sealed partial class TagSpanIntervalTree<TTag>(SpanTrackingMode spanTra
     public TagSpanIntervalTree(
         ITextSnapshot textSnapshot,
         SpanTrackingMode trackingMode,
-        IEnumerable<TagSpan<TTag>>? values1 = null,
-        IEnumerable<TagSpan<TTag>>? values2 = null)
+        SegmentedList<TagSpan<TTag>> values)
         : this(trackingMode)
     {
-        _tree = IntervalTree.Create(
-            new IntervalIntrospector(textSnapshot, trackingMode),
-            values1, values2);
+        values.Sort(static (t1, t2) => t1.Span.Start.Position - t2.Span.Start.Position);
+
+        _tree = IntervalTree<TagSpan<TTag>>.CreateFromSorted(
+            new IntervalIntrospector(textSnapshot, trackingMode), values);
     }
 
     private static SnapshotSpan GetTranslatedSpan(TagSpan<TTag> originalTagSpan, ITextSnapshot textSnapshot, SpanTrackingMode trackingMode)
