@@ -60,7 +60,7 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
         if (semanticModel.GetDeclaredSymbol(typeDeclaration, cancellationToken) is not INamedTypeSymbol containingType)
             return;
 
-        using var _1 = ArrayBuilder<INamedTypeSymbol>.GetInstance(out var missingComparableTypes);
+        using var _ = ArrayBuilder<INamedTypeSymbol>.GetInstance(out var missingComparableTypes);
 
         foreach (var iface in containingType.Interfaces)
         {
@@ -81,34 +81,32 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
             missingComparableTypes.Add(iface);
         }
 
-        if (missingComparableTypes.Count == 0)
-            return;
-
         if (missingComparableTypes is [var singleMissingType])
         {
             context.RegisterRefactoring(CodeAction.Create(
                 FeaturesResources.Generate_comparison_operators,
                 c => GenerateComparisonOperatorsAsync(document, typeDeclaration, singleMissingType, context.Options, c),
                 nameof(FeaturesResources.Generate_comparison_operators)));
-            return;
         }
-
-        using var _2 = ArrayBuilder<CodeAction>.GetInstance(out var nestedActions);
-
-        foreach (var missingType in missingComparableTypes)
+        else if (missingComparableTypes.Count > 0)
         {
-            var typeArg = missingType.TypeArguments[0];
-            var displayString = typeArg.ToMinimalDisplayString(semanticModel, textSpan.Start);
-            nestedActions.Add(CodeAction.Create(
-                string.Format(FeaturesResources.Generate_for_0, displayString),
-                c => GenerateComparisonOperatorsAsync(document, typeDeclaration, missingType, context.Options, c),
-                nameof(FeaturesResources.Generate_for_0) + "_" + displayString));
-        }
+            var nestedActions = new FixedSizeArrayBuilder<CodeAction>(missingComparableTypes.Count);
 
-        context.RegisterRefactoring(CodeAction.Create(
-            FeaturesResources.Generate_comparison_operators,
-            nestedActions.ToImmutable(),
-            isInlinable: false));
+            foreach (var missingType in missingComparableTypes)
+            {
+                var typeArg = missingType.TypeArguments[0];
+                var displayString = typeArg.ToMinimalDisplayString(semanticModel, textSpan.Start);
+                nestedActions.Add(CodeAction.Create(
+                    string.Format(FeaturesResources.Generate_for_0, displayString),
+                    c => GenerateComparisonOperatorsAsync(document, typeDeclaration, missingType, context.Options, c),
+                    nameof(FeaturesResources.Generate_for_0) + "_" + displayString));
+            }
+
+            context.RegisterRefactoring(CodeAction.Create(
+                FeaturesResources.Generate_comparison_operators,
+                nestedActions.MoveToImmutable(),
+                isInlinable: false));
+        }
     }
 
     private static IMethodSymbol? TryGetCompareMethodImpl(INamedTypeSymbol containingType, ITypeSymbol comparableType)
