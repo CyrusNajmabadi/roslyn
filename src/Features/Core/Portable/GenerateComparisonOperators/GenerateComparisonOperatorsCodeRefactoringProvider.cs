@@ -28,13 +28,11 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
     private const string LeftName = "left";
     private const string RightName = "right";
 
-    private static readonly ImmutableArray<CodeGenerationOperatorKind> s_operatorKinds =
-        [
-            CodeGenerationOperatorKind.LessThan,
-            CodeGenerationOperatorKind.LessThanOrEqual,
-            CodeGenerationOperatorKind.GreaterThan,
-            CodeGenerationOperatorKind.GreaterThanOrEqual,
-        ];
+    private static readonly ImmutableArray<CodeGenerationOperatorKind> s_operatorKinds = [
+        CodeGenerationOperatorKind.LessThan,
+        CodeGenerationOperatorKind.LessThanOrEqual,
+        CodeGenerationOperatorKind.GreaterThan,
+        CodeGenerationOperatorKind.GreaterThanOrEqual];
 
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
     {
@@ -59,8 +57,7 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
         if (comparableType == null)
             return;
 
-        var containingType = semanticModel.GetDeclaredSymbol(typeDeclaration, cancellationToken) as INamedTypeSymbol;
-        if (containingType == null)
+        if (semanticModel.GetDeclaredSymbol(typeDeclaration, cancellationToken) is not INamedTypeSymbol containingType)
             return;
 
         using var _1 = ArrayBuilder<INamedTypeSymbol>.GetInstance(out var missingComparableTypes);
@@ -87,12 +84,11 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
         if (missingComparableTypes.Count == 0)
             return;
 
-        if (missingComparableTypes.Count == 1)
+        if (missingComparableTypes is [var singleMissingType])
         {
-            var missingType = missingComparableTypes[0];
             context.RegisterRefactoring(CodeAction.Create(
                 FeaturesResources.Generate_comparison_operators,
-                c => GenerateComparisonOperatorsAsync(document, typeDeclaration, missingType, context.Options, c),
+                c => GenerateComparisonOperatorsAsync(document, typeDeclaration, singleMissingType, context.Options, c),
                 nameof(FeaturesResources.Generate_comparison_operators)));
             return;
         }
@@ -158,15 +154,12 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
         INamedTypeSymbol comparableType,
         IMethodSymbol compareMethod)
     {
-        var thisExpression = generator.IdentifierName(LeftName);
-        var generateCast =
-            compareMethod != null &&
-            compareMethod.DeclaredAccessibility != Accessibility.Public &&
-            compareMethod.Name != nameof(IComparable.CompareTo);
+        var leftExpression = generator.IdentifierName(LeftName);
+        var generateCast = compareMethod is { DeclaredAccessibility: not Accessibility.Public, Name: not nameof(IComparable.CompareTo) };
 
         return generateCast
-            ? generator.CastExpression(comparableType, thisExpression)
-            : thisExpression;
+            ? generator.CastExpression(comparableType, leftExpression)
+            : leftExpression;
     }
 
     private static ImmutableArray<IMethodSymbol> GenerateComparisonOperators(
