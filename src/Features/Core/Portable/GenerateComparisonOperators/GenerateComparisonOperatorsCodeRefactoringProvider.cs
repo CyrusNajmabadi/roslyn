@@ -240,9 +240,8 @@ internal sealed class GenerateComparisonOperatorsCodeRefactoringProvider() : Cod
         // Look for an `operator <(... c1, ComparedType c2)` member.
         foreach (var member in containingType.GetMembers(GetOperatorName(kind)))
         {
-            if (member is IMethodSymbol method &&
-                method.Parameters.Length >= 2 &&
-                comparedType.Equals(method.Parameters[1].Type))
+            if (member is IMethodSymbol { Parameters: [_, { Type: var parameterType }, ..] } &&
+                comparedType.Equals(parameterType))
             {
                 return true;
             }
