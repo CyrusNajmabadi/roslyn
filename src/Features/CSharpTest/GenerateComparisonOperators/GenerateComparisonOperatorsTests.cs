@@ -7,11 +7,10 @@
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp.CodeStyle;
 using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
+using Microsoft.CodeAnalysis.GenerateComparisonOperators;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
-using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
-using Microsoft.CodeAnalysis.GenerateComparisonOperators;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.GenerateComparisonOperators;
 
