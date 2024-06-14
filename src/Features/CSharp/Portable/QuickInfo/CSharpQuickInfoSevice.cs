@@ -18,12 +18,8 @@ internal sealed class CSharpQuickInfoServiceFactory() : ILanguageServiceFactory
     public ILanguageService CreateLanguageService(HostLanguageServices languageServices)
         => new CSharpQuickInfoService(languageServices.LanguageServices);
 
-    private sealed class CSharpQuickInfoService : QuickInfoServiceWithProviders
+    private sealed class CSharpQuickInfoService(LanguageServices services) : QuickInfoServiceWithProviders(services)
     {
-        public CSharpQuickInfoService(LanguageServices services)
-            : base(services)
-        {
-        }
     }
 }
 
