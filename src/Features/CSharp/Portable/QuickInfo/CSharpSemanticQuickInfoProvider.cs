@@ -21,14 +21,10 @@ using Microsoft.CodeAnalysis.Shared.Extensions;
 namespace Microsoft.CodeAnalysis.CSharp.QuickInfo;
 
 [ExportQuickInfoProvider(QuickInfoProviderNames.Semantic, LanguageNames.CSharp), Shared]
-internal class CSharpSemanticQuickInfoProvider : CommonSemanticQuickInfoProvider
+[method: ImportingConstructor]
+[method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+internal sealed class CSharpSemanticQuickInfoProvider() : CommonSemanticQuickInfoProvider
 {
-    [ImportingConstructor]
-    [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-    public CSharpSemanticQuickInfoProvider()
-    {
-    }
-
     /// <summary>
     /// If the token is the '=>' in a lambda, or the 'delegate' in an anonymous function,
     /// return the syntax for the lambda or anonymous function.
