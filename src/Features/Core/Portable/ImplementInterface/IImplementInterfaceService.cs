@@ -13,7 +13,7 @@ namespace Microsoft.CodeAnalysis.ImplementInterface;
 
 internal interface IImplementInterfaceInfo
 {
-
+    INamedTypeSymbol ClassOrStructType { get; }
 }
 
 internal readonly record struct ImplementInterfaceOptions(
