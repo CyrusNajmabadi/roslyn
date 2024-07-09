@@ -60,6 +60,13 @@ internal abstract partial class AbstractImplementInterfaceService : IImplementIn
         }
     }
 
+    public async Task<IImplementInterfaceInfo> ComputeInfoAsync(Document document, SyntaxNode node, CancellationToken cancellationToken)
+    {
+        var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var state = State.Generate(this, document, semanticModel, node, cancellationToken);
+        return state;
+    }
+
     public ImmutableArray<CodeAction> GetCodeActions(Document document, ImplementTypeGenerationOptions options, SemanticModel model, SyntaxNode node, CancellationToken cancellationToken)
     {
         var state = State.Generate(this, document, model, node, cancellationToken);

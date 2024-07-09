@@ -14,7 +14,13 @@ namespace Microsoft.CodeAnalysis.ImplementInterface;
 
 internal abstract partial class AbstractImplementInterfaceService
 {
-    internal class State(Document document, SyntaxNode interfaceNode, SyntaxNode classOrStructDecl, INamedTypeSymbol classOrStructType, IEnumerable<INamedTypeSymbol> interfaceTypes, SemanticModel model)
+    internal sealed class State(
+        Document document,
+        SyntaxNode interfaceNode,
+        SyntaxNode classOrStructDecl,
+        INamedTypeSymbol classOrStructType,
+        IEnumerable<INamedTypeSymbol> interfaceTypes,
+        SemanticModel model) : IImplementInterfaceInfo
     {
         public SyntaxNode Location { get; } = interfaceNode;
         public SyntaxNode ClassOrStructDecl { get; } = classOrStructDecl;
