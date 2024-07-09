@@ -26,6 +26,12 @@ using static ImplementHelpers;
 
 internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeSyntax>
 {
+    // C#: `Dispose(bool disposed)`.  VB: `Dispose(disposed As Boolean)`
+    private static readonly SymbolDisplayFormat s_format = new(
+        memberOptions: SymbolDisplayMemberOptions.IncludeParameters,
+        parameterOptions: SymbolDisplayParameterOptions.IncludeName | SymbolDisplayParameterOptions.IncludeType,
+        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+
     // Parts of the name `disposedValue`.  Used so we can generate a field correctly with 
     // the naming style that the user has specified.
     private static readonly ImmutableArray<string> s_disposedValueNameParts =
