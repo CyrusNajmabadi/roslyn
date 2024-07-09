@@ -13,7 +13,7 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.ImplementInterface;
 
-internal abstract partial class AbstractImplementInterfaceService
+internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeSyntax>
 {
     internal partial class ImplementInterfaceCodeAction
     {

@@ -6,18 +6,21 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.ImplementType;
 
 namespace Microsoft.CodeAnalysis.ImplementInterface;
 
-internal interface IImplementInterfaceInfo
-{
-
-}
-
 internal interface IImplementInterfaceService : ILanguageService
 {
+    bool CanImplementImplicitly { get; }
+    bool HasHiddenExplicitImplementation { get; }
+
+    bool AllowDelegateAndEnumConstraints(ParseOptions options);
+    SyntaxNode AddCommentInsideIfStatement(SyntaxNode ifDisposingStatement, SyntaxTriviaList trivia);
+    SyntaxNode CreateFinalizer(SyntaxGenerator generator, INamedTypeSymbol classType, string disposeMethodDisplayString);
+
     Task<Document> ImplementInterfaceAsync(Document document, ImplementTypeGenerationOptions options, SyntaxNode node, CancellationToken cancellationToken);
     Task<IImplementInterfaceInfo> ComputeInfoAsync(Document document, SyntaxNode node, CancellationToken cancellationToken);
 

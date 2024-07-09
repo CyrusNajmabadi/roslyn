@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,23 @@ namespace Microsoft.CodeAnalysis.ImplementInterface;
 
 internal static class ImplementHelpers
 {
+    public static IMethodSymbol? TryGetIDisposableDispose(Compilation compilation)
+    {
+        // Get symbol for 'System.IDisposable'.
+        var idisposable = compilation.GetSpecialType(SpecialType.System_IDisposable);
+        if (idisposable?.TypeKind == TypeKind.Interface)
+        {
+            var idisposableMembers = idisposable.GetMembers(nameof(IDisposable.Dispose));
+            foreach (var member in idisposableMembers)
+            {
+                if (member is IMethodSymbol { IsStatic: false, ReturnsVoid: true, Arity: 0, Parameters.Length: 0 } disposeMethod)
+                    return disposeMethod;
+            }
+        }
+
+        return null;
+    }
+
     public static ImmutableArray<ISymbol> GetDelegatableMembers(
         Document document,
         INamedTypeSymbol namedType,
@@ -113,5 +131,135 @@ internal static class ImplementHelpers
 
             return false;
         }
+    }
+
+    public static bool IsLessAccessibleThan(ISymbol? first, INamedTypeSymbol second)
+    {
+        if (first is null)
+        {
+            return false;
+        }
+
+        if (first.DeclaredAccessibility <= Accessibility.NotApplicable ||
+            second.DeclaredAccessibility <= Accessibility.NotApplicable)
+        {
+            return false;
+        }
+
+        if (first.DeclaredAccessibility < second.DeclaredAccessibility)
+        {
+            return true;
+        }
+
+        switch (first)
+        {
+            case IPropertySymbol propertySymbol:
+                if (IsTypeLessAccessibleThanOtherType(propertySymbol.Type, second, []))
+                {
+                    return true;
+                }
+
+                if (IsLessAccessibleThan(propertySymbol.GetMethod, second))
+                {
+                    return true;
+                }
+
+                if (IsLessAccessibleThan(propertySymbol.SetMethod, second))
+                {
+                    return true;
+                }
+
+                return false;
+
+            case IMethodSymbol methodSymbol:
+                if (IsTypeLessAccessibleThanOtherType(methodSymbol.ReturnType, second, []))
+                {
+                    return true;
+                }
+
+                foreach (var parameter in methodSymbol.Parameters)
+                {
+                    if (IsTypeLessAccessibleThanOtherType(parameter.Type, second, []))
+                    {
+                        return true;
+                    }
+                }
+
+                foreach (var typeArg in methodSymbol.TypeArguments)
+                {
+                    if (IsTypeLessAccessibleThanOtherType(typeArg, second, []))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+
+            case IEventSymbol eventSymbol:
+                return IsTypeLessAccessibleThanOtherType(eventSymbol.Type, second, []);
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsTypeLessAccessibleThanOtherType(ITypeSymbol? first, INamedTypeSymbol second, HashSet<ITypeSymbol> alreadyCheckingTypes)
+    {
+        if (first is null)
+        {
+            return false;
+        }
+
+        alreadyCheckingTypes.Add(first);
+
+        if (first is ITypeParameterSymbol typeParameter)
+        {
+            foreach (var constraint in typeParameter.ConstraintTypes)
+            {
+                if (alreadyCheckingTypes.Contains(constraint))
+                {
+                    continue;
+                }
+
+                if (IsTypeLessAccessibleThanOtherType(constraint, second, alreadyCheckingTypes))
+                {
+                    return true;
+                }
+            }
+        }
+
+        if (first.DeclaredAccessibility <= Accessibility.NotApplicable ||
+            second.DeclaredAccessibility <= Accessibility.NotApplicable)
+        {
+            return false;
+        }
+
+        if (first.DeclaredAccessibility < second.DeclaredAccessibility)
+        {
+            return true;
+        }
+
+        if (first is INamedTypeSymbol namedType)
+        {
+            foreach (var genericParam in namedType.TypeArguments)
+            {
+                if (alreadyCheckingTypes.Contains(genericParam))
+                {
+                    continue;
+                }
+
+                if (IsTypeLessAccessibleThanOtherType(genericParam, second, alreadyCheckingTypes))
+                {
+                    return true;
+                }
+            }
+        }
+
+        if (IsTypeLessAccessibleThanOtherType(first.ContainingType, second, alreadyCheckingTypes))
+        {
+            return true;
+        }
+
+        return false;
     }
 }
