@@ -62,40 +62,4 @@ internal abstract partial class AbstractImplementInterfaceService() : IImplement
         var state = State.Generate(this, document, semanticModel, node, cancellationToken);
         return state;
     }
-
-    private static bool AnyImplementedImplicitly(State state)
-    {
-        if (state.MembersWithoutExplicitOrImplicitImplementation.Length != state.MembersWithoutExplicitImplementation.Length)
-        {
-            return true;
-        }
-
-        for (var i = 0; i < state.MembersWithoutExplicitOrImplicitImplementation.Length; i++)
-        {
-            var (typeA, membersA) = state.MembersWithoutExplicitOrImplicitImplementation[i];
-            var (typeB, membersB) = state.MembersWithoutExplicitImplementation[i];
-            if (!typeA.Equals(typeB))
-            {
-                return true;
-            }
-
-            if (!membersA.SequenceEqual(membersB))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static ImmutableArray<ISymbol> GetDelegatableMembers(State state, CancellationToken cancellationToken)
-    {
-        var firstInterfaceType = state.InterfaceTypes.First();
-
-        return ImplementHelpers.GetDelegatableMembers(
-            state.Document,
-            state.ClassOrStructType,
-            t => t.GetAllInterfacesIncludingThis().Contains(firstInterfaceType),
-            cancellationToken);
-    }
 }

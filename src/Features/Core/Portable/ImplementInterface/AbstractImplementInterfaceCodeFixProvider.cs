@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,27 +59,31 @@ internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeS
         }
     }
 
-    private async Task<ImmutableArray<CodeAction>> ComputeActionsAsync(
+    private static async Task<ImmutableArray<CodeAction>> ComputeActionsAsync(
         Document document,
         IImplementInterfaceInfo info,
         ImplementTypeGenerationOptions options,
         CancellationToken cancellationToken)
     {
-        return ComputeActionsEnumerable(document, info, options, cancellationToken).ToImmutableArray();
+        using var _ = ArrayBuilder<CodeAction>.GetInstance(out var result);
+        await foreach (var codeAction in ComputeActionsEnumerableAsync(document, info, options, cancellationToken))
+            result.AddIfNotNull(codeAction);
+
+        return result.ToImmutable();
     }
 
-    private IEnumerable<CodeAction> ComputeActionsEnumerable(
+    private static async IAsyncEnumerable<CodeAction> ComputeActionsEnumerableAsync(
         Document document,
         IImplementInterfaceInfo state,
         ImplementTypeGenerationOptions options,
-        CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         if (state == null)
         {
             yield break;
         }
 
-        var service = document.GetRequiredLanguageService<IImplementInterfaceService>();
+        var compilation = await document.Project.GetRequiredCompilationAsync(cancellationToken).ConfigureAwait(false);
 
         if (state.MembersWithoutExplicitOrImplicitImplementationWhichCanBeImplicitlyImplemented.Length > 0)
         {
@@ -102,40 +107,65 @@ internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeS
             // will be the same as "Implement interface explicitly", so there is no point in having both of them
             if (totalMemberCount != inaccessibleMemberCount)
             {
-                yield return ImplementInterfaceCodeAction.CreateImplementCodeAction(service, document, options, state);
+                yield return ImplementInterfaceCodeAction.CreateImplementCodeAction(document, options, state);
             }
 
-            if (ShouldImplementDisposePattern(state, explicitly: false))
+            if (ShouldImplementDisposePattern(compilation, state, explicitly: false))
             {
                 yield return ImplementInterfaceWithDisposePatternCodeAction.CreateImplementWithDisposePatternCodeAction(document, options, state);
             }
 
-            var delegatableMembers = GetDelegatableMembers(state, cancellationToken);
+            var delegatableMembers = GetDelegatableMembers(document, state, cancellationToken);
             foreach (var member in delegatableMembers)
             {
-                yield return ImplementInterfaceCodeAction.CreateImplementThroughMemberCodeAction(this, document, options, state, member);
+                yield return ImplementInterfaceCodeAction.CreateImplementThroughMemberCodeAction(document, options, state, member);
             }
 
             if (state.ClassOrStructType.IsAbstract)
             {
-                yield return ImplementInterfaceCodeAction.CreateImplementAbstractlyCodeAction(this, document, options, state);
+                yield return ImplementInterfaceCodeAction.CreateImplementAbstractlyCodeAction(document, options, state);
             }
         }
 
         if (state.MembersWithoutExplicitImplementation.Length > 0)
         {
-            yield return ImplementInterfaceCodeAction.CreateImplementExplicitlyCodeAction(this, document, options, state);
+            yield return ImplementInterfaceCodeAction.CreateImplementExplicitlyCodeAction(document, options, state);
 
-            if (ShouldImplementDisposePattern(state, explicitly: true))
+            if (ShouldImplementDisposePattern(compilation, state, explicitly: true))
             {
-                yield return ImplementInterfaceWithDisposePatternCodeAction.CreateImplementExplicitlyWithDisposePatternCodeAction(this, document, options, state);
+                yield return ImplementInterfaceWithDisposePatternCodeAction.CreateImplementExplicitlyWithDisposePatternCodeAction(document, options, state);
             }
         }
 
         if (AnyImplementedImplicitly(state))
         {
-            yield return ImplementInterfaceCodeAction.CreateImplementRemainingExplicitlyCodeAction(this, document, options, state);
+            yield return ImplementInterfaceCodeAction.CreateImplementRemainingExplicitlyCodeAction(document, options, state);
         }
+    }
+
+    private static bool AnyImplementedImplicitly(IImplementInterfaceInfo state)
+    {
+        if (state.MembersWithoutExplicitOrImplicitImplementation.Length != state.MembersWithoutExplicitImplementation.Length)
+        {
+            return true;
+        }
+
+        for (var i = 0; i < state.MembersWithoutExplicitOrImplicitImplementation.Length; i++)
+        {
+            var (typeA, membersA) = state.MembersWithoutExplicitOrImplicitImplementation[i];
+            var (typeB, membersB) = state.MembersWithoutExplicitImplementation[i];
+            if (!typeA.Equals(typeB))
+            {
+                return true;
+            }
+
+            if (!membersA.SequenceEqual(membersB))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected static TNode AddComment<TNode>(SyntaxGenerator g, string comment, TNode node) where TNode : SyntaxNode
