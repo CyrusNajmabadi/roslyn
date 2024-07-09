@@ -26,5 +26,23 @@ internal interface IImplementInterfaceService : ILanguageService
     Task<Document> ImplementInterfaceAsync(Document document, ImplementTypeGenerationOptions options, SyntaxNode node, CancellationToken cancellationToken);
     Task<IImplementInterfaceInfo> ComputeInfoAsync(Document document, SyntaxNode node, CancellationToken cancellationToken);
 
+    Task<Document> ImplementInterfaceAsync(
+        Document document,
+        ImmutableArray<(INamedTypeSymbol type, ImmutableArray<ISymbol> members)> unimplementedMembers,
+        bool explicitly,
+        INamedTypeSymbol classType,
+        SyntaxNode classDecl,
+        ImplementTypeGenerationOptions options,
+        CancellationToken cancellationToken);
+
+    Task<Document> ImplementIDisposableInterfaceAsync(
+        Document document,
+        ImmutableArray<(INamedTypeSymbol type, ImmutableArray<ISymbol> members)> unimplementedMembers,
+        bool explicitly,
+        INamedTypeSymbol classType,
+        SyntaxNode classDecl,
+        ImplementTypeGenerationOptions options,
+        CancellationToken cancellationToken);
+
 //    ImmutableArray<CodeAction> GetCodeActions(Document document, ImplementTypeGenerationOptions options, SemanticModel model, SyntaxNode node, CancellationToken cancellationToken);
 }
