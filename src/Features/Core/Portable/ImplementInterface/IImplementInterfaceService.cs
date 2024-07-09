@@ -21,6 +21,8 @@ internal interface IImplementInterfaceService : ILanguageService
     SyntaxNode AddCommentInsideIfStatement(SyntaxNode ifDisposingStatement, SyntaxTriviaList trivia);
     SyntaxNode CreateFinalizer(SyntaxGenerator generator, INamedTypeSymbol classType, string disposeMethodDisplayString);
 
+    string ToDisplayString(IMethodSymbol disposeImplMethod, SymbolDisplayFormat format);
+
     Task<Document> ImplementInterfaceAsync(Document document, ImplementTypeGenerationOptions options, SyntaxNode node, CancellationToken cancellationToken);
     Task<IImplementInterfaceInfo> ComputeInfoAsync(Document document, SyntaxNode node, CancellationToken cancellationToken);
 
