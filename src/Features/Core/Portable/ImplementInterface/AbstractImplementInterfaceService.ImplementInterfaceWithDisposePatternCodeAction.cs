@@ -32,30 +32,27 @@ internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeS
     private const string DisposingName = "disposing";
 
     private sealed class ImplementInterfaceWithDisposePatternCodeAction(
-        AbstractImplementInterfaceService service,
         Document document,
         ImplementTypeGenerationOptions options,
         IImplementInterfaceInfo state,
         bool explicitly,
         bool abstractly,
-        ISymbol? throughMember) : ImplementInterfaceCodeAction(service, document, options, state, explicitly, abstractly, onlyRemaining: !explicitly, throughMember)
+        ISymbol? throughMember) : ImplementInterfaceCodeAction(document, options, state, explicitly, abstractly, onlyRemaining: !explicitly, throughMember)
     {
         public static ImplementInterfaceWithDisposePatternCodeAction CreateImplementWithDisposePatternCodeAction(
-            AbstractImplementInterfaceService service,
             Document document,
             ImplementTypeGenerationOptions options,
             IImplementInterfaceInfo state)
         {
-            return new ImplementInterfaceWithDisposePatternCodeAction(service, document, options, state, explicitly: false, abstractly: false, throughMember: null);
+            return new ImplementInterfaceWithDisposePatternCodeAction(document, options, state, explicitly: false, abstractly: false, throughMember: null);
         }
 
         public static ImplementInterfaceWithDisposePatternCodeAction CreateImplementExplicitlyWithDisposePatternCodeAction(
-            AbstractImplementInterfaceService service,
             Document document,
             ImplementTypeGenerationOptions options,
             IImplementInterfaceInfo state)
         {
-            return new ImplementInterfaceWithDisposePatternCodeAction(service, document, options, state, explicitly: true, abstractly: false, throughMember: null);
+            return new ImplementInterfaceWithDisposePatternCodeAction(document, options, state, explicitly: true, abstractly: false, throughMember: null);
         }
 
         public override string Title

@@ -48,7 +48,7 @@ internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeS
             if (IsTypeInBaseTypeList(typeSyntax))
             {
                 var info = await service.ComputeInfoAsync(document, typeSyntax, cancellationToken).ConfigureAwait(false);
-                var actions = await ComputeActionsAsync(info, options, cancellationToken).ConfigureAwait(false);
+                var actions = await ComputeActionsAsync(document, info, options, cancellationToken).ConfigureAwait(false);
                 if (!actions.IsEmpty)
                 {
                     context.RegisterFixes(actions, context.Diagnostics);
@@ -107,7 +107,7 @@ internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeS
 
             if (ShouldImplementDisposePattern(state, explicitly: false))
             {
-                yield return ImplementInterfaceWithDisposePatternCodeAction.CreateImplementWithDisposePatternCodeAction(service, document, options, state);
+                yield return ImplementInterfaceWithDisposePatternCodeAction.CreateImplementWithDisposePatternCodeAction(document, options, state);
             }
 
             var delegatableMembers = GetDelegatableMembers(state, cancellationToken);
