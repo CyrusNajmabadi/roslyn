@@ -274,28 +274,31 @@ internal abstract partial class AbstractImplementInterfaceService
             state.ClassOrStructType.TypeParameters.Any(static (t, arg) => arg.self.IdentifiersMatch(t.Name, arg.name), (self: this, name));
     }
 
-    private string DetermineMemberName(ISymbol member, ArrayBuilder<ISymbol> implementedVisibleMembers)
+    private string DetermineMemberName(IImplementInterfaceInfo state, ISymbol member, ArrayBuilder<ISymbol> implementedVisibleMembers)
     {
-        if (HasConflictingMember(member, implementedVisibleMembers))
+        if (HasConflictingMember(state, member, implementedVisibleMembers))
         {
-            var memberNames = State.ClassOrStructType.GetAccessibleMembersInThisAndBaseTypes<ISymbol>(State.ClassOrStructType).Select(m => m.Name);
+            var memberNames = state.ClassOrStructType.GetAccessibleMembersInThisAndBaseTypes<ISymbol>(state.ClassOrStructType).Select(m => m.Name);
 
             return NameGenerator.GenerateUniqueName(
                 string.Format("{0}_{1}", member.ContainingType.Name, member.Name),
                 n => !memberNames.Contains(n) &&
                     !implementedVisibleMembers.Any(m => IdentifiersMatch(m.Name, n)) &&
-                    !IsReservedName(n));
+                    !IsReservedName(state, n));
         }
 
         return member.Name;
     }
 
     private IEnumerable<ISymbol?> GenerateMembers(
+        Document document,
         Compilation compilation,
         ParseOptions options,
         ISymbol member,
         ArrayBuilder<ISymbol> implementedVisibleMembers,
-        ImplementTypePropertyGenerationBehavior propertyGenerationBehavior)
+        ImplementTypePropertyGenerationBehavior propertyGenerationBehavior,
+        IImplementInterfaceInfo state,
+        ImplementInterfaceOptions implementInterfaceOptions)
     {
         // First check if we already generate a member that matches the member we want to
         // generate.  This can happen in C# when you have interfaces that have the same
@@ -311,7 +314,7 @@ internal abstract partial class AbstractImplementInterfaceService
         if (HasMatchingMember(implementedVisibleMembers, member))
             return [];
 
-        var memberName = DetermineMemberName(member, implementedVisibleMembers);
+        var memberName = DetermineMemberName(state, member, implementedVisibleMembers);
 
         // See if we need to generate an invisible member.  If we do, then reset the name
         // back to what then member wants it to be.
@@ -320,28 +323,29 @@ internal abstract partial class AbstractImplementInterfaceService
 
         // The language doesn't allow static abstract implementations of interface methods. i.e,
         // Only interface member is declared abstract static, but implementation should be only static.
-        var generateAbstractly = !member.IsStatic && !generateInvisibleMember && Abstractly;
+        var generateAbstractly = !member.IsStatic && !generateInvisibleMember && implementInterfaceOptions.Abstractly;
 
         // Check if we need to add 'new' to the signature we're adding.  We only need to do this
         // if we're not generating something explicit and we have a naming conflict with
         // something in our base class hierarchy.
-        var addNew = !generateInvisibleMember && HasNameConflict(member, memberName, State.ClassOrStructType.GetBaseTypes());
+        var addNew = !generateInvisibleMember && HasNameConflict(member, memberName, state.ClassOrStructType.GetBaseTypes());
 
         // Check if we need to add 'unsafe' to the signature we're generating.
-        var syntaxFacts = Document.GetRequiredLanguageService<ISyntaxFactsService>();
-        var addUnsafe = member.RequiresUnsafeModifier() && !syntaxFacts.IsUnsafeContext(State.Location);
+        var syntaxFacts = document.GetRequiredLanguageService<ISyntaxFactsService>();
+        var addUnsafe = member.RequiresUnsafeModifier() && !syntaxFacts.IsUnsafeContext(state.Location);
 
         return GenerateMembers(
             compilation, member, memberName, generateInvisibleMember, generateAbstractly,
             addNew, addUnsafe, propertyGenerationBehavior);
     }
 
-    private bool ShouldGenerateInvisibleMember(ParseOptions options, ISymbol member, string memberName)
+    private bool ShouldGenerateInvisibleMember(
+        IImplementInterfaceInfo state, ParseOptions options, ISymbol member, string memberName, ImplementInterfaceOptions implementInterfaceOptions)
     {
-        if (Service.HasHiddenExplicitImplementation)
+        if (this.HasHiddenExplicitImplementation)
         {
             // User asked for an explicit (i.e. invisible) member.
-            if (Explicitly)
+            if (implementInterfaceOptions.Explicitly)
                 return true;
 
             // Have to create an invisible member if we have constraints we can't express
@@ -356,7 +360,7 @@ internal abstract partial class AbstractImplementInterfaceService
 
             // If the member is less accessible than type, for which we are implementing it,
             // then only explicit implementation is valid.
-            if (AccessibilityHelper.IsLessAccessibleThan(member, State.ClassOrStructType))
+            if (AccessibilityHelper.IsLessAccessibleThan(member, state.ClassOrStructType))
                 return true;
         }
 
@@ -376,7 +380,7 @@ internal abstract partial class AbstractImplementInterfaceService
         if (member is not IMethodSymbol method)
             return false;
 
-        var allowDelegateAndEnumConstraints = this.Service.AllowDelegateAndEnumConstraints(options);
+        var allowDelegateAndEnumConstraints = this.AllowDelegateAndEnumConstraints(options);
         return method.TypeParameters.Any(t => IsUnexpressibleTypeParameter(t, allowDelegateAndEnumConstraints));
     }
 
@@ -392,6 +396,7 @@ internal abstract partial class AbstractImplementInterfaceService
     }
 
     private IEnumerable<ISymbol?> GenerateMembers(
+        Document document,
         Compilation compilation,
         ISymbol member,
         string memberName,
@@ -401,10 +406,10 @@ internal abstract partial class AbstractImplementInterfaceService
         bool addUnsafe,
         ImplementTypePropertyGenerationBehavior propertyGenerationBehavior)
     {
-        var factory = Document.GetRequiredLanguageService<SyntaxGenerator>();
+        var factory = document.GetRequiredLanguageService<SyntaxGenerator>();
         var modifiers = new DeclarationModifiers(isStatic: member.IsStatic, isAbstract: generateAbstractly, isNew: addNew, isUnsafe: addUnsafe);
 
-        var useExplicitInterfaceSymbol = generateInvisibly || !Service.CanImplementImplicitly;
+        var useExplicitInterfaceSymbol = generateInvisibly || !this.CanImplementImplicitly;
         var accessibility = member.Name == memberName || generateAbstractly
             ? Accessibility.Public
             : Accessibility.Private;
@@ -424,7 +429,10 @@ internal abstract partial class AbstractImplementInterfaceService
         }
     }
 
-    private ISymbol GenerateEvent(Compilation compilation, string memberName, bool generateInvisibly, SyntaxGenerator factory, DeclarationModifiers modifiers, bool useExplicitInterfaceSymbol, Accessibility accessibility, IEventSymbol @event)
+    private ISymbol GenerateEvent(
+        Document document, Compilation compilation, string memberName, bool generateInvisibly, SyntaxGenerator factory, DeclarationModifiers modifiers,
+        bool useExplicitInterfaceSymbol, Accessibility accessibility, IEventSymbol @event,
+        ImplementInterfaceOptions implementInterfaceOptions)
     {
         var accessor = CodeGenerationSymbolFactory.CreateAccessorSymbol(
             attributes: default,
@@ -437,18 +445,20 @@ internal abstract partial class AbstractImplementInterfaceService
             modifiers: modifiers,
             explicitInterfaceImplementations: useExplicitInterfaceSymbol ? [@event] : default,
             name: memberName,
-            addMethod: GetAddOrRemoveMethod(@event, generateInvisibly, accessor, memberName, factory.AddEventHandler),
-            removeMethod: GetAddOrRemoveMethod(@event, generateInvisibly, accessor, memberName, factory.RemoveEventHandler));
+            addMethod: GetAddOrRemoveMethod(document, @event, generateInvisibly, accessor, memberName, factory.AddEventHandler, implementInterfaceOptions),
+            removeMethod: GetAddOrRemoveMethod(document, @event, generateInvisibly, accessor, memberName, factory.RemoveEventHandler, implementInterfaceOptions));
     }
 
     private IMethodSymbol? GetAddOrRemoveMethod(
+        Document document,
         IEventSymbol @event, bool generateInvisibly, IMethodSymbol accessor, string memberName,
-        Func<SyntaxNode, SyntaxNode, SyntaxNode> createAddOrRemoveHandler)
+        Func<SyntaxNode, SyntaxNode, SyntaxNode> createAddOrRemoveHandler,
+        ImplementInterfaceOptions implementInterfaceOptions)
     {
-        if (ThroughMember != null)
+        if (implementInterfaceOptions.ThroughMember != null)
         {
-            var generator = Document.GetRequiredLanguageService<SyntaxGenerator>();
-            var throughExpression = generator.CreateDelegateThroughExpression(@event, ThroughMember);
+            var generator = document.GetRequiredLanguageService<SyntaxGenerator>();
+            var throughExpression = generator.CreateDelegateThroughExpression(@event, implementInterfaceOptions.ThroughMember);
             var statement = generator.ExpressionStatement(createAddOrRemoveHandler(
                 generator.MemberAccessExpression(throughExpression, memberName), generator.IdentifierName("value")));
 
@@ -462,6 +472,7 @@ internal abstract partial class AbstractImplementInterfaceService
     }
 
     private bool HasNameConflict(
+        IImplementInterfaceInfo state,
         ISymbol member,
         string memberName,
         IEnumerable<INamedTypeSymbol> baseTypes)
@@ -472,7 +483,7 @@ internal abstract partial class AbstractImplementInterfaceService
         // parameter signature (return type is irrelevant). 
         return
             baseTypes.Any(ts => ts.GetMembers(memberName)
-                                    .Where(m => m.IsAccessibleWithin(State.ClassOrStructType))
+                                    .Where(m => m.IsAccessibleWithin(state.ClassOrStructType))
                                     .Any(m => HasNameConflict(member, m)));
     }
 
@@ -492,14 +503,14 @@ internal abstract partial class AbstractImplementInterfaceService
         return true;
     }
 
-    private bool IdentifiersMatch(string identifier1, string identifier2)
-        => IsCaseSensitive
+    private bool IdentifiersMatch(Document document, string identifier1, string identifier2)
+        => IsCaseSensitive(document)
             ? identifier1 == identifier2
             : StringComparer.OrdinalIgnoreCase.Equals(identifier1, identifier2);
 
-    private bool IsCaseSensitive => Document.GetRequiredLanguageService<ISyntaxFactsService>().IsCaseSensitive;
+    private bool IsCaseSensitive(Document document) => document.GetRequiredLanguageService<ISyntaxFactsService>().IsCaseSensitive;
 
-    private bool HasMatchingMember(ArrayBuilder<ISymbol> implementedVisibleMembers, ISymbol member)
+    private bool HasMatchingMember(Document document, ArrayBuilder<ISymbol> implementedVisibleMembers, ISymbol member)
     {
         // If this is a language that doesn't support implicit implementation then no
         // implemented members will ever match.  For example, if you have:
@@ -516,15 +527,15 @@ internal abstract partial class AbstractImplementInterfaceService
         //
         // However, that same method won't be viable for IBar.Goo (unlike C#) because it
         // explicitly specifies its interface).
-        if (!Service.CanImplementImplicitly)
+        if (!this.CanImplementImplicitly)
         {
             return false;
         }
 
-        return implementedVisibleMembers.Any(m => MembersMatch(m, member));
+        return implementedVisibleMembers.Any(m => MembersMatch(document, m, member));
     }
 
-    private bool MembersMatch(ISymbol member1, ISymbol member2)
+    private bool MembersMatch(Document document, ISymbol member1, ISymbol member2)
     {
         if (member1.Kind != member2.Kind)
             return false;
@@ -539,6 +550,6 @@ internal abstract partial class AbstractImplementInterfaceService
             return false;
 
         return SignatureComparer.Instance.HaveSameSignatureAndConstraintsAndReturnTypeAndAccessors(
-            member1, member2, IsCaseSensitive);
+            member1, member2, this.IsCaseSensitive(document));
     }
 }
