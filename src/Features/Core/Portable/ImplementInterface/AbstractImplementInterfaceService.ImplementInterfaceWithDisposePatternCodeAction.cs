@@ -22,6 +22,8 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.ImplementInterface;
 
+using static ImplementHelpers;
+
 internal abstract partial class AbstractImplementInterfaceCodeFixProvider<TTypeSyntax>
 {
     // Parts of the name `disposedValue`.  Used so we can generate a field correctly with 
