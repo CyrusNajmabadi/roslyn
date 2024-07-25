@@ -37,6 +37,12 @@
     <Compile Include="$(MSBuildThisFileDirectory)FileHeaders\AbstractFileHeaderCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ForEachCast\AbstractForEachCastCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Formatting\FormattingCodeFixProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateConstructor\AbstractGenerateConstructorService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateConstructor\AbstractGenerateConstructorService.State.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateConstructor\Argument.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateConstructor\GenerateConstructorHelpers.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateConstructor\IGenerateConstructorService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenerateMember\AbstractGenerateMemberCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImplementAbstractClass\AbstractImplementAbstractClassCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImplementAbstractClass\ImplementAbstractClassData.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImplementInterface\IImplementInterfaceInfo.cs" />
