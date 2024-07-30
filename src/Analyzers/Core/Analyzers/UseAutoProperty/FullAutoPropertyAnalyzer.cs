@@ -69,8 +69,8 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             }
 
             _analysisResults = s_analysisResultPool.Allocate();
-            _ineligibleFields = s_fieldSetPool.Allocate();
-            _nonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
+            _ineligibleFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
+            _nonConstructorFieldWrites = ConcurrentDictionaryPool<IFieldSymbol, SyntaxNode>.AllocateMulti();
 
             var self = this;
             context.RegisterSyntaxNodeAction(
@@ -88,12 +88,9 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
 
             s_analysisResultPool.ClearAndFree(_analysisResults);
-            s_fieldSetPool.ClearAndFree(_ineligibleFields);
 
-            foreach (var (_, nodeSet) in _nonConstructorFieldWrites)
-                s_nodeSetPool.ClearAndFree(nodeSet);
-
-            s_fieldWriteLocationPool.ClearAndFree(_nonConstructorFieldWrites);
+            ConcurrentSetPool<IFieldSymbol>.Free(_ineligibleFields);
+            ConcurrentDictionaryPool<IFieldSymbol, SyntaxNode>.Free(_nonConstructorFieldWrites);
         }
 
         private void AnalyzePropertyDeclaration(SyntaxNodeAnalysisContext context)

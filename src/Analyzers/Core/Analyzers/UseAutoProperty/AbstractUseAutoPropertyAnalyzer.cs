@@ -44,12 +44,35 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     where TExpression : SyntaxNode
     where TIdentifierName : TExpression
 {
-    private static readonly ObjectPool<ConcurrentSet<IFieldSymbol>> s_fieldSetPool = new(() => []);
-    private static readonly ObjectPool<ConcurrentSet<SyntaxNode>> s_nodeSetPool = new(() => []);
-    private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>>> s_fieldWriteLocationPool = new(() => []);
-    private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, IPropertySymbol>> s_fieldToPropertyPool = new(() => []);
+    private static class ConcurrentSetPool<T> where T : notnull
+    {
+        private static readonly ObjectPool<ConcurrentSet<T>> s_pool = new(() => []);
 
-    private static readonly Func<IFieldSymbol, ConcurrentSet<SyntaxNode>> s_createFieldWriteNodeSet = _ => s_nodeSetPool.Allocate();
+        public static ConcurrentSet<T> Allocate() => s_pool.Allocate();
+        public static void Free(ConcurrentSet<T> set) => s_pool.ClearAndFree(set);
+    }
+
+    private static class ConcurrentDictionaryPool<TKey, TValue>
+        where TKey : notnull
+        where TValue : notnull
+    {
+        private static readonly ObjectPool<ConcurrentDictionary<TKey, TValue>> s_pool = new(() => []);
+        private static readonly ObjectPool<ConcurrentDictionary<TKey, ConcurrentSet<TValue>>> s_multiPool = new(() => []);
+
+        public static ConcurrentDictionary<TKey, TValue> Allocate() => s_pool.Allocate();
+        public static void Free(ConcurrentDictionary<TKey, TValue> map) => s_pool.Free(map);
+
+        public static ConcurrentDictionary<TKey, ConcurrentSet<TValue>> AllocateMulti() => s_multiPool.Allocate();
+        public static void Free(ConcurrentDictionary<TKey, ConcurrentSet<TValue>> map)
+        {
+            foreach (var (_, set) in map)
+                ConcurrentSetPool<TValue>.Free(set);
+
+            s_multiPool.Free(map);
+        }
+    }
+
+    private static readonly Func<IFieldSymbol, ConcurrentSet<SyntaxNode>> s_createFieldWriteNodeSet = _ => ConcurrentSetPool<SyntaxNode>.Allocate();
 
     /// <summary>
     /// Not static as this has different semantics around case sensitivity for C# and VB.
@@ -188,10 +211,12 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 {
                     // Keep track of the fields/properties we converted to auto-props.  We won't offer to convert those
                     // to semi-auto-properties.
-                    using var _ = s_fieldToPropertyPool.GetPooledObject(out var convertedToAutoProperty);
+                    var convertedToAutoProperty = ConcurrentDictionaryPool<IFieldSymbol, IPropertySymbol>.Allocate();
 
                     simpleAutoPropertyAnalyzer.OnSymbolEnd(convertedToAutoProperty, context);
                     semiAutoPropertyAnalyzer.OnSymbolEnd(convertedToAutoProperty, context);
+
+                    ConcurrentDictionaryPool<IFieldSymbol, IPropertySymbol>.Free(convertedToAutoProperty);
                 }
             });
 

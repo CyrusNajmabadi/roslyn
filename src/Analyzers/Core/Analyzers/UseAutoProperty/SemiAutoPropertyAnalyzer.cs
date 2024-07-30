@@ -72,9 +72,9 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _containingType = (INamedTypeSymbol)context.Symbol;
 
             _fieldNames = _analyzer._fieldNamesPool.Allocate();
-            _fieldsOfInterest = s_fieldSetPool.Allocate();
-            _ineligibleFields = s_fieldSetPool.Allocate();
-            _fieldToPropertyReference = s_fieldToPropertyPool.Allocate();
+            _fieldsOfInterest = ConcurrentSetPool<IFieldSymbol>.Allocate();
+            _ineligibleFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
+            _fieldToPropertyReference = ConcurrentDictionaryPool<IFieldSymbol, IPropertySymbol>.Allocate();
             var compilation = context.Compilation;
 
             if (_analyzer.SupportsSemiAutoProperties(compilation))
@@ -104,13 +104,9 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
 
             // s_analysisResultPool.ClearAndFree(AnalysisResults);
-            s_fieldSetPool.ClearAndFree(_fieldsOfInterest);
-            s_fieldSetPool.ClearAndFree(_ineligibleFields);
-
-            //foreach (var (_, nodeSet) in _propertiesAFieldIsReferencedFrom)
-            //    s_nodeSetPool.ClearAndFree(nodeSet);
-
-            s_fieldToPropertyPool.ClearAndFree(_fieldToPropertyReference);
+            ConcurrentSetPool<IFieldSymbol>.Free(_fieldsOfInterest);
+            ConcurrentSetPool<IFieldSymbol>.Free(_ineligibleFields);
+            ConcurrentDictionaryPool<IFieldSymbol, IPropertySymbol>.Free(_fieldToPropertyReference);
         }
 
         private void AnalyzeCodeBlock(
