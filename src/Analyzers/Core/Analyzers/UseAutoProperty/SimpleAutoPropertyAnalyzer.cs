@@ -51,23 +51,18 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         public readonly ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> NonConstructorFieldWrites;
 
         public SimpleAutoPropertyAnalyzer(
-            TAnalyzer analyzer, SymbolStartAnalysisContext context)
+            TAnalyzer analyzer,
+            SymbolStartAnalysisContext context,
+            HashSet<string> fieldNames)
         {
             _analyzer = analyzer;
 
             _containingType = (INamedTypeSymbol)context.Symbol;
-            _fieldNames = analyzer._fieldNamesPool.Allocate();
+            _fieldNames = fieldNames;
+
             AnalysisResults = s_analysisResultPool.Allocate();
             IneligibleFields = s_fieldSetPool.Allocate();
             NonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
-
-            // Record the names of all the fields in this type.  We can use this to greatly reduce the amount of
-            // binding we need to perform when looking for restrictions in the type.
-            foreach (var member in _containingType.GetMembers())
-            {
-                if (member is IFieldSymbol field)
-                    _fieldNames.Add(field.Name);
-            }
 
             var self = this;
             context.RegisterSyntaxNodeAction(

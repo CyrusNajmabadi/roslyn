@@ -100,7 +100,17 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             if (!ShouldAnalyze(context, namedType))
                 return;
 
-            var simpleAutoPropertyAnalyzer = new SimpleAutoPropertyAnalyzer((TAnalyzer)this, context);
+            // Record the names of all the fields in this type.  We can use this to greatly reduce the amount of
+            // binding we need to perform when looking for restrictions in the type.
+            var fieldNames = _fieldNamesPool.Allocate();
+            foreach (var member in namedType.GetMembers())
+            {
+                if (member is IFieldSymbol field)
+                    fieldNames.Add(field.Name);
+            }
+
+            var simpleAutoPropertyAnalyzer = new SimpleAutoPropertyAnalyzer(
+                (TAnalyzer)this, context, fieldNames);
 
             context.RegisterSymbolEndAction(context =>
             {
