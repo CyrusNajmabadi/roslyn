@@ -108,9 +108,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             if (!_containingType.Equals(property.ContainingType))
                 return;
 
-            if (property.IsIndexer)
-                return;
-
             // The property can't be virtual.  We don't know if it is overridden somewhere.  If it 
             // is, then calls to it may not actually assign to the field.
             if (property.IsVirtual || property.IsOverride || property.IsSealed)
@@ -129,11 +126,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             if (!_analyzer.CanExplicitInterfaceImplementationsBeFixed() && property.ExplicitInterfaceImplementations.Length != 0)
                 return;
 
-            // Serializable types can depend on fields (and their order).  Don't report these
-            // properties in that case.
-            if (_containingType.IsSerializable)
-                return;
-
             var preferAutoProps = context.GetAnalyzerOptions().PreferAutoProperties;
             if (!preferAutoProps.Value)
                 return;
@@ -148,38 +140,17 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             if (getterField == null)
                 return;
 
-            // Only support this for private fields.  It limits the scope of hte program
-            // we have to analyze to make sure this is safe to do.
-            if (getterField.DeclaredAccessibility != Accessibility.Private)
-                return;
-
             // If the user made the field readonly, we only want to convert it to a property if we
             // can keep it readonly.
             if (getterField.IsReadOnly && !_analyzer.SupportsReadOnlyProperties(compilation))
                 return;
 
-            // Field and property have to be in the same type.
-            if (!_containingType.Equals(getterField.ContainingType))
-                return;
-
-            // Property and field have to agree on type.
-            if (!property.Type.Equals(getterField.Type))
+            // Check for common things blocking conversion
+            if (!CanConvert(getterField, property, out var fieldDeclaration, out var variableDeclarator, cancellationToken))
                 return;
 
             // Mutable value type fields are mutable unless they are marked read-only
             if (!getterField.IsReadOnly && getterField.Type.IsMutableValueType() != false)
-                return;
-
-            // Don't want to remove constants and volatile fields.
-            if (getterField.IsConst || getterField.IsVolatile)
-                return;
-
-            // Field and property should match in static-ness
-            if (getterField.IsStatic != property.IsStatic)
-                return;
-
-            var fieldReference = getterField.DeclaringSyntaxReferences[0];
-            if (fieldReference.GetSyntax(cancellationToken) is not TVariableDeclarator { Parent.Parent: TFieldDeclaration fieldDeclaration } variableDeclarator)
                 return;
 
             // A setter is optional though.

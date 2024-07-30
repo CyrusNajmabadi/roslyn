@@ -6,6 +6,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.CodeStyle;
@@ -93,14 +94,31 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     protected abstract void RegisterIneligibleFieldsAction(
         HashSet<string> fieldNames, ConcurrentSet<IFieldSymbol> ineligibleFields, SemanticModel semanticModel, SyntaxNode codeBlock, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Analyzer that looks at all the fields in a type, finds those only referenced in a single property and suggests
+    /// converting those to semi-auto-prop (using `field`).
+    /// </summary>
     private readonly struct SemiAutoPropertyAnalyzer : IDisposable
     {
+        private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, IPropertySymbol>> s_fieldToPropertyPool = new(() => []);
+
         private readonly TAnalyzer _analyzer;
 
         private readonly INamedTypeSymbol _containingType;
 
         private readonly HashSet<string> _fieldNames;
         private readonly ConcurrentSet<IFieldSymbol> _fieldsOfInterest;
+
+        /// <summary>
+        /// Fields we know cannot be converted.  A field cannot be converted if it is referenced *anywhere* outside of
+        /// property.
+        /// </summary>
+        private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
+
+        /// <summary>
+        /// The locations we see a particular field accessed from.  If a field is only referenced from a single property
+        /// </summary>
+        private readonly ConcurrentDictionary<IFieldSymbol, IPropertySymbol> _fieldToPropertyReference;
 
         public SemiAutoPropertyAnalyzer(
             TAnalyzer analyzer,
@@ -111,16 +129,14 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _containingType = (INamedTypeSymbol)context.Symbol;
             _fieldNames = _analyzer._fieldNamesPool.Allocate();
             _fieldsOfInterest = s_fieldSetPool.Allocate();
+            _fieldToPropertyReference = s_fieldToPropertyPool.Allocate();
 
             if (_analyzer.SupportsSemiAutoProperties)
             {
                 foreach (var member in _containingType.GetMembers())
                 {
-                    if (member is not IFieldSymbol
-                        {
-                            DeclaredAccessibility: Accessibility.Private,
-                            CanBeReferencedByName: true,
-                        } field)
+                    if (member is not IFieldSymbol field ||
+                        !Cancon)
                     {
                         continue;
                     }
@@ -139,7 +155,128 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             // s_analysisResultPool.ClearAndFree(AnalysisResults);
             s_fieldSetPool.ClearAndFree(_fieldsOfInterest);
+
+            //foreach (var (_, nodeSet) in _propertiesAFieldIsReferencedFrom)
+            //    s_nodeSetPool.ClearAndFree(nodeSet);
+
+            s_fieldToPropertyPool.ClearAndFree(_fieldToPropertyReference);
         }
+
+        private void AnalyzeCodeBlock(
+            CodeBlockStartAnalysisContext<TSyntaxKind> context)
+        {
+            var cancellationToken = context.CancellationToken;
+            var semanticModel = context.SemanticModel;
+            var syntaxFacts = _analyzer.SyntaxFacts;
+            foreach (var identifierName in context.CodeBlock.DescendantNodesAndSelf().OfType<TIdentifierName>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Quick textual check to avoid looking at anything that couldn't bind to a field.
+                if (!_fieldNames.Contains(syntaxFacts.GetIdentifierOfIdentifierName(identifierName).ValueText))
+                    continue;
+
+                // ok, we're seeing an identifier that could be referencing a field we care about.
+                var symbol = semanticModel.GetSymbolInfo(identifierName, cancellationToken);
+                if (symbol.Symbol is not IFieldSymbol field)
+                    continue;
+
+                // Ignore a field reference to a field in some other type.
+                var originalField = field.OriginalDefinition;
+                if (!_fieldsOfInterest.Contains(originalField))
+                    continue;
+
+                if (!TryAnalyzeFieldReference(field))
+                {
+                    // Was a field we care about, but was used in a way that prevents conversion.  Add it to the
+                    // ineligible list
+                    _ineligibleFields.Add(originalField);
+                    continue;
+                }
+            }
+        }
+
+        private bool TryAnalyzeFieldReference(
+            IFieldSymbol field,
+            SemanticModel semanticModel,
+            TIdentifierName identifierName)
+        {
+            // If the field is referenced through a generic instantiation, then we can't make this an auto prop.
+            if (!field.Equals(field.OriginalDefinition))
+                return false;
+
+            // if this field is referenced outside of a property then we can't convert this.
+            var propertyDeclaration = identifierName.GetAncestor<TPropertyDeclaration>();
+            if (propertyDeclaration is null)
+                return false;
+
+            var propertySymbol = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
+
+            // if this field is referenced in multiple properties then we can't convert it.
+            var existingPropertyReference = _fieldToPropertyReference.GetOrAdd(field, propertySymbol);
+            if (existingPropertyReference != null && !existingPropertyReference.Equals(propertySymbol))
+                return false;
+
+            // if the field and property are not complimentary, then we can't convert this.
+        }
+    }
+
+    private static bool CanConvert(
+        IFieldSymbol field,
+        [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
+        [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
+        CancellationToken cancellationToken)
+    {
+        fieldDeclaration = null;
+        variableDeclarator = null;
+
+        if (!field.CanBeReferencedByName)
+            return false;
+
+        // Don't want to remove constants and volatile fields.
+        if (field.IsConst || field.IsVolatile)
+            return false;
+
+        // Only support this for private fields.  It limits the scope of hte program
+        // we have to analyze to make sure this is safe to do.
+        if (field.DeclaredAccessibility != Accessibility.Private)
+            return false;
+
+        var fieldReference = field.DeclaringSyntaxReferences[0];
+        if (fieldReference.GetSyntax(cancellationToken) is not TVariableDeclarator { Parent.Parent: TFieldDeclaration fieldDecl } variableDecl)
+            return false;
+
+        fieldDeclaration = fieldDecl;
+        variableDeclarator = variableDecl;
+        return true;
+    }
+
+    private static bool CanConvert(
+        IFieldSymbol field,
+        IPropertySymbol property,
+        [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
+        [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
+        CancellationToken cancellationToken)
+    {
+        if (!CanConvert(field, out fieldDeclaration, out variableDeclarator, cancellationToken))
+            return false;
+
+        if (property.IsIndexer)
+            return false;
+
+        // Field and property have to be in the same type.
+        if (!field.ContainingType.Equals(property.ContainingType))
+            return false;
+
+        // Property and field have to agree on type.
+        if (!property.Type.Equals(field.Type))
+            return false;
+
+        // Field and property should match in static-ness
+        if (field.IsStatic != property.IsStatic)
+            return false;
+
+        return true;
     }
 
     protected sealed override void InitializeWorker(AnalysisContext context)
@@ -147,6 +284,11 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         {
             var namedType = (INamedTypeSymbol)context.Symbol;
             if (!ShouldAnalyze(context, namedType))
+                return;
+
+            // Serializable types can depend on fields (and their order).  Don't report these
+            // properties in that case.
+            if (namedType.IsSerializable)
                 return;
 
             var simpleAutoPropertyAnalyzer = new SimpleAutoPropertyAnalyzer(
