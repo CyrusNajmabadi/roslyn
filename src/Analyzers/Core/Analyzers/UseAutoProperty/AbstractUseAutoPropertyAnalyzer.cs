@@ -222,6 +222,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     }
 
     private static bool CanConvert(
+        Compilation compilation,
         IFieldSymbol field,
         [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
         [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
@@ -242,6 +243,15 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         if (field.DeclaredAccessibility != Accessibility.Private)
             return false;
 
+        // Can't remove the field if it has attributes on it.
+        var attributes = field.GetAttributes();
+        var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
+        foreach (var attribute in attributes)
+        {
+            if (attribute.AttributeClass != suppressMessageAttributeType)
+                return false;
+        }
+
         var fieldReference = field.DeclaringSyntaxReferences[0];
         if (fieldReference.GetSyntax(cancellationToken) is not TVariableDeclarator { Parent.Parent: TFieldDeclaration fieldDecl } variableDecl)
             return false;
@@ -252,13 +262,14 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     }
 
     private static bool CanConvert(
+        Compilation compilation,
         IFieldSymbol field,
         IPropertySymbol property,
         [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
         [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
         CancellationToken cancellationToken)
     {
-        if (!CanConvert(field, out fieldDeclaration, out variableDeclarator, cancellationToken))
+        if (!CanConvert(compilation, field, out fieldDeclaration, out variableDeclarator, cancellationToken))
             return false;
 
         if (property.IsIndexer)

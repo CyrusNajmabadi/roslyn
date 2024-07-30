@@ -146,7 +146,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 return;
 
             // Check for common things blocking conversion
-            if (!CanConvert(getterField, property, out var fieldDeclaration, out var variableDeclarator, cancellationToken))
+            if (!CanConvert(compilation, getterField, property, out var fieldDeclaration, out var variableDeclarator, cancellationToken))
                 return;
 
             // Mutable value type fields are mutable unless they are marked read-only
@@ -167,15 +167,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             var initializer = _analyzer.GetFieldInitializer(variableDeclarator, cancellationToken);
             if (initializer != null && !_analyzer.SupportsPropertyInitializer(compilation))
                 return;
-
-            // Can't remove the field if it has attributes on it.
-            var attributes = getterField.GetAttributes();
-            var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
-            foreach (var attribute in attributes)
-            {
-                if (attribute.AttributeClass != suppressMessageAttributeType)
-                    return;
-            }
 
             if (!_analyzer.CanConvert(property))
                 return;
