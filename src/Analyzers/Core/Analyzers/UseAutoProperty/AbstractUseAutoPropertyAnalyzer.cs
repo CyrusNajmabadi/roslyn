@@ -18,6 +18,7 @@ using Roslyn.Utilities;
 namespace Microsoft.CodeAnalysis.UseAutoProperty;
 
 internal abstract class AbstractUseAutoPropertyAnalyzer<
+    TAnalyzer,
     TSyntaxKind,
     TPropertyDeclaration,
     TConstructorDeclaration,
@@ -25,6 +26,15 @@ internal abstract class AbstractUseAutoPropertyAnalyzer<
     TVariableDeclarator,
     TExpression,
     TIdentifierName> : AbstractBuiltInCodeStyleDiagnosticAnalyzer
+    where TAnalyzer : AbstractUseAutoPropertyAnalyzer<
+        TAnalyzer,
+        TSyntaxKind,
+        TPropertyDeclaration,
+        TConstructorDeclaration,
+        TFieldDeclaration,
+        TVariableDeclarator,
+        TExpression,
+        TIdentifierName>
     where TSyntaxKind : struct, Enum
     where TPropertyDeclaration : SyntaxNode
     where TConstructorDeclaration : SyntaxNode
@@ -83,6 +93,206 @@ internal abstract class AbstractUseAutoPropertyAnalyzer<
     protected abstract void RegisterIneligibleFieldsAction(
         HashSet<string> fieldNames, ConcurrentSet<IFieldSymbol> ineligibleFields, SemanticModel semanticModel, SyntaxNode codeBlock, CancellationToken cancellationToken);
 
+    private readonly struct SimpleAutoPropertyAnalyzer : IDisposable
+    {
+        private readonly TAnalyzer _analyzer;
+
+        private readonly INamedTypeSymbol _containingType;
+
+        private readonly HashSet<string> _fieldNames;
+        private readonly ConcurrentStack<AnalysisResult> _analysisResults;
+        private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
+        private readonly ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> _nonConstructorFieldWrites;
+
+        public SimpleAutoPropertyAnalyzer(
+            TAnalyzer analyzer, SymbolStartAnalysisContext context)
+        {
+            _analyzer = analyzer;
+
+            _containingType = (INamedTypeSymbol)context.Symbol;
+            _fieldNames = analyzer._fieldNamesPool.Allocate();
+            _analysisResults = s_analysisResultPool.Allocate();
+            _ineligibleFields = s_fieldSetPool.Allocate();
+            _nonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
+
+            // Record the names of all the fields in this type.  We can use this to greatly reduce the amount of
+            // binding we need to perform when looking for restrictions in the type.
+            foreach (var member in _containingType.GetMembers())
+            {
+                if (member is IFieldSymbol field)
+                    _fieldNames.Add(field.Name);
+            }
+
+            var _this = this;
+            context.RegisterSyntaxNodeAction(
+                context => _this.AnalyzePropertyDeclaration(context),
+                _analyzer.PropertyDeclarationKind);
+            context.RegisterCodeBlockStartAction<TSyntaxKind>(context =>
+            {
+                _this._analyzer.RegisterIneligibleFieldsAction(_this._fieldNames, _this._ineligibleFields, context.SemanticModel, context.CodeBlock, context.CancellationToken);
+                _this.RegisterNonConstructorFieldWrites(context.SemanticModel, context.CodeBlock, context.CancellationToken);
+            });
+        }
+
+        public void Dispose()
+        {
+            // Cleanup after doing all our work.
+            _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
+
+            s_analysisResultPool.ClearAndFree(_analysisResults);
+            s_fieldSetPool.ClearAndFree(_ineligibleFields);
+
+            foreach (var (_, nodeSet) in _nonConstructorFieldWrites)
+                s_nodeSetPool.ClearAndFree(nodeSet);
+
+            s_fieldWriteLocationPool.ClearAndFree(_nonConstructorFieldWrites);
+        }
+
+        private void AnalyzePropertyDeclaration(SyntaxNodeAnalysisContext context)
+        {
+            var cancellationToken = context.CancellationToken;
+            var semanticModel = context.SemanticModel;
+            var compilation = semanticModel.Compilation;
+
+            var propertyDeclaration = (TPropertyDeclaration)context.Node;
+            if (semanticModel.GetDeclaredSymbol(propertyDeclaration, cancellationToken) is not IPropertySymbol property)
+                return;
+
+            if (!_containingType.Equals(property.ContainingType))
+                return;
+
+            if (property.IsIndexer)
+                return;
+
+            // The property can't be virtual.  We don't know if it is overridden somewhere.  If it 
+            // is, then calls to it may not actually assign to the field.
+            if (property.IsVirtual || property.IsOverride || property.IsSealed)
+                return;
+
+            if (property.IsWithEvents)
+                return;
+
+            if (property.Parameters.Length > 0)
+                return;
+
+            // Need at least a getter.
+            if (property.GetMethod == null)
+                return;
+
+            if (!_analyzer.CanExplicitInterfaceImplementationsBeFixed() && property.ExplicitInterfaceImplementations.Length != 0)
+                return;
+
+            // Serializable types can depend on fields (and their order).  Don't report these
+            // properties in that case.
+            if (_containingType.IsSerializable)
+                return;
+
+            var preferAutoProps = context.GetAnalyzerOptions().PreferAutoProperties;
+            if (!preferAutoProps.Value)
+                return;
+
+            // Avoid reporting diagnostics when the feature is disabled. This primarily avoids reporting the hidden
+            // helper diagnostic which is not otherwise influenced by the severity settings.
+            var notification = preferAutoProps.Notification;
+            if (notification.Severity == ReportDiagnostic.Suppress)
+                return;
+
+            var getterField = _analyzer.GetGetterField(semanticModel, property.GetMethod, cancellationToken);
+            if (getterField == null)
+                return;
+
+            // Only support this for private fields.  It limits the scope of hte program
+            // we have to analyze to make sure this is safe to do.
+            if (getterField.DeclaredAccessibility != Accessibility.Private)
+                return;
+
+            // If the user made the field readonly, we only want to convert it to a property if we
+            // can keep it readonly.
+            if (getterField.IsReadOnly && !_analyzer.SupportsReadOnlyProperties(compilation))
+                return;
+
+            // Field and property have to be in the same type.
+            if (!_containingType.Equals(getterField.ContainingType))
+                return;
+
+            // Property and field have to agree on type.
+            if (!property.Type.Equals(getterField.Type))
+                return;
+
+            // Mutable value type fields are mutable unless they are marked read-only
+            if (!getterField.IsReadOnly && getterField.Type.IsMutableValueType() != false)
+                return;
+
+            // Don't want to remove constants and volatile fields.
+            if (getterField.IsConst || getterField.IsVolatile)
+                return;
+
+            // Field and property should match in static-ness
+            if (getterField.IsStatic != property.IsStatic)
+                return;
+
+            var fieldReference = getterField.DeclaringSyntaxReferences[0];
+            if (fieldReference.GetSyntax(cancellationToken) is not TVariableDeclarator { Parent.Parent: TFieldDeclaration fieldDeclaration } variableDeclarator)
+                return;
+
+            // A setter is optional though.
+            var setMethod = property.SetMethod;
+            if (setMethod != null)
+            {
+                var setterField = _analyzer.GetSetterField(semanticModel, setMethod, cancellationToken);
+                // If there is a getter and a setter, they both need to agree on which field they are 
+                // writing to.
+                if (setterField != getterField)
+                    return;
+            }
+
+            var initializer = _analyzer.GetFieldInitializer(variableDeclarator, cancellationToken);
+            if (initializer != null && !_analyzer.SupportsPropertyInitializer(compilation))
+                return;
+
+            // Can't remove the field if it has attributes on it.
+            var attributes = getterField.GetAttributes();
+            var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
+            foreach (var attribute in attributes)
+            {
+                if (attribute.AttributeClass != suppressMessageAttributeType)
+                    return;
+            }
+
+            if (!_analyzer.CanConvert(property))
+                return;
+
+            // Looks like a viable property/field to convert into an auto property.
+            _analysisResults.Push(new AnalysisResult(property, getterField, propertyDeclaration, fieldDeclaration, variableDeclarator, notification));
+        }
+
+        private void RegisterNonConstructorFieldWrites(
+            SemanticModel semanticModel,
+            SyntaxNode codeBlock,
+            CancellationToken cancellationToken)
+        {
+            if (codeBlock.FirstAncestorOrSelf<TConstructorDeclaration>() != null)
+                return;
+
+            var semanticFacts = _analyzer.SemanticFacts;
+            var syntaxFacts = _analyzer.SyntaxFacts;
+            foreach (var identifierName in codeBlock.DescendantNodesAndSelf().OfType<TIdentifierName>())
+            {
+                var identifier = syntaxFacts.GetIdentifierOfIdentifierName(identifierName);
+                if (!_fieldNames.Contains(identifier.ValueText))
+                    continue;
+
+                if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is not IFieldSymbol field)
+                    continue;
+
+                if (!semanticFacts.IsWrittenTo(semanticModel, identifierName, cancellationToken))
+                    continue;
+
+                AddFieldWrite(_nonConstructorFieldWrites, field, identifierName);
+            }
+        }
+    }
+
     protected sealed override void InitializeWorker(AnalysisContext context)
         => context.RegisterSymbolStartAction(context =>
         {
@@ -90,44 +300,13 @@ internal abstract class AbstractUseAutoPropertyAnalyzer<
             if (!ShouldAnalyze(context, namedType))
                 return;
 
-            var fieldNames = _fieldNamesPool.Allocate();
-            var analysisResults = s_analysisResultPool.Allocate();
-            var ineligibleFields = s_fieldSetPool.Allocate();
-            var nonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
-
-            // Record the names of all the fields in this type.  We can use this to greatly reduce the amount of
-            // binding we need to perform when looking for restrictions in the type.
-            foreach (var member in namedType.GetMembers())
-            {
-                if (member is IFieldSymbol field)
-                    fieldNames.Add(field.Name);
-            }
-
-            context.RegisterSyntaxNodeAction(context => AnalyzePropertyDeclaration(context, namedType, analysisResults), PropertyDeclarationKind);
-            context.RegisterCodeBlockStartAction<TSyntaxKind>(context =>
-            {
-                RegisterIneligibleFieldsAction(fieldNames, ineligibleFields, context.SemanticModel, context.CodeBlock, context.CancellationToken);
-                RegisterNonConstructorFieldWrites(fieldNames, nonConstructorFieldWrites, context.SemanticModel, context.CodeBlock, context.CancellationToken);
-            });
+            var simpleAutoPropertyAnalyzer = new SimpleAutoPropertyAnalyzer((TAnalyzer)this, context);
 
             context.RegisterSymbolEndAction(context =>
             {
-                try
+                using (simpleAutoPropertyAnalyzer)
                 {
                     Process(analysisResults, ineligibleFields, nonConstructorFieldWrites, context);
-                }
-                finally
-                {
-                    // Cleanup after doing all our work.
-                    _fieldNamesPool.ClearAndFree(fieldNames);
-
-                    s_analysisResultPool.ClearAndFree(analysisResults);
-                    s_fieldSetPool.ClearAndFree(ineligibleFields);
-
-                    foreach (var (_, nodeSet) in nonConstructorFieldWrites)
-                        s_nodeSetPool.ClearAndFree(nodeSet);
-
-                    s_fieldWriteLocationPool.ClearAndFree(nonConstructorFieldWrites);
                 }
             });
 
@@ -170,155 +349,6 @@ internal abstract class AbstractUseAutoPropertyAnalyzer<
                 return true;
             }
         }, SymbolKind.NamedType);
-
-    private void RegisterNonConstructorFieldWrites(
-        HashSet<string> fieldNames,
-        ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> fieldWrites,
-        SemanticModel semanticModel,
-        SyntaxNode codeBlock,
-        CancellationToken cancellationToken)
-    {
-        if (codeBlock.FirstAncestorOrSelf<TConstructorDeclaration>() != null)
-            return;
-
-        var semanticFacts = this.SemanticFacts;
-        var syntaxFacts = this.SyntaxFacts;
-        foreach (var identifierName in codeBlock.DescendantNodesAndSelf().OfType<TIdentifierName>())
-        {
-            var identifier = syntaxFacts.GetIdentifierOfIdentifierName(identifierName);
-            if (!fieldNames.Contains(identifier.ValueText))
-                continue;
-
-            if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is not IFieldSymbol field)
-                continue;
-
-            if (!semanticFacts.IsWrittenTo(semanticModel, identifierName, cancellationToken))
-                continue;
-
-            AddFieldWrite(fieldWrites, field, identifierName);
-        }
-    }
-
-    private void AnalyzePropertyDeclaration(
-        SyntaxNodeAnalysisContext context,
-        INamedTypeSymbol containingType,
-        ConcurrentStack<AnalysisResult> analysisResults)
-    {
-        var cancellationToken = context.CancellationToken;
-        var semanticModel = context.SemanticModel;
-        var compilation = semanticModel.Compilation;
-
-        var propertyDeclaration = (TPropertyDeclaration)context.Node;
-        if (semanticModel.GetDeclaredSymbol(propertyDeclaration, cancellationToken) is not IPropertySymbol property)
-            return;
-
-        if (!containingType.Equals(property.ContainingType))
-            return;
-
-        if (property.IsIndexer)
-            return;
-
-        // The property can't be virtual.  We don't know if it is overridden somewhere.  If it 
-        // is, then calls to it may not actually assign to the field.
-        if (property.IsVirtual || property.IsOverride || property.IsSealed)
-            return;
-
-        if (property.IsWithEvents)
-            return;
-
-        if (property.Parameters.Length > 0)
-            return;
-
-        // Need at least a getter.
-        if (property.GetMethod == null)
-            return;
-
-        if (!CanExplicitInterfaceImplementationsBeFixed() && property.ExplicitInterfaceImplementations.Length != 0)
-            return;
-
-        // Serializable types can depend on fields (and their order).  Don't report these
-        // properties in that case.
-        if (containingType.IsSerializable)
-            return;
-
-        var preferAutoProps = context.GetAnalyzerOptions().PreferAutoProperties;
-        if (!preferAutoProps.Value)
-            return;
-
-        // Avoid reporting diagnostics when the feature is disabled. This primarily avoids reporting the hidden
-        // helper diagnostic which is not otherwise influenced by the severity settings.
-        var notification = preferAutoProps.Notification;
-        if (notification.Severity == ReportDiagnostic.Suppress)
-            return;
-
-        var getterField = GetGetterField(semanticModel, property.GetMethod, cancellationToken);
-        if (getterField == null)
-            return;
-
-        // Only support this for private fields.  It limits the scope of hte program
-        // we have to analyze to make sure this is safe to do.
-        if (getterField.DeclaredAccessibility != Accessibility.Private)
-            return;
-
-        // If the user made the field readonly, we only want to convert it to a property if we
-        // can keep it readonly.
-        if (getterField.IsReadOnly && !SupportsReadOnlyProperties(compilation))
-            return;
-
-        // Field and property have to be in the same type.
-        if (!containingType.Equals(getterField.ContainingType))
-            return;
-
-        // Property and field have to agree on type.
-        if (!property.Type.Equals(getterField.Type))
-            return;
-
-        // Mutable value type fields are mutable unless they are marked read-only
-        if (!getterField.IsReadOnly && getterField.Type.IsMutableValueType() != false)
-            return;
-
-        // Don't want to remove constants and volatile fields.
-        if (getterField.IsConst || getterField.IsVolatile)
-            return;
-
-        // Field and property should match in static-ness
-        if (getterField.IsStatic != property.IsStatic)
-            return;
-
-        var fieldReference = getterField.DeclaringSyntaxReferences[0];
-        if (fieldReference.GetSyntax(cancellationToken) is not TVariableDeclarator { Parent.Parent: TFieldDeclaration fieldDeclaration } variableDeclarator)
-            return;
-
-        // A setter is optional though.
-        var setMethod = property.SetMethod;
-        if (setMethod != null)
-        {
-            var setterField = GetSetterField(semanticModel, setMethod, cancellationToken);
-            // If there is a getter and a setter, they both need to agree on which field they are 
-            // writing to.
-            if (setterField != getterField)
-                return;
-        }
-
-        var initializer = GetFieldInitializer(variableDeclarator, cancellationToken);
-        if (initializer != null && !SupportsPropertyInitializer(compilation))
-            return;
-
-        // Can't remove the field if it has attributes on it.
-        var attributes = getterField.GetAttributes();
-        var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
-        foreach (var attribute in attributes)
-        {
-            if (attribute.AttributeClass != suppressMessageAttributeType)
-                return;
-        }
-
-        if (!CanConvert(property))
-            return;
-
-        // Looks like a viable property/field to convert into an auto property.
-        analysisResults.Push(new AnalysisResult(property, getterField, propertyDeclaration, fieldDeclaration, variableDeclarator, notification));
-    }
 
     protected virtual bool CanConvert(IPropertySymbol property)
         => true;

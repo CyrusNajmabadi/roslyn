@@ -18,6 +18,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UseAutoProperty;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 internal sealed class CSharpUseAutoPropertyAnalyzer : AbstractUseAutoPropertyAnalyzer<
+    CSharpUseAutoPropertyAnalyzer,
     SyntaxKind,
     PropertyDeclarationSyntax,
     ConstructorDeclarationSyntax,

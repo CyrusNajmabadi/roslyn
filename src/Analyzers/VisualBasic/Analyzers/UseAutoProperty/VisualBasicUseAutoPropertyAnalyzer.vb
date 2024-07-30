@@ -12,6 +12,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UseAutoProperty
     <DiagnosticAnalyzer(LanguageNames.VisualBasic)>
     Friend Class VisualBasicUseAutoPropertyAnalyzer
         Inherits AbstractUseAutoPropertyAnalyzer(Of
+            VisualBasicUseAutoPropertyAnalyzer,
             SyntaxKind,
             PropertyBlockSyntax,
             ConstructorBlockSyntax,
