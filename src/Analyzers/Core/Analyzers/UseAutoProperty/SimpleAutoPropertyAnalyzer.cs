@@ -146,8 +146,12 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 return;
 
             // Check for common things blocking conversion
-            if (!CanConvert(compilation, getterField, property, out var fieldDeclaration, out var variableDeclarator, cancellationToken))
+            if (!CanConvert(
+                    getterField, property, compilation.SuppressMessageAttributeType(),
+                    out var fieldDeclaration, out var variableDeclarator, cancellationToken))
+            {
                 return;
+            }
 
             // Mutable value type fields are mutable unless they are marked read-only
             if (!getterField.IsReadOnly && getterField.Type.IsMutableValueType() != false)

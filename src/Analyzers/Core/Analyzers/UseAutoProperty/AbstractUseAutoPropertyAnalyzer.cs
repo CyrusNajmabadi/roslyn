@@ -133,10 +133,14 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             if (_analyzer.SupportsSemiAutoProperties)
             {
+                var cancellationToken = context.CancellationToken;
+                var suppressMessageAttributeType = context.Compilation.SuppressMessageAttributeType();
                 foreach (var member in _containingType.GetMembers())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (member is not IFieldSymbol field ||
-                        !Cancon)
+                        !CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
                     {
                         continue;
                     }
@@ -168,6 +172,8 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             var cancellationToken = context.CancellationToken;
             var semanticModel = context.SemanticModel;
             var syntaxFacts = _analyzer.SyntaxFacts;
+            var suppressMessageAttributeType = semanticModel.Compilation.SuppressMessageAttributeType();
+
             foreach (var identifierName in context.CodeBlock.DescendantNodesAndSelf().OfType<TIdentifierName>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -186,7 +192,8 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (!_fieldsOfInterest.Contains(originalField))
                     continue;
 
-                if (!TryAnalyzeFieldReference(field))
+                if (!TryAnalyzeFieldReference(
+                        field, semanticModel, identifierName, suppressMessageAttributeType, cancellationToken))
                 {
                     // Was a field we care about, but was used in a way that prevents conversion.  Add it to the
                     // ineligible list
@@ -199,7 +206,9 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         private bool TryAnalyzeFieldReference(
             IFieldSymbol field,
             SemanticModel semanticModel,
-            TIdentifierName identifierName)
+            TIdentifierName identifierName,
+            INamedTypeSymbol? suppressMessageAttributeType,
+            CancellationToken cancellationToken)
         {
             // If the field is referenced through a generic instantiation, then we can't make this an auto prop.
             if (!field.Equals(field.OriginalDefinition))
@@ -218,12 +227,16 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 return false;
 
             // if the field and property are not complimentary, then we can't convert this.
+            if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
+                return false;
+
+            return true;
         }
     }
 
     private static bool CanConvert(
-        Compilation compilation,
         IFieldSymbol field,
+        INamedTypeSymbol? suppressMessageAttributeType,
         [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
         [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
         CancellationToken cancellationToken)
@@ -245,10 +258,9 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
         // Can't remove the field if it has attributes on it.
         var attributes = field.GetAttributes();
-        var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
         foreach (var attribute in attributes)
         {
-            if (attribute.AttributeClass != suppressMessageAttributeType)
+            if (!Equals(attribute.AttributeClass, suppressMessageAttributeType))
                 return false;
         }
 
@@ -262,14 +274,14 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     }
 
     private static bool CanConvert(
-        Compilation compilation,
         IFieldSymbol field,
         IPropertySymbol property,
+        INamedTypeSymbol? suppressMessageAttributeType,
         [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
         [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
         CancellationToken cancellationToken)
     {
-        if (!CanConvert(compilation, field, out fieldDeclaration, out variableDeclarator, cancellationToken))
+        if (!CanConvert(field, suppressMessageAttributeType, out fieldDeclaration, out variableDeclarator, cancellationToken))
             return false;
 
         if (property.IsIndexer)
