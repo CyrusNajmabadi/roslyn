@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -22,35 +23,20 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     TFieldDeclaration,
     TVariableDeclarator,
     TExpression,
-    TIdentifierName> where TAnalyzer : AbstractUseAutoPropertyAnalyzer<
-        TAnalyzer,
-        TSyntaxKind,
-        TPropertyDeclaration,
-        TConstructorDeclaration,
-        TFieldDeclaration,
-        TVariableDeclarator,
-        TExpression,
-        TIdentifierName>
-    where TSyntaxKind : struct, Enum
-    where TPropertyDeclaration : SyntaxNode
-    where TConstructorDeclaration : SyntaxNode
-    where TFieldDeclaration : SyntaxNode
-    where TVariableDeclarator : SyntaxNode
-    where TExpression : SyntaxNode
-    where TIdentifierName : TExpression
+    TIdentifierName>
 {
-    private readonly struct SimpleAutoPropertyAnalyzer : IDisposable
+    private readonly struct FullAutoPropertyAnalyzer : IDisposable
     {
         private readonly TAnalyzer _analyzer;
 
         private readonly INamedTypeSymbol _containingType;
 
         private readonly HashSet<string> _fieldNames;
-        public readonly ConcurrentStack<AnalysisResult> AnalysisResults;
-        public readonly ConcurrentSet<IFieldSymbol> IneligibleFields;
-        public readonly ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> NonConstructorFieldWrites;
+        private readonly ConcurrentStack<AnalysisResult> _analysisResult;
+        private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
+        private readonly ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> _nonConstructorFieldWrites;
 
-        public SimpleAutoPropertyAnalyzer(
+        public FullAutoPropertyAnalyzer(
             TAnalyzer analyzer,
             SymbolStartAnalysisContext context)
         {
@@ -68,15 +54,15 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             }
 
             AnalysisResults = s_analysisResultPool.Allocate();
-            IneligibleFields = s_fieldSetPool.Allocate();
-            NonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
+            _ineligibleFields = s_fieldSetPool.Allocate();
+            _nonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
 
             var self = this;
             context.RegisterSyntaxNodeAction(
                 self.AnalyzePropertyDeclaration, _analyzer.PropertyDeclarationKind);
             context.RegisterCodeBlockStartAction<TSyntaxKind>(context =>
             {
-                self._analyzer.RegisterIneligibleFieldsAction(self._fieldNames, self.IneligibleFields, context.SemanticModel, context.CodeBlock, context.CancellationToken);
+                self._analyzer.RegisterIneligibleFieldsAction(self._fieldNames, self._ineligibleFields, context.SemanticModel, context.CodeBlock, context.CancellationToken);
                 self.RegisterNonConstructorFieldWrites(context.SemanticModel, context.CodeBlock, context.CancellationToken);
             });
         }
@@ -87,12 +73,12 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
 
             s_analysisResultPool.ClearAndFree(AnalysisResults);
-            s_fieldSetPool.ClearAndFree(IneligibleFields);
+            s_fieldSetPool.ClearAndFree(_ineligibleFields);
 
-            foreach (var (_, nodeSet) in NonConstructorFieldWrites)
+            foreach (var (_, nodeSet) in _nonConstructorFieldWrites)
                 s_nodeSetPool.ClearAndFree(nodeSet);
 
-            s_fieldWriteLocationPool.ClearAndFree(NonConstructorFieldWrites);
+            s_fieldWriteLocationPool.ClearAndFree(_nonConstructorFieldWrites);
         }
 
         private void AnalyzePropertyDeclaration(SyntaxNodeAnalysisContext context)
@@ -201,8 +187,87 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (!semanticFacts.IsWrittenTo(semanticModel, identifierName, cancellationToken))
                     continue;
 
-                AddFieldWrite(NonConstructorFieldWrites, field, identifierName);
+                AddFieldWrite(_nonConstructorFieldWrites, field, identifierName);
             }
+        }
+
+        public void OnSymbolEnd(
+            ConcurrentDictionary<IFieldSymbol, IPropertySymbol> convertedToAutoProperty,
+            SymbolAnalysisContext context)
+        {
+            foreach (var result in AnalysisResults)
+            {
+                // C# specific check.
+                if (ineligibleFields.Contains(result.Field))
+                    continue;
+
+                // VB specific check.
+                //
+                // if the property doesn't have a setter currently.check all the types the field is declared in.  If the
+                // field is written to outside of a constructor, then this field Is Not eligible for replacement with an
+                // auto prop.  We'd have to make the autoprop read/write, And that could be opening up the property
+                // widely (in accessibility terms) in a way the user would not want.
+                if (result.Property.Language == LanguageNames.VisualBasic)
+                {
+                    if (result.Property.DeclaredAccessibility != Accessibility.Private &&
+                        result.Property.SetMethod is null &&
+                        nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations1) &&
+                        writeLocations1.Any(loc => !loc.Ancestors().Contains(result.PropertyDeclaration)))
+                    {
+                        continue;
+                    }
+                }
+
+                // If this was an `init` property, and there was a write to the field, then we can't support this.
+                // That's because we can't still keep this `init` as that write will not be allowed, and we can't make
+                // it a `setter` as that would allow arbitrary writing outside the type, despite the original `init`
+                // semantics.
+                if (result.Property.SetMethod is { IsInitOnly: true } &&
+                    nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations2) &&
+                    writeLocations2.Any(loc => !loc.Ancestors().Contains(result.PropertyDeclaration)))
+                {
+                    continue;
+                }
+
+                Process(result, convertedToAutoProperty, context);
+            }
+        }
+
+        private void Process(
+            AnalysisResult result,
+            ConcurrentDictionary<IFieldSymbol, IPropertySymbol> convertedToAutoProperty,
+            SymbolAnalysisContext context)
+        {
+            convertedToAutoProperty[result.Field] = result.Property;
+
+            var propertyDeclaration = result.PropertyDeclaration;
+            var variableDeclarator = result.VariableDeclarator;
+            var fieldNode = GetFieldNode(result.FieldDeclaration, variableDeclarator);
+
+            // Now add diagnostics to both the field and the property saying we can convert it to 
+            // an auto property.  For each diagnostic store both location so we can easily retrieve
+            // them when performing the code fix.
+            var additionalLocations = ImmutableArray.Create(
+                propertyDeclaration.GetLocation(),
+                variableDeclarator.GetLocation());
+
+            // Place the appropriate marker on the field depending on the user option.
+            var diagnostic1 = DiagnosticHelper.Create(
+                Descriptor,
+                fieldNode.GetLocation(),
+                result.Notification,
+                context.Options,
+                additionalLocations: additionalLocations,
+                properties: null);
+
+            // Also, place a hidden marker on the property.  If they bring up a lightbulb
+            // there, they'll be able to see that they can convert it to an auto-prop.
+            var diagnostic2 = Diagnostic.Create(
+                Descriptor, propertyDeclaration.GetLocation(),
+                additionalLocations: additionalLocations);
+
+            context.ReportDiagnostic(diagnostic1);
+            context.ReportDiagnostic(diagnostic2);
         }
     }
 }

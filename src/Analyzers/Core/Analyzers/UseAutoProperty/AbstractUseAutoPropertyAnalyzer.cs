@@ -51,6 +51,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     private static readonly ObjectPool<ConcurrentSet<IFieldSymbol>> s_fieldSetPool = new(() => []);
     private static readonly ObjectPool<ConcurrentSet<SyntaxNode>> s_nodeSetPool = new(() => []);
     private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>>> s_fieldWriteLocationPool = new(() => []);
+    private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, IPropertySymbol>> s_fieldToPropertyPool = new(() => []);
 
     private static readonly Func<IFieldSymbol, ConcurrentSet<SyntaxNode>> s_createFieldWriteNodeSet = _ => s_nodeSetPool.Allocate();
 
@@ -83,8 +84,11 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     protected ISyntaxFacts SyntaxFacts => this.SemanticFacts.SyntaxFacts;
 
     protected abstract TSyntaxKind PropertyDeclarationKind { get; }
+
     protected abstract bool SupportsReadOnlyProperties(Compilation compilation);
     protected abstract bool SupportsPropertyInitializer(Compilation compilation);
+    protected abstract bool SupportsSemiAutoProperties(Compilation compilation);
+
     protected abstract bool CanExplicitInterfaceImplementationsBeFixed();
     protected abstract TExpression? GetFieldInitializer(TVariableDeclarator variable, CancellationToken cancellationToken);
     protected abstract TExpression? GetGetterExpression(IMethodSymbol getMethod, CancellationToken cancellationToken);
@@ -100,8 +104,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     /// </summary>
     private readonly struct SemiAutoPropertyAnalyzer : IDisposable
     {
-        private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, IPropertySymbol>> s_fieldToPropertyPool = new(() => []);
-
         private readonly TAnalyzer _analyzer;
 
         private readonly INamedTypeSymbol _containingType;
@@ -127,14 +129,17 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _analyzer = analyzer;
 
             _containingType = (INamedTypeSymbol)context.Symbol;
+
             _fieldNames = _analyzer._fieldNamesPool.Allocate();
             _fieldsOfInterest = s_fieldSetPool.Allocate();
+            _ineligibleFields = s_fieldSetPool.Allocate();
             _fieldToPropertyReference = s_fieldToPropertyPool.Allocate();
+            var compilation = context.Compilation;
 
-            if (_analyzer.SupportsSemiAutoProperties)
+            if (_analyzer.SupportsSemiAutoProperties(compilation))
             {
                 var cancellationToken = context.CancellationToken;
-                var suppressMessageAttributeType = context.Compilation.SuppressMessageAttributeType();
+                var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
                 foreach (var member in _containingType.GetMembers())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -159,6 +164,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             // s_analysisResultPool.ClearAndFree(AnalysisResults);
             s_fieldSetPool.ClearAndFree(_fieldsOfInterest);
+            s_fieldSetPool.ClearAndFree(_ineligibleFields);
 
             //foreach (var (_, nodeSet) in _propertiesAFieldIsReferencedFrom)
             //    s_nodeSetPool.ClearAndFree(nodeSet);
@@ -314,22 +320,22 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             if (namedType.IsSerializable)
                 return;
 
-            var simpleAutoPropertyAnalyzer = new SimpleAutoPropertyAnalyzer(
-                (TAnalyzer)this, context);
-
-            var semiAutoPropertyAnalyzer = new SemiAutoPropertyAnalyzer(
-                (TAnalyzer)this, context);
+            // Create two inner analyzers to analyze this type.  The first looks for fields/properties we can convert to
+            // a full auto prop (like `int X { get; private set; }`).  The second looks for fields/properties we can
+            // convert to a semi-auto-prop (like `int X { get => field.Trim(); }`) if the first doesn't succeed.
+            var simpleAutoPropertyAnalyzer = new FullAutoPropertyAnalyzer((TAnalyzer)this, context);
+            var semiAutoPropertyAnalyzer = new SemiAutoPropertyAnalyzer((TAnalyzer)this, context);
 
             context.RegisterSymbolEndAction(context =>
             {
                 using (simpleAutoPropertyAnalyzer)
                 using (semiAutoPropertyAnalyzer)
                 {
-                    Process(
-                        simpleAutoPropertyAnalyzer.AnalysisResults,
-                        simpleAutoPropertyAnalyzer.IneligibleFields,
-                        simpleAutoPropertyAnalyzer.NonConstructorFieldWrites,
-                        context);
+                    // Keep track of the fields/properties we converted to auto-props.  We won't offer to convert those
+                    // to semi-auto-properties.
+                    using var _ = s_fieldToPropertyPool.GetPooledObject(out var convertedToAutoProperty);
+
+                    simpleAutoPropertyAnalyzer.OnSymbolEnd(context, convertedToAutoProperty);
                 }
             });
 
@@ -391,82 +397,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         return symbolInfo.Symbol is IFieldSymbol { DeclaringSyntaxReferences.Length: 1 } field
             ? field
             : null;
-    }
-
-    private void Process(
-        ConcurrentStack<AnalysisResult> analysisResults,
-        ConcurrentSet<IFieldSymbol> ineligibleFields,
-        ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> nonConstructorFieldWrites,
-        SymbolAnalysisContext context)
-    {
-        foreach (var result in analysisResults)
-        {
-            // C# specific check.
-            if (ineligibleFields.Contains(result.Field))
-                continue;
-
-            // VB specific check.
-            //
-            // if the property doesn't have a setter currently.check all the types the field is declared in.  If the
-            // field is written to outside of a constructor, then this field Is Not eligible for replacement with an
-            // auto prop.  We'd have to make the autoprop read/write, And that could be opening up the property
-            // widely (in accessibility terms) in a way the user would not want.
-            if (result.Property.Language == LanguageNames.VisualBasic)
-            {
-                if (result.Property.DeclaredAccessibility != Accessibility.Private &&
-                    result.Property.SetMethod is null &&
-                    nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations1) &&
-                    writeLocations1.Any(loc => !loc.Ancestors().Contains(result.PropertyDeclaration)))
-                {
-                    continue;
-                }
-            }
-
-            // If this was an `init` property, and there was a write to the field, then we can't support this.
-            // That's because we can't still keep this `init` as that write will not be allowed, and we can't make
-            // it a `setter` as that would allow arbitrary writing outside the type, despite the original `init`
-            // semantics.
-            if (result.Property.SetMethod is { IsInitOnly: true } &&
-                nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations2) &&
-                writeLocations2.Any(loc => !loc.Ancestors().Contains(result.PropertyDeclaration)))
-            {
-                continue;
-            }
-
-            Process(result, context);
-        }
-    }
-
-    private void Process(AnalysisResult result, SymbolAnalysisContext context)
-    {
-        var propertyDeclaration = result.PropertyDeclaration;
-        var variableDeclarator = result.VariableDeclarator;
-        var fieldNode = GetFieldNode(result.FieldDeclaration, variableDeclarator);
-
-        // Now add diagnostics to both the field and the property saying we can convert it to 
-        // an auto property.  For each diagnostic store both location so we can easily retrieve
-        // them when performing the code fix.
-        var additionalLocations = ImmutableArray.Create(
-            propertyDeclaration.GetLocation(),
-            variableDeclarator.GetLocation());
-
-        // Place the appropriate marker on the field depending on the user option.
-        var diagnostic1 = DiagnosticHelper.Create(
-            Descriptor,
-            fieldNode.GetLocation(),
-            result.Notification,
-            context.Options,
-            additionalLocations: additionalLocations,
-            properties: null);
-
-        // Also, place a hidden marker on the property.  If they bring up a lightbulb
-        // there, they'll be able to see that they can convert it to an auto-prop.
-        var diagnostic2 = Diagnostic.Create(
-            Descriptor, propertyDeclaration.GetLocation(),
-            additionalLocations: additionalLocations);
-
-        context.ReportDiagnostic(diagnostic1);
-        context.ReportDiagnostic(diagnostic2);
     }
 
     private sealed record AnalysisResult(
