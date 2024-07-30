@@ -200,6 +200,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                         : self._nonConstructorWrites;
 
                     writesSet.Add(field);
+                    return true;
                 }
 
                 return false;
