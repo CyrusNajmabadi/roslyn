@@ -78,6 +78,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)UseAutoProperty\Pooling.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UseAutoProperty\FullAutoPropertyAnalyzer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UseAutoProperty\SemiAutoPropertyAnalyzer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UseAutoProperty\UseAutoPropertyHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UseCoalesceExpression\AbstractUseCoalesceExpressionForIfNullCheckDiagnosticAnalyzer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UseCoalesceExpression\AbstractUseCoalesceExpressionForTernaryConditionalCheckDiagnosticAnalyzer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UseCoalesceExpression\AbstractUseCoalesceExpressionForNullableTernaryConditionalCheckDiagnosticAnalyzer.cs" />

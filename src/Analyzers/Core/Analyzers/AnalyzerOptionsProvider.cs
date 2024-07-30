@@ -100,4 +100,7 @@ internal static partial class AnalyzerOptionsProviders
 
     public static AnalyzerOptionsProvider GetAnalyzerOptions(this CodeBlockAnalysisContext context)
         => GetAnalyzerOptions(context.Options, context.CodeBlock.SyntaxTree);
+
+    public static AnalyzerOptionsProvider GetAnalyzerOptions<TLanguageKindEnum>(this CodeBlockStartAnalysisContext<TLanguageKindEnum> context) where TLanguageKindEnum : struct
+        => GetAnalyzerOptions(context.Options, context.CodeBlock.SyntaxTree);
 }

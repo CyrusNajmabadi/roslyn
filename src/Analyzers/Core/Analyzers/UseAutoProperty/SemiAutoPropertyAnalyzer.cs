@@ -46,7 +46,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         /// <summary>
         /// The locations we see a particular field accessed from.  If a field is only referenced from a single property
         /// </summary>
-        private readonly ConcurrentDictionary<IFieldSymbol, IPropertySymbol> _fieldToPropertyReference;
+        private readonly ConcurrentDictionary<IFieldSymbol, (TPropertyDeclaration propertyDeclaration, IPropertySymbol property)> _fieldToPropertyReference;
 
         public SemiAutoPropertyAnalyzer(
             TAnalyzer analyzer,
@@ -59,7 +59,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _fieldNames = _analyzer._fieldNamesPool.Allocate();
             _fieldsOfInterest = ConcurrentSetPool<IFieldSymbol>.Allocate();
             _ineligibleFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
-            _fieldToPropertyReference = ConcurrentDictionaryPool<IFieldSymbol, IPropertySymbol>.Allocate();
+            _fieldToPropertyReference = ConcurrentDictionaryPool<IFieldSymbol, (TPropertyDeclaration propertyDeclaration, IPropertySymbol property)>.Allocate();
             var compilation = context.Compilation;
 
             if (_analyzer.SupportsSemiAutoProperties(compilation))
@@ -91,7 +91,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             // s_analysisResultPool.ClearAndFree(AnalysisResults);
             ConcurrentSetPool<IFieldSymbol>.Free(_fieldsOfInterest);
             ConcurrentSetPool<IFieldSymbol>.Free(_ineligibleFields);
-            ConcurrentDictionaryPool<IFieldSymbol, IPropertySymbol>.Free(_fieldToPropertyReference);
+            ConcurrentDictionaryPool<IFieldSymbol, (TPropertyDeclaration propertyDeclaration, IPropertySymbol property)>.Free(_fieldToPropertyReference);
         }
 
         private void AnalyzeCodeBlock(
@@ -155,13 +155,27 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 var propertySymbol = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
 
                 // if this field is referenced in multiple properties then we can't convert it.
-                var existingPropertyReference = self._fieldToPropertyReference.GetOrAdd(field, propertySymbol);
-                if (existingPropertyReference != null && !existingPropertyReference.Equals(propertySymbol))
+                var (existingPropertyDeclaration, existingProperty) = self._fieldToPropertyReference.GetOrAdd(field, (propertyDeclaration, propertySymbol));
+                if (existingProperty != null && !existingProperty.Equals(propertySymbol))
                     return false;
 
                 // if the field and property are not complimentary, then we can't convert this.
                 if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
                     return false;
+
+                if (existingProperty is null)
+                {
+                    // first time seeing this property.  ensure the property is one we can convert.
+                    var preferAutoProps = context.GetAnalyzerOptions().PreferAutoProperties;
+                    if (!preferAutoProps.Value)
+                        return false;
+
+                    // Avoid reporting diagnostics when the feature is disabled. This primarily avoids reporting the
+                    // hidden helper diagnostic which is not otherwise influenced by the severity settings.
+                    var notification = preferAutoProps.Notification;
+                    if (notification.Severity == ReportDiagnostic.Suppress)
+                        return false;
+                }
 
                 return true;
             }
@@ -185,14 +199,24 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (convertedToAutoProperty.ContainsKey(field))
                     continue;
 
+                if (!_fieldToPropertyReference.TryGetValue(field, out var propertyInfo))
+                    continue;
+
                 // We checked this originally when we added to the set of fields to look at.
                 Contract.ThrowIfFalse(CanConvert(
-                    field, suppressMessageAttribute, out var fieldDeclaration, out var variableDeclarator, cancellationToken))
+                    field, suppressMessageAttribute, out var fieldDeclaration, out var variableDeclarator, cancellationToken));
+
+                var propertyDeclaration = propertyInfo.propertyDeclaration;
+                var notification = context.Options.GetAnalyzerOptions(
+                    propertyDeclaration.SyntaxTree).PreferAutoProperties.Notification;
 
                 _analyzer.ReportDiagnostics(
+                    propertyDeclaration,
                     fieldDeclaration,
                     variableDeclarator,
-                    )
+                    notification,
+                    UseAutoPropertyHelpers.SemiAutoProperties,
+                    context);
             }
         }
     }
