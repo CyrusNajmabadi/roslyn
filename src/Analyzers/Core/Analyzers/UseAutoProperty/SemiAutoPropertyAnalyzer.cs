@@ -14,6 +14,8 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.UseAutoProperty;
 
+using static UseAutoPropertyHelpers;
+
 internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     TAnalyzer,
     TSyntaxKind,
@@ -149,35 +151,45 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
                 // if this field is referenced outside of a property then we can't convert this.
                 var propertyDeclaration = identifierName.GetAncestor<TPropertyDeclaration>();
-                if (propertyDeclaration is null)
-                    return false;
-
-                var propertySymbol = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
-
-                // if this field is referenced in multiple properties then we can't convert it.
-                var (existingPropertyDeclaration, existingProperty) = self._fieldToPropertyReference.GetOrAdd(field, (propertyDeclaration, propertySymbol));
-                if (existingProperty != null && !existingProperty.Equals(propertySymbol))
-                    return false;
-
-                // if the field and property are not complimentary, then we can't convert this.
-                if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
-                    return false;
-
-                if (existingProperty is null)
+                var constructorDeclaration = identifierName.GetAncestor<TConstructorDeclaration>();
+                if (propertyDeclaration != null)
                 {
-                    // first time seeing this property.  ensure the property is one we can convert.
-                    var preferAutoProps = context.GetAnalyzerOptions().PreferAutoProperties;
-                    if (!preferAutoProps.Value)
+                    var property = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
+
+                    // if this field is referenced in multiple properties then we can't convert it.
+                    var (existingPropertyDeclaration, existingProperty) = self._fieldToPropertyReference.GetOrAdd(field, (propertyDeclaration, property));
+                    if (existingProperty != null && !existingProperty.Equals(property))
                         return false;
 
-                    // Avoid reporting diagnostics when the feature is disabled. This primarily avoids reporting the
-                    // hidden helper diagnostic which is not otherwise influenced by the severity settings.
-                    var notification = preferAutoProps.Notification;
-                    if (notification.Severity == ReportDiagnostic.Suppress)
+                    // if the field and property are not complimentary, then we can't convert this.
+                    if (!CanConvert(field, property, suppressMessageAttributeType, out _, out _, cancellationToken))
                         return false;
+
+                    if (existingProperty is null)
+                    {
+                        // first time seeing this property.  ensure the property is one we can convert.
+                        var preferAutoProps = context.GetAnalyzerOptions().PreferAutoProperties;
+                        if (!preferAutoProps.Value)
+                            return false;
+
+                        // Avoid reporting diagnostics when the feature is disabled. This primarily avoids reporting the
+                        // hidden helper diagnostic which is not otherwise influenced by the severity settings.
+                        var notification = preferAutoProps.Notification;
+                        if (notification.Severity == ReportDiagnostic.Suppress)
+                            return false;
+                    }
+
+                    return true;
                 }
-
-                return true;
+                else if (constructorDeclaration != null)
+                {
+                    // If we're writing to the field within a constructor, we can still change this to an semi-auto-property, 
+                    // a long as the property has no setter.
+                }
+                else
+                {
+                    return false;
+                }
             }
         }
 
@@ -215,7 +227,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     fieldDeclaration,
                     variableDeclarator,
                     notification,
-                    UseAutoPropertyHelpers.SemiAutoProperties,
+                    SemiAutoProperties.Add(FieldName, field.Name),
                     context);
             }
         }

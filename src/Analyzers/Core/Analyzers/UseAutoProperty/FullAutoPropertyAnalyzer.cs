@@ -44,12 +44,31 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
         private readonly TAnalyzer _analyzer;
 
+        /// <summary>
+        /// The current type we're analyzing.
+        /// </summary>
         private readonly INamedTypeSymbol _containingType;
 
+        /// <summary>
+        /// The set of names of fields in this type.  Used to help us bind only identifiers that could bind to a field,
+        /// allowing us to avoid the majority of binding.
+        /// </summary>
         private readonly HashSet<string> _fieldNames;
-        private readonly ConcurrentStack<AnalysisResult> _analysisResults;
+
+        /// <summary>
+        /// Fields we've determined cannot be removed.
+        /// </summary>
         private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
+
+        /// <summary>
+        /// Locations (outside of a constructor) where a field has been written to.
+        /// </summary>
         private readonly ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> _nonConstructorFieldWrites;
+
+        /// <summary>
+        /// Final set of candidates we believe we can convert to an auto-prop.
+        /// </summary>
+        private readonly ConcurrentStack<AnalysisResult> _analysisResults;
 
         public FullAutoPropertyAnalyzer(
             TAnalyzer analyzer,

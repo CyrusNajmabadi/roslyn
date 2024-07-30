@@ -9,6 +9,7 @@ namespace Microsoft.CodeAnalysis.UseAutoProperty;
 internal static class UseAutoPropertyHelpers
 {
     public const string SemiAutoProperty = nameof(SemiAutoProperty);
+    public const string FieldName = nameof(FieldName);
 
     public static readonly ImmutableDictionary<string, string?> SemiAutoProperties =
         ImmutableDictionary<string, string?>.Empty.Add(SemiAutoProperty, SemiAutoProperty);
