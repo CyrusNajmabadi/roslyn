@@ -227,11 +227,29 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (!_fieldToPropertyReference.TryGetValue(field, out var propertyInfo))
                     continue;
 
+                var properties = SemiAutoProperties.Add(FieldName, field.Name);
+
+                var (propertyDeclaration, property) = propertyInfo;
+                var hasNonConstructorWrite = _nonConstructorWrites.Contains(field);
+                if (hasNonConstructorWrite = _constructorWrites.Contains(field))
+                {
+                    // Will not be able an assignment to the field work if the property already has a setter.
+                    if (property.SetMethod != null)
+                        continue;
+
+                    // Similarly, if the property is abstract, a derived type may override the set behavior.  So we
+                    // cannot call through that.
+                    if (property.IsVirtual || property.IsAbstract || property.IsOverride)
+                        continue;
+
+                    if (hasNonConstructorWrite)
+                        properties = properties.Add(AddPrivateSetAccessor, AddPrivateSetAccessor);
+                }
+
                 // We checked this originally when we added to the set of fields to look at.
                 Contract.ThrowIfFalse(CanConvert(
                     field, suppressMessageAttribute, out var fieldDeclaration, out var variableDeclarator, cancellationToken));
 
-                var propertyDeclaration = propertyInfo.propertyDeclaration;
                 var notification = context.Options.GetAnalyzerOptions(
                     propertyDeclaration.SyntaxTree).PreferAutoProperties.Notification;
 
@@ -240,7 +258,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     fieldDeclaration,
                     variableDeclarator,
                     notification,
-                    SemiAutoProperties.Add(FieldName, field.Name),
+                    properties,
                     context);
             }
         }
