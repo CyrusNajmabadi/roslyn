@@ -44,10 +44,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     where TExpression : SyntaxNode
     where TIdentifierName : TExpression
 {
-    /// <summary>
-    /// ConcurrentStack as that's the only concurrent collection that supports 'Clear' in netstandard2.
-    /// </summary>
-    private static readonly ObjectPool<ConcurrentStack<AnalysisResult>> s_analysisResultPool = new(() => new());
     private static readonly ObjectPool<ConcurrentSet<IFieldSymbol>> s_fieldSetPool = new(() => []);
     private static readonly ObjectPool<ConcurrentSet<SyntaxNode>> s_nodeSetPool = new(() => []);
     private static readonly ObjectPool<ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>>> s_fieldWriteLocationPool = new(() => []);
@@ -97,148 +93,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
     protected abstract void RegisterIneligibleFieldsAction(
         HashSet<string> fieldNames, ConcurrentSet<IFieldSymbol> ineligibleFields, SemanticModel semanticModel, SyntaxNode codeBlock, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Analyzer that looks at all the fields in a type, finds those only referenced in a single property and suggests
-    /// converting those to semi-auto-prop (using `field`).
-    /// </summary>
-    private readonly struct SemiAutoPropertyAnalyzer : IDisposable
-    {
-        private readonly TAnalyzer _analyzer;
-
-        private readonly INamedTypeSymbol _containingType;
-
-        private readonly HashSet<string> _fieldNames;
-        private readonly ConcurrentSet<IFieldSymbol> _fieldsOfInterest;
-
-        /// <summary>
-        /// Fields we know cannot be converted.  A field cannot be converted if it is referenced *anywhere* outside of
-        /// property.
-        /// </summary>
-        private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
-
-        /// <summary>
-        /// The locations we see a particular field accessed from.  If a field is only referenced from a single property
-        /// </summary>
-        private readonly ConcurrentDictionary<IFieldSymbol, IPropertySymbol> _fieldToPropertyReference;
-
-        public SemiAutoPropertyAnalyzer(
-            TAnalyzer analyzer,
-            SymbolStartAnalysisContext context)
-        {
-            _analyzer = analyzer;
-
-            _containingType = (INamedTypeSymbol)context.Symbol;
-
-            _fieldNames = _analyzer._fieldNamesPool.Allocate();
-            _fieldsOfInterest = s_fieldSetPool.Allocate();
-            _ineligibleFields = s_fieldSetPool.Allocate();
-            _fieldToPropertyReference = s_fieldToPropertyPool.Allocate();
-            var compilation = context.Compilation;
-
-            if (_analyzer.SupportsSemiAutoProperties(compilation))
-            {
-                var cancellationToken = context.CancellationToken;
-                var suppressMessageAttributeType = compilation.SuppressMessageAttributeType();
-                foreach (var member in _containingType.GetMembers())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    if (member is not IFieldSymbol field ||
-                        !CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
-                    {
-                        continue;
-                    }
-
-                    _fieldsOfInterest.Add(field);
-                    _fieldNames.Add(field.Name);
-                }
-
-                context.RegisterCodeBlockStartAction<TSyntaxKind>(AnalyzeCodeBlock);
-            }
-        }
-
-        public void Dispose()
-        {
-            _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
-
-            // s_analysisResultPool.ClearAndFree(AnalysisResults);
-            s_fieldSetPool.ClearAndFree(_fieldsOfInterest);
-            s_fieldSetPool.ClearAndFree(_ineligibleFields);
-
-            //foreach (var (_, nodeSet) in _propertiesAFieldIsReferencedFrom)
-            //    s_nodeSetPool.ClearAndFree(nodeSet);
-
-            s_fieldToPropertyPool.ClearAndFree(_fieldToPropertyReference);
-        }
-
-        private void AnalyzeCodeBlock(
-            CodeBlockStartAnalysisContext<TSyntaxKind> context)
-        {
-            var cancellationToken = context.CancellationToken;
-            var semanticModel = context.SemanticModel;
-            var syntaxFacts = _analyzer.SyntaxFacts;
-            var suppressMessageAttributeType = semanticModel.Compilation.SuppressMessageAttributeType();
-
-            foreach (var identifierName in context.CodeBlock.DescendantNodesAndSelf().OfType<TIdentifierName>())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                // Quick textual check to avoid looking at anything that couldn't bind to a field.
-                if (!_fieldNames.Contains(syntaxFacts.GetIdentifierOfIdentifierName(identifierName).ValueText))
-                    continue;
-
-                // ok, we're seeing an identifier that could be referencing a field we care about.
-                var symbol = semanticModel.GetSymbolInfo(identifierName, cancellationToken);
-                if (symbol.Symbol is not IFieldSymbol field)
-                    continue;
-
-                // Ignore a field reference to a field in some other type.
-                var originalField = field.OriginalDefinition;
-                if (!_fieldsOfInterest.Contains(originalField))
-                    continue;
-
-                if (!TryAnalyzeFieldReference(
-                        field, semanticModel, identifierName, suppressMessageAttributeType, cancellationToken))
-                {
-                    // Was a field we care about, but was used in a way that prevents conversion.  Add it to the
-                    // ineligible list
-                    _ineligibleFields.Add(originalField);
-                    continue;
-                }
-            }
-        }
-
-        private bool TryAnalyzeFieldReference(
-            IFieldSymbol field,
-            SemanticModel semanticModel,
-            TIdentifierName identifierName,
-            INamedTypeSymbol? suppressMessageAttributeType,
-            CancellationToken cancellationToken)
-        {
-            // If the field is referenced through a generic instantiation, then we can't make this an auto prop.
-            if (!field.Equals(field.OriginalDefinition))
-                return false;
-
-            // if this field is referenced outside of a property then we can't convert this.
-            var propertyDeclaration = identifierName.GetAncestor<TPropertyDeclaration>();
-            if (propertyDeclaration is null)
-                return false;
-
-            var propertySymbol = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
-
-            // if this field is referenced in multiple properties then we can't convert it.
-            var existingPropertyReference = _fieldToPropertyReference.GetOrAdd(field, propertySymbol);
-            if (existingPropertyReference != null && !existingPropertyReference.Equals(propertySymbol))
-                return false;
-
-            // if the field and property are not complimentary, then we can't convert this.
-            if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
-                return false;
-
-            return true;
-        }
-    }
 
     private static bool CanConvert(
         IFieldSymbol field,
@@ -328,6 +182,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             context.RegisterSymbolEndAction(context =>
             {
+                // Ensure we cleanup the analyzers once done with this named type.
                 using (simpleAutoPropertyAnalyzer)
                 using (semiAutoPropertyAnalyzer)
                 {
@@ -336,6 +191,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     using var _ = s_fieldToPropertyPool.GetPooledObject(out var convertedToAutoProperty);
 
                     simpleAutoPropertyAnalyzer.OnSymbolEnd(convertedToAutoProperty, context);
+                    semiAutoPropertyAnalyzer.OnSymbolEnd(convertedToAutoProperty, context);
                 }
             });
 
@@ -399,11 +255,41 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             : null;
     }
 
-    private sealed record AnalysisResult(
-        IPropertySymbol Property,
-        IFieldSymbol Field,
-        TPropertyDeclaration PropertyDeclaration,
-        TFieldDeclaration FieldDeclaration,
-        TVariableDeclarator VariableDeclarator,
-        NotificationOption2 Notification);
+    private void ReportDiagnostics(
+        TPropertyDeclaration propertyDeclaration,
+        TFieldDeclaration fieldDeclaration,
+        TVariableDeclarator variableDeclarator,
+        NotificationOption2 notification,
+        ImmutableDictionary<string, string?>? properties,
+        SymbolAnalysisContext context)
+    {
+        var fieldNode = this.GetFieldNode(fieldDeclaration, variableDeclarator);
+
+        // Now add diagnostics to both the field and the property saying we can convert it to 
+        // an auto property.  For each diagnostic store both location so we can easily retrieve
+        // them when performing the code fix.
+        var additionalLocations = ImmutableArray.Create(
+            propertyDeclaration.GetLocation(),
+            variableDeclarator.GetLocation());
+
+        // Place the appropriate marker on the field depending on the user option.
+        var diagnostic1 = DiagnosticHelper.Create(
+            this.Descriptor,
+            fieldNode.GetLocation(),
+            notification,
+            context.Options,
+            additionalLocations: additionalLocations,
+            properties: properties);
+
+        // Also, place a hidden marker on the property.  If they bring up a lightbulb
+        // there, they'll be able to see that they can convert it to an auto-prop.
+        var diagnostic2 = Diagnostic.Create(
+            this.Descriptor,
+            propertyDeclaration.GetLocation(),
+            additionalLocations: additionalLocations,
+            properties: properties);
+
+        context.ReportDiagnostic(diagnostic1);
+        context.ReportDiagnostic(diagnostic2);
+    }
 }

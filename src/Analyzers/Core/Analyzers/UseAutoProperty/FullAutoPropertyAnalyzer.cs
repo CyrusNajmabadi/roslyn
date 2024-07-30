@@ -8,8 +8,10 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
+using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.LanguageService;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Roslyn.Utilities;
 
@@ -27,6 +29,19 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 {
     private readonly struct FullAutoPropertyAnalyzer : IDisposable
     {
+        private readonly record struct AnalysisResult(
+            IPropertySymbol Property,
+            IFieldSymbol Field,
+            TPropertyDeclaration PropertyDeclaration,
+            TFieldDeclaration FieldDeclaration,
+            TVariableDeclarator VariableDeclarator,
+            NotificationOption2 Notification);
+
+        /// <summary>
+        /// ConcurrentStack as that's the only concurrent collection that supports 'Clear' in netstandard2.
+        /// </summary>
+        private static readonly ObjectPool<ConcurrentStack<AnalysisResult>> s_analysisResultPool = new(() => new());
+
         private readonly TAnalyzer _analyzer;
 
         private readonly INamedTypeSymbol _containingType;
@@ -229,45 +244,16 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     continue;
                 }
 
-                Process(result, convertedToAutoProperty, context);
+                convertedToAutoProperty[result.Field] = result.Property;
+
+                _analyzer.ReportDiagnostics(
+                    result.PropertyDeclaration,
+                    result.FieldDeclaration,
+                    result.VariableDeclarator,
+                    result.Notification,
+                    properties: null,
+                    context);
             }
-        }
-
-        private void Process(
-            AnalysisResult result,
-            ConcurrentDictionary<IFieldSymbol, IPropertySymbol> convertedToAutoProperty,
-            SymbolAnalysisContext context)
-        {
-            convertedToAutoProperty[result.Field] = result.Property;
-
-            var propertyDeclaration = result.PropertyDeclaration;
-            var variableDeclarator = result.VariableDeclarator;
-            var fieldNode = _analyzer.GetFieldNode(result.FieldDeclaration, variableDeclarator);
-
-            // Now add diagnostics to both the field and the property saying we can convert it to 
-            // an auto property.  For each diagnostic store both location so we can easily retrieve
-            // them when performing the code fix.
-            var additionalLocations = ImmutableArray.Create(
-                propertyDeclaration.GetLocation(),
-                variableDeclarator.GetLocation());
-
-            // Place the appropriate marker on the field depending on the user option.
-            var diagnostic1 = DiagnosticHelper.Create(
-                _analyzer.Descriptor,
-                fieldNode.GetLocation(),
-                result.Notification,
-                context.Options,
-                additionalLocations: additionalLocations,
-                properties: null);
-
-            // Also, place a hidden marker on the property.  If they bring up a lightbulb
-            // there, they'll be able to see that they can convert it to an auto-prop.
-            var diagnostic2 = Diagnostic.Create(
-                _analyzer.Descriptor, propertyDeclaration.GetLocation(),
-                additionalLocations: additionalLocations);
-
-            context.ReportDiagnostic(diagnostic1);
-            context.ReportDiagnostic(diagnostic2);
         }
     }
 }
