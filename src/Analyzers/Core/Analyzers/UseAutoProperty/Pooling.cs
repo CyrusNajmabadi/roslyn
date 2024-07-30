@@ -35,7 +35,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         private static readonly ObjectPool<ConcurrentDictionary<TKey, ConcurrentSet<TValue>>> s_multiPool = new(() => []);
 
         public static ConcurrentDictionary<TKey, TValue> Allocate() => s_pool.Allocate();
-        public static void Free(ConcurrentDictionary<TKey, TValue> map) => s_pool.Free(map);
+        public static void Free(ConcurrentDictionary<TKey, TValue> map) => s_pool.ClearAndFree(map);
 
         public static ConcurrentDictionary<TKey, ConcurrentSet<TValue>> AllocateMulti() => s_multiPool.Allocate();
         public static void Free(ConcurrentDictionary<TKey, ConcurrentSet<TValue>> map)
@@ -43,7 +43,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             foreach (var (_, set) in map)
                 ConcurrentSetPool<TValue>.Free(set);
 
-            s_multiPool.Free(map);
+            s_multiPool.ClearAndFree(map);
         }
     }
 }
