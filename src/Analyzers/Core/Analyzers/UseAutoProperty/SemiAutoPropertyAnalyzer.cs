@@ -116,9 +116,13 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         private void AnalyzeCodeBlock(
             CodeBlockStartAnalysisContext<TSyntaxKind> context)
         {
+            var self = this;
             var cancellationToken = context.CancellationToken;
             var semanticModel = context.SemanticModel;
+
             var syntaxFacts = _analyzer.SyntaxFacts;
+            var semanticFacts = _analyzer.SemanticFacts;
+
             var suppressMessageAttributeType = semanticModel.Compilation.SuppressMessageAttributeType();
 
             foreach (var identifierName in context.CodeBlock.DescendantNodesAndSelf().OfType<TIdentifierName>())
@@ -139,8 +143,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (!_fieldsOfInterest.Contains(originalField))
                     continue;
 
-                if (!TryAnalyzeFieldReference(
-                        field, semanticModel, identifierName, suppressMessageAttributeType, cancellationToken))
+                if (!TryAnalyzeFieldReference(field, identifierName))
                 {
                     // Was a field we care about, but was used in a way that prevents conversion.  Add it to the
                     // ineligible list
@@ -148,40 +151,49 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     continue;
                 }
             }
+
+            return;
+
+            bool TryAnalyzeFieldReference(
+                IFieldSymbol field,
+                TIdentifierName identifierName)
+            {
+                // `field` can't be used inside of a nameof() expression.
+                if (semanticFacts.IsInsideNameOfExpression(semanticModel, identifierName, cancellationToken))
+                    return false;
+
+                // If the field is referenced through a generic instantiation, then we can't make this an auto prop.
+                if (!field.Equals(field.OriginalDefinition))
+                    return false;
+
+                // if this field is referenced outside of a property then we can't convert this.
+                var propertyDeclaration = identifierName.GetAncestor<TPropertyDeclaration>();
+                if (propertyDeclaration is null)
+                    return false;
+
+                var propertySymbol = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
+
+                // if this field is referenced in multiple properties then we can't convert it.
+                var existingPropertyReference = self._fieldToPropertyReference.GetOrAdd(field, propertySymbol);
+                if (existingPropertyReference != null && !existingPropertyReference.Equals(propertySymbol))
+                    return false;
+
+                // if the field and property are not complimentary, then we can't convert this.
+                if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
+                    return false;
+
+                return true;
+            }
         }
 
-        private bool TryAnalyzeFieldReference(
-            IFieldSymbol field,
-            SemanticModel semanticModel,
-            TIdentifierName identifierName,
-            INamedTypeSymbol? suppressMessageAttributeType,
-            CancellationToken cancellationToken)
+        public void OnSymbolEnd(
+            ConcurrentDictionary<IFieldSymbol, IPropertySymbol> convertedToAutoProperty,
+            SymbolAnalysisContext context)
         {
-            // If the field is referenced through a generic instantiation, then we can't make this an auto prop.
-            if (!field.Equals(field.OriginalDefinition))
-                return false;
+            var cancellationToken = context.CancellationToken;
+            var compilation = context.Compilation;
+            var suppressMessageAttribute = compilation.SuppressMessageAttributeType();
 
-            // if this field is referenced outside of a property then we can't convert this.
-            var propertyDeclaration = identifierName.GetAncestor<TPropertyDeclaration>();
-            if (propertyDeclaration is null)
-                return false;
-
-            var propertySymbol = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
-
-            // if this field is referenced in multiple properties then we can't convert it.
-            var existingPropertyReference = _fieldToPropertyReference.GetOrAdd(field, propertySymbol);
-            if (existingPropertyReference != null && !existingPropertyReference.Equals(propertySymbol))
-                return false;
-
-            // if the field and property are not complimentary, then we can't convert this.
-            if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
-                return false;
-
-            return true;
-        }
-
-        public void OnSymbolEnd(ConcurrentDictionary<IFieldSymbol, IPropertySymbol> convertedToAutoProperty, SymbolAnalysisContext context)
-        {
             foreach (var field in _fieldsOfInterest)
             {
                 // Ignore fields we know we can't convert.
@@ -192,7 +204,14 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (convertedToAutoProperty.ContainsKey(field))
                     continue;
 
+                // We checked this originally when we added to the set of fields to look at.
+                Contract.ThrowIfFalse(CanConvert(
+                    field, suppressMessageAttribute, out var fieldDeclaration, out var variableDeclarator, cancellationToken))
 
+                _analyzer.ReportDiagnostics(
+                    fieldDeclaration,
+                    variableDeclarator,
+                    )
             }
         }
     }
