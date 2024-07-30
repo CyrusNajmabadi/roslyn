@@ -231,7 +231,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
                 var (propertyDeclaration, property) = propertyInfo;
                 var hasNonConstructorWrite = _nonConstructorWrites.Contains(field);
-                if (hasNonConstructorWrite = _constructorWrites.Contains(field))
+                if (hasNonConstructorWrite || _constructorWrites.Contains(field))
                 {
                     // Will not be able an assignment to the field work if the property already has a setter.
                     if (property.SetMethod != null)
