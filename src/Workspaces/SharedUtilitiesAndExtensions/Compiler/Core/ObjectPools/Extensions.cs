@@ -79,6 +79,14 @@ internal static class SharedPoolExtensions
         return pooledObject;
     }
 
+    public static PooledObject<ConcurrentDictionary<TKey, TValue>> GetPooledObject<TKey, TValue>(this ObjectPool<ConcurrentDictionary<TKey, TValue>> pool, out ConcurrentDictionary<TKey, TValue> dictionary)
+        where TKey : notnull
+    {
+        var pooledObject = PooledObject<ConcurrentDictionary<TKey, TValue>>.Create(pool);
+        dictionary = pooledObject.Object;
+        return pooledObject;
+    }
+
     public static PooledObject<T> GetPooledObject<T>(this ObjectPool<T> pool) where T : class
         => new(pool, p => p.Allocate(), (p, o) => p.Free(o));
 
@@ -123,6 +131,15 @@ internal static class SharedPoolExtensions
     }
 
     public static Dictionary<TKey, TValue> AllocateAndClear<TKey, TValue>(this ObjectPool<Dictionary<TKey, TValue>> pool)
+        where TKey : notnull
+    {
+        var map = pool.Allocate();
+        map.Clear();
+
+        return map;
+    }
+
+    public static ConcurrentDictionary<TKey, TValue> AllocateAndClear<TKey, TValue>(this ObjectPool<ConcurrentDictionary<TKey, TValue>> pool)
         where TKey : notnull
     {
         var map = pool.Allocate();

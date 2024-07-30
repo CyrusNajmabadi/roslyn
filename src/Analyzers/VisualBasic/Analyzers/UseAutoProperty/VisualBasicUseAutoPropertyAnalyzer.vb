@@ -33,6 +33,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UseAutoProperty
             Return DirectCast(compilation, VisualBasicCompilation).LanguageVersion >= LanguageVersion.VisualBasic10
         End Function
 
+        Protected Overrides Function SupportsSemiAutoProperties(compilation As Compilation) As Boolean
+            Return False
+        End Function
+
         Protected Overrides Function CanExplicitInterfaceImplementationsBeFixed() As Boolean
             Return True
         End Function

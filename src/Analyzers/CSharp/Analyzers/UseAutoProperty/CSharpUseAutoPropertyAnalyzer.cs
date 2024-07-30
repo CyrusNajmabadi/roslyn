@@ -39,6 +39,9 @@ internal sealed class CSharpUseAutoPropertyAnalyzer : AbstractUseAutoPropertyAna
     protected override bool SupportsPropertyInitializer(Compilation compilation)
         => compilation.LanguageVersion() >= LanguageVersion.CSharp6;
 
+    protected override bool SupportsSemiAutoProperties(Compilation compilation)
+        => compilation.LanguageVersion() >= LanguageVersion.CSharp13;
+
     protected override bool CanExplicitInterfaceImplementationsBeFixed()
         => false;
 

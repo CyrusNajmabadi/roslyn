@@ -32,7 +32,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         private readonly INamedTypeSymbol _containingType;
 
         private readonly HashSet<string> _fieldNames;
-        private readonly ConcurrentStack<AnalysisResult> _analysisResult;
+        private readonly ConcurrentStack<AnalysisResult> _analysisResults;
         private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
         private readonly ConcurrentDictionary<IFieldSymbol, ConcurrentSet<SyntaxNode>> _nonConstructorFieldWrites;
 
@@ -53,7 +53,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     _fieldNames.Add(field.Name);
             }
 
-            AnalysisResults = s_analysisResultPool.Allocate();
+            _analysisResults = s_analysisResultPool.Allocate();
             _ineligibleFields = s_fieldSetPool.Allocate();
             _nonConstructorFieldWrites = s_fieldWriteLocationPool.Allocate();
 
@@ -72,7 +72,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             // Cleanup after doing all our work.
             _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
 
-            s_analysisResultPool.ClearAndFree(AnalysisResults);
+            s_analysisResultPool.ClearAndFree(_analysisResults);
             s_fieldSetPool.ClearAndFree(_ineligibleFields);
 
             foreach (var (_, nodeSet) in _nonConstructorFieldWrites)
@@ -162,7 +162,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 return;
 
             // Looks like a viable property/field to convert into an auto property.
-            AnalysisResults.Push(new AnalysisResult(property, getterField, propertyDeclaration, fieldDeclaration, variableDeclarator, notification));
+            _analysisResults.Push(new AnalysisResult(property, getterField, propertyDeclaration, fieldDeclaration, variableDeclarator, notification));
         }
 
         private void RegisterNonConstructorFieldWrites(
@@ -195,10 +195,10 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             ConcurrentDictionary<IFieldSymbol, IPropertySymbol> convertedToAutoProperty,
             SymbolAnalysisContext context)
         {
-            foreach (var result in AnalysisResults)
+            foreach (var result in _analysisResults)
             {
                 // C# specific check.
-                if (ineligibleFields.Contains(result.Field))
+                if (_ineligibleFields.Contains(result.Field))
                     continue;
 
                 // VB specific check.
@@ -211,7 +211,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 {
                     if (result.Property.DeclaredAccessibility != Accessibility.Private &&
                         result.Property.SetMethod is null &&
-                        nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations1) &&
+                        _nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations1) &&
                         writeLocations1.Any(loc => !loc.Ancestors().Contains(result.PropertyDeclaration)))
                     {
                         continue;
@@ -223,7 +223,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 // it a `setter` as that would allow arbitrary writing outside the type, despite the original `init`
                 // semantics.
                 if (result.Property.SetMethod is { IsInitOnly: true } &&
-                    nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations2) &&
+                    _nonConstructorFieldWrites.TryGetValue(result.Field, out var writeLocations2) &&
                     writeLocations2.Any(loc => !loc.Ancestors().Contains(result.PropertyDeclaration)))
                 {
                     continue;
@@ -242,7 +242,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             var propertyDeclaration = result.PropertyDeclaration;
             var variableDeclarator = result.VariableDeclarator;
-            var fieldNode = GetFieldNode(result.FieldDeclaration, variableDeclarator);
+            var fieldNode = _analyzer.GetFieldNode(result.FieldDeclaration, variableDeclarator);
 
             // Now add diagnostics to both the field and the property saying we can convert it to 
             // an auto property.  For each diagnostic store both location so we can easily retrieve
@@ -253,7 +253,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             // Place the appropriate marker on the field depending on the user option.
             var diagnostic1 = DiagnosticHelper.Create(
-                Descriptor,
+                _analyzer.Descriptor,
                 fieldNode.GetLocation(),
                 result.Notification,
                 context.Options,
@@ -263,7 +263,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             // Also, place a hidden marker on the property.  If they bring up a lightbulb
             // there, they'll be able to see that they can convert it to an auto-prop.
             var diagnostic2 = Diagnostic.Create(
-                Descriptor, propertyDeclaration.GetLocation(),
+                _analyzer.Descriptor, propertyDeclaration.GetLocation(),
                 additionalLocations: additionalLocations);
 
             context.ReportDiagnostic(diagnostic1);

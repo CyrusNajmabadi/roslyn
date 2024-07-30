@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.CodeAnalysis.Collections;
@@ -79,6 +80,15 @@ internal struct PooledObject<T> : IDisposable where T : class
             static (p, v) => Releaser(p, v));
     }
 
+    public static PooledObject<ConcurrentDictionary<TKey, TValue>> Create<TKey, TValue>(ObjectPool<ConcurrentDictionary<TKey, TValue>> pool)
+        where TKey : notnull
+    {
+        return new PooledObject<ConcurrentDictionary<TKey, TValue>>(
+            pool,
+            static p => Allocator(p),
+            static (p, v) => Releaser(p, v));
+    }
+
     public static PooledObject<List<TItem>> Create<TItem>(ObjectPool<List<TItem>> pool)
     {
         return new PooledObject<List<TItem>>(
@@ -127,6 +137,14 @@ internal struct PooledObject<T> : IDisposable where T : class
         => pool.AllocateAndClear();
 
     private static void Releaser<TKey, TValue>(ObjectPool<Dictionary<TKey, TValue>> pool, Dictionary<TKey, TValue> obj)
+        where TKey : notnull
+        => pool.ClearAndFree(obj);
+
+    private static ConcurrentDictionary<TKey, TValue> Allocator<TKey, TValue>(ObjectPool<ConcurrentDictionary<TKey, TValue>> pool)
+        where TKey : notnull
+        => pool.AllocateAndClear();
+
+    private static void Releaser<TKey, TValue>(ObjectPool<ConcurrentDictionary<TKey, TValue>> pool, ConcurrentDictionary<TKey, TValue> obj)
         where TKey : notnull
         => pool.ClearAndFree(obj);
 

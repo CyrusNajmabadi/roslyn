@@ -335,7 +335,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     // to semi-auto-properties.
                     using var _ = s_fieldToPropertyPool.GetPooledObject(out var convertedToAutoProperty);
 
-                    simpleAutoPropertyAnalyzer.OnSymbolEnd(context, convertedToAutoProperty);
+                    simpleAutoPropertyAnalyzer.OnSymbolEnd(convertedToAutoProperty, context);
                 }
             });
 
