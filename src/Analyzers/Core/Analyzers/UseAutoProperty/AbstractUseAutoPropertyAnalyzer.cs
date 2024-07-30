@@ -130,15 +130,8 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
     private static bool CanConvert(
         IFieldSymbol field,
-        IPropertySymbol property,
-        INamedTypeSymbol? suppressMessageAttributeType,
-        [NotNullWhen(true)] out TFieldDeclaration? fieldDeclaration,
-        [NotNullWhen(true)] out TVariableDeclarator? variableDeclarator,
-        CancellationToken cancellationToken)
+        IPropertySymbol property)
     {
-        if (!CanConvert(field, suppressMessageAttributeType, out fieldDeclaration, out variableDeclarator, cancellationToken))
-            return false;
-
         if (property.IsIndexer)
             return false;
 

@@ -37,13 +37,17 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         private readonly INamedTypeSymbol _containingType;
 
         private readonly HashSet<string> _fieldNames;
-        private readonly ConcurrentSet<IFieldSymbol> _fieldsOfInterest;
+
+        private readonly ConcurrentSet<IFieldSymbol> _fieldsOfInterest = ConcurrentSetPool<IFieldSymbol>.Allocate();
 
         /// <summary>
         /// Fields we know cannot be converted.  A field cannot be converted if it is referenced *anywhere* outside of
         /// property.
         /// </summary>
-        private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields;
+        private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
+
+        private readonly ConcurrentSet<IFieldSymbol> _constructorWrites = ConcurrentSetPool<IFieldSymbol>.Allocate();
+        private readonly ConcurrentSet<IFieldSymbol> _nonConstructorWrites = ConcurrentSetPool<IFieldSymbol>.Allocate();
 
         /// <summary>
         /// The locations we see a particular field accessed from.  If a field is only referenced from a single property
@@ -59,8 +63,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             _containingType = (INamedTypeSymbol)context.Symbol;
 
             _fieldNames = _analyzer._fieldNamesPool.Allocate();
-            _fieldsOfInterest = ConcurrentSetPool<IFieldSymbol>.Allocate();
-            _ineligibleFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
             _fieldToPropertyReference = ConcurrentDictionaryPool<IFieldSymbol, (TPropertyDeclaration propertyDeclaration, IPropertySymbol property)>.Allocate();
             var compilation = context.Compilation;
 
@@ -93,6 +95,8 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             // s_analysisResultPool.ClearAndFree(AnalysisResults);
             ConcurrentSetPool<IFieldSymbol>.Free(_fieldsOfInterest);
             ConcurrentSetPool<IFieldSymbol>.Free(_ineligibleFields);
+            ConcurrentSetPool<IFieldSymbol>.Free(_constructorWrites);
+            ConcurrentSetPool<IFieldSymbol>.Free(_nonConstructorWrites);
             ConcurrentDictionaryPool<IFieldSymbol, (TPropertyDeclaration propertyDeclaration, IPropertySymbol property)>.Free(_fieldToPropertyReference);
         }
 
@@ -149,9 +153,12 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 if (!field.Equals(field.OriginalDefinition))
                     return false;
 
+                // Check for common blockers.
+                if (!CanConvert(field, suppressMessageAttributeType, out _, out _, cancellationToken))
+                    return false;
+
                 // if this field is referenced outside of a property then we can't convert this.
                 var propertyDeclaration = identifierName.GetAncestor<TPropertyDeclaration>();
-                var constructorDeclaration = identifierName.GetAncestor<TConstructorDeclaration>();
                 if (propertyDeclaration != null)
                 {
                     var property = (IPropertySymbol)semanticModel.GetRequiredDeclaredSymbol(propertyDeclaration, cancellationToken);
@@ -162,7 +169,8 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                         return false;
 
                     // if the field and property are not complimentary, then we can't convert this.
-                    if (!CanConvert(field, property, suppressMessageAttributeType, out _, out _, cancellationToken))
+
+                    if (!CanConvert(field, property))
                         return false;
 
                     if (existingProperty is null)
@@ -181,15 +189,20 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
                     return true;
                 }
-                else if (constructorDeclaration != null)
+
+                // Access outside of a property constructor.  This may be ok if it's a *write* only. A write will be ok
+                // if we're going to give the property a basic `set;` method when converting it.
+                if (syntaxFacts.IsLeftSideOfAssignment(identifierName))
                 {
-                    // If we're writing to the field within a constructor, we can still change this to an semi-auto-property, 
-                    // a long as the property has no setter.
+                    var constructorDeclaration = identifierName.GetAncestor<TConstructorDeclaration>();
+                    var writesSet = constructorDeclaration != null
+                        ? self._constructorWrites
+                        : self._nonConstructorWrites;
+
+                    writesSet.Add(field);
                 }
-                else
-                {
-                    return false;
-                }
+
+                return false;
             }
         }
 
