@@ -93,6 +93,55 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     protected abstract void RegisterIneligibleFieldsAction(
         HashSet<string> fieldNames, ConcurrentSet<IFieldSymbol> ineligibleFields, SemanticModel semanticModel, SyntaxNode codeBlock, CancellationToken cancellationToken);
 
+    private readonly struct SemiAutoPropertyAnalyzer : IDisposable
+    {
+        private readonly TAnalyzer _analyzer;
+
+        private readonly INamedTypeSymbol _containingType;
+
+        private readonly HashSet<string> _fieldNames;
+        private readonly ConcurrentSet<IFieldSymbol> _fieldsOfInterest;
+
+        public SemiAutoPropertyAnalyzer(
+            TAnalyzer analyzer,
+            SymbolStartAnalysisContext context)
+        {
+            _analyzer = analyzer;
+
+            _containingType = (INamedTypeSymbol)context.Symbol;
+            _fieldNames = _analyzer._fieldNamesPool.Allocate();
+            _fieldsOfInterest = s_fieldSetPool.Allocate();
+
+            if (_analyzer.SupportsSemiAutoProperties)
+            {
+                foreach (var member in _containingType.GetMembers())
+                {
+                    if (member is not IFieldSymbol
+                        {
+                            DeclaredAccessibility: Accessibility.Private,
+                            CanBeReferencedByName: true,
+                        } field)
+                    {
+                        continue;
+                    }
+
+                    _fieldsOfInterest.Add(field);
+                    _fieldNames.Add(field.Name);
+                }
+
+                context.RegisterCodeBlockStartAction<TSyntaxKind>(AnalyzeCodeBlock);
+            }
+        }
+
+        public void Dispose()
+        {
+            _analyzer._fieldNamesPool.ClearAndFree(_fieldNames);
+
+            // s_analysisResultPool.ClearAndFree(AnalysisResults);
+            s_fieldSetPool.ClearAndFree(_fieldsOfInterest);
+        }
+    }
+
     protected sealed override void InitializeWorker(AnalysisContext context)
         => context.RegisterSymbolStartAction(context =>
         {
@@ -100,21 +149,16 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             if (!ShouldAnalyze(context, namedType))
                 return;
 
-            // Record the names of all the fields in this type.  We can use this to greatly reduce the amount of
-            // binding we need to perform when looking for restrictions in the type.
-            var fieldNames = _fieldNamesPool.Allocate();
-            foreach (var member in namedType.GetMembers())
-            {
-                if (member is IFieldSymbol field)
-                    fieldNames.Add(field.Name);
-            }
-
             var simpleAutoPropertyAnalyzer = new SimpleAutoPropertyAnalyzer(
-                (TAnalyzer)this, context, fieldNames);
+                (TAnalyzer)this, context);
+
+            var semiAutoPropertyAnalyzer = new SemiAutoPropertyAnalyzer(
+                (TAnalyzer)this, context);
 
             context.RegisterSymbolEndAction(context =>
             {
                 using (simpleAutoPropertyAnalyzer)
+                using (semiAutoPropertyAnalyzer)
                 {
                     Process(
                         simpleAutoPropertyAnalyzer.AnalysisResults,

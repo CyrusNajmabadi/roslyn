@@ -52,13 +52,20 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
         public SimpleAutoPropertyAnalyzer(
             TAnalyzer analyzer,
-            SymbolStartAnalysisContext context,
-            HashSet<string> fieldNames)
+            SymbolStartAnalysisContext context)
         {
             _analyzer = analyzer;
 
             _containingType = (INamedTypeSymbol)context.Symbol;
-            _fieldNames = fieldNames;
+
+            // Record the names of all the fields in this type.  We can use this to greatly reduce the amount of
+            // binding we need to perform when looking for restrictions in the type.
+            _fieldNames = _analyzer._fieldNamesPool.Allocate();
+            foreach (var member in _containingType.GetMembers())
+            {
+                if (member is IFieldSymbol field)
+                    _fieldNames.Add(field.Name);
+            }
 
             AnalysisResults = s_analysisResultPool.Allocate();
             IneligibleFields = s_fieldSetPool.Allocate();
@@ -66,8 +73,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
 
             var self = this;
             context.RegisterSyntaxNodeAction(
-                context => self.AnalyzePropertyDeclaration(context),
-                _analyzer.PropertyDeclarationKind);
+                self.AnalyzePropertyDeclaration, _analyzer.PropertyDeclarationKind);
             context.RegisterCodeBlockStartAction<TSyntaxKind>(context =>
             {
                 self._analyzer.RegisterIneligibleFieldsAction(self._fieldNames, self.IneligibleFields, context.SemanticModel, context.CodeBlock, context.CancellationToken);
