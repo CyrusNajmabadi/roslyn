@@ -46,8 +46,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
         /// </summary>
         private readonly ConcurrentSet<IFieldSymbol> _ineligibleFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
 
-        private readonly ConcurrentSet<IFieldSymbol> _constructorWrites = ConcurrentSetPool<IFieldSymbol>.Allocate();
-        private readonly ConcurrentSet<IFieldSymbol> _nonConstructorWrites = ConcurrentSetPool<IFieldSymbol>.Allocate();
+        private readonly ConcurrentSet<IFieldSymbol> _writtenFields = ConcurrentSetPool<IFieldSymbol>.Allocate();
 
         /// <summary>
         /// The locations we see a particular field accessed from.  If a field is only referenced from a single property
@@ -95,8 +94,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
             // s_analysisResultPool.ClearAndFree(AnalysisResults);
             ConcurrentSetPool<IFieldSymbol>.Free(_fieldsOfInterest);
             ConcurrentSetPool<IFieldSymbol>.Free(_ineligibleFields);
-            ConcurrentSetPool<IFieldSymbol>.Free(_constructorWrites);
-            ConcurrentSetPool<IFieldSymbol>.Free(_nonConstructorWrites);
+            ConcurrentSetPool<IFieldSymbol>.Free(_writtenFields);
             ConcurrentDictionaryPool<IFieldSymbol, (TPropertyDeclaration propertyDeclaration, IPropertySymbol property)>.Free(_fieldToPropertyReference);
         }
 
@@ -194,12 +192,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 // if we're going to give the property a basic `set;` method when converting it.
                 if (syntaxFacts.IsLeftSideOfAssignment(identifierName))
                 {
-                    var constructorDeclaration = identifierName.GetAncestor<TConstructorDeclaration>();
-                    var writesSet = constructorDeclaration != null
-                        ? self._constructorWrites
-                        : self._nonConstructorWrites;
-
-                    writesSet.Add(field);
+                    self._writtenFields.Add(field);
                     return true;
                 }
 
@@ -231,8 +224,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                 var properties = SemiAutoProperties.Add(FieldName, field.Name);
 
                 var (propertyDeclaration, property) = propertyInfo;
-                var hasNonConstructorWrite = _nonConstructorWrites.Contains(field);
-                if (hasNonConstructorWrite || _constructorWrites.Contains(field))
+                if (_writtenFields.Contains(field))
                 {
                     // Will not be able an assignment to the field work if the property already has a setter.
                     if (property.SetMethod != null)
@@ -242,9 +234,6 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
                     // cannot call through that.
                     if (property.IsVirtual || property.IsAbstract || property.IsOverride)
                         continue;
-
-                    if (hasNonConstructorWrite)
-                        properties = properties.Add(AddPrivateSetAccessor, AddPrivateSetAccessor);
                 }
 
                 // We checked this originally when we added to the set of fields to look at.
