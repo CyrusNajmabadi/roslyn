@@ -22,22 +22,7 @@ internal abstract partial class AbstractUseAutoPropertyAnalyzer<
     TFieldDeclaration,
     TVariableDeclarator,
     TExpression,
-    TIdentifierName> where TAnalyzer : AbstractUseAutoPropertyAnalyzer<
-        TAnalyzer,
-        TSyntaxKind,
-        TPropertyDeclaration,
-        TConstructorDeclaration,
-        TFieldDeclaration,
-        TVariableDeclarator,
-        TExpression,
-        TIdentifierName>
-    where TSyntaxKind : struct, Enum
-    where TPropertyDeclaration : SyntaxNode
-    where TConstructorDeclaration : SyntaxNode
-    where TFieldDeclaration : SyntaxNode
-    where TVariableDeclarator : SyntaxNode
-    where TExpression : SyntaxNode
-    where TIdentifierName : TExpression
+    TIdentifierName>
 {
     /// <summary>
     /// Analyzer that looks at all the fields in a type, finds those only referenced in a single property and suggests
