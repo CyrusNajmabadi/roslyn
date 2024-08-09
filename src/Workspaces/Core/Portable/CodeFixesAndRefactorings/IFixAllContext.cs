@@ -39,6 +39,7 @@ using Microsoft.CodeAnalysis.CodeFixes;
 internal interface IFixAllContextWitness<TFixAllContext>
 {
     CancellationToken GetCancellationToken(TFixAllContext fixAllContext);
+    string GetDefaultFixAllTitle(TFixAllContext fixAllContext);
     Project GetProject(TFixAllContext fixAllContext);
     FixAllScope GetScope(TFixAllContext fixAllContext);
     Solution GetSolution(TFixAllContext fixAllContext);

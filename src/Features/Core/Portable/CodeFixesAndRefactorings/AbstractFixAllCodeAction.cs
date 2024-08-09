@@ -16,14 +16,17 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// Fix all code action for a code action registered by
 /// a <see cref="CodeFixes.CodeFixProvider"/> or a <see cref="CodeRefactorings.CodeRefactoringProvider"/>.
 /// </summary>
-internal abstract class AbstractFixAllCodeAction : CodeAction
+internal abstract class AbstractFixAllCodeAction<
+    TFixAllContext,
+    TFixAllContextWitness> : CodeAction
+    where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
 {
     private bool _showPreviewChangesDialog;
 
-    public IFixAllState FixAllState { get; }
+    public IFixAllState<TFixAllContext> FixAllState { get; }
 
     protected AbstractFixAllCodeAction(
-        IFixAllState fixAllState, bool showPreviewChangesDialog)
+        IFixAllState<TFixAllContext> fixAllState, bool showPreviewChangesDialog)
     {
         FixAllState = fixAllState;
         _showPreviewChangesDialog = showPreviewChangesDialog;
@@ -32,12 +35,12 @@ internal abstract class AbstractFixAllCodeAction : CodeAction
     /// <summary>
     /// Determine if the <see cref="IFixAllState.Provider"/> is an internal first-party provider or not.
     /// </summary>
-    protected abstract bool IsInternalProvider(IFixAllState fixAllState);
+    protected abstract bool IsInternalProvider(IFixAllState<TFixAllContext> fixAllState);
 
     /// <summary>
     /// Creates a new <see cref="IFixAllContext"/> with the given parameters.
     /// </summary>
-    protected abstract IFixAllContext CreateFixAllContext(IFixAllState fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken);
+    protected abstract TFixAllContext CreateFixAllContext(IFixAllState<TFixAllContext> fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken);
 
     public override string Title
         => this.FixAllState.Scope switch
@@ -61,7 +64,7 @@ internal abstract class AbstractFixAllCodeAction : CodeAction
         var service = FixAllState.Project.Solution.Services.GetRequiredService<IFixAllGetFixesService>();
 
         var fixAllContext = CreateFixAllContext(FixAllState, progressTracker, cancellationToken);
-        progressTracker.Report(CodeAnalysisProgress.Description(fixAllContext.GetDefaultFixAllTitle()));
+        progressTracker.Report(CodeAnalysisProgress.Description(default(TFixAllContextWitness).GetDefaultFixAllTitle(fixAllContext)));
 
         return service.GetFixAllOperationsAsync(fixAllContext, _showPreviewChangesDialog);
     }
@@ -75,7 +78,7 @@ internal abstract class AbstractFixAllCodeAction : CodeAction
         var service = FixAllState.Project.Solution.Services.GetRequiredService<IFixAllGetFixesService>();
 
         var fixAllContext = CreateFixAllContext(FixAllState, progressTracker, cancellationToken);
-        progressTracker.Report(CodeAnalysisProgress.Description(fixAllContext.GetDefaultFixAllTitle()));
+        progressTracker.Report(CodeAnalysisProgress.Description(default(TFixAllContextWitness).GetDefaultFixAllTitle(fixAllContext)));
 
         return service.GetFixAllChangedSolutionAsync(fixAllContext);
     }
@@ -87,9 +90,9 @@ internal abstract class AbstractFixAllCodeAction : CodeAction
     // internal for testing purposes.
     internal readonly struct TestAccessor
     {
-        private readonly AbstractFixAllCodeAction _fixAllCodeAction;
+        private readonly AbstractFixAllCodeAction<TFixAllContext, TFixAllContextWitness> _fixAllCodeAction;
 
-        internal TestAccessor(AbstractFixAllCodeAction fixAllCodeAction)
+        internal TestAccessor(AbstractFixAllCodeAction<TFixAllContext, TFixAllContextWitness> fixAllCodeAction)
             => _fixAllCodeAction = fixAllCodeAction;
 
         /// <summary>

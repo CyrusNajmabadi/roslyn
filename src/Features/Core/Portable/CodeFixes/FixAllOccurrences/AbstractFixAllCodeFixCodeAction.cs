@@ -19,7 +19,7 @@ internal abstract class AbstractFixAllCodeFixCodeAction : AbstractFixAllCodeActi
     private static readonly HashSet<string> s_predefinedCodeFixProviderNames = GetPredefinedCodeFixProviderNames();
 
     protected AbstractFixAllCodeFixCodeAction(
-        IFixAllState fixAllState, bool showPreviewChangesDialog)
+        IFixAllState<FixAllContext> fixAllState, bool showPreviewChangesDialog)
         : base(fixAllState, showPreviewChangesDialog)
     {
     }
