@@ -9,9 +9,13 @@ using FixAllScope = Microsoft.CodeAnalysis.CodeFixes.FixAllScope;
 
 namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 
-internal abstract partial class CommonFixAllState<TProvider, TFixAllProvider, TFixAllState> : IFixAllState
-    where TFixAllProvider : IFixAllProvider
-    where TFixAllState : CommonFixAllState<TProvider, TFixAllProvider, TFixAllState>
+internal abstract partial class CommonFixAllState<
+    TProvider,
+    TFixAllProvider,
+    TFixAllContext,
+    TFixAllState> : IFixAllState<TFixAllContext>
+    where TFixAllProvider : IFixAllProvider<TFixAllContext>
+    where TFixAllState : CommonFixAllState<TProvider, TFixAllProvider, TFixAllContext, TFixAllState>
 {
     public int CorrelationId { get; } = CorrelationIdFactory.GetNextId();
     public TFixAllProvider FixAllProvider { get; }
@@ -64,11 +68,11 @@ internal abstract partial class CommonFixAllState<TProvider, TFixAllProvider, TF
     }
 
     #region IFixAllState implementation
-    IFixAllProvider IFixAllState.FixAllProvider => this.FixAllProvider!;
+    IFixAllProvider<TFixAllContext> IFixAllState<TFixAllContext>.FixAllProvider => this.FixAllProvider!;
 
-    object IFixAllState.Provider => this.Provider!;
+    object IFixAllState<TFixAllContext>.Provider => this.Provider!;
 
-    IFixAllState IFixAllState.With(
+    IFixAllState<TFixAllContext> IFixAllState<TFixAllContext>.With(
         Optional<(Document? document, Project project)> documentAndProject,
         Optional<FixAllScope> scope,
         Optional<string?> codeActionEquivalenceKey)

@@ -15,6 +15,24 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeFixes;
 
+internal struct FixAllContextWitness : IFixAllContextWitness<FixAllContext>
+{
+    public CancellationToken GetCancellationToken(FixAllContext fixAllContext) => fixAllContext.CancellationToken;
+    public Project GetProject(FixAllContext fixAllContext) => fixAllContext.Project;
+    public FixAllScope GetScope(FixAllContext fixAllContext) => fixAllContext.Scope;
+    public Solution GetSolution(FixAllContext fixAllContext) => fixAllContext.Solution;
+
+    public FixAllContext With(
+        FixAllContext fixAllContext,
+        Optional<(Document? document, Project project)> documentAndProject = default,
+        Optional<FixAllScope> scope = default,
+        Optional<string?> codeActionEquivalenceKey = default,
+        Optional<CancellationToken> cancellationToken = default)
+    {
+        return fixAllContext.With(documentAndProject, scope, codeActionEquivalenceKey, cancellationToken);
+    }
+}
+
 /// <summary>
 /// Context for "Fix all occurrences" code fixes provided by a <see cref="FixAllProvider"/>.
 /// </summary>

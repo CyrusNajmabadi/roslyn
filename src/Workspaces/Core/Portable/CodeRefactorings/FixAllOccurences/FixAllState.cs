@@ -17,7 +17,11 @@ using FixAllScope = Microsoft.CodeAnalysis.CodeFixes.FixAllScope;
 
 namespace Microsoft.CodeAnalysis.CodeRefactorings;
 
-internal sealed class FixAllState : CommonFixAllState<CodeRefactoringProvider, FixAllProvider, FixAllState>
+internal sealed class FixAllState : CommonFixAllState<
+    CodeRefactoringProvider,
+    FixAllProvider,
+    FixAllContext,
+    FixAllState>
 {
     /// <summary>
     /// Original selection span from which FixAll was invoked.

@@ -90,11 +90,6 @@ public abstract class FixAllProvider : IFixAllProvider<FixAllContext>
         return new CallbackDocumentBasedFixAllProvider(fixAllAsync, supportedFixAllScopes);
     }
 
-    #region IFixAllProvider implementation
-    Task<CodeAction?> IFixAllProvider.GetFixAsync(IFixAllContext fixAllContext)
-        => this.GetFixAsync((FixAllContext)fixAllContext);
-    #endregion
-
     private class CallbackDocumentBasedFixAllProvider(
         Func<FixAllContext, Document, ImmutableArray<Diagnostic>, Task<Document?>> fixAllAsync,
         ImmutableArray<FixAllScope> supportedFixAllScopes) : DocumentBasedFixAllProvider(supportedFixAllScopes)

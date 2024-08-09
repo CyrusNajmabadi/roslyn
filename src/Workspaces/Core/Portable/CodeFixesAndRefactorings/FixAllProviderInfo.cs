@@ -14,13 +14,13 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// <summary>
 /// Contains computed information for a given <see cref="FixAllProvider"/>, such as supported diagnostic Ids and supported <see cref="FixAllScope"/>.
 /// </summary>
-internal abstract class FixAllProviderInfo
+internal abstract class FixAllProviderInfo<TFixAllContext>
 {
-    public readonly IFixAllProvider FixAllProvider;
+    public readonly IFixAllProvider<TFixAllContext> FixAllProvider;
     public readonly ImmutableArray<FixAllScope> SupportedScopes;
 
     private FixAllProviderInfo(
-        IFixAllProvider fixAllProvider,
+        IFixAllProvider<TFixAllContext> fixAllProvider,
         ImmutableArray<FixAllScope> supportedScopes)
     {
         FixAllProvider = fixAllProvider;
@@ -30,7 +30,7 @@ internal abstract class FixAllProviderInfo
     /// <summary>
     /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider or suppression fix provider.
     /// </summary>
-    public static FixAllProviderInfo? Create(object provider)
+    public static FixAllProviderInfo<TFixAllContext>? Create(object provider)
     {
         if (provider is CodeFixProvider codeFixProvider)
         {

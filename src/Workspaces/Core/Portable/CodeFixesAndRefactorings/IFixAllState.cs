@@ -10,10 +10,10 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// <summary>
 /// Represents internal FixAllState for code fixes or refactorings. 
 /// </summary>
-internal interface IFixAllState
+internal interface IFixAllState<TFixAllContext>
 {
     int CorrelationId { get; }
-    IFixAllProvider FixAllProvider { get; }
+    IFixAllProvider<TFixAllContext> FixAllProvider { get; }
     string? CodeActionEquivalenceKey { get; }
     FixAllScope Scope { get; }
     FixAllKind FixAllKind { get; }
@@ -26,7 +26,7 @@ internal interface IFixAllState
     /// </summary>
     object Provider { get; }
 
-    IFixAllState With(
+    IFixAllState<TFixAllContext> With(
         Optional<(Document? document, Project project)> documentAndProject = default,
         Optional<FixAllScope> scope = default,
         Optional<string?> codeActionEquivalenceKey = default);

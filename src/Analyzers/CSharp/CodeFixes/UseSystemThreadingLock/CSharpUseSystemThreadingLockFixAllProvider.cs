@@ -23,7 +23,7 @@ internal sealed partial class CSharpUseSystemThreadingLockCodeFixProvider
         public override Task<CodeAction?> GetFixAsync(FixAllContext fixAllContext)
         {
             return DefaultFixAllProviderHelpers.GetFixAsync(
-                fixAllContext.GetDefaultFixAllTitle(), fixAllContext, FixAllContextsHelperAsync);
+                fixAllContext.GetDefaultFixAllTitle(), fixAllContext, default(FixAllContextWitness), FixAllContextsHelperAsync);
         }
 
         private static async Task<Solution?> FixAllContextsHelperAsync(FixAllContext originalContext, ImmutableArray<FixAllContext> contexts)

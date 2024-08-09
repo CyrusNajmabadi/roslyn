@@ -39,7 +39,7 @@ internal static class FixAllLogger
     private const string TotalDiagnosticsToFix = nameof(TotalDiagnosticsToFix);
     private const string TotalFixesToMerge = nameof(TotalFixesToMerge);
 
-    public static void LogState(IFixAllState fixAllState, bool isInternalProvider)
+    public static void LogState<TFixAllContext>(IFixAllState<TFixAllContext> fixAllState, bool isInternalProvider)
     {
         FunctionId functionId;
         string providerKey;
