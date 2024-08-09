@@ -76,7 +76,7 @@ internal class CodeActionResolveHandler : ILspServiceDocumentRequestHandler<LSP.
 
         var document = context.GetRequiredTextDocument();
         var solution = document.Project.Solution;
-        var codeActions = await CodeActionHelpers.GetCodeActionsAsync(
+        var codeActions = await CodeActions.CodeActionHelpers.GetCodeActionsAsync(
             document,
             data.Range,
             _codeFixService,
@@ -85,7 +85,7 @@ internal class CodeActionResolveHandler : ILspServiceDocumentRequestHandler<LSP.
             cancellationToken).ConfigureAwait(false);
 
         Contract.ThrowIfNull(data.CodeActionPath);
-        var codeActionToResolve = CodeActionHelpers.GetCodeActionToResolve(data.CodeActionPath, codeActions, isFixAllAction: false);
+        var codeActionToResolve = CodeActions.CodeActionHelpers.GetCodeActionToResolve(data.CodeActionPath, codeActions, isFixAllAction: false);
 
         // LSP currently has no way to report progress for code action computation.
         var operations = await codeActionToResolve.GetOperationsAsync(

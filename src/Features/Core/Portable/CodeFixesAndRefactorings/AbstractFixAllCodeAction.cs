@@ -33,12 +33,12 @@ internal abstract class AbstractFixAllCodeAction<
     }
 
     /// <summary>
-    /// Determine if the <see cref="IFixAllState.Provider"/> is an internal first-party provider or not.
+    /// Determine if the <see cref="IFixAllState{TFixAllContext}.Provider"/> is an internal first-party provider or not.
     /// </summary>
     protected abstract bool IsInternalProvider(IFixAllState<TFixAllContext> fixAllState);
 
     /// <summary>
-    /// Creates a new <see cref="IFixAllContext"/> with the given parameters.
+    /// Creates a new <typeparamref name="TFixAllContext"/> with the given parameters.
     /// </summary>
     protected abstract TFixAllContext CreateFixAllContext(IFixAllState<TFixAllContext> fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken);
 
