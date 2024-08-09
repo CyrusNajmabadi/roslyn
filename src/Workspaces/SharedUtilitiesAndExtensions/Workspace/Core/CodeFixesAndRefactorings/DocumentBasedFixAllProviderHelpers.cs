@@ -56,7 +56,7 @@ internal static class DocumentBasedFixAllProviderHelpers
         // Once we clean the document, we get the text of it and insert that back into the final solution.  This way we
         // can release both the original fixed tree, and the cleaned tree (both of which can be much more expensive than
         // just text).
-        var cleanedTexts = await CodeAction.GetAllChangedOrAddedDocumentIds(originalSolution, cleanedSolution)
+        var cleanedTexts = await CodeActionHelpers.GetAllChangedOrAddedDocumentIds(originalSolution, cleanedSolution)
             .SelectAsArrayAsync(async documentId => (documentId, await cleanedSolution.GetRequiredDocument(documentId).GetTextAsync(cancellationToken).ConfigureAwait(false)))
             .ConfigureAwait(false);
 

@@ -56,26 +56,13 @@ public abstract partial class CodeAction
         return document2;
     }
 
-    internal static ImmutableArray<DocumentId> GetAllChangedOrAddedDocumentIds(
-        Solution originalSolution,
-        Solution changedSolution)
-    {
-        var solutionChanges = changedSolution.GetChanges(originalSolution);
-        var documentIds = solutionChanges
-            .GetProjectChanges()
-            .SelectMany(p => p.GetChangedDocuments(onlyGetDocumentsWithTextChanges: true).Concat(p.GetAddedDocuments()))
-            .Concat(solutionChanges.GetAddedProjects().SelectMany(p => p.DocumentIds))
-            .ToImmutableArray();
-        return documentIds;
-    }
-
     internal static async Task<Solution> CleanSyntaxAndSemanticsAsync(
         Solution originalSolution,
         Solution changedSolution,
         IProgress<CodeAnalysisProgress> progress,
         CancellationToken cancellationToken)
     {
-        var documentIds = GetAllChangedOrAddedDocumentIds(originalSolution, changedSolution);
+        var documentIds = CodeActionHelpers.GetAllChangedOrAddedDocumentIds(originalSolution, changedSolution);
         var documentIdsAndOptionsToClean = await GetDocumentIdsAndOptionsToCleanAsync().ConfigureAwait(false);
 
         // Then do a pass where we cleanup semantics.
