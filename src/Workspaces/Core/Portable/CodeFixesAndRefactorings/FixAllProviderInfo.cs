@@ -27,27 +27,33 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
         SupportedScopes = supportedScopes;
     }
 
-    /// <summary>
-    /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider or suppression fix provider.
-    /// </summary>
-    public static FixAllProviderInfo<TFixAllContext>? Create(object provider)
-    {
-        if (provider is CodeFixProvider codeFixProvider)
-        {
-            return CreateWithCodeFixer(codeFixProvider);
-        }
-        else if (provider is CodeRefactoringProvider codeRefactoringProvider)
-        {
-            return CreateWithCodeRefactoring(codeRefactoringProvider);
-        }
-
-        return CreateWithSuppressionFixer((IConfigurationFixProvider)provider);
-    }
+    ///// <summary>
+    ///// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider or suppression fix provider.
+    ///// </summary>
+    //public static FixAllProviderInfo<TFixAllContext>? Create(object provider)
+    //{
+    //    if (provider is CodeFixProvider codeFixProvider)
+    //    {
+    //        return CreateWithCodeFixer(codeFixProvider);
+    //    }
+    //    else if (provider is CodeRefactoringProvider codeRefactoringProvider)
+    //    {
+    //        return CreateWithCodeRefactoring(codeRefactoringProvider);
+    //    }
+    //    else if (provider is IConfigurationFixProvider configurationFixProvider)
+    //    {
+    //        return CreateWithSuppressionFixer(configurationFixProvider);
+    //    }
+    //    else
+    //    {
+    //        throw ExceptionUtilities.Unreachable();
+    //    }
+    //}
 
     /// <summary>
     /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider.
     /// </summary>
-    private static FixAllProviderInfo? CreateWithCodeFixer(CodeFixProvider provider)
+    private static FixAllProviderInfo<CodeFixes.FixAllContext>? CreateWithCodeFixer(CodeFixProvider provider)
     {
         var fixAllProvider = provider.GetFixAllProvider();
         if (fixAllProvider == null)
@@ -73,7 +79,7 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     /// <summary>
     /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code refactoring provider.
     /// </summary>
-    private static FixAllProviderInfo? CreateWithCodeRefactoring(CodeRefactoringProvider provider)
+    private static FixAllProviderInfo<CodeRefactorings.FixAllContext>? CreateWithCodeRefactoring(CodeRefactoringProvider provider)
     {
         var fixAllProvider = provider.GetFixAllProvider();
         if (fixAllProvider == null)
@@ -93,7 +99,7 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     /// <summary>
     /// Gets an optional <see cref="FixAllProviderInfo"/> for the given suppression fix provider.
     /// </summary>
-    private static FixAllProviderInfo? CreateWithSuppressionFixer(IConfigurationFixProvider provider)
+    private static FixAllProviderInfo<CodeFixes.FixAllContext>? CreateWithSuppressionFixer(IConfigurationFixProvider provider)
     {
         var fixAllProvider = provider.GetFixAllProvider();
         if (fixAllProvider == null)
@@ -113,18 +119,20 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     public abstract bool CanBeFixed(Diagnostic diagnostic);
 
     private class CodeFixerFixAllProviderInfo(
-        IFixAllProvider fixAllProvider,
+        IFixAllProvider<CodeFixes.FixAllContext> fixAllProvider,
         IEnumerable<string> supportedDiagnosticIds,
-        ImmutableArray<FixAllScope> supportedScopes) : FixAllProviderInfo(fixAllProvider, supportedScopes)
+        ImmutableArray<FixAllScope> supportedScopes)
+        : FixAllProviderInfo<CodeFixes.FixAllContext>(fixAllProvider, supportedScopes)
     {
         public override bool CanBeFixed(Diagnostic diagnostic)
             => supportedDiagnosticIds.Contains(diagnostic.Id);
     }
 
     private class SuppressionFixerFixAllProviderInfo(
-        IFixAllProvider fixAllProvider,
+        IFixAllProvider<CodeFixes.FixAllContext> fixAllProvider,
         IConfigurationFixProvider suppressionFixer,
-        ImmutableArray<FixAllScope> supportedScopes) : FixAllProviderInfo(fixAllProvider, supportedScopes)
+        ImmutableArray<FixAllScope> supportedScopes)
+        : FixAllProviderInfo<CodeFixes.FixAllContext>(fixAllProvider, supportedScopes)
     {
         private readonly Func<Diagnostic, bool> _canBeSuppressedOrUnsuppressed = suppressionFixer.IsFixableDiagnostic;
 
@@ -133,8 +141,9 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     }
 
     private class CodeRefactoringFixAllProviderInfo(
-        IFixAllProvider fixAllProvider,
-        ImmutableArray<FixAllScope> supportedScopes) : FixAllProviderInfo(fixAllProvider, supportedScopes)
+        IFixAllProvider<CodeRefactorings.FixAllContext> fixAllProvider,
+        ImmutableArray<FixAllScope> supportedScopes)
+        : FixAllProviderInfo<CodeRefactorings.FixAllContext>(fixAllProvider, supportedScopes)
     {
         public override bool CanBeFixed(Diagnostic diagnostic)
             => throw ExceptionUtilities.Unreachable();
