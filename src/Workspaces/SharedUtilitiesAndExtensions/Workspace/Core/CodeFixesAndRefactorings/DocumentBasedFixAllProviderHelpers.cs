@@ -20,14 +20,17 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// </summary>
 internal static class DocumentBasedFixAllProviderHelpers
 {
-    public static async Task<Solution?> FixAllContextsAsync<TFixAllContext, TFixAllContextWitness>(
+    public static async Task<Solution?> FixAllContextsAsync<
+        TFixAllContext, TFixAllContextWitness,
+        TFixAllState,
+        TFixAllProvider>(
         TFixAllContext originalFixAllContext,
         TFixAllContextWitness witness,
         ImmutableArray<TFixAllContext> fixAllContexts,
         IProgress<CodeAnalysisProgress> progressTracker,
         string progressTrackerDescription,
         Func<TFixAllContext, Func<Document, Document?, ValueTask>, Task> getFixedDocumentsAsync)
-        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext, TFixAllState, TFixAllProvider>
     {
         var cancellationToken = witness.GetCancellationToken(originalFixAllContext);
 

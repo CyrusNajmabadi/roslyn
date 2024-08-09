@@ -15,7 +15,8 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeFixes;
 
-internal struct FixAllContextWitness : IFixAllContextWitness<FixAllContext>
+internal struct FixAllContextWitness : IFixAllContextWitness<
+    FixAllContext, FixAllState, FixAllProvider>
 {
     public CancellationToken GetCancellationToken(FixAllContext fixAllContext) => fixAllContext.CancellationToken;
     public Project GetProject(FixAllContext fixAllContext) => fixAllContext.Project;
@@ -23,8 +24,8 @@ internal struct FixAllContextWitness : IFixAllContextWitness<FixAllContext>
     public Solution GetSolution(FixAllContext fixAllContext) => fixAllContext.Solution;
     public string GetDefaultFixAllTitle(FixAllContext fixAllContext) => fixAllContext.GetDefaultFixAllTitle();
     public IProgress<CodeAnalysisProgress> GetProgress(FixAllContext fixAllContext) => fixAllContext.Progress;
-    public IFixAllState<FixAllContext> GetState(FixAllContext fixAllContext) => fixAllContext.State;
-    public IFixAllProvider<FixAllContext> GetFixAllProvider(FixAllContext fixAllContext) => fixAllContext.FixAllProvider;
+    public FixAllState GetState(FixAllContext fixAllContext) => fixAllContext.State;
+    public FixAllProvider GetFixAllProvider(FixAllContext fixAllContext) => fixAllContext.FixAllProvider;
 
     public FixAllContext With(
         FixAllContext fixAllContext,

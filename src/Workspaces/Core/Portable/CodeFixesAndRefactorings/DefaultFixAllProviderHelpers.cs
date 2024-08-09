@@ -20,14 +20,16 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// </summary>
 internal static class DefaultFixAllProviderHelpers
 {
-    public static async Task<CodeAction?> GetFixAsync<TFixAllContext, TFixAllContextWitness>(
+    public static async Task<CodeAction?> GetFixAsync<
+        TFixAllContext, TFixAllContextWitness,
+        TFixAllState,
+        TFixAllProvider>(
         string title,
         TFixAllContext fixAllContext,
         TFixAllContextWitness witness,
         Func<TFixAllContext, ImmutableArray<TFixAllContext>, Task<Solution?>> fixAllContextsAsync)
-        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext, TFixAllState, TFixAllProvider>
     {
-
         // We're about to do a lot of computation to compute all the diagnostics needed and to perform the
         // changes.  Keep this solution alive on the OOP side so that we never drop it and then resync it
         // (which would cause us to drop/recreate compilations, skeletons and sg docs.
@@ -38,8 +40,8 @@ internal static class DefaultFixAllProviderHelpers
         {
             FixAllScope.Document or FixAllScope.ContainingMember or FixAllScope.ContainingType
                 => await GetDocumentFixesAsync(fixAllContext, fixAllContextsAsync).ConfigureAwait(false),
-            FixAllScope.Project => await GetProjectFixesAsync(fixAllContext, witness, fixAllContextsAsync).ConfigureAwait(false),
-            FixAllScope.Solution => await GetSolutionFixesAsync(fixAllContext, witness, fixAllContextsAsync).ConfigureAwait(false),
+            FixAllScope.Project => await GetProjectFixesAsync<TFixAllContext, TFixAllContextWitness, TFixAllState, TFixAllProvider>(fixAllContext, witness, fixAllContextsAsync).ConfigureAwait(false),
+            FixAllScope.Solution => await GetSolutionFixesAsync<TFixAllContext, TFixAllContextWitness, TFixAllState, TFixAllProvider>(fixAllContext, witness, fixAllContextsAsync).ConfigureAwait(false),
             var scope => throw ExceptionUtilities.UnexpectedValue(scope),
         };
 
@@ -55,18 +57,24 @@ internal static class DefaultFixAllProviderHelpers
         Func<TFixAllContext, ImmutableArray<TFixAllContext>, Task<Solution?>> fixAllContextsAsync)
         => fixAllContextsAsync(fixAllContext, [fixAllContext]);
 
-    private static Task<Solution?> GetProjectFixesAsync<TFixAllContext, TFixAllContextWitness>(
+    private static Task<Solution?> GetProjectFixesAsync<
+        TFixAllContext, TFixAllContextWitness,
+        TFixAllState,
+        TFixAllProvider>(
         TFixAllContext fixAllContext,
         TFixAllContextWitness witness,
         Func<TFixAllContext, ImmutableArray<TFixAllContext>, Task<Solution?>> fixAllContextsAsync)
-        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext, TFixAllState, TFixAllProvider>
         => fixAllContextsAsync(fixAllContext, [witness.With(fixAllContext, (document: null, witness.GetProject(fixAllContext)))]);
 
-    private static Task<Solution?> GetSolutionFixesAsync<TFixAllContext, TFixAllContextWitness>(
+    private static Task<Solution?> GetSolutionFixesAsync<
+        TFixAllContext, TFixAllContextWitness,
+        TFixAllState,
+        TFixAllProvider>(
         TFixAllContext fixAllContext,
         TFixAllContextWitness witness,
         Func<TFixAllContext, ImmutableArray<TFixAllContext>, Task<Solution?>> fixAllContextsAsync)
-        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext, TFixAllState, TFixAllProvider>
     {
         var solution = witness.GetSolution(fixAllContext);
         var dependencyGraph = solution.GetProjectDependencyGraph();

@@ -38,7 +38,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 
-internal interface IFixAllContextWitness<TFixAllContext>
+internal interface IFixAllContextWitness<
+    TFixAllContext, TFixAllState, TFixAllProvider>
 {
     CancellationToken GetCancellationToken(TFixAllContext fixAllContext);
     string GetDefaultFixAllTitle(TFixAllContext fixAllContext);
@@ -46,8 +47,8 @@ internal interface IFixAllContextWitness<TFixAllContext>
     Project GetProject(TFixAllContext fixAllContext);
     FixAllScope GetScope(TFixAllContext fixAllContext);
     Solution GetSolution(TFixAllContext fixAllContext);
-    IFixAllState<TFixAllContext> GetState(TFixAllContext fixAllContext);
-    IFixAllProvider<TFixAllContext> GetFixAllProvider(TFixAllContext fixAllContext);
+    TFixAllState GetState(TFixAllContext fixAllContext);
+    TFixAllProvider GetFixAllProvider(TFixAllContext fixAllContext);
 
     TFixAllContext With(
         TFixAllContext fixAllContext,
