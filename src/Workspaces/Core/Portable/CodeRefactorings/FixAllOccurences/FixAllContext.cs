@@ -102,6 +102,7 @@ internal sealed class FixAllContext
         public Project GetProject(FixAllContext fixAllContext) => fixAllContext.Project;
         public FixAllScope GetScope(FixAllContext fixAllContext) => fixAllContext.Scope;
         public Solution GetSolution(FixAllContext fixAllContext) => fixAllContext.Solution;
+        public string GetDefaultFixAllTitle(FixAllContext fixAllContext) => fixAllContext.GetDefaultFixAllTitle();
 
         public FixAllContext With(
             FixAllContext fixAllContext,
