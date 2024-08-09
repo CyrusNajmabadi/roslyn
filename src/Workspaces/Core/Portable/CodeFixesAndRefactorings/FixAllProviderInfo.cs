@@ -30,25 +30,21 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     ///// <summary>
     ///// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider or suppression fix provider.
     ///// </summary>
-    //public static FixAllProviderInfo<TFixAllContext>? Create(object provider)
-    //{
-    //    if (provider is CodeFixProvider codeFixProvider)
-    //    {
-    //        return CreateWithCodeFixer(codeFixProvider);
-    //    }
-    //    else if (provider is CodeRefactoringProvider codeRefactoringProvider)
-    //    {
-    //        return CreateWithCodeRefactoring(codeRefactoringProvider);
-    //    }
-    //    else if (provider is IConfigurationFixProvider configurationFixProvider)
-    //    {
-    //        return CreateWithSuppressionFixer(configurationFixProvider);
-    //    }
-    //    else
-    //    {
-    //        throw ExceptionUtilities.Unreachable();
-    //    }
-    //}
+    public static FixAllProviderInfo<CodeFixes.FixAllContext>? CreateWithCodeOrSuppressionFixer(object provider)
+    {
+        if (provider is CodeFixProvider codeFixProvider)
+        {
+            return CreateWithCodeFixer(codeFixProvider);
+        }
+        else if (provider is IConfigurationFixProvider configurationFixProvider)
+        {
+            return CreateWithSuppressionFixer(configurationFixProvider);
+        }
+        else
+        {
+            throw ExceptionUtilities.Unreachable();
+        }
+    }
 
     /// <summary>
     /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider.

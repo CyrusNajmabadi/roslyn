@@ -53,7 +53,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
         private ImmutableDictionary<LanguageKind, Lazy<ImmutableDictionary<CodeFixProvider, int>>>? _lazyFixerPriorityMap;
 
         private ImmutableDictionary<CodeFixProvider, ImmutableArray<DiagnosticId>> _fixerToFixableIdsMap = ImmutableDictionary<CodeFixProvider, ImmutableArray<DiagnosticId>>.Empty;
-        private ImmutableDictionary<object, FixAllProviderInfo?> _fixAllProviderMap = ImmutableDictionary<object, FixAllProviderInfo?>.Empty;
+        private ImmutableDictionary<object, FixAllProviderInfo<FixAllContext>?> _fixAllProviderMap = ImmutableDictionary<object, FixAllProviderInfo<FixAllContext>?>.Empty;
         private ImmutableDictionary<CodeFixProvider, CodeChangeProviderMetadata?> _fixerToMetadataMap = ImmutableDictionary<CodeFixProvider, CodeChangeProviderMetadata?>.Empty;
 
         [ImportingConstructor]
@@ -347,7 +347,8 @@ namespace Microsoft.CodeAnalysis.CodeFixes
             var fixAllService = document.Project.Solution.Services.GetRequiredService<IFixAllGetFixesService>();
 
             var solution = await fixAllService.GetFixAllChangedSolutionAsync(
-                new FixAllContext(fixCollection.FixAllState, progressTracker, cancellationToken)).ConfigureAwait(false);
+                new FixAllContext(fixCollection.FixAllState, progressTracker, cancellationToken),
+                default(FixAllContextWitness)).ConfigureAwait(false);
             Contract.ThrowIfNull(solution);
 
             return (TDocument)(solution.GetTextDocument(document.Id) ?? throw new NotSupportedException(FeaturesResources.Removal_of_document_not_supported));
@@ -762,7 +763,9 @@ namespace Microsoft.CodeAnalysis.CodeFixes
 
             // If the fix provider supports fix all occurrences, then get the corresponding FixAllProviderInfo and fix all context.
             var fixAllProviderInfo = extensionManager.PerformFunction(
-                fixer, () => ImmutableInterlocked.GetOrAdd(ref _fixAllProviderMap, fixer, FixAllProviderInfo.Create), defaultValue: null);
+                fixer, () => ImmutableInterlocked.GetOrAdd(
+                    ref _fixAllProviderMap, fixer, FixAllProviderInfo<CodeFixContext>.CreateWithCodeOrSuppressionFixer),
+                defaultValue: null);
 
             FixAllState? fixAllState = null;
             var supportedScopes = ImmutableArray<FixAllScope>.Empty;
