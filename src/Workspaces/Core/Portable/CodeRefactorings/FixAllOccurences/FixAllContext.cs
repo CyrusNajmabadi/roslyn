@@ -19,7 +19,7 @@ namespace Microsoft.CodeAnalysis.CodeRefactorings;
 /// <remarks>
 /// TODO: Make public, tracked with https://github.com/dotnet/roslyn/issues/60703
 /// </remarks>
-internal sealed class FixAllContext : IFixAllContext
+internal sealed class FixAllContext
 {
     internal FixAllState State { get; }
 
@@ -62,23 +62,6 @@ internal sealed class FixAllContext : IFixAllContext
 
     public Solution Solution => Project.Solution;
 
-    #region IFixAllContext implementation
-    IFixAllState IFixAllContext.State => this.State;
-
-    IFixAllProvider IFixAllContext.FixAllProvider => this.FixAllProvider;
-
-    object IFixAllContext.Provider => this.CodeRefactoringProvider;
-
-    string IFixAllContext.GetDefaultFixAllTitle() => this.GetDefaultFixAllTitle();
-
-    IFixAllContext IFixAllContext.With(
-        Optional<(Document? document, Project project)> documentAndProject,
-        Optional<FixAllScope> scope,
-        Optional<string?> codeActionEquivalenceKey,
-        Optional<CancellationToken> cancellationToken)
-        => this.With(documentAndProject, scope, codeActionEquivalenceKey, cancellationToken);
-    #endregion
-
     internal FixAllContext(
         FixAllState state,
         IProgress<CodeAnalysisProgress> progressTracker,
@@ -112,4 +95,20 @@ internal sealed class FixAllContext : IFixAllContext
 
     internal string GetDefaultFixAllTitle()
         => FixAllHelper.GetDefaultFixAllTitle(this.Scope, this.State.CodeActionTitle, this.Document, this.Project);
+
+    public struct Witness : IFixAllContextWitness<FixAllContext>
+    {
+        public CancellationToken GetCancellationToken(FixAllContext fixAllContext) => fixAllContext.CancellationToken;
+        public Project GetProject(FixAllContext fixAllContext) => fixAllContext.Project;
+        public FixAllScope GetScope(FixAllContext fixAllContext) => fixAllContext.Scope;
+        public Solution GetSolution(FixAllContext fixAllContext) => fixAllContext.Solution;
+
+        public FixAllContext With(
+            FixAllContext fixAllContext,
+            Optional<(Document? document, Project project)> documentAndProject = default,
+            Optional<FixAllScope> scope = default,
+            Optional<string?> codeActionEquivalenceKey = default,
+            Optional<CancellationToken> cancellationToken = default)
+            => fixAllContext.With(documentAndProject, scope, codeActionEquivalenceKey, cancellationToken);
+    }
 }
