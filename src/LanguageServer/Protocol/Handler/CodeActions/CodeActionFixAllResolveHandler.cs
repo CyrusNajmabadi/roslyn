@@ -55,10 +55,7 @@ internal sealed class CodeActionFixAllResolveHandler(
         Contract.ThrowIfNull(data.CodeActionPath);
         var codeActionToResolve = CodeActionHelpers.GetCodeActionToResolve(data.CodeActionPath, codeActions, isFixAllAction: true);
 
-        var fixAllCodeAction = (FixAllCodeAction)codeActionToResolve;
-        Contract.ThrowIfNull(fixAllCodeAction);
-
-        var operations = await fixAllCodeAction.GetOperationsAsync(document.Project.Solution, CodeAnalysisProgress.None, cancellationToken).ConfigureAwait(false);
+        var operations = await codeActionToResolve.GetOperationsAsync(document.Project.Solution, CodeAnalysisProgress.None, cancellationToken).ConfigureAwait(false);
         var edit = await CodeActionResolveHelper.GetCodeActionResolveEditsAsync(context, data, operations, cancellationToken).ConfigureAwait(false);
 
         request.Edit = edit;
