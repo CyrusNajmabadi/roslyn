@@ -11,11 +11,14 @@ namespace Microsoft.CodeAnalysis.CodeRefactorings;
 /// <summary>
 /// Fix all code action for a code action registered by a <see cref="CodeRefactoringProvider"/>.
 /// </summary>
-internal sealed class FixAllCodeRefactoringCodeAction(IFixAllState fixAllState) : AbstractFixAllCodeAction(fixAllState, showPreviewChangesDialog: true)
+internal sealed class FixAllCodeRefactoringCodeAction(
+    IFixAllState<FixAllContext> fixAllState)
+    : AbstractFixAllCodeAction<FixAllContext, FixAllContext.Witness>(
+        fixAllState, showPreviewChangesDialog: true)
 {
-    protected override IFixAllContext CreateFixAllContext(IFixAllState fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken)
+    protected override FixAllContext CreateFixAllContext(IFixAllState<FixAllContext> fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken)
         => new FixAllContext((FixAllState)fixAllState, progressTracker, cancellationToken);
 
-    protected override bool IsInternalProvider(IFixAllState fixAllState)
+    protected override bool IsInternalProvider(IFixAllState<FixAllContext> fixAllState)
         => true; // FixAll for refactorings is currently only supported for internal code refactoring providers.
 }
