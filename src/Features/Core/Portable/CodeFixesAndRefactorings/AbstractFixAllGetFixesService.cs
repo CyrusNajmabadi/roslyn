@@ -192,7 +192,7 @@ internal abstract class AbstractFixAllGetFixesService : IFixAllGetFixesService
             CodeAction? action = null;
             try
             {
-                action = await fixAllContext.FixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
+                action = await witness.GetFixAllProvider(fixAllContext).GetFixAsync(fixAllContext).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

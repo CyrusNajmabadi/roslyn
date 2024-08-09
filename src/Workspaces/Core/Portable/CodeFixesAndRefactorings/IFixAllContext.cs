@@ -47,6 +47,7 @@ internal interface IFixAllContextWitness<TFixAllContext>
     FixAllScope GetScope(TFixAllContext fixAllContext);
     Solution GetSolution(TFixAllContext fixAllContext);
     IFixAllState<TFixAllContext> GetState(TFixAllContext fixAllContext);
+    IFixAllProvider<TFixAllContext> GetFixAllProvider(TFixAllContext fixAllContext);
 
     TFixAllContext With(
         TFixAllContext fixAllContext,
