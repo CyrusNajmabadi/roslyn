@@ -14,7 +14,8 @@ namespace Microsoft.CodeAnalysis.CodeFixes;
 /// <summary>
 /// Fix all code action for a code action registered by a <see cref="CodeFixProvider"/>.
 /// </summary>
-internal abstract class AbstractFixAllCodeFixCodeAction : AbstractFixAllCodeAction
+internal abstract class AbstractFixAllCodeFixCodeAction
+    : AbstractFixAllCodeAction<FixAllContext, FixAllContextWitness>
 {
     private static readonly HashSet<string> s_predefinedCodeFixProviderNames = GetPredefinedCodeFixProviderNames();
 
@@ -24,10 +25,10 @@ internal abstract class AbstractFixAllCodeFixCodeAction : AbstractFixAllCodeActi
     {
     }
 
-    protected sealed override IFixAllContext CreateFixAllContext(IFixAllState fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken)
-        => new FixAllContext((FixAllState)fixAllState, progressTracker, cancellationToken);
+    protected sealed override FixAllContext CreateFixAllContext(IFixAllState<FixAllContext> fixAllState, IProgress<CodeAnalysisProgress> progressTracker, CancellationToken cancellationToken)
+        => new((FixAllState)fixAllState, progressTracker, cancellationToken);
 
-    protected sealed override bool IsInternalProvider(IFixAllState fixAllState)
+    protected sealed override bool IsInternalProvider(IFixAllState<FixAllContext> fixAllState)
     {
         var exportAttributes = fixAllState.Provider.GetType().GetTypeInfo().GetCustomAttributes(typeof(ExportCodeFixProviderAttribute), false);
         if (exportAttributes?.Any() == true)
