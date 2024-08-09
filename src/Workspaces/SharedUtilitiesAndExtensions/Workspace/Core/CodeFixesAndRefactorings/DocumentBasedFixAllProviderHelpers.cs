@@ -42,7 +42,9 @@ internal static class DocumentBasedFixAllProviderHelpers
         var dirtySolution = await GetInitialUncleanedSolutionAsync(originalSolution).ConfigureAwait(false);
 
         // Now do a pass to clean the fixed documents.
+#if !CODE_STYLE
         progressTracker.Report(CodeAnalysisProgress.Clear());
+#endif
         progressTracker.Report(CodeAnalysisProgress.Description(WorkspacesResources.Running_code_cleanup_on_fixed_documents));
 
         var cleanedSolution = await CodeAction.CleanSyntaxAndSemanticsAsync(
@@ -63,10 +65,12 @@ internal static class DocumentBasedFixAllProviderHelpers
 
         async Task<Solution> GetInitialUncleanedSolutionAsync(Solution originalSolution)
         {
+#if !CODE_STYLE
             // First, iterate over all contexts, and collect all the changes for each of them.  We'll be making a lot of
             // calls to the remote server to compute diagnostics and changes.  So keep a single connection alive to it
             // so we never resync or recompute anything.
             using var _ = await RemoteKeepAliveSession.CreateAsync(originalSolution, cancellationToken).ConfigureAwait(false);
+#endif
 
             var changedRootsAndTexts = await ProducerConsumer<(DocumentId documentId, (SyntaxNode? node, SourceText? text))>.RunParallelAsync(
                 source: fixAllContexts,
@@ -106,9 +110,21 @@ internal static class DocumentBasedFixAllProviderHelpers
             var changedRoots = changedRootsAndTexts.SelectAsArray(t => t.Item2.node != null, t => (t.documentId, t.Item2.node!));
             var changedTexts = changedRootsAndTexts.SelectAsArray(t => t.Item2.text != null, t => (t.documentId, t.Item2.text!));
 
+#if CODE_STYLE
+            var finalSolution = originalSolution;
+
+            foreach (var (documentId, changedRoot) in changedRoots)
+                finalSolution = finalSolution.WithDocumentSyntaxRoot(documentId, changedRoot);
+
+            foreach (var (documentId, changedText) in changedTexts)
+                finalSolution = finalSolution.WithDocumentText(documentId, changedText);
+
+            return finalSolution;
+#else
             return originalSolution
                 .WithDocumentSyntaxRoots(changedRoots)
                 .WithDocumentTexts(changedTexts);
+#endif
         }
     }
 }

@@ -10,6 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)CodeCleanup\CodeCleanupOptionsProviders.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CodeFixesAndRefactorings\DocumentBasedFixAllProviderHelpers.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CodeFixesAndRefactorings\IFixAllContext.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CodeGeneration\CodeGenerationOptionsProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CodeRefactorings\AbstractRefactoringHelpersService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CodeRefactorings\CodeRefactoringHelpers.cs" />
