@@ -112,6 +112,11 @@
         <target state="translated">Do wykonania zadania wymagany jest projekt o identyfikatorze {0}, ale nie jest on udostępniany przez rozwiązanie</target>
         <note />
       </trans-unit>
+      <trans-unit id="Running_code_cleanup_on_fixed_documents">
+        <source>Running code cleanup on fixed documents</source>
+        <target state="new">Running code cleanup on fixed documents</target>
+        <note />
+      </trans-unit>
       <trans-unit id="Supplied_diagnostic_cannot_be_null">
         <source>Supplied diagnostic cannot be null.</source>
         <target state="translated">Podane informacje diagnostyczne nie mogą mieć wartości null.</target>

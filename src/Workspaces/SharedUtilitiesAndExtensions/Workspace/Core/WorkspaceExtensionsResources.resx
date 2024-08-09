@@ -198,4 +198,7 @@
   <data name="Document_does_not_support_syntax_trees" xml:space="preserve">
     <value>Document does not support syntax trees</value>
   </data>
+  <data name="Running_code_cleanup_on_fixed_documents" xml:space="preserve">
+    <value>Running code cleanup on fixed documents</value>
+  </data>
 </root>

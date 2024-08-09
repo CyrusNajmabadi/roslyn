@@ -45,7 +45,7 @@ internal static class DocumentBasedFixAllProviderHelpers
 #if !CODE_STYLE
         progressTracker.Report(CodeAnalysisProgress.Clear());
 #endif
-        progressTracker.Report(CodeAnalysisProgress.Description(WorkspacesResources.Running_code_cleanup_on_fixed_documents));
+        progressTracker.Report(CodeAnalysisProgress.Description(WorkspaceExtensionsResources.Running_code_cleanup_on_fixed_documents));
 
         var cleanedSolution = await CodeActionHelpers.CleanSyntaxAndSemanticsAsync(
             originalSolution,
