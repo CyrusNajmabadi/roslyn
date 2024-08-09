@@ -20,19 +20,20 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// </summary>
 internal static class DocumentBasedFixAllProviderHelpers
 {
-    public static async Task<Solution?> FixAllContextsAsync<TFixAllContext>(
+    public static async Task<Solution?> FixAllContextsAsync<TFixAllContext, TFixAllContextWitness>(
         TFixAllContext originalFixAllContext,
+        TFixAllContextWitness witness,
         ImmutableArray<TFixAllContext> fixAllContexts,
         IProgress<CodeAnalysisProgress> progressTracker,
         string progressTrackerDescription,
         Func<TFixAllContext, Func<Document, Document?, ValueTask>, Task> getFixedDocumentsAsync)
-        where TFixAllContext : IFixAllContext
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
     {
-        var cancellationToken = originalFixAllContext.CancellationToken;
+        var cancellationToken = witness.GetCancellationToken(originalFixAllContext);
 
         progressTracker.Report(CodeAnalysisProgress.Description(progressTrackerDescription));
 
-        var originalSolution = originalFixAllContext.Solution;
+        var originalSolution = witness.GetSolution(originalFixAllContext);
 
         // One work item for each context.
         progressTracker.AddItems(fixAllContexts.Length);
@@ -71,13 +72,13 @@ internal static class DocumentBasedFixAllProviderHelpers
                 source: fixAllContexts,
                 produceItems: static async (fixAllContext, callback, args, cancellationToken) =>
                 {
-                    var (getFixedDocumentsAsync, progressTracker) = args;
+                    var (witness, getFixedDocumentsAsync, progressTracker) = args;
 
                     // Update our progress for each fixAllContext we process.
                     using var _ = progressTracker.ItemCompletedScope();
 
                     Contract.ThrowIfFalse(
-                        fixAllContext.Scope is FixAllScope.Document or FixAllScope.Project or FixAllScope.ContainingMember or FixAllScope.ContainingType);
+                        witness.GetScope(fixAllContext) is FixAllScope.Document or FixAllScope.Project or FixAllScope.ContainingMember or FixAllScope.ContainingType);
 
                     // Defer to the FixAllProvider to actually compute each fixed document.
                     await getFixedDocumentsAsync(
@@ -92,7 +93,7 @@ internal static class DocumentBasedFixAllProviderHelpers
                             callback((newDocument.Id, (newRoot, newText)));
                         }).ConfigureAwait(false);
                 },
-                args: (getFixedDocumentsAsync, progressTracker),
+                args: (witness, getFixedDocumentsAsync, progressTracker),
                 cancellationToken).ConfigureAwait(false);
 
             // Next, go and insert those all into the solution so all the docs in this particular project point
