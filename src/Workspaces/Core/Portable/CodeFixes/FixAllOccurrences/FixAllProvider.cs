@@ -16,7 +16,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes;
 /// Implement this abstract type to provide fix all/multiple occurrences code fixes for source code problems.
 /// Alternatively, you can use any of the well known fix all providers from <see cref="WellKnownFixAllProviders"/>.
 /// </summary>
-public abstract class FixAllProvider : IFixAllProvider
+public abstract class FixAllProvider : IFixAllProvider<FixAllContext>
 {
     private protected static ImmutableArray<FixAllScope> DefaultSupportedFixAllScopes
         = [FixAllScope.Document, FixAllScope.Project, FixAllScope.Solution];

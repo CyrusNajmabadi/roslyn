@@ -19,7 +19,7 @@ namespace Microsoft.CodeAnalysis.CodeRefactorings;
 /// <remarks>
 /// TODO: Make public, tracked with https://github.com/dotnet/roslyn/issues/60703
 /// </remarks>
-internal abstract class FixAllProvider : IFixAllProvider
+internal abstract class FixAllProvider : IFixAllProvider<FixAllContext>
 {
     private protected static ImmutableArray<FixAllScope> DefaultSupportedFixAllScopes
         = [FixAllScope.Document, FixAllScope.Project, FixAllScope.Solution];
@@ -38,11 +38,6 @@ internal abstract class FixAllProvider : IFixAllProvider
     /// Gets fix all occurrences fix for the given fixAllContext.
     /// </summary>
     public abstract Task<CodeAction?> GetFixAsync(FixAllContext fixAllContext);
-
-    #region IFixAllProvider implementation
-    Task<CodeAction?> IFixAllProvider.GetFixAsync(IFixAllContext fixAllContext)
-        => this.GetFixAsync((FixAllContext)fixAllContext);
-    #endregion
 
     /// <summary>
     /// Create a <see cref="FixAllProvider"/> that fixes documents independently.

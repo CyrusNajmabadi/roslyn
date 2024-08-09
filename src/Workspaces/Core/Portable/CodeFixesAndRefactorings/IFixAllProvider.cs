@@ -12,8 +12,8 @@ namespace Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 /// <summary>
 /// Represents a FixAllProvider for code fixes or refactorings. 
 /// </summary>
-internal interface IFixAllProvider
+internal interface IFixAllProvider<TFixAllContext>
 {
     IEnumerable<FixAllScope> GetSupportedFixAllScopes();
-    Task<CodeAction?> GetFixAsync(IFixAllContext fixAllContext);
+    Task<CodeAction?> GetFixAsync(TFixAllContext fixAllContext);
 }
