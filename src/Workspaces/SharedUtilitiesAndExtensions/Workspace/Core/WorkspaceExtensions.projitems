@@ -9,6 +9,7 @@
     <Import_RootNamespace>Microsoft.CodeAnalysis.Shared</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)codeactions\CodeActionHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CodeCleanup\CodeCleanupOptionsProviders.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CodeFixesAndRefactorings\DocumentBasedFixAllProviderHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CodeFixesAndRefactorings\IFixAllContext.cs" />
@@ -179,5 +180,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)CodeCleanup\" />
+    <Folder Include="$(MSBuildThisFileDirectory)CodeActions\" />
   </ItemGroup>
 </Project>

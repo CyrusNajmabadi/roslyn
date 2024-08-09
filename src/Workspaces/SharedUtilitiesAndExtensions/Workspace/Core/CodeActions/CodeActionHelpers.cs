@@ -34,4 +34,38 @@ internal static class CodeActionHelpers
             .ToImmutableArray();
         return documentIds;
     }
+
+    internal static async Task<Solution> CleanSyntaxAndSemanticsAsync(
+        Solution originalSolution,
+        Solution changedSolution,
+        IProgress<CodeAnalysisProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        var documentIds = CodeActionHelpers.GetAllChangedOrAddedDocumentIds(originalSolution, changedSolution);
+        var documentIdsAndOptionsToClean = await GetDocumentIdsAndOptionsToCleanAsync().ConfigureAwait(false);
+
+        // Then do a pass where we cleanup semantics.
+        var cleanedSolution = await RunAllCleanupPassesInOrderAsync(
+            changedSolution, documentIdsAndOptionsToClean, progress, cancellationToken).ConfigureAwait(false);
+
+        return cleanedSolution;
+
+        async Task<ImmutableArray<(DocumentId documentId, CodeCleanupOptions codeCleanupOptions)>> GetDocumentIdsAndOptionsToCleanAsync()
+        {
+            using var _ = ArrayBuilder<(DocumentId documentId, CodeCleanupOptions options)>.GetInstance(documentIds.Length, out var documentIdsAndOptions);
+            foreach (var documentId in documentIds)
+            {
+                var document = changedSolution.GetRequiredDocument(documentId);
+
+                // Only care about documents that support syntax.  Non-C#/VB files can't be cleaned.
+                if (document.SupportsSyntaxTree)
+                {
+                    var codeActionOptions = await document.GetCodeCleanupOptionsAsync(cancellationToken).ConfigureAwait(false);
+                    documentIdsAndOptions.Add((documentId, codeActionOptions));
+                }
+            }
+
+            return documentIdsAndOptions.ToImmutableAndClear();
+        }
+    }
 }

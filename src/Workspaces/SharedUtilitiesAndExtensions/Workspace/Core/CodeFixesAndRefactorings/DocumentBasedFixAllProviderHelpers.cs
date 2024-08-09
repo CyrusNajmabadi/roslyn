@@ -47,7 +47,7 @@ internal static class DocumentBasedFixAllProviderHelpers
 #endif
         progressTracker.Report(CodeAnalysisProgress.Description(WorkspacesResources.Running_code_cleanup_on_fixed_documents));
 
-        var cleanedSolution = await CodeAction.CleanSyntaxAndSemanticsAsync(
+        var cleanedSolution = await CodeActionHelpers.CleanSyntaxAndSemanticsAsync(
             originalSolution,
             dirtySolution,
             progressTracker,
@@ -60,7 +60,7 @@ internal static class DocumentBasedFixAllProviderHelpers
             .SelectAsArrayAsync(async documentId => (documentId, await cleanedSolution.GetRequiredDocument(documentId).GetTextAsync(cancellationToken).ConfigureAwait(false)))
             .ConfigureAwait(false);
 
-        var finalSolution = cleanedSolution.WithDocumentTexts(cleanedTexts);
+        var finalSolution = WithDocumentTexts(cleanedSolution, cleanedTexts);
         return finalSolution;
 
         async Task<Solution> GetInitialUncleanedSolutionAsync(Solution originalSolution)
@@ -116,15 +116,27 @@ internal static class DocumentBasedFixAllProviderHelpers
             foreach (var (documentId, changedRoot) in changedRoots)
                 finalSolution = finalSolution.WithDocumentSyntaxRoot(documentId, changedRoot);
 
-            foreach (var (documentId, changedText) in changedTexts)
-                finalSolution = finalSolution.WithDocumentText(documentId, changedText);
-
-            return finalSolution;
+            return WithDocumentTexts(finalSolution, changedTexts);
 #else
             return originalSolution
                 .WithDocumentSyntaxRoots(changedRoots)
                 .WithDocumentTexts(changedTexts);
 #endif
         }
+    }
+
+    public static Solution WithDocumentTexts(Solution solution, ImmutableArray<(DocumentId documentId, SourceText text)> changedTexts)
+    {
+#if CODE_STYLE
+        var finalSolution = solution;
+
+        foreach (var (documentId, changedText) in changedTexts)
+            finalSolution = finalSolution.WithDocumentText(documentId, changedText);
+
+        return finalSolution;
+#else
+        return solution.WithDocumentTexts(changedTexts);
+#endif
+
     }
 }
