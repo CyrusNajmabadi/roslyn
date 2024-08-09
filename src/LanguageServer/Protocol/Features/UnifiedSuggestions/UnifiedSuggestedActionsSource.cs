@@ -208,7 +208,7 @@ namespace Microsoft.CodeAnalysis.UnifiedSuggestions
         private static async Task<UnifiedSuggestedActionSet?> GetUnifiedFixAllSuggestedActionSetAsync(
             CodeAction action,
             int actionCount,
-            IFixAllState fixAllState,
+            IFixAllState<CodeFixes.FixAllContext> fixAllState,
             ImmutableArray<FixAllScope> supportedScopes,
             Diagnostic firstDiagnostic,
             Workspace workspace,
@@ -580,7 +580,7 @@ namespace Microsoft.CodeAnalysis.UnifiedSuggestions
             Document? document,
             TextSpan selection,
             CodeRefactoringProvider provider,
-            FixAllProviderInfo? fixAllProviderInfo,
+            FixAllProviderInfo<CodeRefactorings.FixAllContext>? fixAllProviderInfo,
             Workspace workspace,
             CancellationToken cancellationToken)
         {

@@ -47,7 +47,7 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     }
 
     /// <summary>
-    /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code fix provider.
+    /// Gets an optional <see cref="FixAllProviderInfo{TFixAllContext}"/> for the given code fix provider.
     /// </summary>
     private static FixAllProviderInfo<CodeFixes.FixAllContext>? CreateWithCodeFixer(CodeFixProvider provider)
     {
@@ -73,7 +73,7 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     }
 
     /// <summary>
-    /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code refactoring provider.
+    /// Gets an optional <see cref="FixAllProviderInfo{TFixAllContext}"/> for the given code refactoring provider.
     /// </summary>
     public static FixAllProviderInfo<CodeRefactorings.FixAllContext>? CreateWithCodeRefactoring(CodeRefactoringProvider provider)
     {
@@ -93,7 +93,7 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     }
 
     /// <summary>
-    /// Gets an optional <see cref="FixAllProviderInfo"/> for the given suppression fix provider.
+    /// Gets an optional <see cref="FixAllProviderInfo{TFixAllContext}"/> for the given suppression fix provider.
     /// </summary>
     private static FixAllProviderInfo<CodeFixes.FixAllContext>? CreateWithSuppressionFixer(IConfigurationFixProvider provider)
     {

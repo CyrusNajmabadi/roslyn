@@ -4,6 +4,7 @@
 
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
+using Microsoft.CodeAnalysis.CodeRefactorings;
 
 namespace Microsoft.CodeAnalysis.UnifiedSuggestions.UnifiedSuggestedActions
 {
@@ -15,6 +16,6 @@ namespace Microsoft.CodeAnalysis.UnifiedSuggestions.UnifiedSuggestedActions
     {
         CodeAction OriginalCodeAction { get; }
 
-        IFixAllState FixAllState { get; }
+        IFixAllState<FixAllContext> FixAllState { get; }
     }
 }

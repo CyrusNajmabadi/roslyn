@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 using Microsoft.CodeAnalysis.UnifiedSuggestions.UnifiedSuggestedActions;
 
@@ -16,13 +17,13 @@ namespace Microsoft.CodeAnalysis.UnifiedSuggestions
     {
         public Diagnostic Diagnostic { get; }
 
-        public IFixAllState FixAllState { get; }
+        public IFixAllState<FixAllContext> FixAllState { get; }
 
         public UnifiedFixAllCodeFixSuggestedAction(
             Workspace workspace,
             CodeAction codeAction,
             CodeActionPriority codeActionPriority,
-            IFixAllState fixAllState,
+            IFixAllState<FixAllContext> fixAllState,
             Diagnostic diagnostic)
             : base(workspace, codeAction, codeActionPriority)
         {

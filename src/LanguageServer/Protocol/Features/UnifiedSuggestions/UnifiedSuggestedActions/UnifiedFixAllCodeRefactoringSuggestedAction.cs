@@ -4,6 +4,7 @@
 
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
+using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.UnifiedSuggestions.UnifiedSuggestedActions;
 
 namespace Microsoft.CodeAnalysis.UnifiedSuggestions
@@ -14,13 +15,13 @@ namespace Microsoft.CodeAnalysis.UnifiedSuggestions
     /// </summary>
     internal class UnifiedFixAllCodeRefactoringSuggestedAction : UnifiedSuggestedAction, IFixAllCodeRefactoringSuggestedAction
     {
-        public IFixAllState FixAllState { get; }
+        public IFixAllState<FixAllContext> FixAllState { get; }
 
         public UnifiedFixAllCodeRefactoringSuggestedAction(
             Workspace workspace,
             CodeAction codeAction,
             CodeActionPriority codeActionPriority,
-            IFixAllState fixAllState)
+            IFixAllState<FixAllContext> fixAllState)
             : base(workspace, codeAction, codeActionPriority)
         {
             FixAllState = fixAllState;
