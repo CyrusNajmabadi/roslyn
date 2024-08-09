@@ -169,7 +169,10 @@ internal abstract class AbstractFixAllGetFixesService : IFixAllGetFixesService
         TFixAllContextWitness witness)
         where TFixAllContextWitness : IFixAllContextWitness<TFixAllContext>
     {
-        var fixAllKind = fixAllContext.State.FixAllKind;
+        var cancellationToken = witness.GetCancellationToken(fixAllContext);
+        var state = witness.GetState(fixAllContext);
+
+        var fixAllKind = state.FixAllKind;
         var functionId = fixAllKind switch
         {
             FixAllKind.CodeFix => FunctionId.CodeFixes_FixAllOccurrencesComputation,
@@ -181,10 +184,10 @@ internal abstract class AbstractFixAllGetFixesService : IFixAllGetFixesService
             functionId,
             KeyValueLogMessage.Create(LogType.UserAction, m =>
             {
-                m[FixAllLogger.CorrelationId] = fixAllContext.State.CorrelationId;
-                m[FixAllLogger.FixAllScope] = fixAllContext.State.Scope.ToString();
+                m[FixAllLogger.CorrelationId] = state.CorrelationId;
+                m[FixAllLogger.FixAllScope] = state.Scope.ToString();
             }),
-            fixAllContext.CancellationToken))
+            cancellationToken))
         {
             CodeAction? action = null;
             try
@@ -193,17 +196,17 @@ internal abstract class AbstractFixAllGetFixesService : IFixAllGetFixesService
             }
             catch (OperationCanceledException)
             {
-                FixAllLogger.LogComputationResult(fixAllKind, fixAllContext.State.CorrelationId, completed: false);
+                FixAllLogger.LogComputationResult(fixAllKind, state.CorrelationId, completed: false);
             }
             finally
             {
                 if (action != null)
                 {
-                    FixAllLogger.LogComputationResult(fixAllKind, fixAllContext.State.CorrelationId, completed: true);
+                    FixAllLogger.LogComputationResult(fixAllKind, state.CorrelationId, completed: true);
                 }
                 else
                 {
-                    FixAllLogger.LogComputationResult(fixAllKind, fixAllContext.State.CorrelationId, completed: false, timedOut: true);
+                    FixAllLogger.LogComputationResult(fixAllKind, state.CorrelationId, completed: false, timedOut: true);
                 }
             }
 
