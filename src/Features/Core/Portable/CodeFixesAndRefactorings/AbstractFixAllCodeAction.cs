@@ -64,9 +64,10 @@ internal abstract class AbstractFixAllCodeAction<
         var service = FixAllState.Project.Solution.Services.GetRequiredService<IFixAllGetFixesService>();
 
         var fixAllContext = CreateFixAllContext(FixAllState, progressTracker, cancellationToken);
-        progressTracker.Report(CodeAnalysisProgress.Description(default(TFixAllContextWitness).GetDefaultFixAllTitle(fixAllContext)));
+        var witness = default(TFixAllContextWitness);
+        progressTracker.Report(CodeAnalysisProgress.Description(witness.GetDefaultFixAllTitle(fixAllContext)));
 
-        return service.GetFixAllOperationsAsync(fixAllContext, _showPreviewChangesDialog);
+        return service.GetFixAllOperationsAsync(fixAllContext, witness, _showPreviewChangesDialog);
     }
 
     protected sealed override Task<Solution?> GetChangedSolutionAsync(
@@ -78,9 +79,10 @@ internal abstract class AbstractFixAllCodeAction<
         var service = FixAllState.Project.Solution.Services.GetRequiredService<IFixAllGetFixesService>();
 
         var fixAllContext = CreateFixAllContext(FixAllState, progressTracker, cancellationToken);
-        progressTracker.Report(CodeAnalysisProgress.Description(default(TFixAllContextWitness).GetDefaultFixAllTitle(fixAllContext)));
+        var witness = default(TFixAllContextWitness);
+        progressTracker.Report(CodeAnalysisProgress.Description(witness.GetDefaultFixAllTitle(fixAllContext)));
 
-        return service.GetFixAllChangedSolutionAsync(fixAllContext);
+        return service.GetFixAllChangedSolutionAsync(fixAllContext, witness);
     }
 
     // internal for testing purposes.
