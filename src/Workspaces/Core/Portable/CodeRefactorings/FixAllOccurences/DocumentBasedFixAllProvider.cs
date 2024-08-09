@@ -63,11 +63,12 @@ internal abstract class DocumentBasedFixAllProvider(ImmutableArray<FixAllScope> 
 
     public sealed override Task<CodeAction?> GetFixAsync(FixAllContext fixAllContext)
         => DefaultFixAllProviderHelpers.GetFixAsync(
-            fixAllContext.GetDefaultFixAllTitle(), fixAllContext, FixAllContextsHelperAsync);
+            fixAllContext.GetDefaultFixAllTitle(), fixAllContext, default(FixAllContext.Witness), FixAllContextsHelperAsync);
 
     private Task<Solution?> FixAllContextsHelperAsync(FixAllContext originalFixAllContext, ImmutableArray<FixAllContext> fixAllContexts)
         => DocumentBasedFixAllProviderHelpers.FixAllContextsAsync(
             originalFixAllContext,
+            default(FixAllContext.Witness),
             fixAllContexts,
             originalFixAllContext.Progress,
             this.GetFixAllTitle(originalFixAllContext),
