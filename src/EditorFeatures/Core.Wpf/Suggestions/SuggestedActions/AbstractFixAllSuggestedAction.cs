@@ -17,11 +17,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
     /// <summary>
     /// Suggested action for fix all occurrences for a code fix or a code refactoring.
     /// </summary>
-    internal abstract class AbstractFixAllSuggestedAction : SuggestedAction
+    internal abstract class AbstractFixAllSuggestedAction<TFixAllContext, TFixAllContextWitness>
+        : SuggestedAction
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
     {
         public CodeAction OriginalCodeAction { get; }
 
-        public IFixAllState FixAllState { get; }
+        public IFixAllState<TFixAllContext> FixAllState { get; }
 
         protected AbstractFixAllSuggestedAction(
             IThreadingContext threadingContext,
@@ -29,9 +31,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             Solution originalSolution,
             ITextBuffer subjectBuffer,
-            IFixAllState fixAllState,
+            IFixAllState<TFixAllContext> fixAllState,
             CodeAction originalCodeAction,
-            AbstractFixAllCodeAction fixAllCodeAction)
+            AbstractFixAllCodeAction<TFixAllContext, TFixAllContextWitness> fixAllCodeAction)
             : base(threadingContext,
                    sourceProvider,
                    workspace,

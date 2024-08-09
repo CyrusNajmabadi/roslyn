@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -16,7 +17,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
     /// Suggested action for fix all occurrences code fix.  Note: this is only used
     /// as a 'flavor' inside CodeFixSuggestionAction.
     /// </summary>
-    internal sealed partial class FixAllCodeFixSuggestedAction : AbstractFixAllSuggestedAction, ITelemetryDiagnosticID<string>, IFixAllCodeFixSuggestedAction
+    internal sealed partial class FixAllCodeFixSuggestedAction
+        : AbstractFixAllSuggestedAction<FixAllContext, FixAllContextWitness>,
+        ITelemetryDiagnosticID<string>, IFixAllCodeFixSuggestedAction
     {
         public Diagnostic Diagnostic { get; }
 
@@ -26,7 +29,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             Solution originalSolution,
             ITextBuffer subjectBuffer,
-            IFixAllState fixAllState,
+            IFixAllState<FixAllContext> fixAllState,
             Diagnostic diagnostic,
             CodeAction originalCodeAction)
             : base(threadingContext,

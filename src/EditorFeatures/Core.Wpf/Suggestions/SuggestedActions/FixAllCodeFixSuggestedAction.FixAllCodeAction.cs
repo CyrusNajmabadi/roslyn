@@ -11,7 +11,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
     {
         private sealed partial class FixAllCodeAction : AbstractFixAllCodeFixCodeAction
         {
-            public FixAllCodeAction(IFixAllState fixAllState)
+            public FixAllCodeAction(IFixAllState<FixAllContext> fixAllState)
                 : base(fixAllState, showPreviewChangesDialog: true)
             {
             }
