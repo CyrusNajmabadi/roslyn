@@ -57,6 +57,7 @@ using IOleServiceProvider = Microsoft.VisualStudio.OLE.Interop.IServiceProvider;
 using IPersistFile = Microsoft.VisualStudio.OLE.Interop.IPersistFile;
 using SComponentModel = Microsoft.VisualStudio.ComponentModelHost.SComponentModel;
 using TextSpan = Microsoft.CodeAnalysis.Text.TextSpan;
+using Microsoft.CodeAnalysis.CodeRefactorings;
 
 namespace Microsoft.VisualStudio.Extensibility.Testing;
 
@@ -815,14 +816,16 @@ internal partial class EditorInProcess : ITextViewWindowInProcess
 
                 action = fixAllAction;
 
-                if (willBlockUntilComplete
-                    && action is AbstractFixAllSuggestedAction fixAllSuggestedAction
-                    && fixAllSuggestedAction.CodeAction is AbstractFixAllCodeAction fixAllCodeAction)
+                if (willBlockUntilComplete)
                 {
-                    // Ensure the preview changes dialog will not be shown. Since the operation 'willBlockUntilComplete',
-                    // the caller would not be able to interact with the preview changes dialog, and the tests would
-                    // either timeout or deadlock.
-                    fixAllCodeAction.GetTestAccessor().ShowPreviewChangesDialog = false;
+                    if (action is AbstractFixAllSuggestedAction<Microsoft.CodeAnalysis.CodeFixes.FixAllContext, FixAllContextWitness> fixAllSuggestedAction &&
+                        fixAllSuggestedAction.CodeAction is AbstractFixAllCodeAction<Microsoft.CodeAnalysis.CodeFixes.FixAllContext, FixAllContextWitness> fixAllCodeAction)
+                    {
+                        // Ensure the preview changes dialog will not be shown. Since the operation 'willBlockUntilComplete',
+                        // the caller would not be able to interact with the preview changes dialog, and the tests would
+                        // either timeout or deadlock.
+                        fixAllCodeAction.GetTestAccessor().ShowPreviewChangesDialog = false;
+                    }
                 }
 
                 if (string.IsNullOrEmpty(actionName))
@@ -907,7 +910,7 @@ internal partial class EditorInProcess : ITextViewWindowInProcess
         return actions;
     }
 
-    private async Task<AbstractFixAllSuggestedAction?> GetFixAllSuggestedActionAsync(IEnumerable<SuggestedActionSet> actionSets, FixAllScope fixAllScope, CancellationToken cancellationToken)
+    private async Task<SuggestedAction?> GetFixAllSuggestedActionAsync(IEnumerable<SuggestedActionSet> actionSets, FixAllScope fixAllScope, CancellationToken cancellationToken)
     {
         await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
@@ -915,13 +918,17 @@ internal partial class EditorInProcess : ITextViewWindowInProcess
         {
             foreach (var action in actionSet.Actions)
             {
-                if (action is AbstractFixAllSuggestedAction fixAllSuggestedAction)
+                if (action is FixAllCodeFixSuggestedAction fixAllSuggestedAction)
                 {
-                    var fixAllCodeAction = fixAllSuggestedAction.CodeAction as AbstractFixAllCodeAction;
+                    var fixAllCodeAction = fixAllSuggestedAction.CodeAction as AbstractFixAllCodeAction<Microsoft.CodeAnalysis.CodeFixes.FixAllContext, FixAllContextWitness>;
                     if (fixAllCodeAction?.FixAllState?.Scope == fixAllScope)
-                    {
                         return fixAllSuggestedAction;
-                    }
+                }
+                else if (action is FixAllCodeRefactoringSuggestedAction fixAllCodeRefactoringSuggestedAction)
+                {
+                    var fixAllCodeAction = fixAllCodeRefactoringSuggestedAction.CodeAction as AbstractFixAllCodeAction<Microsoft.CodeAnalysis.CodeRefactorings.FixAllContext, Microsoft.CodeAnalysis.CodeRefactorings.FixAllContext.Witness>;
+                    if (fixAllCodeAction?.FixAllState?.Scope == fixAllScope)
+                        return fixAllCodeRefactoringSuggestedAction;
                 }
 
                 if (action.HasActionSets)
