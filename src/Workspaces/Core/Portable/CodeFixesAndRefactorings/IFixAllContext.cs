@@ -36,6 +36,7 @@ using System;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CodeFixesAndRefactorings;
 
 internal interface IFixAllContextWitness<TFixAllContext>
 {
@@ -45,6 +46,7 @@ internal interface IFixAllContextWitness<TFixAllContext>
     Project GetProject(TFixAllContext fixAllContext);
     FixAllScope GetScope(TFixAllContext fixAllContext);
     Solution GetSolution(TFixAllContext fixAllContext);
+    IFixAllState<TFixAllContext> GetState(TFixAllContext fixAllContext);
 
     TFixAllContext With(
         TFixAllContext fixAllContext,

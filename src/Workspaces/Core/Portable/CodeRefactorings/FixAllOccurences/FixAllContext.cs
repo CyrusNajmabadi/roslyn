@@ -104,6 +104,7 @@ internal sealed class FixAllContext
         public Solution GetSolution(FixAllContext fixAllContext) => fixAllContext.Solution;
         public string GetDefaultFixAllTitle(FixAllContext fixAllContext) => fixAllContext.GetDefaultFixAllTitle();
         public IProgress<CodeAnalysisProgress> GetProgress(FixAllContext fixAllContext) => fixAllContext.Progress;
+        public IFixAllState<FixAllContext> GetState(FixAllContext fixAllContext) => fixAllContext.State;
 
         public FixAllContext With(
             FixAllContext fixAllContext,
