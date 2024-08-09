@@ -463,7 +463,7 @@ public abstract partial class CodeAction
         // points.
         originalSolution ??= changedSolution.Workspace.CurrentSolution;
 
-        return await CleanSyntaxAndSemanticsAsync(originalSolution, changedSolution, CodeAnalysisProgress.None, cancellationToken).ConfigureAwait(false);
+        return await CodeActionHelpers.CleanSyntaxAndSemanticsAsync(originalSolution, changedSolution, CodeAnalysisProgress.None, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
