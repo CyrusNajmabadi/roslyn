@@ -23,36 +23,44 @@ internal abstract class AbstractFixAllGetFixesService : IFixAllGetFixesService
         string fixAllTopLevelHeader,
         Glyph glyph);
 
-    public async Task<Solution?> GetFixAllChangedSolutionAsync(IFixAllContext fixAllContext)
+    public async Task<Solution?> GetFixAllChangedSolutionAsync<TFixAllContext, TFixAllContextWitness>(
+        TFixAllContext fixAllContext,
+        TFixAllContextWitness witness)
+        where TFixAllContextWitness : struct, IFixAllContextWitness<TFixAllContext>
     {
-        var codeAction = await GetFixAllCodeActionAsync(fixAllContext).ConfigureAwait(false);
+        var codeAction = await GetFixAllCodeActionAsync(fixAllContext, witness).ConfigureAwait(false);
         if (codeAction == null)
         {
-            return fixAllContext.Solution;
+            return witness.GetSolution(fixAllContext);;
         }
 
-        fixAllContext.CancellationToken.ThrowIfCancellationRequested();
-        return await codeAction.GetChangedSolutionInternalAsync(fixAllContext.Solution, fixAllContext.Progress, cancellationToken: fixAllContext.CancellationToken).ConfigureAwait(false);
+        var cancellationToken = witness.GetCancellationToken(fixAllContext);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await codeAction.GetChangedSolutionInternalAsync(
+            witness.GetSolution(fixAllContext), witness.GetProgress(fixAllContext), cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<ImmutableArray<CodeActionOperation>> GetFixAllOperationsAsync(
-        IFixAllContext fixAllContext, bool showPreviewChangesDialog)
+    public async Task<ImmutableArray<CodeActionOperation>> GetFixAllOperationsAsync<TFixAllContext, TFixAllContextWitness>(
+        TFixAllContext fixAllContext, TFixAllContextWitness witness, bool showPreviewChangesDialog)
+        where TFixAllContextWitness : IFixAllContextWitness<TFixAllContext>
     {
-        var codeAction = await GetFixAllCodeActionAsync(fixAllContext).ConfigureAwait(false);
+        var cancellationToken = witness.GetCancellationToken(fixAllContext);
+
+        var codeAction = await GetFixAllCodeActionAsync(fixAllContext, witness).ConfigureAwait(false);
         if (codeAction == null)
         {
             return [];
         }
 
         return await GetFixAllOperationsAsync(
-            codeAction, showPreviewChangesDialog, fixAllContext.Progress, fixAllContext.State, fixAllContext.CancellationToken).ConfigureAwait(false);
+            codeAction, showPreviewChangesDialog, witness.GetProgress(fixAllContext), fixAllContext.State, cancellationToken).ConfigureAwait(false);
     }
 
-    protected async Task<ImmutableArray<CodeActionOperation>> GetFixAllOperationsAsync(
+    protected async Task<ImmutableArray<CodeActionOperation>> GetFixAllOperationsAsync<TFixAllContext>(
         CodeAction codeAction,
         bool showPreviewChangesDialog,
         IProgress<CodeAnalysisProgress> progressTracker,
-        IFixAllState fixAllState,
+        IFixAllState<TFixAllContext> fixAllState,
         CancellationToken cancellationToken)
     {
         // We have computed the fix all occurrences code fix.
@@ -154,7 +162,10 @@ internal abstract class AbstractFixAllGetFixesService : IFixAllGetFixesService
         }
     }
 
-    private static async Task<CodeAction?> GetFixAllCodeActionAsync(IFixAllContext fixAllContext)
+    private static async Task<CodeAction?> GetFixAllCodeActionAsync<TFixAllContext, TFixAllContextWitness>(
+        TFixAllContext fixAllContext,
+        TFixAllContextWitness witness)
+        where TFixAllContextWitness : IFixAllContextWitness<TFixAllContext>
     {
         var fixAllKind = fixAllContext.State.FixAllKind;
         var functionId = fixAllKind switch

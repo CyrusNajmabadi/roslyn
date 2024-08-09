@@ -22,6 +22,7 @@ internal struct FixAllContextWitness : IFixAllContextWitness<FixAllContext>
     public FixAllScope GetScope(FixAllContext fixAllContext) => fixAllContext.Scope;
     public Solution GetSolution(FixAllContext fixAllContext) => fixAllContext.Solution;
     public string GetDefaultFixAllTitle(FixAllContext fixAllContext) => fixAllContext.GetDefaultFixAllTitle();
+    public IProgress<CodeAnalysisProgress> GetProgress(FixAllContext fixAllContext) => fixAllContext.Progress;
 
     public FixAllContext With(
         FixAllContext fixAllContext,

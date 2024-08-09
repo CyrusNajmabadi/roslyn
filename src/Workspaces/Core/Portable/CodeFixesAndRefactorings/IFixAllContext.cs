@@ -32,6 +32,7 @@
 //        Optional<CancellationToken> cancellationToken = default);
 //}
 
+using System;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -40,6 +41,7 @@ internal interface IFixAllContextWitness<TFixAllContext>
 {
     CancellationToken GetCancellationToken(TFixAllContext fixAllContext);
     string GetDefaultFixAllTitle(TFixAllContext fixAllContext);
+    IProgress<CodeAnalysisProgress> GetProgress(TFixAllContext fixAllContext);
     Project GetProject(TFixAllContext fixAllContext);
     FixAllScope GetScope(TFixAllContext fixAllContext);
     Solution GetSolution(TFixAllContext fixAllContext);
