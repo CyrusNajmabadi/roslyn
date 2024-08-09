@@ -18,7 +18,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes;
 /// <summary>
 /// Context for "Fix all occurrences" code fixes provided by a <see cref="FixAllProvider"/>.
 /// </summary>
-public partial class FixAllContext : IFixAllContext
+public partial class FixAllContext
 {
     internal FixAllState State { get; }
 
@@ -71,23 +71,23 @@ public partial class FixAllContext : IFixAllContext
     /// </summary>
     public IProgress<CodeAnalysisProgress> Progress { get; }
 
-    #region IFixAllContext implementation
-    IFixAllState IFixAllContext.State => this.State;
+    //#region IFixAllContext implementation
+    //IFixAllState IFixAllContext.State => this.State;
 
-    IFixAllProvider IFixAllContext.FixAllProvider => this.FixAllProvider;
+    //IFixAllProvider IFixAllContext.FixAllProvider => this.FixAllProvider;
 
-    object IFixAllContext.Provider => this.CodeFixProvider;
+    //object IFixAllContext.Provider => this.CodeFixProvider;
 
-    string IFixAllContext.GetDefaultFixAllTitle()
-        => this.GetDefaultFixAllTitle();
+    //string IFixAllContext.GetDefaultFixAllTitle()
+    //    => this.GetDefaultFixAllTitle();
 
-    IFixAllContext IFixAllContext.With(
-        Optional<(Document? document, Project project)> documentAndProject,
-        Optional<FixAllScope> scope,
-        Optional<string?> codeActionEquivalenceKey,
-        Optional<CancellationToken> cancellationToken)
-        => this.With(documentAndProject, scope, codeActionEquivalenceKey, cancellationToken);
-    #endregion
+    //IFixAllContext IFixAllContext.With(
+    //    Optional<(Document? document, Project project)> documentAndProject,
+    //    Optional<FixAllScope> scope,
+    //    Optional<string?> codeActionEquivalenceKey,
+    //    Optional<CancellationToken> cancellationToken)
+    //    => this.With(documentAndProject, scope, codeActionEquivalenceKey, cancellationToken);
+    //#endregion
 
     /// <summary>
     /// Creates a new <see cref="FixAllContext"/>.
