@@ -26,12 +26,12 @@ internal class CodeRefactoring
     /// </remarks>
     public ImmutableArray<(CodeAction action, TextSpan? applicableToSpan)> CodeActions { get; }
 
-    public FixAllProviderInfo? FixAllProviderInfo { get; }
+    public FixAllProviderInfo<FixAllContext>? FixAllProviderInfo { get; }
 
     public CodeRefactoring(
         CodeRefactoringProvider provider,
         ImmutableArray<(CodeAction, TextSpan?)> actions,
-        FixAllProviderInfo? fixAllProviderInfo)
+        FixAllProviderInfo<FixAllContext>? fixAllProviderInfo)
     {
         Provider = provider;
         CodeActions = actions.NullToEmpty();

@@ -79,7 +79,7 @@ internal abstract class FixAllProviderInfo<TFixAllContext>
     /// <summary>
     /// Gets an optional <see cref="FixAllProviderInfo"/> for the given code refactoring provider.
     /// </summary>
-    private static FixAllProviderInfo<CodeRefactorings.FixAllContext>? CreateWithCodeRefactoring(CodeRefactoringProvider provider)
+    public static FixAllProviderInfo<CodeRefactorings.FixAllContext>? CreateWithCodeRefactoring(CodeRefactoringProvider provider)
     {
         var fixAllProvider = provider.GetFixAllProvider();
         if (fixAllProvider == null)
