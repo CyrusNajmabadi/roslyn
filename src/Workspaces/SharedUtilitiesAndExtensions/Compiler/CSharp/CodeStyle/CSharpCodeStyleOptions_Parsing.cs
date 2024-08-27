@@ -74,8 +74,8 @@ internal static partial class CSharpCodeStyleOptions
         };
     }
 
-    public static CodeStyleOption2<NamespaceDeclarationPreference> ParseNamespaceDeclaration(
-        string optionString, CodeStyleOption2<NamespaceDeclarationPreference> @default)
+    public static CodeStyleOption2<NamespaceDeclarationPreference?> ParseNamespaceDeclaration(
+        string optionString, CodeStyleOption2<NamespaceDeclarationPreference?> @default)
     {
         if (CodeStyleHelpers.TryGetCodeStyleValueAndOptionalNotification(
                 optionString, @default.Notification, out var value, out var notification))
@@ -91,12 +91,12 @@ internal static partial class CSharpCodeStyleOptions
         return @default;
     }
 
-    public static string GetNamespaceDeclarationEditorConfigString(CodeStyleOption2<NamespaceDeclarationPreference> value, CodeStyleOption2<NamespaceDeclarationPreference> defaultValue)
+    public static string GetNamespaceDeclarationEditorConfigString(CodeStyleOption2<NamespaceDeclarationPreference?> value, CodeStyleOption2<NamespaceDeclarationPreference?> defaultValue)
     {
         var notificationString = CodeStyleHelpers.GetEditorConfigStringNotificationPart(value, defaultValue);
         return value.Value switch
         {
-            NamespaceDeclarationPreference.BlockScoped => $"block_scoped{notificationString}",
+            null or NamespaceDeclarationPreference.BlockScoped => $"block_scoped{notificationString}",
             NamespaceDeclarationPreference.FileScoped => $"file_scoped{notificationString}",
             _ => throw new NotSupportedException(),
         };

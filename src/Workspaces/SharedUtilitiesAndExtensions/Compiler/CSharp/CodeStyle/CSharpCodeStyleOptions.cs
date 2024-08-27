@@ -265,7 +265,7 @@ internal static partial class CSharpCodeStyleOptions
         "csharp_style_allow_blank_line_after_token_in_arrow_expression_clause_experimental",
         defaultValue: CodeStyleOption2.TrueWithSilentEnforcement);
 
-    public static Option2<CodeStyleOption2<NamespaceDeclarationPreference>> NamespaceDeclarations { get; } = CreateOption(
+    public static Option2<CodeStyleOption2<NamespaceDeclarationPreference?>> NamespaceDeclarations { get; } = CreateOption(
         CSharpCodeStyleOptionGroups.CodeBlockPreferences,
         "csharp_style_namespace_declarations",
         CSharpSyntaxFormattingOptions.Default.NamespaceDeclarations,

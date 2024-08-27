@@ -33,7 +33,7 @@ internal readonly struct CSharpAnalyzerOptionsProvider(IOptionsReader options)
 
     // SyntaxFormattingOptions
 
-    public CodeStyleOption2<NamespaceDeclarationPreference> NamespaceDeclarations => GetOption(CSharpCodeStyleOptions.NamespaceDeclarations);
+    public CodeStyleOption2<NamespaceDeclarationPreference?> NamespaceDeclarations => GetOption(CSharpCodeStyleOptions.NamespaceDeclarations);
     public CodeStyleOption2<bool> PreferTopLevelStatements => GetOption(CSharpCodeStyleOptions.PreferTopLevelStatements);
 
     // AddImportPlacementOptions

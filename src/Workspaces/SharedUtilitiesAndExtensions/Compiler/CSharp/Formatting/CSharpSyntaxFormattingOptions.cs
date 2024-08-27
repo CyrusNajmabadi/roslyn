@@ -14,8 +14,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting;
 [DataContract]
 internal sealed record class CSharpSyntaxFormattingOptions : SyntaxFormattingOptions, IEquatable<CSharpSyntaxFormattingOptions>
 {
-    private static readonly CodeStyleOption2<NamespaceDeclarationPreference> s_defaultNamespaceDeclarations =
-        new(NamespaceDeclarationPreference.BlockScoped, NotificationOption2.Silent);
+    private static readonly CodeStyleOption2<NamespaceDeclarationPreference?> s_defaultNamespaceDeclarations = new(value: null, NotificationOption2.Silent);
 
     private static readonly CodeStyleOption2<bool> s_trueWithSilentEnforcement =
         new(value: true, notification: NotificationOption2.Silent);
@@ -59,7 +58,7 @@ internal sealed record class CSharpSyntaxFormattingOptions : SyntaxFormattingOpt
     [DataMember] public IndentationPlacement Indentation { get; init; } = IndentationDefault;
     [DataMember] public bool WrappingKeepStatementsOnSingleLine { get; init; } = true;
     [DataMember] public bool WrappingPreserveSingleLine { get; init; } = true;
-    [DataMember] public CodeStyleOption2<NamespaceDeclarationPreference> NamespaceDeclarations { get; init; } = s_defaultNamespaceDeclarations;
+    [DataMember] public CodeStyleOption2<NamespaceDeclarationPreference?> NamespaceDeclarations { get; init; } = s_defaultNamespaceDeclarations;
     [DataMember] public CodeStyleOption2<bool> PreferTopLevelStatements { get; init; } = s_trueWithSilentEnforcement;
     [DataMember] public int CollectionExpressionWrappingLength { get; init; } = 120;
 
