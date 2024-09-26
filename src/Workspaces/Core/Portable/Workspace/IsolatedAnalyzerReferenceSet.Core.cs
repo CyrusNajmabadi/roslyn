@@ -15,6 +15,7 @@ using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 using Microsoft.CodeAnalysis.Serialization;
 using System.Runtime.Loader;
+using Microsoft.CodeAnalysis.Internal.Log;
 
 namespace Microsoft.CodeAnalysis;
 
@@ -77,6 +78,7 @@ internal sealed partial class IsolatedAnalyzerReferenceSet
         }
 
         this.AnalyzerReferences = builder.MoveToImmutable();
+        Logger.Log(FunctionId.IsolatedAnalyzerReferenceSet_Create);
     }
 
     /// <summary>
@@ -85,6 +87,7 @@ internal sealed partial class IsolatedAnalyzerReferenceSet
     ~IsolatedAnalyzerReferenceSet()
     {
         _shadowCopyLoader.Dispose();
+        Logger.Log(FunctionId.IsolatedAnalyzerReferenceSet_Destroy);
     }
 
     private static void GarbageCollectReleaseReferences_NoLock()
