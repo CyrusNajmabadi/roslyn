@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Roslyn.Utilities;
@@ -82,8 +83,8 @@ internal partial class SerializerService
         return new ProjectReference(projectId, aliases.ToImmutableArrayOrEmpty(), embedInteropTypes);
     }
 
-    private void SerializeMetadataReference(MetadataReference reference, ObjectWriter writer)
-        => WriteMetadataReferenceTo(reference, writer);
+    private ValueTask SerializeMetadataReferenceAsync(MetadataReference reference, ObjectWriter writer, CancellationToken cancellationToken)
+        => WriteMetadataReferenceToAsync(reference, writer, cancellationToken);
 
     private MetadataReference DeserializeMetadataReference(ObjectReader reader)
         => ReadMetadataReferenceFrom(reader);

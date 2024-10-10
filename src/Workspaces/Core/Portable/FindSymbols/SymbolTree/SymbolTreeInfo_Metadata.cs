@@ -29,11 +29,11 @@ internal sealed partial class SymbolTreeInfo
 {
     /// <summary>
     /// Cache the symbol tree infos for assembly symbols produced from a particular <see
-    /// cref="PortableExecutableReference"/>. Generating symbol trees for metadata can be expensive (in large
-    /// metadata cases).  And it's common for us to have many threads to want to search the same metadata
-    /// simultaneously. As such, we use an AsyncLazy to compute the value that can be shared among all callers.
+    /// cref="PortableExecutableReference"/>. Generating symbol trees for metadata can be expensive (in large metadata
+    /// cases).  And it's common for us to have many threads to want to search the same metadata simultaneously. As
+    /// such, we use an AsyncLazy to compute the value that can be shared among all callers.
     /// <para>
-    /// We store this keyed off of the <see cref="Checksum"/> produced by <see cref="GetMetadataChecksum"/>.  This
+    /// We store this keyed off of the <see cref="Checksum"/> produced by <see cref="GetMetadataChecksumAsync"/>.  This
     /// ensures that 
     /// </para>
     /// </summary>
@@ -96,7 +96,7 @@ internal sealed partial class SymbolTreeInfo
     /// Note:  will never return null;
     /// </summary>
     /// <param name="checksum">Optional checksum for the <paramref name="reference"/> (produced by <see
-    /// cref="GetMetadataChecksum"/>).  Can be provided if already computed.  If not provided it will be computed
+    /// cref="GetMetadataChecksumAsync"/>).  Can be provided if already computed.  If not provided it will be computed
     /// and used for the <see cref="SymbolTreeInfo"/>.</param>
     [PerformanceSensitive("https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1224834", OftenCompletesSynchronously = true)]
     public static ValueTask<SymbolTreeInfo> GetInfoForMetadataReferenceAsync(
@@ -118,7 +118,7 @@ internal sealed partial class SymbolTreeInfo
     /// Note:  will never return null;
     /// </summary>
     /// <param name="checksum">Optional checksum for the <paramref name="reference"/> (produced by <see
-    /// cref="GetMetadataChecksum"/>).  Can be provided if already computed.  If not provided it will be computed
+    /// cref="GetMetadataChecksumAsync"/>).  Can be provided if already computed.  If not provided it will be computed
     /// and used for the <see cref="SymbolTreeInfo"/>.</param>
     [PerformanceSensitive("https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1224834", OftenCompletesSynchronously = true)]
     public static async ValueTask<SymbolTreeInfo> GetInfoForMetadataReferenceAsync(
@@ -128,7 +128,7 @@ internal sealed partial class SymbolTreeInfo
         Checksum? checksum,
         CancellationToken cancellationToken)
     {
-        checksum ??= GetMetadataChecksum(solutionServices, reference, cancellationToken);
+        checksum ??= await GetMetadataChecksumAsync(solutionServices, reference, cancellationToken).ConfigureAwait(false);
 
         if (s_peReferenceToInfo.TryGetValue(reference, out var infoTask))
         {
@@ -233,18 +233,18 @@ internal sealed partial class SymbolTreeInfo
     /// checksum of the <paramref name="reference"/>.  Should only be used by clients that are ok with potentially
     /// stale data.
     /// </summary>
-    public static Task<SymbolTreeInfo?> LoadAnyInfoForMetadataReferenceAsync(
+    public static async Task<SymbolTreeInfo?> LoadAnyInfoForMetadataReferenceAsync(
         Solution solution,
         PortableExecutableReference reference,
         CancellationToken cancellationToken)
     {
-        return LoadAsync(
+        return await LoadAsync(
             solution.Services,
             SolutionKey.ToSolutionKey(solution),
-            checksum: GetMetadataChecksum(solution.Services, reference, cancellationToken),
+            checksum: await GetMetadataChecksumAsync(solution.Services, reference, cancellationToken).ConfigureAwait(false),
             checksumMustMatch: false,
             keySuffix: GetMetadataKeySuffix(reference),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
     }
 
     private struct MetadataInfoCreator(

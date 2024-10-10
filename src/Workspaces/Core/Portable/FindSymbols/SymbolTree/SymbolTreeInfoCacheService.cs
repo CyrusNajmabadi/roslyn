@@ -191,7 +191,8 @@ internal sealed partial class SymbolTreeInfoCacheServiceFactory
             PortableExecutableReference reference,
             CancellationToken cancellationToken)
         {
-            var checksum = SymbolTreeInfo.GetMetadataChecksum(project.Solution.Services, reference, cancellationToken);
+            var checksum = await SymbolTreeInfo.GetMetadataChecksumAsync(
+                project.Solution.Services, reference, cancellationToken).ConfigureAwait(false);
             if (!_peReferenceToInfo.TryGetValue(reference, out var metadataInfo) ||
                 metadataInfo.SymbolTreeInfo.Checksum != checksum)
             {
