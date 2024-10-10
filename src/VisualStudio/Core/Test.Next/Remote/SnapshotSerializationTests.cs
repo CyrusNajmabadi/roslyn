@@ -281,17 +281,17 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         }
 
         [Fact]
-        public void MetadataReference_RoundTrip_Test()
+        public async Task MetadataReference_RoundTrip_Test()
         {
             using var workspace = CreateWorkspace();
 
             var reference = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
 
             var serializer = workspace.Services.GetService<ISerializerService>();
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
 
-            var assetFromStorage = CloneAsset(serializer, assetFromFile);
-            _ = CloneAsset(serializer, assetFromStorage);
+            var assetFromStorage = await CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromStorage);
         }
 
         [Fact]
@@ -376,7 +376,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         }
 
         [Fact]
-        public void Missing_Metadata_Serialization_Test()
+        public async Task Missing_Metadata_Serialization_Test()
         {
             using var workspace = CreateWorkspace();
             var serializer = workspace.Services.GetService<ISerializerService>();
@@ -384,13 +384,13 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             var reference = new MissingMetadataReference();
 
             // make sure this doesn't throw
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
-            var assetFromStorage = CloneAsset(serializer, assetFromFile);
-            _ = CloneAsset(serializer, assetFromStorage);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
+            var assetFromStorage = await CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromStorage);
         }
 
         [Fact]
-        public void Missing_Analyzer_Serialization_Test()
+        public async Task Missing_Analyzer_Serialization_Test()
         {
             using var workspace = CreateWorkspace();
             var serializer = workspace.Services.GetService<ISerializerService>();
@@ -398,13 +398,13 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             var reference = new AnalyzerFileReference(Path.Combine(TempRoot.Root, "missing_reference"), new MissingAnalyzerLoader());
 
             // make sure this doesn't throw
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
-            var assetFromStorage = CloneAsset(serializer, assetFromFile);
-            _ = CloneAsset(serializer, assetFromStorage);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
+            var assetFromStorage = await CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromStorage);
         }
 
         [Fact]
-        public void Missing_Analyzer_Serialization_Desktop_Test()
+        public async Task Missing_Analyzer_Serialization_Desktop_Test()
         {
             using var workspace = CreateWorkspace();
             var serializer = workspace.Services.GetService<ISerializerService>();
@@ -412,13 +412,13 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             var reference = new AnalyzerFileReference(Path.Combine(TempRoot.Root, "missing_reference"), new MissingAnalyzerLoader());
 
             // make sure this doesn't throw
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
-            var assetFromStorage = CloneAsset(serializer, assetFromFile);
-            _ = CloneAsset(serializer, assetFromStorage);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
+            var assetFromStorage = await CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromStorage);
         }
 
         [Fact]
-        public void RoundTrip_Analyzer_Serialization_Test()
+        public async Task RoundTrip_Analyzer_Serialization_Test()
         {
             using var tempRoot = new TempRoot();
             using var workspace = CreateWorkspace();
@@ -433,13 +433,13 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             var reference = new AnalyzerFileReference(location, new MockShadowCopyAnalyzerAssemblyLoader(ImmutableDictionary<string, string>.Empty.Add(location, file.Path)));
 
             // make sure this doesn't throw
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
-            var assetFromStorage = CloneAsset(serializer, assetFromFile);
-            _ = CloneAsset(serializer, assetFromStorage);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
+            var assetFromStorage = await CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromStorage);
         }
 
         [Fact]
-        public void RoundTrip_Analyzer_Serialization_Desktop_Test()
+        public async Task RoundTrip_Analyzer_Serialization_Desktop_Test()
         {
             using var tempRoot = new TempRoot();
 
@@ -454,13 +454,13 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             var reference = new AnalyzerFileReference(location, new MockShadowCopyAnalyzerAssemblyLoader(ImmutableDictionary<string, string>.Empty.Add(location, file.Path)));
 
             // make sure this doesn't throw
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
-            var assetFromStorage = CloneAsset(serializer, assetFromFile);
-            _ = CloneAsset(serializer, assetFromStorage);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
+            var assetFromStorage = await CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromStorage);
         }
 
         [Fact]
-        public void ShadowCopied_Analyzer_Serialization_Desktop_Test()
+        public async Task ShadowCopied_Analyzer_Serialization_Desktop_Test()
         {
             using var tempRoot = new TempRoot();
             using var workspace = CreateWorkspace();
@@ -469,10 +469,10 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             var serializer = workspace.Services.GetService<ISerializerService>();
 
             // make sure this doesn't throw
-            var assetFromFile = new SolutionAsset(serializer.CreateChecksum(reference, CancellationToken.None), reference);
+            var assetFromFile = new SolutionAsset(await serializer.CreateChecksumAsync(reference, CancellationToken.None), reference);
 
             // this will verify serialized analyzer reference return same checksum as the original one
-            _ = CloneAsset(serializer, assetFromFile);
+            _ = await CloneAsset(serializer, assetFromFile);
         }
 
         [Fact, WorkItem("https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1107294")]
@@ -540,8 +540,8 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
 
             var text = await document.GetTextAsync().ConfigureAwait(false);
             var source = new SerializableSourceText(text, text.GetContentHash()).ContentChecksum;
-            var metadata = serializer.CreateChecksum(new MissingMetadataReference(), CancellationToken.None);
-            var analyzer = serializer.CreateChecksum(new AnalyzerFileReference(Path.Combine(TempRoot.Root, "missing"), new MissingAnalyzerLoader()), CancellationToken.None);
+            var metadata = await serializer.CreateChecksumAsync(new MissingMetadataReference(), CancellationToken.None);
+            var analyzer = await serializer.CreateChecksumAsync(new AnalyzerFileReference(Path.Combine(TempRoot.Root, "missing"), new MissingAnalyzerLoader()), CancellationToken.None);
 
             Assert.NotEqual(source, metadata);
             Assert.NotEqual(source, analyzer);
@@ -603,7 +603,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         }
 
         [Fact]
-        public void TestEncodingSerialization()
+        public async Task TestEncodingSerialization()
         {
             using var workspace = CreateWorkspace();
 
@@ -616,7 +616,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             {
                 using (var objectWriter = new ObjectWriter(stream, leaveOpen: true))
                 {
-                    serializer.Serialize(serializableSourceText, objectWriter, CancellationToken.None);
+                    await serializer.SerializeAsync(serializableSourceText, objectWriter, CancellationToken.None);
                 }
 
                 stream.Position = 0;
@@ -634,7 +634,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             {
                 using (var objectWriter = new ObjectWriter(stream, leaveOpen: true))
                 {
-                    serializer.Serialize(serializableSourceText, objectWriter, CancellationToken.None);
+                    await serializer.SerializeAsync(serializableSourceText, objectWriter, CancellationToken.None);
                 }
 
                 stream.Position = 0;
@@ -647,7 +647,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         }
 
         [Fact]
-        public void TestCompilationOptions_NullableAndImport()
+        public async Task TestCompilationOptions_NullableAndImport()
         {
             var csharpOptions = CSharp.CSharpCompilation.Create("dummy").Options.WithNullableContextOptions(NullableContextOptions.Warnings).WithMetadataImportOptions(MetadataImportOptions.All);
             var vbOptions = VisualBasic.VisualBasicCompilation.Create("dummy").Options.WithMetadataImportOptions(MetadataImportOptions.Internal);
@@ -655,40 +655,40 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             using var workspace = CreateWorkspace();
             var serializer = workspace.Services.GetService<ISerializerService>();
 
-            VerifyOptions(csharpOptions);
-            VerifyOptions(vbOptions);
+            await VerifyOptions(csharpOptions);
+            await VerifyOptions(vbOptions);
 
-            void VerifyOptions(CompilationOptions originalOptions)
+            async Task VerifyOptions(CompilationOptions originalOptions)
             {
                 using var stream = SerializableBytes.CreateWritableStream();
                 using (var objectWriter = new ObjectWriter(stream, leaveOpen: true))
                 {
-                    serializer.Serialize(originalOptions, objectWriter, CancellationToken.None);
+                    await serializer.SerializeAsync(originalOptions, objectWriter, CancellationToken.None);
                 }
 
                 stream.Position = 0;
                 using var objectReader = ObjectReader.TryGetReader(stream);
                 var recoveredOptions = (CompilationOptions)serializer.Deserialize(originalOptions.GetWellKnownSynchronizationKind(), objectReader, CancellationToken.None);
 
-                var original = serializer.CreateChecksum(originalOptions, CancellationToken.None);
-                var recovered = serializer.CreateChecksum(recoveredOptions, CancellationToken.None);
+                var original = await serializer.CreateChecksumAsync(originalOptions, CancellationToken.None);
+                var recovered = await serializer.CreateChecksumAsync(recoveredOptions, CancellationToken.None);
 
                 Assert.Equal(original, recovered);
             }
         }
 
-        private static SolutionAsset CloneAsset(ISerializerService serializer, SolutionAsset asset)
+        private static async Task<SolutionAsset> CloneAsset(ISerializerService serializer, SolutionAsset asset)
         {
             using var stream = SerializableBytes.CreateWritableStream();
             using (var writer = new ObjectWriter(stream, leaveOpen: true))
             {
-                serializer.Serialize(asset.Value, writer, CancellationToken.None);
+                await serializer.SerializeAsync(asset.Value, writer, CancellationToken.None);
             }
 
             stream.Position = 0;
             using var reader = ObjectReader.TryGetReader(stream);
             var recovered = serializer.Deserialize(asset.Kind, reader, CancellationToken.None);
-            var checksum = recovered is SerializableSourceText text ? text.ContentChecksum : serializer.CreateChecksum(recovered, CancellationToken.None);
+            var checksum = recovered is SerializableSourceText text ? text.ContentChecksum : await serializer.CreateChecksumAsync(recovered, CancellationToken.None);
 
             var assetFromStorage = new SolutionAsset(checksum, recovered);
 

@@ -3,6 +3,7 @@
 ' See the LICENSE file in the project root for more information.
 
 Imports System.IO
+Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Host
 Imports Microsoft.CodeAnalysis.Serialization
@@ -14,7 +15,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ReferenceManager
     <UseExportProvider>
     Public Class VisualStudioMetadataReferenceManagerTests
         <Fact>
-        Public Sub TestReferenceAssemblyWithMultipleModules()
+        Public Async Function TestReferenceAssemblyWithMultipleModules() As Task
             Using workspace = EditorTestWorkspace.CreateCSharp("")
                 Dim assemblyDir = Path.GetDirectoryName(GetType(Object).Assembly.Location)
                 Dim enterprisePath = Path.Combine(assemblyDir, "System.EnterpriseServices.dll")
@@ -36,20 +37,20 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ReferenceManager
 
                 Dim stream = New MemoryStream()
                 Dim writer = New ObjectWriter(stream, leaveOpen:=True)
-                serializerService.Serialize(testReference, writer, cancellationToken:=Nothing)
+                Await serializerService.SerializeAsync(testReference, writer, cancellationToken:=Nothing)
 
                 stream.Position = 0
                 Dim reader = ObjectReader.GetReader(stream, leaveOpen:=True)
                 Dim deserialized = DirectCast(serializerService.Deserialize(
                     WellKnownSynchronizationKind.MetadataReference, reader, cancellationToken:=Nothing), MetadataReference)
 
-                Dim checksum1 = SerializerService.CreateChecksum(testReference, cancellationToken:=Nothing)
-                Dim checksum2 = SerializerService.CreateChecksum(deserialized, cancellationToken:=Nothing)
+                Dim checksum1 = Await serializerService.CreateChecksumAsync(testReference, cancellationToken:=Nothing)
+                Dim checksum2 = Await serializerService.CreateChecksumAsync(deserialized, cancellationToken:=Nothing)
 
                 ' Serializing the original reference and the deserialized reference should produce the same checksum
                 Assert.Equal(checksum1, checksum2)
             End Using
-        End Sub
+        End Function
 
         Private Class TestPEReference
             Inherits PortableExecutableReference
@@ -64,11 +65,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ReferenceManager
                 _storageHandles = storageHandles
             End Sub
 
-            Public ReadOnly Property StorageHandles As IReadOnlyList(Of ITemporaryStorageStreamHandle) Implements ISupportTemporaryStorage.StorageHandles
-                Get
-                    Return _storageHandles
-                End Get
-            End Property
+            Public Function GetStorageHandlesAsync(cancellationToken As CancellationToken) As ValueTask(Of IReadOnlyList(Of ITemporaryStorageStreamHandle)) Implements ISupportTemporaryStorage.GetStorageHandlesAsync
+                Return ValueTaskFactory.FromResult(_storageHandles)
+            End Function
+
+            Public Function PreloadAsync(cancellationToken As CancellationToken) As ValueTask Implements ISupportTemporaryStorage.PreloadAsync
+                Return ValueTaskFactory.CompletedTask
+            End Function
 
             Protected Overrides Function CreateDocumentationProvider() As DocumentationProvider
                 Throw New NotImplementedException()

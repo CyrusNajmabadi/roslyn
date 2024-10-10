@@ -16,6 +16,8 @@ using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
 using Xunit;
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+
 namespace Microsoft.CodeAnalysis.Remote.UnitTests
 {
     internal sealed class SerializationValidator
@@ -95,7 +97,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
             using var stream = SerializableBytes.CreateWritableStream();
             using (var writer = new ObjectWriter(stream, leaveOpen: true))
             {
-                Serializer.Serialize(data.Value, writer, CancellationToken.None);
+                await Serializer.SerializeAsync(data.Value, writer, CancellationToken.None);
             }
 
             stream.Position = 0;
@@ -124,7 +126,7 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         {
             await VerifyAssetSerializationAsync<SolutionInfo.SolutionAttributes>(
                 solutionObject.Attributes, WellKnownSynchronizationKind.SolutionAttributes,
-                (v, k, s) => new SolutionAsset(v.Checksum, v)).ConfigureAwait(false);
+                async (v, k, s) => new SolutionAsset(v.Checksum, v)).ConfigureAwait(false);
 
             foreach (var (projectChecksum, projectId) in solutionObject.Projects)
             {
@@ -138,35 +140,35 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         {
             var info = await VerifyAssetSerializationAsync<ProjectInfo.ProjectAttributes>(
                 projectObject.Info, WellKnownSynchronizationKind.ProjectAttributes,
-                (v, k, s) => new SolutionAsset(v.Checksum, v)).ConfigureAwait(false);
+                async (v, k, s) => new SolutionAsset(v.Checksum, v)).ConfigureAwait(false);
 
             await VerifyAssetSerializationAsync<CompilationOptions>(
                 projectObject.CompilationOptions, WellKnownSynchronizationKind.CompilationOptions,
-                (v, k, s) => new SolutionAsset(s.CreateChecksum(v, CancellationToken.None), v));
+                async (v, k, s) => new SolutionAsset(await s.CreateChecksumAsync(v, CancellationToken.None), v));
 
             await VerifyAssetSerializationAsync<ParseOptions>(
                 projectObject.ParseOptions, WellKnownSynchronizationKind.ParseOptions,
-                (v, k, s) => new SolutionAsset(s.CreateChecksum(v, CancellationToken.None), v));
+                async (v, k, s) => new SolutionAsset(await s.CreateChecksumAsync(v, CancellationToken.None), v));
 
             foreach (var checksum in projectObject.ProjectReferences)
             {
                 await VerifyAssetSerializationAsync<ProjectReference>(
                     checksum, WellKnownSynchronizationKind.ProjectReference,
-                    (v, k, s) => new SolutionAsset(s.CreateChecksum(v, CancellationToken.None), v));
+                    async (v, k, s) => new SolutionAsset(await s.CreateChecksumAsync(v, CancellationToken.None), v));
             }
 
             foreach (var checksum in projectObject.MetadataReferences)
             {
                 await VerifyAssetSerializationAsync<MetadataReference>(
                     checksum, WellKnownSynchronizationKind.MetadataReference,
-                    (v, k, s) => new SolutionAsset(s.CreateChecksum(v, CancellationToken.None), v));
+                    async (v, k, s) => new SolutionAsset(await s.CreateChecksumAsync(v, CancellationToken.None), v));
             }
 
             foreach (var checksum in projectObject.AnalyzerReferences)
             {
                 await VerifyAssetSerializationAsync<AnalyzerReference>(
                     checksum, WellKnownSynchronizationKind.AnalyzerReference,
-                    (v, k, s) => new SolutionAsset(s.CreateChecksum(v, CancellationToken.None), v));
+                    async (v, k, s) => new SolutionAsset(await s.CreateChecksumAsync(v, CancellationToken.None), v));
             }
 
             foreach (var (attributeChecksum, textChecksum, documentId) in projectObject.Documents)
@@ -183,23 +185,23 @@ namespace Microsoft.CodeAnalysis.Remote.UnitTests
         {
             var info = await VerifyAssetSerializationAsync<DocumentInfo.DocumentAttributes>(
                 attributeChecksum, WellKnownSynchronizationKind.DocumentAttributes,
-                (v, k, s) => new SolutionAsset(v.Checksum, v)).ConfigureAwait(false);
+                async (v, k, s) => new SolutionAsset(v.Checksum, v)).ConfigureAwait(false);
 
             await VerifyAssetSerializationAsync<SerializableSourceText>(
                 textChecksum, WellKnownSynchronizationKind.SerializableSourceText,
-                (v, k, s) => new SolutionAsset(v.ContentChecksum, v));
+                async (v, k, s) => new SolutionAsset(v.ContentChecksum, v));
         }
 
         internal async Task<T> VerifyAssetSerializationAsync<T>(
             Checksum checksum,
             WellKnownSynchronizationKind kind,
-            Func<T, WellKnownSynchronizationKind, ISerializerService, SolutionAsset> assetGetter)
+            Func<T, WellKnownSynchronizationKind, ISerializerService, Task<SolutionAsset>> assetGetter)
         {
             // re-create asset from object
             var syncObject = await GetRequiredAssetAsync(checksum).ConfigureAwait(false);
 
             var recoveredValue = await GetValueAsync<T>(checksum).ConfigureAwait(false);
-            var recreatedSyncObject = assetGetter(recoveredValue, kind, Serializer);
+            var recreatedSyncObject = await assetGetter(recoveredValue, kind, Serializer);
 
             // make sure original object and re-created object are same.
             SynchronizationObjectEqual(syncObject, recreatedSyncObject);

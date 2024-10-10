@@ -190,7 +190,7 @@ namespace Roslyn.VisualStudio.Next.UnitTests.Remote
             ISerializerService serializerService,
             IReadOnlyDictionary<Checksum, object> map) : IAssetSource
         {
-            public ValueTask GetAssetsAsync<T, TArg>(
+            public async ValueTask GetAssetsAsync<T, TArg>(
                 Checksum solutionChecksum,
                 AssetPath assetPath,
                 ReadOnlyMemory<Checksum> checksums,
@@ -206,7 +206,7 @@ namespace Roslyn.VisualStudio.Next.UnitTests.Remote
                         using var stream = new MemoryStream();
                         using (var writer = new ObjectWriter(stream, leaveOpen: true))
                         {
-                            serializerService.Serialize(asset, writer, cancellationToken);
+                            await serializerService.SerializeAsync(asset, writer, cancellationToken);
                         }
 
                         stream.Position = 0;
@@ -216,8 +216,6 @@ namespace Roslyn.VisualStudio.Next.UnitTests.Remote
                         callback(checksum, (T)deserialized, arg);
                     }
                 }
-
-                return ValueTaskFactory.CompletedTask;
             }
         }
     }

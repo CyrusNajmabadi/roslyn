@@ -31,8 +31,8 @@ public class SymbolTreeInfoTests
             solution, reference2, checksum: null, CancellationToken.None);
 
         Assert.NotEqual(info1.Checksum, info2.Checksum);
-        Assert.Equal(info1.Checksum, SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference1, CancellationToken.None));
-        Assert.Equal(info2.Checksum, SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference2, CancellationToken.None));
+        Assert.Equal(info1.Checksum, await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference1, CancellationToken.None));
+        Assert.Equal(info2.Checksum, await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference2, CancellationToken.None));
     }
 
     [Fact]
@@ -45,11 +45,11 @@ public class SymbolTreeInfoTests
         var reference1 = (PortableExecutableReference)project.MetadataReferences.First();
         var reference2 = reference1.WithAliases(["Alias"]);
 
-        var checksum1 = SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference1, CancellationToken.None);
+        var checksum1 = await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference1, CancellationToken.None);
         var info1 = await SymbolTreeInfo.GetInfoForMetadataReferenceAsync(
             solution, reference1, checksum1, CancellationToken.None);
 
-        var checksum2 = SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference2, CancellationToken.None);
+        var checksum2 = await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference2, CancellationToken.None);
         var info2 = await SymbolTreeInfo.GetInfoForMetadataReferenceAsync(
             solution, reference2, checksum2, CancellationToken.None);
 
@@ -68,7 +68,7 @@ public class SymbolTreeInfoTests
         var reference1 = (PortableExecutableReference)project.MetadataReferences.First();
         var reference2 = reference1.WithAliases(["Alias"]);
 
-        var checksum1 = SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference1, CancellationToken.None);
+        var checksum1 = await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference1, CancellationToken.None);
         var info1 = await SymbolTreeInfo.GetInfoForMetadataReferenceAsync(
             solution, reference1, checksum1, CancellationToken.None);
 
@@ -77,7 +77,7 @@ public class SymbolTreeInfoTests
 
         Assert.NotEqual(info1.Checksum, info2.Checksum);
         Assert.Equal(info1.Checksum, checksum1);
-        Assert.Equal(info2.Checksum, SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference2, CancellationToken.None));
+        Assert.Equal(info2.Checksum, await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference2, CancellationToken.None));
     }
 
     [Fact]
@@ -93,12 +93,12 @@ public class SymbolTreeInfoTests
         var info1 = await SymbolTreeInfo.GetInfoForMetadataReferenceAsync(
             solution, reference1, checksum: null, CancellationToken.None);
 
-        var checksum2 = SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference2, CancellationToken.None);
+        var checksum2 = await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference2, CancellationToken.None);
         var info2 = await SymbolTreeInfo.GetInfoForMetadataReferenceAsync(
             solution, reference2, checksum2, CancellationToken.None);
 
         Assert.NotEqual(info1.Checksum, info2.Checksum);
-        Assert.Equal(info1.Checksum, SymbolTreeInfo.GetMetadataChecksum(solution.Services, reference1, CancellationToken.None));
+        Assert.Equal(info1.Checksum, await SymbolTreeInfo.GetMetadataChecksumAsync(solution.Services, reference1, CancellationToken.None));
         Assert.Equal(info2.Checksum, checksum2);
     }
 }
