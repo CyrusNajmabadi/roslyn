@@ -114,10 +114,11 @@ internal abstract partial class AbstractTypeImportCompletionService : ITypeImpor
 
                 if (forceCacheCreation)
                 {
-                    if (TryGetUpToDateCacheForPEReference(originCompilation, solution, editorBrowsableInfo.Value, peReference, cancellationToken, out var upToDateCacheEntry))
-                    {
+                    var (success, upToDateCacheEntry) = await TryGetUpToDateCacheForPEReferenceAsync(
+                        originCompilation, solution, editorBrowsableInfo.Value, peReference, cancellationToken).ConfigureAwait(false);
+
+                    if (success)
                         resultBuilder.Add(upToDateCacheEntry);
-                    }
                 }
                 else if (CacheService.PEItemsCache.TryGetValue(peReferenceKey, out var cacheEntry))
                 {
@@ -159,7 +160,7 @@ internal abstract partial class AbstractTypeImportCompletionService : ITypeImpor
     /// <summary>
     /// Get appropriate completion items for all the visible top level types from given project. 
     /// This method is intended to be used for getting types from source only, so the project must support compilation. 
-    /// For getting types from PE, use <see cref="TryGetUpToDateCacheForPEReference"/>.
+    /// For getting types from PE, use <see cref="TryGetUpToDateCacheForPEReferenceAsync"/>.
     /// </summary>
     private async Task<TypeImportCompletionCacheEntry> GetUpToDateCacheForProjectAsync(Project project, CancellationToken cancellationToken)
     {
@@ -179,30 +180,25 @@ internal abstract partial class AbstractTypeImportCompletionService : ITypeImpor
     /// <summary>
     /// Get appropriate completion items for all the visible top level types from given PE reference.
     /// </summary>
-    private bool TryGetUpToDateCacheForPEReference(
+    private async ValueTask<(bool success, TypeImportCompletionCacheEntry cacheEntry)> TryGetUpToDateCacheForPEReferenceAsync(
         Compilation originCompilation,
         Solution solution,
         EditorBrowsableInfo editorBrowsableInfo,
         PortableExecutableReference peReference,
-        CancellationToken cancellationToken,
-        out TypeImportCompletionCacheEntry cacheEntry)
+        CancellationToken cancellationToken)
     {
         if (originCompilation.GetAssemblyOrModuleSymbol(peReference) is not IAssemblySymbol assemblySymbol)
-        {
-            cacheEntry = default;
-            return false;
-        }
-        else
-        {
-            cacheEntry = CreateCacheWorker(
-                GetPEReferenceCacheKey(peReference)!,
-                assemblySymbol,
-                checksum: SymbolTreeInfo.GetMetadataChecksum(solution.Services, peReference, cancellationToken),
-                CacheService.PEItemsCache,
-                editorBrowsableInfo,
-                cancellationToken);
-            return true;
-        }
+            return (success: false, cacheEntry: default);
+
+        var cacheEntry = CreateCacheWorker(
+            GetPEReferenceCacheKey(peReference)!,
+            assemblySymbol,
+            checksum: await SymbolTreeInfo.GetMetadataChecksumAsync(
+                solution.Services, peReference, cancellationToken).ConfigureAwait(false),
+            CacheService.PEItemsCache,
+            editorBrowsableInfo,
+            cancellationToken);
+        return (success: true, cacheEntry);
     }
 
     private TypeImportCompletionCacheEntry CreateCacheWorker<TKey>(

@@ -9,6 +9,7 @@ using System.IO;
 using System.IO.Hashing;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Serialization;
 using Roslyn.Utilities;
@@ -62,6 +63,19 @@ internal readonly partial record struct Checksum
         using (var objectWriter = new ObjectWriter(stream, leaveOpen: true))
         {
             writeObject(@object, objectWriter);
+        }
+
+        stream.Position = 0;
+        return Create(stream);
+    }
+
+    public static async ValueTask<Checksum> CreateAsync<T>(T @object, Func<T, ObjectWriter, ValueTask> writeObject)
+    {
+        using var stream = SerializableBytes.CreateWritableStream();
+
+        using (var objectWriter = new ObjectWriter(stream, leaveOpen: true))
+        {
+            await writeObject(@object, objectWriter).ConfigureAwait(false);
         }
 
         stream.Position = 0;
@@ -137,12 +151,12 @@ internal readonly partial record struct Checksum
         return From(destination);
     }
 
-    public static Checksum Create<T>(T value, ISerializerService serializer, CancellationToken cancellationToken)
-        => Create(
+    public static async ValueTask<Checksum> CreateAsync<T>(T value, ISerializerService serializer, CancellationToken cancellationToken)
+        => await CreateAsync(
             (value, serializer, cancellationToken),
-            static (tuple, writer) =>
+            async static (tuple, writer) =>
             {
                 var (value, serializer, cancellationToken) = tuple;
-                serializer.Serialize(value!, writer, cancellationToken);
-            });
+                await serializer.SerializeAsync(value!, writer, cancellationToken).ConfigureAwait(false);
+            }).ConfigureAwait(false);
 }

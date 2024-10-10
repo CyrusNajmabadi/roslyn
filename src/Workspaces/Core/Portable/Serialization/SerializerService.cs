@@ -48,7 +48,7 @@ internal partial class SerializerService(SolutionServices workspaceServices) : I
 
     private readonly ConcurrentDictionary<string, IOptionsSerializationService> _lazyLanguageSerializationService = new(concurrencyLevel: 2, capacity: workspaceServices.SupportedLanguages.Count());
 
-    public ValueTask<Checksum> CreateChecksumAsync(object value, CancellationToken cancellationToken)
+    public async ValueTask<Checksum> CreateChecksumAsync(object value, CancellationToken cancellationToken)
     {
         var kind = value.GetWellKnownSynchronizationKind();
 
@@ -63,13 +63,13 @@ internal partial class SerializerService(SolutionServices workspaceServices) : I
                 case WellKnownSynchronizationKind.ProjectReference:
                 case WellKnownSynchronizationKind.SourceGeneratedDocumentIdentity:
                 case WellKnownSynchronizationKind.FallbackAnalyzerOptions:
-                    return ValueTaskFactory.FromResult(Checksum.Create(value, this, cancellationToken));
+                    return await Checksum.CreateAsync(value, this, cancellationToken).ConfigureAwait(false);
 
                 case WellKnownSynchronizationKind.MetadataReference:
-                    return CreateChecksumAsync((MetadataReference)value, cancellationToken);
+                    return await CreateChecksumAsync((MetadataReference)value, cancellationToken).ConfigureAwait(false);
 
                 case WellKnownSynchronizationKind.AnalyzerReference:
-                    return ValueTaskFactory.FromResult(CreateChecksum((AnalyzerReference)value));
+                    return CreateChecksum((AnalyzerReference)value);
 
                 case WellKnownSynchronizationKind.SerializableSourceText:
                     throw new InvalidOperationException("Clients can already get a checksum directly from a SerializableSourceText");
