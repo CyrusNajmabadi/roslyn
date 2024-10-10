@@ -82,7 +82,7 @@ internal partial class SerializerService(SolutionServices workspaceServices) : I
         }
     }
 
-    public void Serialize(object value, ObjectWriter writer, CancellationToken cancellationToken)
+    public async ValueTask SerializeAsync(object value, ObjectWriter writer, CancellationToken cancellationToken)
     {
         var kind = value.GetWellKnownSynchronizationKind();
 
@@ -122,7 +122,7 @@ internal partial class SerializerService(SolutionServices workspaceServices) : I
                     return;
 
                 case WellKnownSynchronizationKind.MetadataReference:
-                    SerializeMetadataReference((MetadataReference)value, writer);
+                    await SerializeMetadataReferenceAsync((MetadataReference)value, writer, cancellationToken).ConfigureAwait(false);
                     return;
 
                 case WellKnownSynchronizationKind.AnalyzerReference:

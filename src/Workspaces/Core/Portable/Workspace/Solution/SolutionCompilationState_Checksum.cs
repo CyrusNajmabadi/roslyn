@@ -132,8 +132,12 @@ internal sealed partial class SolutionCompilationState
                 if (FrozenSourceGeneratedDocumentStates != null)
                 {
                     var serializer = this.SolutionState.Services.GetRequiredService<ISerializerService>();
-                    var identityChecksums = FrozenSourceGeneratedDocumentStates.SelectAsArray(
-                        static (s, arg) => arg.serializer.CreateChecksum(s.Identity, cancellationToken: arg.cancellationToken), (serializer, cancellationToken));
+                    var identityChecksums = await FrozenSourceGeneratedDocumentStates.SelectAsArrayAsync(
+                        async static (s, arg) =>
+                        {
+                            var (serializer, cancellationToken) = arg;
+                            return await serializer.CreateChecksumAsync(s.Identity, cancellationToken).ConfigureAwait(false);
+                        }, (serializer, cancellationToken)).ConfigureAwait(false);
 
                     frozenSourceGeneratedDocumentTexts = await FrozenSourceGeneratedDocumentStates.GetDocumentChecksumsAndIdsAsync(cancellationToken).ConfigureAwait(false);
                     frozenSourceGeneratedDocumentIdentities = new ChecksumCollection(identityChecksums);

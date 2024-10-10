@@ -11,7 +11,7 @@ namespace Microsoft.CodeAnalysis.Serialization;
 
 internal interface ISerializerService : IWorkspaceService
 {
-    void Serialize(object value, ObjectWriter writer, CancellationToken cancellationToken);
+    ValueTask SerializeAsync(object value, ObjectWriter writer, CancellationToken cancellationToken);
     object Deserialize(WellKnownSynchronizationKind kind, ObjectReader reader, CancellationToken cancellationToken);
 
     ValueTask<Checksum> CreateChecksumAsync(object value, CancellationToken cancellationToken);

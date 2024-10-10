@@ -53,9 +53,13 @@ internal sealed partial class ProjectState
                 var infoChecksum = this.ProjectInfo.Attributes.Checksum;
 
                 // these compiler objects doesn't have good place to cache checksum. but rarely ever get changed.
-                var compilationOptionsChecksum = SupportsCompilation
-                    ? ChecksumCache.GetOrCreate(CompilationOptions!, static (options, tuple) => tuple.serializer.CreateChecksum(options, tuple.cancellationToken), (serializer, cancellationToken))
-                    : Checksum.Null;
+                var compilationOptionsChecksum = !SupportsCompilation
+                    ? Checksum.Null
+                    : await ChecksumCache.GetOrCreateAsync(
+                        CompilationOptions!,
+                        async static (options, tuple) =>
+                            await tuple.serializer.CreateChecksumAsync(options, tuple.cancellationToken).ConfigureAwait(false),
+                        (serializer, cancellationToken)).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 var parseOptionsChecksum = GetParseOptionsChecksum(serializer);
 

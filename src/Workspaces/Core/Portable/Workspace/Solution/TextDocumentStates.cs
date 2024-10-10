@@ -137,6 +137,15 @@ internal sealed class TextDocumentStates<TState>
         return result.MoveToImmutable();
     }
 
+    public async ValueTask<ImmutableArray<TValue>> SelectAsArrayAsync<TValue, TArg>(Func<TState, TArg, ValueTask<TValue>> selector, TArg arg)
+    {
+        var result = new FixedSizeArrayBuilder<TValue>(States.Count);
+        foreach (var (_, state) in States)
+            result.Add(await selector(state, arg).ConfigureAwait(false));
+
+        return result.MoveToImmutable();
+    }
+
     public TextDocumentStates<TState> AddRange(ImmutableArray<TState> states)
         => new(_ids.AddRange(states.Select(state => state.Id)),
                States.AddRange(states.Select(state => KeyValuePairUtil.Create(state.Id, state))),

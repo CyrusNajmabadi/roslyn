@@ -138,10 +138,14 @@ internal sealed partial class SolutionState
                 var analyzerReferenceChecksums = await ChecksumCache.GetOrCreateChecksumCollectionAsync(
                     AnalyzerReferences, serializer, cancellationToken).ConfigureAwait(false);
 
-                var fallbackAnalyzerOptionsChecksum = ChecksumCache.GetOrCreate(
+                var fallbackAnalyzerOptionsChecksum = await ChecksumCache.GetOrCreateAsync(
                     FallbackAnalyzerOptions,
-                    static (value, args) => args.serializer.CreateChecksum(value, args.cancellationToken),
-                    arg: (serializer, cancellationToken));
+                    async static (value, arg) =>
+                    {
+                        var (serializer, cancellationToken) = arg;
+                        return await serializer.CreateChecksumAsync(value, cancellationToken).ConfigureAwait(false);
+                    },
+                    (serializer, cancellationToken)).ConfigureAwait(false);
 
                 var stateChecksums = new SolutionStateChecksums(
                     projectConeId,
