@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Serialization;
@@ -31,7 +32,7 @@ internal partial class VisualStudioMetadataReferenceManager
     private sealed class VisualStudioPortableExecutableReference : PortableExecutableReference, ISupportTemporaryStorage
     {
         private readonly VisualStudioMetadataReferenceManager _provider;
-        private readonly Lazy<DateTime> _timestamp;
+        private readonly AsyncLazy<DateTime> _timestamp;
         private readonly FileChangeTracker? _fileChangeTracker;
 
         private Exception? _error;
@@ -47,11 +48,12 @@ internal partial class VisualStudioMetadataReferenceManager
             _provider = provider;
             _fileChangeTracker = fileChangeTracker;
 
-            _timestamp = new Lazy<DateTime>(() =>
+            _timestamp = AsyncLazy.Create(async cancellationToken =>
             {
                 try
                 {
-                    _fileChangeTracker?.EnsureSubscription();
+                    if (_fileChangeTracker != null)
+                        await _fileChangeTracker.EnsureSubscriptionAsync(cancellationToken).ConfigureAwait(false);
 
                     return FileUtilities.GetFileTimeStamp(this.FilePath);
                 }
@@ -65,15 +67,23 @@ internal partial class VisualStudioMetadataReferenceManager
                     _error = e;
                     return DateTime.MinValue;
                 }
-            }, LazyThreadSafetyMode.PublicationOnly);
+            });
         }
 
         private new string FilePath => base.FilePath!;
 
+        async ValueTask ISupportTemporaryStorage.PreloadAsync(CancellationToken cancellationToken)
+        {
+            // Help ensure that the timestamp is cached to avoid expensively hitting the disk from many threads at once.
+            // This will ensure that the call to _timestamp.GetValue(CancellationToken.None) inside GetMetadataImpl is
+            // cheap.
+            await _timestamp.GetValueAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         protected override Metadata GetMetadataImpl()
         {
             // Fetch the timestamp first, so as to populate _error if needed
-            var timestamp = _timestamp.Value;
+            var timestamp = _timestamp.GetValue(CancellationToken.None);
 
             if (_error != null)
                 throw _error;
@@ -107,7 +117,10 @@ internal partial class VisualStudioMetadataReferenceManager
         private string GetDebuggerDisplay()
             => "Metadata File: " + FilePath;
 
-        public IReadOnlyList<ITemporaryStorageStreamHandle>? StorageHandles
-            => _provider.GetStorageHandles(this.FilePath, _timestamp.Value);
+        public async ValueTask<IReadOnlyList<ITemporaryStorageStreamHandle>?> GetStorageHandlesAsync(CancellationToken cancellationToken)
+        {
+            var timeStamp = await _timestamp.GetValueAsync(cancellationToken).ConfigureAwait(false);
+            return _provider.GetStorageHandles(this.FilePath, timeStamp);
+        }
     }
 }

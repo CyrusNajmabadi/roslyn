@@ -565,19 +565,30 @@ internal static class ChecksumCache
     public static Checksum GetOrCreate<TValue, TArg>(TValue value, Func<TValue, TArg, Checksum> checksumCreator, TArg arg)
         where TValue : class
     {
+        return GetOrCreate(value, static (value, arg) =>
+        {
+            var (checksumCreator, originalArg) = arg;
+            var result = checksumCreator(value, originalArg);
+            return ValueTaskFactory.FromResult(result);
+        }, (checksumCreator, arg));
+    }
+
+    public static Checksum GetOrCreate<TValue, TArg>(TValue value, Func<TValue, TArg, ValueTask<Checksum>> checksumCreator, TArg arg)
+        where TValue : class
+    {
         return StronglyTypedChecksumCache<TValue, Checksum>.GetOrCreate(value, checksumCreator, arg);
     }
 
-    public static ChecksumCollection GetOrCreateChecksumCollection<TReference>(
+    public static ValueTask<ChecksumCollection> GetOrCreateChecksumCollectionAsync<TReference>(
         IReadOnlyList<TReference> references, ISerializerService serializer, CancellationToken cancellationToken) where TReference : class
     {
-        return StronglyTypedChecksumCache<IReadOnlyList<TReference>, ChecksumCollection>.GetOrCreate(
+        return StronglyTypedChecksumCache<IReadOnlyList<TReference>, ValueTask<ChecksumCollection>>.GetOrCreate(
             references,
-            static (references, tuple) =>
+            async static (references, tuple) =>
             {
                 var checksums = new FixedSizeArrayBuilder<Checksum>(references.Count);
                 foreach (var reference in references)
-                    checksums.Add(tuple.serializer.CreateChecksum(reference, tuple.cancellationToken));
+                    checksums.Add(await tuple.serializer.CreateChecksumAsync(reference, tuple.cancellationToken).ConfigureAwait(false));
 
                 return new ChecksumCollection(checksums.MoveToImmutable());
             },
@@ -590,7 +601,7 @@ internal static class ChecksumCache
     {
         private static readonly ConditionalWeakTable<TValue, StrongBox<TResult>> s_objectToChecksumCollectionCache = new();
 
-        public static TResult GetOrCreate<TArg>(TValue value, Func<TValue, TArg, TResult> checksumCreator, TArg arg)
+        public static Task<TResult> GetOrCreateAsync<TArg>(TValue value, Func<TValue, TArg, ValueTask<TResult>> checksumCreator, TArg arg)
         {
             if (s_objectToChecksumCollectionCache.TryGetValue(value, out var checksumCollection))
                 return checksumCollection.Value;

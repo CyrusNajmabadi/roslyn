@@ -88,10 +88,10 @@ internal sealed class FileChangeTracker : IVsFreeThreadedFileChangeEvents2, IDis
         Contract.ThrowIfTrue(_fileChangeCookie != s_none);
     }
 
-    public void EnsureSubscription()
+    public async Task EnsureSubscriptionAsync(CancellationToken cancellationToken)
     {
         // make sure we have file notification subscribed
-        _ = _fileChangeCookie.GetValue(CancellationToken.None);
+        await _fileChangeCookie.GetValueAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public Task StartFileChangeListeningAsync()

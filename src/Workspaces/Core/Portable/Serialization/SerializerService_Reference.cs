@@ -8,6 +8,8 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection.Metadata;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -43,10 +45,10 @@ internal partial class SerializerService
             return s_analyzerImageReferenceMap.TryGetKey(guid, out imageReference);
     }
 
-    private static Checksum CreateChecksum(MetadataReference reference)
+    private static async ValueTask<Checksum> CreateChecksumAsync(MetadataReference reference, CancellationToken cancellationToken)
     {
         if (reference is PortableExecutableReference portable)
-            return CreatePortableExecutableReferenceChecksum(portable);
+            return await CreatePortableExecutableReferenceChecksumAsync(portable, cancellationToken).ConfigureAwait(false);
 
         throw ExceptionUtilities.UnexpectedValue(reference.GetType());
     }
@@ -87,17 +89,21 @@ internal partial class SerializerService
         return Checksum.Create(stream);
     }
 
-    protected virtual void WriteMetadataReferenceTo(MetadataReference reference, ObjectWriter writer)
+    protected virtual async ValueTask WriteMetadataReferenceToAsync(MetadataReference reference, ObjectWriter writer, CancellationToken cancellationToken)
     {
         if (reference is PortableExecutableReference portable)
         {
-            if (portable is ISupportTemporaryStorage { StorageHandles: { Count: > 0 } handles } &&
-                TryWritePortableExecutableReferenceBackedByTemporaryStorageTo(portable, handles, writer))
+            if (portable is ISupportTemporaryStorage supportTemporaryStorage)
             {
-                return;
+                var handles = await supportTemporaryStorage.GetStorageHandlesAsync(cancellationToken).ConfigureAwait(false);
+                if (handles is { Count: > 0 } &&
+                    TryWritePortableExecutableReferenceBackedByTemporaryStorageTo(portable, handles, writer))
+                {
+                    return;
+                }
             }
 
-            WritePortableExecutableReferenceTo(portable, writer);
+            await WritePortableExecutableReferenceToAsync(portable, writer, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -188,14 +194,15 @@ internal partial class SerializerService
         writer.WriteString(reference.FilePath);
     }
 
-    private static Checksum CreatePortableExecutableReferenceChecksum(PortableExecutableReference reference)
+    private static async ValueTask<Checksum> CreatePortableExecutableReferenceChecksumAsync(
+        PortableExecutableReference reference, CancellationToken cancellationToken)
     {
         using var stream = SerializableBytes.CreateWritableStream();
 
         using (var writer = new ObjectWriter(stream, leaveOpen: true))
         {
             WritePortableExecutableReferencePropertiesTo(reference, writer);
-            WriteMvidsTo(TryGetMetadata(reference), writer);
+            WriteMvidsTo(await TryGetMetadataAsync(reference, cancellationToken).ConfigureAwait(false), writer);
         }
 
         stream.Position = 0;
@@ -261,11 +268,11 @@ internal partial class SerializerService
         return guid;
     }
 
-    private static void WritePortableExecutableReferenceTo(
-        PortableExecutableReference reference, ObjectWriter writer)
+    private static async ValueTask WritePortableExecutableReferenceToAsync(
+        PortableExecutableReference reference, ObjectWriter writer, CancellationToken cancellationToken)
     {
         WritePortableExecutableReferenceHeaderTo(reference, SerializationKinds.Bits, writer);
-        WriteTo(TryGetMetadata(reference), writer);
+        WriteTo(await TryGetMetadataAsync(reference, cancellationToken).ConfigureAwait(false), writer);
 
         // TODO: what I should do with documentation provider? it is not exposed outside
     }
@@ -488,10 +495,13 @@ internal partial class SerializerService
         writer.WriteString(reference.FullPath);
     }
 
-    private static Metadata? TryGetMetadata(PortableExecutableReference reference)
+    private static async ValueTask<Metadata?> TryGetMetadataAsync(PortableExecutableReference reference, CancellationToken cancellationToken)
     {
         try
         {
+            if (reference is ISupportTemporaryStorage supportTemporaryStorage)
+                await supportTemporaryStorage.PreloadAsync(cancellationToken).ConfigureAwait(false);
+
             return reference.GetMetadata();
         }
         catch

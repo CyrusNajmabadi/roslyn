@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Host;
 using Roslyn.Utilities;
 
@@ -13,6 +14,6 @@ internal interface ISerializerService : IWorkspaceService
     void Serialize(object value, ObjectWriter writer, CancellationToken cancellationToken);
     object Deserialize(WellKnownSynchronizationKind kind, ObjectReader reader, CancellationToken cancellationToken);
 
-    Checksum CreateChecksum(object value, CancellationToken cancellationToken);
+    ValueTask<Checksum> CreateChecksumAsync(object value, CancellationToken cancellationToken);
     Checksum CreateParseOptionsChecksum(ParseOptions value);
 }

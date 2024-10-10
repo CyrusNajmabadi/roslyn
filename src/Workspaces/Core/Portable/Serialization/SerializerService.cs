@@ -9,6 +9,7 @@ using System.Composition;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -47,7 +48,7 @@ internal partial class SerializerService(SolutionServices workspaceServices) : I
 
     private readonly ConcurrentDictionary<string, IOptionsSerializationService> _lazyLanguageSerializationService = new(concurrencyLevel: 2, capacity: workspaceServices.SupportedLanguages.Count());
 
-    public Checksum CreateChecksum(object value, CancellationToken cancellationToken)
+    public ValueTask<Checksum> CreateChecksumAsync(object value, CancellationToken cancellationToken)
     {
         var kind = value.GetWellKnownSynchronizationKind();
 
@@ -62,13 +63,13 @@ internal partial class SerializerService(SolutionServices workspaceServices) : I
                 case WellKnownSynchronizationKind.ProjectReference:
                 case WellKnownSynchronizationKind.SourceGeneratedDocumentIdentity:
                 case WellKnownSynchronizationKind.FallbackAnalyzerOptions:
-                    return Checksum.Create(value, this, cancellationToken);
+                    return ValueTaskFactory.FromResult(Checksum.Create(value, this, cancellationToken));
 
                 case WellKnownSynchronizationKind.MetadataReference:
-                    return CreateChecksum((MetadataReference)value);
+                    return CreateChecksumAsync((MetadataReference)value, cancellationToken);
 
                 case WellKnownSynchronizationKind.AnalyzerReference:
-                    return CreateChecksum((AnalyzerReference)value);
+                    return ValueTaskFactory.FromResult(CreateChecksum((AnalyzerReference)value));
 
                 case WellKnownSynchronizationKind.SerializableSourceText:
                     throw new InvalidOperationException("Clients can already get a checksum directly from a SerializableSourceText");

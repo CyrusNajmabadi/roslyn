@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Host;
 using Roslyn.Utilities;
 
@@ -22,8 +24,6 @@ internal partial class SerializerService
         private readonly ImmutableArray<TemporaryStorageStreamHandle> _storageHandles;
         private readonly DocumentationProvider _provider;
 
-        public IReadOnlyList<ITemporaryStorageStreamHandle> StorageHandles => _storageHandles;
-
         public SerializedPortableExecutableReference(
             MetadataReferenceProperties properties,
             string? fullPath,
@@ -39,6 +39,13 @@ internal partial class SerializerService
             _provider = initialDocumentation;
         }
 
+        ValueTask ISupportTemporaryStorage.PreloadAsync(CancellationToken cancellationToken)
+            // Nothing to do, we're already fully loaded
+            => ValueTaskFactory.CompletedTask;
+
+        ValueTask<IReadOnlyList<ITemporaryStorageStreamHandle>?> ISupportTemporaryStorage.GetStorageHandlesAsync(CancellationToken cancellationToken)
+            => ValueTaskFactory.FromResult<IReadOnlyList<ITemporaryStorageStreamHandle>?>(_storageHandles);
+
         protected override DocumentationProvider CreateDocumentationProvider()
         {
             // this uses documentation provider given at the constructor
@@ -53,7 +60,7 @@ internal partial class SerializerService
 
         public override string ToString()
         {
-            var metadata = TryGetMetadata(this);
+            var metadata = this.GetMetadata();
             var modules = GetModules(metadata);
 
             return $"""

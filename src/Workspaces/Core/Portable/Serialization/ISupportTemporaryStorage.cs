@@ -3,6 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Host;
 
 namespace Microsoft.CodeAnalysis.Serialization;
@@ -14,5 +16,14 @@ namespace Microsoft.CodeAnalysis.Serialization;
 /// </summary>
 internal interface ISupportTemporaryStorage
 {
-    IReadOnlyList<ITemporaryStorageStreamHandle>? StorageHandles { get; }
+    /// <summary>
+    /// Give a chance for the system to load this object from disk in an async, cancellable fashion.  Used as certain
+    /// compiler apis (like <see cref="PortableExecutableReference.GetMetadata()"/>) are synchronous and can cause
+    /// undesired blocking.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    ValueTask PreloadAsync(CancellationToken cancellationToken);
+
+    ValueTask<IReadOnlyList<ITemporaryStorageStreamHandle>?> GetStorageHandlesAsync(CancellationToken cancellationToken);
 }

@@ -207,16 +207,16 @@ internal sealed partial class SymbolTreeInfo
     }
 
     [PerformanceSensitive("https://github.com/dotnet/roslyn/issues/33131", AllowCaptures = false)]
-    public static Checksum GetMetadataChecksum(
+    public static ValueTask<Checksum> GetMetadataChecksumAsync(
         SolutionServices services, PortableExecutableReference reference, CancellationToken cancellationToken)
     {
         // We can reuse the index for any given reference as long as it hasn't changed.
         // So our checksum is just the checksum for the PEReference itself.
-        return ChecksumCache.GetOrCreate(reference, static (reference, tuple) =>
+        return ChecksumCache.GetOrCreate(reference, async static (reference, tuple) =>
         {
             var (services, cancellationToken) = tuple;
             var serializer = services.GetRequiredService<ISerializerService>();
-            var checksum = serializer.CreateChecksum(reference, cancellationToken);
+            var checksum = await serializer.CreateChecksumAsync(reference, cancellationToken).ConfigureAwait(false);
 
             // Include serialization format version in our checksum.  That way if the 
             // version ever changes, all persisted data won't match the current checksum
