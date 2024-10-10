@@ -59,9 +59,12 @@ internal sealed partial class ProjectState
                 cancellationToken.ThrowIfCancellationRequested();
                 var parseOptionsChecksum = GetParseOptionsChecksum(serializer);
 
-                var projectReferenceChecksums = ChecksumCache.GetOrCreateChecksumCollection(ProjectReferences, serializer, cancellationToken);
-                var metadataReferenceChecksums = ChecksumCache.GetOrCreateChecksumCollection(MetadataReferences, serializer, cancellationToken);
-                var analyzerReferenceChecksums = ChecksumCache.GetOrCreateChecksumCollection(AnalyzerReferences, serializer, cancellationToken);
+                var projectReferenceChecksums = await ChecksumCache.GetOrCreateChecksumCollectionAsync(
+                    ProjectReferences, serializer, cancellationToken).ConfigureAwait(false);
+                var metadataReferenceChecksums = await ChecksumCache.GetOrCreateChecksumCollectionAsync(
+                    MetadataReferences, serializer, cancellationToken).ConfigureAwait(false);
+                var analyzerReferenceChecksums = await ChecksumCache.GetOrCreateChecksumCollectionAsync(
+                    AnalyzerReferences, serializer, cancellationToken).ConfigureAwait(false);
 
                 return new ProjectStateChecksums(
                     this.Id,

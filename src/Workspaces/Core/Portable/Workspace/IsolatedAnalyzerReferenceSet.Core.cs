@@ -204,7 +204,8 @@ internal sealed partial class IsolatedAnalyzerReferenceSet
             return [];
 
         var serializerService = solutionServices.GetRequiredService<ISerializerService>();
-        var analyzerChecksums = ChecksumCache.GetOrCreateChecksumCollection(references, serializerService, cancellationToken);
+        var analyzerChecksums = await ChecksumCache.GetOrCreateChecksumCollectionAsync(
+            references, serializerService, cancellationToken).ConfigureAwait(false);
 
         return await CreateIsolatedAnalyzerReferencesAsync(
             useAsync,

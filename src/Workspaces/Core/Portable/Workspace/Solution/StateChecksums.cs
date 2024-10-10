@@ -568,16 +568,19 @@ internal static class ChecksumCache
         return StronglyTypedChecksumCache<TValue, Checksum>.GetOrCreate(value, checksumCreator, arg);
     }
 
-    public static ChecksumCollection GetOrCreateChecksumCollection<TReference>(
+    public static ValueTask<ChecksumCollection> GetOrCreateChecksumCollectionAsync<TReference>(
         IReadOnlyList<TReference> references, ISerializerService serializer, CancellationToken cancellationToken) where TReference : class
     {
-        return StronglyTypedChecksumCache<IReadOnlyList<TReference>, ChecksumCollection>.GetOrCreate(
+        return StronglyTypedChecksumCache<IReadOnlyList<TReference>, ValueTask<ChecksumCollection>>.GetOrCreate(
             references,
-            static (references, tuple) =>
+            async static (references, tuple) =>
             {
                 var checksums = new FixedSizeArrayBuilder<Checksum>(references.Count);
                 foreach (var reference in references)
-                    checksums.Add(tuple.serializer.CreateChecksum(reference, tuple.cancellationToken));
+                {
+                    var checksum = await tuple.serializer.CreateChecksumAsync(reference, tuple.cancellationToken).ConfigureAwait(false);
+                    checksums.Add(checksum);
+                }
 
                 return new ChecksumCollection(checksums.MoveToImmutable());
             },

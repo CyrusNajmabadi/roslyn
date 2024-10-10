@@ -135,7 +135,8 @@ internal sealed partial class SolutionState
 
                 var serializer = this.Services.GetRequiredService<ISerializerService>();
 
-                var analyzerReferenceChecksums = ChecksumCache.GetOrCreateChecksumCollection(AnalyzerReferences, serializer, cancellationToken);
+                var analyzerReferenceChecksums = await ChecksumCache.GetOrCreateChecksumCollectionAsync(
+                    AnalyzerReferences, serializer, cancellationToken).ConfigureAwait(false);
 
                 var fallbackAnalyzerOptionsChecksum = ChecksumCache.GetOrCreate(
                     FallbackAnalyzerOptions,
