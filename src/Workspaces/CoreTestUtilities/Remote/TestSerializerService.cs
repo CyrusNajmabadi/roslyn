@@ -9,6 +9,8 @@ using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
 using System.Runtime.Versioning;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host;
@@ -42,7 +44,7 @@ namespace Microsoft.CodeAnalysis.UnitTests.Remote
 
         private readonly ConcurrentDictionary<Guid, TestGeneratorReference> _sharedTestGeneratorReferences = sharedTestGeneratorReferences;
 
-        protected override void WriteMetadataReferenceTo(MetadataReference reference, ObjectWriter writer)
+        protected override async ValueTask WriteMetadataReferenceToAsync(MetadataReference reference, ObjectWriter writer, CancellationToken cancellationToken)
         {
             var wellKnownReferenceName = s_wellKnownReferenceNames.GetValueOrDefault(reference, null);
             if (wellKnownReferenceName is not null)
@@ -53,7 +55,7 @@ namespace Microsoft.CodeAnalysis.UnitTests.Remote
             else
             {
                 writer.WriteBoolean(false);
-                base.WriteMetadataReferenceTo(reference, writer);
+                await base.WriteMetadataReferenceToAsync(reference, writer, cancellationToken).ConfigureAwait(false);
             }
         }
 

@@ -126,7 +126,8 @@ internal readonly struct RemoteHostAssetWriter(
         // Write the asset to a temporary buffer so we can calculate its length.  Note: as this is an in-memory
         // temporary buffer, we don't have to worry about synchronous writes on it blocking on the pipe-writer. Instead,
         // we'll handle the pipe-writing ourselves afterwards in a completely async fashion.
-        WriteAssetToTempStream(tempStream, objectWriter, checksum, asset, cancellationToken);
+        await WriteAssetToTempStreamAsync(
+            tempStream, objectWriter, checksum, asset, cancellationToken).ConfigureAwait(false);
 
         // Write the length of the asset to the pipe writer so the reader knows how much data to read.
         WriteTempStreamLengthToPipeWriter(tempStream);
@@ -146,7 +147,7 @@ internal readonly struct RemoteHostAssetWriter(
         await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private void WriteAssetToTempStream(
+    private async ValueTask WriteAssetToTempStreamAsync(
         ReadWriteStream tempStream, ObjectWriter objectWriter, Checksum checksum, object asset, CancellationToken cancellationToken)
     {
         // Reset the temp stream to the beginning and clear it out. Don't truncate the stream as we're going to be
@@ -167,7 +168,7 @@ internal readonly struct RemoteHostAssetWriter(
         objectWriter.WriteByte((byte)asset.GetWellKnownSynchronizationKind());
 
         // Now serialize out the asset itself.
-        _serializer.Serialize(asset, objectWriter, cancellationToken);
+        await _serializer.SerializeAsync(asset, objectWriter, cancellationToken).ConfigureAwait(false);
     }
 
     private void WriteSentinelByteToPipeWriter()
