@@ -53,8 +53,7 @@ internal partial class SerializerService
 
         public override string ToString()
         {
-            var metadata = TryGetMetadata(this);
-            var modules = GetModules(metadata);
+            var modules = GetModules(_metadata);
 
             return $"""
             {nameof(PortableExecutableReference)}
@@ -62,7 +61,7 @@ internal partial class SerializerService
                 Kind={this.Properties.Kind}
                 Aliases={this.Properties.Aliases.Join(",")}
                 EmbedInteropTypes={this.Properties.EmbedInteropTypes}
-                MetadataKind={metadata switch { null => "null", AssemblyMetadata => "assembly", ModuleMetadata => "module", _ => metadata.GetType().Name }}
+                MetadataKind={_metadata switch { null => "null", AssemblyMetadata => "assembly", ModuleMetadata => "module", _ => _metadata.GetType().Name }}
                 Guids={modules.Select(m => GetMetadataGuid(m).ToString()).Join(",")}
             """;
 

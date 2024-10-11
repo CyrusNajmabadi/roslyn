@@ -45,8 +45,21 @@ internal partial class SerializerService
 
     private static Checksum CreateChecksum(MetadataReference reference)
     {
-        if (reference is PortableExecutableReference portable)
-            return CreatePortableExecutableReferenceChecksum(portable);
+        if (reference is PortableExecutableReference { FilePath: string filePath } peReference)
+        {
+            using var stream = SerializableBytes.CreateWritableStream();
+
+            using (var writer = new ObjectWriter(stream, leaveOpen: true))
+            {
+                WritePortableExecutableReferencePropertiesTo(peReference, writer);
+                // For a reference on disk, it's cheaper and easier to just grab it's mvid directly.  This also exactly
+                // matches what we do with analyzer file references.
+                writer.WriteGuid(IsolatedAnalyzerReferenceSet.TryGetFileReferenceMvid(filePath));
+            }
+
+            stream.Position = 0;
+            return Checksum.Create(stream);
+        }
 
         throw ExceptionUtilities.UnexpectedValue(reference.GetType());
     }
@@ -188,57 +201,6 @@ internal partial class SerializerService
         writer.WriteString(reference.FilePath);
     }
 
-    private static Checksum CreatePortableExecutableReferenceChecksum(PortableExecutableReference reference)
-    {
-        using var stream = SerializableBytes.CreateWritableStream();
-
-        using (var writer = new ObjectWriter(stream, leaveOpen: true))
-        {
-            WritePortableExecutableReferencePropertiesTo(reference, writer);
-            if (!string.IsNullOrEmpty(reference.FilePath))
-            {
-                // For a reference on disk, it's cheaper and easier to just grab it's mvid directly.  This also exactly
-                // matches what we do with analyzer file references.
-                writer.WriteGuid(IsolatedAnalyzerReferenceSet.TryGetFileReferenceMvid(reference.FilePath));
-            }
-            else
-            {
-                WriteMvidsTo(TryGetMetadata(reference), writer);
-            }
-        }
-
-        stream.Position = 0;
-        return Checksum.Create(stream);
-    }
-
-    private static void WriteMvidsTo(Metadata? metadata, ObjectWriter writer)
-    {
-        if (metadata == null)
-        {
-            // handle error case where we couldn't load metadata of the reference.
-            // this basically won't write anything to writer
-            return;
-        }
-
-        if (metadata is AssemblyMetadata assemblyMetadata)
-        {
-            if (!TryGetModules(assemblyMetadata, out var modules))
-            {
-                // Gracefully bail out without writing anything to the writer.
-                return;
-            }
-
-            writer.WriteInt32((int)assemblyMetadata.Kind);
-            writer.WriteInt32(modules.Length);
-            foreach (var module in modules)
-                WriteMvidTo(module, writer);
-
-            return;
-        }
-
-        WriteMvidTo((ModuleMetadata)metadata, writer);
-    }
-
     private static bool TryGetModules(AssemblyMetadata assemblyMetadata, out ImmutableArray<ModuleMetadata> modules)
     {
         // Gracefully handle documented exceptions from 'GetModules' invocation.
@@ -256,12 +218,6 @@ internal partial class SerializerService
         }
     }
 
-    private static void WriteMvidTo(ModuleMetadata metadata, ObjectWriter writer)
-    {
-        writer.WriteInt32((int)metadata.Kind);
-        writer.WriteGuid(GetMetadataGuid(metadata));
-    }
-
     private static Guid GetMetadataGuid(ModuleMetadata metadata)
     {
         var metadataReader = metadata.GetMetadataReader();
@@ -277,6 +233,20 @@ internal partial class SerializerService
         WriteTo(TryGetMetadata(reference), writer);
 
         // TODO: what I should do with documentation provider? it is not exposed outside
+    }
+
+    private static Metadata? TryGetMetadata(PortableExecutableReference reference)
+    {
+        try
+        {
+            return reference.GetMetadata();
+        }
+        catch
+        {
+            // We have a reference but the file the reference is pointing to might not actually exist on disk. In that
+            // case, rather than crashing, we will handle it gracefully.
+            return null;
+        }
     }
 
     private PortableExecutableReference ReadPortableExecutableReferenceFrom(ObjectReader reader)
@@ -329,22 +299,9 @@ internal partial class SerializerService
 
     private static void WriteTo(Metadata? metadata, ObjectWriter writer)
     {
-        if (metadata == null)
+        if (metadata is AssemblyMetadata assemblyMetadata &&
+            TryGetModules(assemblyMetadata, out var modules))
         {
-            // handle error case where metadata failed to load
-            writer.WriteInt32(MetadataFailed);
-            return;
-        }
-
-        if (metadata is AssemblyMetadata assemblyMetadata)
-        {
-            if (!TryGetModules(assemblyMetadata, out var modules))
-            {
-                // Gracefully handle error case where unable to get modules.
-                writer.WriteInt32(MetadataFailed);
-                return;
-            }
-
             writer.WriteInt32((int)assemblyMetadata.Kind);
             writer.WriteInt32(modules.Length);
 
@@ -353,8 +310,31 @@ internal partial class SerializerService
 
             return;
         }
+        else if (metadata is ModuleMetadata moduleMetadata)
+        {
+            WriteTo(moduleMetadata, writer);
+            return;
+        }
+        else if (metadata is null)
+        {
+            // Intentionally fall through to the failure case below.
+        }
+        else
+        {
+            throw ExceptionUtilities.UnexpectedValue(metadata.GetType());
+        }
 
-        WriteTo((ModuleMetadata)metadata, writer);
+        // handle error case where metadata failed to load, or where we couldn't load modules.
+        writer.WriteInt32(MetadataFailed);
+        return;
+
+        unsafe static void WriteTo(ModuleMetadata metadata, ObjectWriter writer)
+        {
+            var reader = metadata.GetMetadataReader();
+
+            writer.WriteInt32((int)metadata.Kind);
+            writer.WriteSpan(new ReadOnlySpan<byte>(reader.MetadataPointer, reader.MetadataLength));
+        }
     }
 
     private static bool TryWritePortableExecutableReferenceBackedByTemporaryStorageTo(
@@ -381,15 +361,14 @@ internal partial class SerializerService
     private (Metadata metadata, ImmutableArray<TemporaryStorageStreamHandle> storageHandles)? TryReadMetadataFrom(
         ObjectReader reader, SerializationKinds kind)
     {
-        var imageKind = reader.ReadInt32();
-        if (imageKind == MetadataFailed)
+        var imageKind = (MetadataImageKind)reader.ReadInt32();
+        if ((int)imageKind == MetadataFailed)
         {
             // error case
             return null;
         }
 
-        var metadataKind = (MetadataImageKind)imageKind;
-        if (metadataKind == MetadataImageKind.Assembly)
+        if (imageKind == MetadataImageKind.Assembly)
         {
             var count = reader.ReadInt32();
 
@@ -398,8 +377,8 @@ internal partial class SerializerService
 
             for (var i = 0; i < count; i++)
             {
-                metadataKind = (MetadataImageKind)reader.ReadInt32();
-                Contract.ThrowIfFalse(metadataKind == MetadataImageKind.Module);
+                var moduleKind = (MetadataImageKind)reader.ReadInt32();
+                Contract.ThrowIfFalse(moduleKind == MetadataImageKind.Module);
 
                 var (metadata, storageHandle) = ReadModuleMetadataFrom(reader, kind);
 
@@ -409,12 +388,14 @@ internal partial class SerializerService
 
             return (AssemblyMetadata.Create(allMetadata.MoveToImmutable()), allHandles.MoveToImmutable());
         }
+        else if (imageKind == MetadataImageKind.Module)
+        {
+            var (metadata, storageHandle) = ReadModuleMetadataFrom(reader, kind);
+            return (metadata, [storageHandle]);
+        }
         else
         {
-            Contract.ThrowIfFalse(metadataKind == MetadataImageKind.Module);
-
-            var moduleInfo = ReadModuleMetadataFrom(reader, kind);
-            return (moduleInfo.metadata, [moduleInfo.storageHandle]);
+            throw ExceptionUtilities.UnexpectedValue(imageKind);
         }
     }
 
@@ -480,35 +461,10 @@ internal partial class SerializerService
         stream.Write(content, 0, content.Length);
     }
 
-    private static void WriteTo(ModuleMetadata metadata, ObjectWriter writer)
-    {
-        writer.WriteInt32((int)metadata.Kind);
-        WriteTo(metadata.GetMetadataReader(), writer);
-    }
-
-    private static unsafe void WriteTo(MetadataReader reader, ObjectWriter writer)
-    {
-        writer.WriteSpan(new ReadOnlySpan<byte>(reader.MetadataPointer, reader.MetadataLength));
-    }
-
     private static void WriteUnresolvedAnalyzerReferenceTo(AnalyzerReference reference, ObjectWriter writer)
     {
         writer.WriteString(nameof(UnresolvedAnalyzerReference));
         writer.WriteString(reference.FullPath);
-    }
-
-    private static Metadata? TryGetMetadata(PortableExecutableReference reference)
-    {
-        try
-        {
-            return reference.GetMetadata();
-        }
-        catch
-        {
-            // We have a reference but the file the reference is pointing to might not actually exist on disk. In that
-            // case, rather than crashing, we will handle it gracefully.
-            return null;
-        }
     }
 
     private sealed class MissingMetadataReference : PortableExecutableReference
