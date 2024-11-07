@@ -98,34 +98,6 @@ internal static partial class TaskExtensions
     }
 
     [SuppressMessage("Style", "VSTHRD200:Use \"Async\" suffix for async methods", Justification = "This is a Task wrapper, not an asynchronous method.")]
-    public static Task<TResult> SafeContinueWith<TInput, TResult>(
-        this Task<TInput> task,
-        Func<Task<TInput>, TResult> continuationFunction,
-        CancellationToken cancellationToken,
-        TaskContinuationOptions continuationOptions,
-        TaskScheduler scheduler)
-    {
-        Contract.ThrowIfNull(continuationFunction, nameof(continuationFunction));
-
-        return task.SafeContinueWith<TResult>(
-            (Task antecedent) => continuationFunction((Task<TInput>)antecedent), cancellationToken, continuationOptions, scheduler);
-    }
-
-    [SuppressMessage("Style", "VSTHRD200:Use \"Async\" suffix for async methods", Justification = "This is a Task wrapper, not an asynchronous method.")]
-    public static Task SafeContinueWith<TInput>(
-        this Task<TInput> task,
-        Action<Task<TInput>> continuationAction,
-        CancellationToken cancellationToken,
-        TaskContinuationOptions continuationOptions,
-        TaskScheduler scheduler)
-    {
-        Contract.ThrowIfNull(continuationAction, nameof(continuationAction));
-
-        return task.SafeContinueWith(
-            (Task antecedent) => continuationAction((Task<TInput>)antecedent), cancellationToken, continuationOptions, scheduler);
-    }
-
-    [SuppressMessage("Style", "VSTHRD200:Use \"Async\" suffix for async methods", Justification = "This is a Task wrapper, not an asynchronous method.")]
     public static Task<TResult> SafeContinueWith<TResult>(
         this Task task,
         Func<Task, TResult> continuationFunction,
@@ -177,16 +149,6 @@ internal static partial class TaskExtensions
         TaskScheduler scheduler)
     {
         return task.SafeContinueWith(continuationAction, CancellationToken.None, TaskContinuationOptions.None, scheduler);
-    }
-
-    [SuppressMessage("Style", "VSTHRD200:Use \"Async\" suffix for async methods", Justification = "This is a Task wrapper, not an asynchronous method.")]
-    public static Task SafeContinueWith(
-        this Task task,
-        Action<Task> continuationAction,
-        CancellationToken cancellationToken,
-        TaskScheduler scheduler)
-    {
-        return task.SafeContinueWith(continuationAction, cancellationToken, TaskContinuationOptions.None, scheduler);
     }
 
     public static Task<TResult> SafeContinueWithFromAsync<TInput, TResult>(
