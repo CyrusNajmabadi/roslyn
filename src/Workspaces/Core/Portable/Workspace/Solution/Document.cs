@@ -490,9 +490,7 @@ public class Document : TextDocument
     /// <summary>
     /// Creates a branched version of this document that has its semantic model frozen in whatever state it is available
     /// at the time, assuming a background process is constructing the semantics asynchronously. Repeated calls to this
-    /// method may return documents with increasingly more complete semantics. If the semantic model is already ready
-    /// (due to the owning project's <see cref="Compilation"/> being computed and cached, then this instance will be
-    /// returned.
+    /// method may return documents with increasingly more complete semantics.
     /// <para/>
     /// Use this method to gain access to potentially incomplete semantics quickly.
     /// <para/> Note: this will give back a solution where this <see cref="Document"/>'s project will not run generators

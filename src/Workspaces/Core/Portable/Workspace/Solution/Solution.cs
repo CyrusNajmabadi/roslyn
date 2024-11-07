@@ -1499,28 +1499,8 @@ public partial class Solution
     /// at least the syntax tree for the document.
     /// <para/> This not intended to be the public API, use Document.WithFrozenPartialSemantics() instead.
     /// </summary>
-    /// <remarks>
-    /// As per <see cref="Document.WithFrozenPartialSemantics"/>, repeated calls to this method may return documents
-    /// with increasingly more complete semantics. If the compilation has already been computed for this document's
-    /// project, then <see langword="this"/> solution instance will be returned as it will not be costly to get
-    /// semantics.</remarks>
     internal Solution WithFrozenPartialCompilationIncludingSpecificDocument(DocumentId documentId, CancellationToken cancellationToken)
     {
-        // See if the compilation for this document's project already exist.  In that case, we don't need to actually
-        // freeze anything as getting the compilation for this project will not cost anything.  This ensures that if
-        // there is the following sequence of calls:
-        //
-        // 1. getting semantics from a frozen snapshot S' off of S.
-        // 2. getting semantics from S.
-        // 3. getting semantics from a new call to get a frozen snapshot S'' off of S.
-        //
-        // that the final semantics in step '3' will be as good as the semantics in step '2'.  Clients can then intermix
-        // calls to get frozen and full semantics off of a solution, without having to worry about semantic quality
-        // degrading.
-        var project = this.GetRequiredProject(documentId.ProjectId);
-        if (project.TryGetCompilation(out _))
-            return this;
-
         return GetLazySolution().GetValue(cancellationToken);
 
         AsyncLazy<Solution> GetLazySolution()
