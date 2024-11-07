@@ -140,9 +140,7 @@ internal class ModelComputation<TModel> where TModel : class
         var asyncToken = _controller.BeginAsyncOperation();
 
         // Create the task that will actually run the transformation step.
-        var nextTask = _lastTask.SafeContinueWithFromAsync(
-            t => transformModelAsync(t.Result, _stopCancellationToken),
-            _stopCancellationToken, TaskContinuationOptions.OnlyOnRanToCompletion, _taskScheduler);
+        var nextTask = TransformModelAsync(_lastTask, transformModelAsync, _stopCancellationToken);
 
         // The next task is now the last task in the chain.
         _lastTask = nextTask;
@@ -174,6 +172,15 @@ internal class ModelComputation<TModel> where TModel : class
         // When we've notified the controller of our result, we consider the async operation
         // to be completed.
         _notifyControllerTask.CompletesAsyncOperation(asyncToken);
+        return;
+
+        static async Task<TModel> TransformModelAsync(
+            Task<TModel> lastTask,
+            Func<TModel, CancellationToken, Task<TModel>> transformModelAsync,
+            CancellationToken cancellationToken)
+        {
+            return await transformModelAsync(await lastTask.ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private void OnModelUpdated(TModel result, bool updateController)
