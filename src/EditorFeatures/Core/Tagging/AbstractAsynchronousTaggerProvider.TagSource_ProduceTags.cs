@@ -428,7 +428,7 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
                     {
                         document = snapshot.GetOpenDocumentInCurrentContextWithChanges();
                         if (frozenPartialSemantics)
-                            document = document?.WithFrozenPartialSemanticsUnlessAlreadyComputed(cancellationToken);
+                            document = document?.WithFrozenPartialSemantics(cancellationToken);
 
                         snapshotToDocument.Add((snapshot, document));
                     }

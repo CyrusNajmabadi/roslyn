@@ -51,7 +51,7 @@ internal abstract partial class AbstractInheritanceMarginService
         // work we need to do running source generators or producing skeleton references.
         if (document != null && frozenPartialSemantics)
         {
-            document = document.WithFrozenPartialSemanticsUnlessAlreadyComputed(cancellationToken);
+            document = document.WithFrozenPartialSemantics(cancellationToken);
             project = document.Project;
         }
 

@@ -53,7 +53,7 @@ internal abstract class AbstractBraceCompletionService : IBraceCompletionService
 
         // Pass along a document with frozen partial semantics.  Brace completion is a highly latency sensitive
         // operation.  We don't want to wait on things like source generators to figure things out.
-        return IsValidOpenBraceTokenAtPositionAsync(document.WithFrozenPartialSemanticsUnlessAlreadyComputed(cancellationToken), openingToken, context.OpeningPoint, cancellationToken);
+        return IsValidOpenBraceTokenAtPositionAsync(document.WithFrozenPartialSemantics(cancellationToken), openingToken, context.OpeningPoint, cancellationToken);
     }
 
     public BraceCompletionResult GetBraceCompletion(BraceCompletionContext context)
