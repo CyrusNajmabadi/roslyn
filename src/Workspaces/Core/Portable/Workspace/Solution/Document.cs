@@ -488,14 +488,35 @@ public class Document : TextDocument
     }
 
     /// <summary>
-    /// Creates a branched version of this document that has its semantic model frozen in whatever state it is available at the time,
-    /// assuming a background process is constructing the semantics asynchronously. Repeated calls to this method may return
-    /// documents with increasingly more complete semantics.
+    /// Returns <see cref="WithFrozenPartialSemantics"/> for this document.  Unless the semantics for this document are
+    /// already known (in other words <see cref="Project.TryGetCompilation(out Compilation?)"/> succeeds).  In that
+    /// case, this document instance will be returned.  This method should be used when it would be preferable to use up
+    /// to date semantics when available.  In that case future forks of this document will act in a normal manner
+    /// (producing complete semantic information). <see cref="WithFrozenPartialSemantics"/> should be used when forking
+    /// is always desired, and all future forks should have frozen/partial semantics (so generators and skeletons will
+    /// not run).
+    /// </summary>
+    internal Document WithFrozenPartialSemanticsUnlessAlreadyComputed(CancellationToken cancellationToken)
+    {
+        if (this.Project.TryGetCompilation(out _))
+            return this;
+
+        return WithFrozenPartialSemantics(cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates a branched version of this document that has its semantic model frozen in whatever state it is available
+    /// at the time, assuming a background process is constructing the semantics asynchronously. Repeated calls to this
+    /// method may return documents with increasingly more complete semantics.
     /// <para/>
     /// Use this method to gain access to potentially incomplete semantics quickly.
-    /// <para/> Note: this will give back a solution where this <see cref="Document"/>'s project will not run
-    /// generators when getting its compilation.  However, all other projects will still run generators when their
-    /// compilations are requested.
+    /// <para/> Note: this will give back a solution where this <see cref="Document"/>'s project will not run generators
+    /// when getting its compilation.  However, all other projects will still run generators when their compilations are
+    /// requested.
+    /// <para/> This method should be used when the returned document will be further forked, and generators and
+    /// skeletons should not be produced for those forks.  If that behavior is not desired, then <see
+    /// cref="WithFrozenPartialSemanticsUnlessAlreadyComputed(CancellationToken)"/> is preferred as it will produce up
+    /// to date semantic information if already available.
     /// </summary>
     internal virtual Document WithFrozenPartialSemantics(CancellationToken cancellationToken)
     {

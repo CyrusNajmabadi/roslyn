@@ -45,7 +45,7 @@ internal abstract partial class AbstractDefinitionLocationService(
         // don't want to wait on expensive operations like computing source-generators or skeletons if we can avoid
         // it.  So first try with a frozen document, then fallback to a normal document.  This mirrors how go-to-def
         // works as well.
-        return await GetDefinitionLocationWorkerAsync(document.WithFrozenPartialSemantics(cancellationToken)).ConfigureAwait(false) ??
+        return await GetDefinitionLocationWorkerAsync(document.WithFrozenPartialSemanticsUnlessAlreadyComputed(cancellationToken)).ConfigureAwait(false) ??
                await GetDefinitionLocationWorkerAsync(document).ConfigureAwait(false);
 
         async ValueTask<DefinitionLocation?> GetDefinitionLocationWorkerAsync(Document document)
