@@ -102,8 +102,7 @@ internal abstract partial class AbstractMemberInsertingCompletionProvider : LSPC
         var finalText = insertionRoot.GetText(text.Encoding)
             .Replace(destinationSpan, insertionText.Trim());
 
-        // freeze again after we make the edit to avoid triggering source generators.
-        document = document.WithText(finalText).WithFrozenPartialSemantics(cancellationToken);
+        document = document.WithText(finalText);
         var newRoot = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         var declaration = GetSyntax(newRoot.FindToken(destinationSpan.End));
 
