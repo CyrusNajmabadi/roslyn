@@ -25,20 +25,20 @@ internal partial class NavigationBarController
     private async ValueTask<NavigationBarModel?> ComputeModelAndSelectItemAsync(
         ImmutableSegmentedList<NavigationBarQueueItem> queueItems, CancellationToken cancellationToken)
     {
-        // If any of the requests are for frozen partial, then we do compute with frozen partial semantics.  We
+        // If any of the requests are for frozen, then we do compute with frozen semantics.  We
         // always want these "fast but inaccurate" passes to happen first.  That pass will then enqueue the work
         // to do the slow-but-accurate pass.
-        var frozenPartialSemantics = queueItems.Any(t => t.FrozenPartialSemantics);
+        var frozenSemantics = queueItems.Any(t => t.FrozenSemantics);
 
-        if (!frozenPartialSemantics)
+        if (!frozenSemantics)
         {
             // We're asking for the expensive nav-bar-pass, Kick off the work to do that, but attach ourselves to the
-            // requested cancellation token so this expensive work can be canceled if new requests for frozen partial
+            // requested cancellation token so this expensive work can be canceled if new requests for frozen
             // work come in.
 
-            // Since we're not frozen-partial, all requests must have an associated cancellation token.  And all but
+            // Since we're not frozen, all requests must have an associated cancellation token.  And all but
             // the last *must* be already canceled (since each is canceled as new work is added).
-            Contract.ThrowIfFalse(queueItems.All(t => !t.FrozenPartialSemantics));
+            Contract.ThrowIfFalse(queueItems.All(t => !t.FrozenSemantics));
             Contract.ThrowIfFalse(queueItems.All(t => t.NonFrozenComputationToken != null));
             Contract.ThrowIfFalse(queueItems.Take(queueItems.Count - 1).All(t => t.NonFrozenComputationToken!.Value.IsCancellationRequested));
 
@@ -48,7 +48,7 @@ internal partial class NavigationBarController
             using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(lastNonFrozenComputationToken, cancellationToken);
             try
             {
-                return await ComputeModelAndSelectItemAsync(frozenPartialSemantics: false, linkedTokenSource.Token).ConfigureAwait(false);
+                return await ComputeModelAndSelectItemAsync(frozenSemantics: false, linkedTokenSource.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException ex) when (ExceptionUtilities.IsCurrentOperationBeingCancelled(ex, linkedTokenSource.Token))
             {
@@ -57,13 +57,13 @@ internal partial class NavigationBarController
         }
         else
         {
-            // Normal request to either compute nav-bar items using frozen partial semantics.
-            var model = await ComputeModelAndSelectItemAsync(frozenPartialSemantics: true, cancellationToken).ConfigureAwait(false);
+            // Normal request to either compute nav-bar items using frozen semantics.
+            var model = await ComputeModelAndSelectItemAsync(frozenSemantics: true, cancellationToken).ConfigureAwait(false);
 
-            // After that completes, enqueue work to compute *without* frozen partial snapshots so we move to accurate
+            // After that completes, enqueue work to compute *without* frozen snapshots so we move to accurate
             // results shortly. Create and pass along a new cancellation token for this expensive work so that it can be
             // canceled by future lightweight work.
-            _computeModelQueue.AddWork(new NavigationBarQueueItem(FrozenPartialSemantics: false, _nonFrozenComputationCancellationSeries.CreateNext(default)));
+            _computeModelQueue.AddWork(new NavigationBarQueueItem(FrozenSemantics: false, _nonFrozenComputationCancellationSeries.CreateNext(default)));
 
             return model;
         }
@@ -73,7 +73,7 @@ internal partial class NavigationBarController
     /// Starts a new task to compute the model based on the current text.
     /// </summary>
     private async ValueTask<NavigationBarModel?> ComputeModelAndSelectItemAsync(
-        bool frozenPartialSemantics, CancellationToken cancellationToken)
+        bool frozenSemantics, CancellationToken cancellationToken)
     {
         // Jump back to the UI thread to determine what snapshot the user is processing.
         await _threadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken).NoThrowAwaitable();
@@ -86,7 +86,7 @@ internal partial class NavigationBarController
         var textSnapshot = _subjectBuffer.CurrentSnapshot;
         var caretPoint = GetCaretPoint();
 
-        // Ensure we switch to the threadpool before calling GetDocumentWithFrozenPartialSemantics.  It ensures that any
+        // Ensure we switch to the threadpool before calling GetDocumentWithFullOrFrozenSemantics.  It ensures that any
         // IO that performs is not potentially on the UI thread.
         await TaskScheduler.Default;
 
@@ -106,8 +106,8 @@ internal partial class NavigationBarController
             if (workspace is null)
                 return null;
 
-            var document = frozenPartialSemantics
-                ? textSnapshot.AsText().GetDocumentWithFrozenPartialSemantics(cancellationToken)
+            var document = frozenSemantics
+                ? textSnapshot.AsText().GetDocumentWithFullOrFrozenSemantics(cancellationToken)
                 : textSnapshot.AsText().GetOpenDocumentInCurrentContextWithChanges();
             if (document == null)
                 return null;
@@ -133,7 +133,7 @@ internal partial class NavigationBarController
                 var items = await itemService.GetItemsAsync(
                     document,
                     workspace.CanApplyChange(ApplyChangesKind.ChangeDocument),
-                    frozenPartialSemantics,
+                    frozenSemantics,
                     textSnapshot.Version,
                     cancellationToken).ConfigureAwait(false);
                 return new NavigationBarModel(itemService, items);

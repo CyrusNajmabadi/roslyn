@@ -16,6 +16,6 @@ internal interface IRemoteInheritanceMarginService
         DocumentId documentId,
         TextSpan spanToSearch,
         bool includeGlobalImports,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken);
 }

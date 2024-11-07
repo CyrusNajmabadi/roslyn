@@ -52,10 +52,10 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.LineCommit
                 spanToFormat = spanToFormat.TranslateTo(currentSnapshot, SpanTrackingMode.EdgeInclusive)
                 dirtyRegion = dirtyRegion.TranslateTo(currentSnapshot, SpanTrackingMode.EdgeInclusive)
 
-                ' Use frozen partial semantics here.  We're operating on the UI thread, and we don't want to block the
+                ' Use frozen semantics here.  We're operating on the UI thread, and we don't want to block the
                 ' user indefinitely while getting full semantics for this projects (which can require building all
                 ' projects we depend on).
-                Dim document = currentSnapshot.AsText().GetDocumentWithFrozenPartialSemantics(cancellationToken)
+                Dim document = currentSnapshot.AsText().GetDocumentWithFullOrFrozenSemantics(cancellationToken)
                 If document Is Nothing Then
                     Return
                 End If

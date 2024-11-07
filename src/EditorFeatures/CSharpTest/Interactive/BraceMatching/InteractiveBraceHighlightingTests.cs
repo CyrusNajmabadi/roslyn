@@ -39,7 +39,7 @@ public class InteractiveBraceHighlightingTests
         var context = new TaggerContext<BraceHighlightTag>(
             buffer.CurrentSnapshot.GetRelatedDocumentsWithChanges().FirstOrDefault(),
             buffer.CurrentSnapshot,
-            frozenPartialSemantics: false,
+            frozenSemantics: false,
             new SnapshotPoint(buffer.CurrentSnapshot, position));
         await producer.GetTestAccessor().ProduceTagsAsync(context);
 

@@ -30,21 +30,21 @@ internal sealed class RemoteInheritanceMarginService : BrokeredServiceBase, IRem
         DocumentId documentId,
         TextSpan spanToSearch,
         bool includeGlobalImports,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken)
     {
         return RunServiceAsync(solutionChecksum, async solution =>
         {
-            // Explicitly disabling frozen partial on the OOP size.  This flag was passed in, but had no actual
-            // effect (since OOP didn't support frozen partial semantics initially).  When OOP gained real support
-            // for frozen-partial, this started breaking inheritance margin.  So, until that is figured out, we just
+            // Explicitly disabling frozen on the OOP size.  This flag was passed in, but had no actual
+            // effect (since OOP didn't support frozen semantics initially).  When OOP gained real support
+            // for frozen, this started breaking inheritance margin.  So, until that is figured out, we just
             // disable this to keep the pre-existing behavior.
             //
             // Tracked by https://github.com/dotnet/roslyn/issues/67065.
-            frozenPartialSemantics = false;
+            frozenSemantics = false;
             var document = await solution.GetRequiredDocumentAsync(documentId, includeSourceGenerated: true, cancellationToken).ConfigureAwait(false);
             var service = document.GetRequiredLanguageService<IInheritanceMarginService>();
-            return await service.GetInheritanceMemberItemsAsync(document, spanToSearch, includeGlobalImports, frozenPartialSemantics, cancellationToken).ConfigureAwait(false);
+            return await service.GetInheritanceMemberItemsAsync(document, spanToSearch, includeGlobalImports, frozenSemantics, cancellationToken).ConfigureAwait(false);
         }, cancellationToken);
     }
 }

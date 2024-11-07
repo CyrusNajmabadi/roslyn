@@ -24,6 +24,6 @@ internal class DocumentProvider(IThreadingContext threadingContext) : IDocumentP
     public Document GetDocument(ITextSnapshot snapshot, CancellationToken cancellationToken)
     {
         _threadingContext.ThrowIfNotOnBackgroundThread();
-        return snapshot.AsText().GetDocumentWithFrozenPartialSemantics(cancellationToken);
+        return snapshot.AsText().GetDocumentWithFullOrFrozenSemantics(cancellationToken);
     }
 }

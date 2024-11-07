@@ -34,8 +34,8 @@ internal sealed partial class RemoteSemanticClassificationService : BrokeredServ
             var document = solution.GetDocument(documentId) ?? await solution.GetSourceGeneratedDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
             Contract.ThrowIfNull(document);
 
-            // Frozen partial semantics is not automatically passed to OOP, so enable it explicitly when desired
-            document = options.FrozenPartialSemantics ? document.WithFrozenPartialSemantics(cancellationToken) : document;
+            // frozen semantics is not automatically passed to OOP, so enable it explicitly when desired
+            document = options.FrozenSemantics ? document.WithFullOrFrozenSemantics(cancellationToken) : document;
             solution = document.Project.Solution;
 
             using var _ = Classifier.GetPooledList(out var temp);

@@ -175,12 +175,12 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
             // Note: intentionally ignoring the return value here.  We're enqueuing normal work here, so it has no
             // associated token with it.
             _ = _nonFrozenComputationCancellationSeries.CreateNext();
-            EnqueueWork(highPriority, _dataSource.SupportsFrozenPartialSemantics, nonFrozenComputationToken: null);
+            EnqueueWork(highPriority, _dataSource.SupportsFrozenSemantics, nonFrozenComputationToken: null);
         }
 
-        private void EnqueueWork(bool highPriority, bool frozenPartialSemantics, CancellationToken? nonFrozenComputationToken)
+        private void EnqueueWork(bool highPriority, bool frozenSemantics, CancellationToken? nonFrozenComputationToken)
             => _eventChangeQueue.AddWork(
-                new TagSourceQueueItem(highPriority, frozenPartialSemantics, nonFrozenComputationToken),
+                new TagSourceQueueItem(highPriority, frozenSemantics, nonFrozenComputationToken),
                 _dataSource.CancelOnNewWork);
 
         private async ValueTask<VoidResult> ProcessEventChangeAsync(
@@ -191,20 +191,20 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
             // If any of the requests was high priority, then compute at that speed.
             var highPriority = changes.Any(x => x.HighPriority);
 
-            // If any of the requests are for frozen partial, then we do compute with frozen partial semantics.  We
+            // If any of the requests are for frozen, then we do compute with frozen semantics.  We
             // always want these "fast but inaccurate" passes to happen first.  That pass will then enqueue the work
             // to do the slow-but-accurate pass.
-            var frozenPartialSemantics = changes.Any(t => t.FrozenPartialSemantics);
+            var frozenSemantics = changes.Any(t => t.FrozenSemantics);
 
-            if (!frozenPartialSemantics && _dataSource.SupportsFrozenPartialSemantics)
+            if (!frozenSemantics && _dataSource.SupportsFrozenSemantics)
             {
-                // We're asking for expensive tags, and this tagger supports frozen partial tags.  Kick off the work
+                // We're asking for expensive tags, and this tagger supports frozen tags.  Kick off the work
                 // to do this expensive tagging, but attach ourselves to the requested cancellation token so this
-                // expensive work can be canceled if new requests for frozen partial work come in.
+                // expensive work can be canceled if new requests for frozen work come in.
 
-                // Since we're not frozen-partial, all requests must have an associated cancellation token.  And all but
+                // Since we're not frozen, all requests must have an associated cancellation token.  And all but
                 // the last *must* be already canceled (since each is canceled as new work is added).
-                Contract.ThrowIfFalse(changes.All(t => !t.FrozenPartialSemantics));
+                Contract.ThrowIfFalse(changes.All(t => !t.FrozenSemantics));
                 Contract.ThrowIfFalse(changes.All(t => t.NonFrozenComputationToken != null));
                 Contract.ThrowIfFalse(changes.Take(changes.Count - 1).All(t => t.NonFrozenComputationToken!.Value.IsCancellationRequested));
 
@@ -214,7 +214,7 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
                 using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(lastNonFrozenComputationToken, cancellationToken);
                 try
                 {
-                    await RecomputeTagsAsync(highPriority, frozenPartialSemantics, calledFromJtfRun: false, linkedTokenSource.Token).ConfigureAwait(false);
+                    await RecomputeTagsAsync(highPriority, frozenSemantics, calledFromJtfRun: false, linkedTokenSource.Token).ConfigureAwait(false);
                     return default;
                 }
                 catch (OperationCanceledException ex) when (ExceptionUtilities.IsCurrentOperationBeingCancelled(ex, linkedTokenSource.Token))
@@ -224,9 +224,9 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
             }
             else
             {
-                // Normal request to either compute frozen partial tags, or compute normal tags in a tagger that does
-                // *not* support frozen partial tagging.
-                await RecomputeTagsAsync(highPriority, frozenPartialSemantics, calledFromJtfRun: false, cancellationToken).ConfigureAwait(false);
+                // Normal request to either compute frozen tags, or compute normal tags in a tagger that does
+                // *not* support frozen tagging.
+                await RecomputeTagsAsync(highPriority, frozenSemantics, calledFromJtfRun: false, cancellationToken).ConfigureAwait(false);
                 return default;
             }
         }
@@ -280,7 +280,7 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
         /// ensure we don't do unnecessary switches to the threadpool while JTF is waiting on us.</param>
         private async Task<ImmutableDictionary<ITextBuffer, TagSpanIntervalTree<TTag>>?> RecomputeTagsAsync(
             bool highPriority,
-            bool frozenPartialSemantics,
+            bool frozenSemantics,
             bool calledFromJtfRun,
             CancellationToken cancellationToken)
         {
@@ -330,7 +330,7 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
 
                 // Now that we're on the threadpool, figure out what documents we need to tag corresponding to those
                 // SnapshotSpan the underlying data source asked us to tag.
-                var spansToTag = GetDocumentSnapshotSpansToTag(snapshotSpansToTag, frozenPartialSemantics, cancellationToken);
+                var spansToTag = GetDocumentSnapshotSpansToTag(snapshotSpansToTag, frozenSemantics, cancellationToken);
 
                 // Now spin, trying to compute the updated tags.  We only need to do this as the tag state is also
                 // allowed to change on the UI thread (for example, taggers can say they want tags to be immediately
@@ -341,16 +341,16 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
                 var (oldTagTrees, newTagTrees, context) = await CompareAndSwapTagTreesAsync(
                     static async (oldTagTrees, args, cancellationToken) =>
                     {
-                        var (@this, oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition) = args;
+                        var (@this, oldState, frozenSemantics, spansToTag, snapshotSpansToTag, caretPosition) = args;
 
                         // Create a context to store pass the information along and collect the results.
                         var context = new TaggerContext<TTag>(
-                            oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition, oldTagTrees);
+                            oldState, frozenSemantics, spansToTag, snapshotSpansToTag, caretPosition, oldTagTrees);
                         await @this.ProduceTagsAsync(context, cancellationToken).ConfigureAwait(true);
 
                         return (@this.ComputeNewTagTrees(oldTagTrees, context), context);
                     },
-                    (this, oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition),
+                    (this, oldState, frozenSemantics, spansToTag, snapshotSpansToTag, caretPosition),
                     cancellationToken).ConfigureAwait(true);
 
                 // We may get back null if we were canceled.  Immediately bail out in that case.
@@ -370,11 +370,11 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
 
                 OnTagsChangedForBuffer(bufferToChanges, highPriority);
 
-                // If we were computing with frozen partial semantics here, enqueue work to compute *without* frozen
+                // If we were computing with frozen semantics here, enqueue work to compute *without* frozen
                 // partial snapshots so we move to accurate results shortly. Create and pass along a new cancellation
                 // token for this expensive work so that it can be canceled by future lightweight work.
-                if (frozenPartialSemantics)
-                    this.EnqueueWork(highPriority, frozenPartialSemantics: false, _nonFrozenComputationCancellationSeries.CreateNext(default));
+                if (frozenSemantics)
+                    this.EnqueueWork(highPriority, frozenSemantics: false, _nonFrozenComputationCancellationSeries.CreateNext(default));
 
                 return newTagTrees;
             }
@@ -405,7 +405,7 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
 
             static OneOrMany<DocumentSnapshotSpan> GetDocumentSnapshotSpansToTag(
                 OneOrMany<SnapshotSpan> snapshotSpansToTag,
-                bool frozenPartialSemantics,
+                bool frozenSemantics,
                 CancellationToken cancellationToken)
             {
                 // We only ever have a tiny number of snapshots we're classifying.  So it's easier and faster to just store
@@ -427,8 +427,8 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
                     if (foundSnapshot is null)
                     {
                         document = snapshot.GetOpenDocumentInCurrentContextWithChanges();
-                        if (frozenPartialSemantics)
-                            document = document?.WithFrozenPartialSemantics(cancellationToken);
+                        if (frozenSemantics)
+                            document = document?.WithFullOrFrozenSemantics(cancellationToken);
 
                         snapshotToDocument.Add((snapshot, document));
                     }
@@ -725,7 +725,7 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
             {
                 // Compute this as a high priority work item to have the lease amount of blocking as possible.
                 tagTrees = _dataSource.ThreadingContext.JoinableTaskFactory.Run(() =>
-                    this.RecomputeTagsAsync(highPriority: true, _dataSource.SupportsFrozenPartialSemantics, calledFromJtfRun: true, _disposalTokenSource.Token));
+                    this.RecomputeTagsAsync(highPriority: true, _dataSource.SupportsFrozenSemantics, calledFromJtfRun: true, _disposalTokenSource.Token));
             }
 
             _firstTagsRequest = false;

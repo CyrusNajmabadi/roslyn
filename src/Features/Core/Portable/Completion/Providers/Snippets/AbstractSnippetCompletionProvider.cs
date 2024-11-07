@@ -131,7 +131,7 @@ internal abstract class AbstractSnippetCompletionProvider : CompletionProvider
         // The document might not be frozen, so make sure we freeze it here to avoid triggering source generator which
         // is not needed for snippet completion and will cause perf issue. Pass in 'forceFreeze: true' to ensure all
         // further transformations we make do not run generators either.
-        var newDocument = document.WithText(originalText).WithFrozenPartialSemantics(forceFreeze: true, cancellationToken);
+        var newDocument = document.WithText(originalText).WithFrozenSemantics(forceFreeze: true, cancellationToken);
         return (newDocument, span.Start);
     }
 }

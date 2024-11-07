@@ -26,9 +26,9 @@ public sealed class SourceGeneratedDocument : Document
 
     internal DateTime GenerationDateTime => State.GenerationDateTime;
 
-    internal override Document WithFrozenPartialSemantics(bool forceFreeze, CancellationToken cancellationToken)
+    internal override Document WithFrozenSemantics(bool forceFreeze, CancellationToken cancellationToken)
     {
-        // For us to implement frozen partial semantics here with a source generated document,
+        // For us to implement frozen semantics here with a source generated document,
         // we'd need to potentially deal with the combination where that happens on a snapshot that was already
         // forked; rather than trying to deal with that combo we'll just fall back to not doing anything special
         // which is allowed.

@@ -487,9 +487,9 @@ public class Document : TextDocument
         return filteredDocumentIds.Remove(this.Id);
     }
 
-    /// <inheritdoc cref="WithFrozenPartialSemantics(bool, CancellationToken)"/>
-    internal Document WithFrozenPartialSemantics(CancellationToken cancellationToken)
-        => WithFrozenPartialSemantics(forceFreeze: false, cancellationToken);
+    /// <inheritdoc cref="WithFrozenSemantics(bool, CancellationToken)"/>
+    internal Document WithFullOrFrozenSemantics(CancellationToken cancellationToken)
+        => WithFrozenSemantics(forceFreeze: false, cancellationToken);
 
     /// <summary>
     /// Creates a branched version of this document that has its semantic model frozen in whatever state it is available
@@ -511,7 +511,7 @@ public class Document : TextDocument
     /// should be used for most clients that intend to just query for semantic information and do not intend to make any
     /// further changes.
     /// </param>
-    internal virtual Document WithFrozenPartialSemantics(bool forceFreeze, CancellationToken cancellationToken)
+    internal virtual Document WithFrozenSemantics(bool forceFreeze, CancellationToken cancellationToken)
     {
         if (!forceFreeze && this.Project.TryGetCompilation(out _))
             return this;

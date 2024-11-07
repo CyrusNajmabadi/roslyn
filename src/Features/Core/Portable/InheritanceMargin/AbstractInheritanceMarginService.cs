@@ -30,7 +30,7 @@ internal abstract partial class AbstractInheritanceMarginService : IInheritanceM
         Document document,
         TextSpan spanToSearch,
         bool includeGlobalImports,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken)
     {
         var solution = document.Project.Solution;
@@ -44,7 +44,7 @@ internal abstract partial class AbstractInheritanceMarginService : IInheritanceM
             var result = await remoteClient.TryInvokeAsync<IRemoteInheritanceMarginService, ImmutableArray<InheritanceMarginItem>>(
                 solution,
                 (service, solutionInfo, cancellationToken) =>
-                    service.GetInheritanceMarginItemsAsync(solutionInfo, document.Id, spanToSearch, includeGlobalImports, frozenPartialSemantics, cancellationToken),
+                    service.GetInheritanceMarginItemsAsync(solutionInfo, document.Id, spanToSearch, includeGlobalImports, frozenSemantics, cancellationToken),
                 cancellationToken).ConfigureAwait(false);
 
             if (!result.HasValue)
@@ -60,7 +60,7 @@ internal abstract partial class AbstractInheritanceMarginService : IInheritanceM
                 document,
                 spanToSearch,
                 includeGlobalImports,
-                frozenPartialSemantics,
+                frozenSemantics,
                 cancellationToken).ConfigureAwait(false);
         }
     }

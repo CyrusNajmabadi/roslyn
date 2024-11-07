@@ -33,7 +33,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.KeywordHighlighting
                     workspace.GetService(Of TaggerHost),
                     workspace.GetService(Of IHighlightingService))
 
-                Dim context = New TaggerContext(Of KeywordHighlightTag)(document, snapshot, frozenPartialSemantics:=False, New SnapshotPoint(snapshot, caretPosition))
+                Dim context = New TaggerContext(Of KeywordHighlightTag)(document, snapshot, frozenSemantics:=False, New SnapshotPoint(snapshot, caretPosition))
                 Await tagProducer.GetTestAccessor().ProduceTagsAsync(context)
 
                 Dim producedTags = From tag In context.TagSpans

@@ -29,12 +29,12 @@ internal sealed class TaggerContext<TTag> where TTag : ITag
     public readonly SegmentedList<TagSpan<TTag>> TagSpans = [];
 
     /// <summary>
-    /// If the client should compute tags using frozen partial semantics.  This generally should have no effect if tags
+    /// If the client should compute tags using frozen semantics.  This generally should have no effect if tags
     /// are computed within this process as the provided <see cref="SpansToTag"/> will be given the right frozen or
     /// unfrozen documents.  However, this is relevant when making calls to our external OOP server to ensure that it
     /// also does the same when processing the request on its side.
     /// </summary>
-    public bool FrozenPartialSemantics { get; }
+    public bool FrozenSemantics { get; }
 
     public OneOrMany<DocumentSnapshotSpan> SpansToTag { get; }
     public SnapshotPoint? CaretPosition { get; }
@@ -53,11 +53,11 @@ internal sealed class TaggerContext<TTag> where TTag : ITag
     internal TaggerContext(
         Document document,
         ITextSnapshot snapshot,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         SnapshotPoint? caretPosition = null)
         : this(
               state: null,
-              frozenPartialSemantics,
+              frozenSemantics,
               OneOrMany.Create(new DocumentSnapshotSpan(document, snapshot.GetFullSpan())),
               OneOrMany.Create(snapshot.GetFullSpan()),
               caretPosition,
@@ -67,14 +67,14 @@ internal sealed class TaggerContext<TTag> where TTag : ITag
 
     internal TaggerContext(
         object state,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         OneOrMany<DocumentSnapshotSpan> spansToTag,
         OneOrMany<SnapshotSpan> spansTagged,
         SnapshotPoint? caretPosition,
         ImmutableDictionary<ITextBuffer, TagSpanIntervalTree<TTag>> existingTags)
     {
         this.State = state;
-        this.FrozenPartialSemantics = frozenPartialSemantics;
+        this.FrozenSemantics = frozenSemantics;
         this.SpansToTag = spansToTag;
         this.CaretPosition = caretPosition;
 

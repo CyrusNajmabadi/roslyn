@@ -141,9 +141,9 @@ internal static class TextExtensions
     /// with the specified text's container, or the text's container isn't associated with a workspace,
     /// then the method returns false.
     /// </summary>
-    internal static Document? GetDocumentWithFrozenPartialSemantics(this SourceText text, CancellationToken cancellationToken)
+    internal static Document? GetDocumentWithFullOrFrozenSemantics(this SourceText text, CancellationToken cancellationToken)
     {
         var document = text.GetOpenDocumentInCurrentContextWithChanges();
-        return document?.WithFrozenPartialSemantics(cancellationToken);
+        return document?.WithFullOrFrozenSemantics(cancellationToken);
     }
 }

@@ -122,7 +122,7 @@ internal partial class NavigationBarController : IDisposable
 
         presenter.ItemSelected += OnItemSelected;
 
-        // Use 'compilation available' as that may produce different results from the initial 'frozen partial'
+        // Use 'compilation available' as that may produce different results from the initial 'frozen'
         // snapshot we use.
         _eventSource = TaggerEventSources.Compose(
             // Any time an edit happens, recompute as the nav bar items may have changed.
@@ -213,7 +213,7 @@ internal partial class NavigationBarController : IDisposable
         // token with it.
         _ = _nonFrozenComputationCancellationSeries.CreateNext();
         _computeModelQueue.AddWork(
-            new NavigationBarQueueItem(FrozenPartialSemantics: true, NonFrozenComputationToken: null),
+            new NavigationBarQueueItem(FrozenSemantics: true, NonFrozenComputationToken: null),
             cancelExistingWork: true);
     }
 
@@ -304,7 +304,7 @@ internal partial class NavigationBarController : IDisposable
             // When navigating, just use the partial semantics workspace.  Navigation doesn't need the fully bound
             // compilations to be created, and it can save us a lot of costly time building skeleton assemblies.
             var textSnapshot = _subjectBuffer.CurrentSnapshot;
-            var document = textSnapshot.AsText().GetDocumentWithFrozenPartialSemantics(cancellationToken);
+            var document = textSnapshot.AsText().GetDocumentWithFullOrFrozenSemantics(cancellationToken);
             if (document != null)
             {
                 var navBarService = document.GetRequiredLanguageService<INavigationBarItemService>();

@@ -1529,7 +1529,7 @@ internal sealed partial class SolutionCompilationState
     /// A compilation for the project containing the specified document id will be guaranteed to exist with at least the
     /// syntax tree for the document.
     /// <para/>
-    /// This not intended to be the public API, use Document.WithFrozenPartialSemantics() instead.
+    /// This not intended to be the public API, use Document.WithFrozenSemantics() instead.
     /// </summary>
     public SolutionCompilationState WithFrozenPartialCompilationIncludingSpecificDocument(
         DocumentId documentId, CancellationToken cancellationToken)
@@ -1546,7 +1546,7 @@ internal sealed partial class SolutionCompilationState
         // available in certain project contexts). We do this in a slightly hacky way for perf though. Specifically,
         // instead of parsing *all* the sibling files (which can be expensive, especially for a file linked in many
         // projects/tfms), we only parse this single tree.  We then use that same tree across all siblings.  That's
-        // technically inaccurate, but we can accept that as the primary purpose of 'frozen partial' is to get a
+        // technically inaccurate, but we can accept that as the primary purpose of 'frozen' is to get a
         // snapshot *fast* that is allowed to be *inaccurate*.
         //
         // Note: this does mean that some *potentially* desirable feature behaviors may not be possible.  For example,
@@ -1559,7 +1559,7 @@ internal sealed partial class SolutionCompilationState
         // Note: this is very different from the logic we have in the workspace to 'UnifyLinkedDocumentContents'. In
         // that case, we only share trees when completely safe and accurate to do so (for example, where no
         // directives are involved).  As that is used for the real solution snapshot, it must be correct.  The
-        // frozen-partial snapshot is different as it is a fork that is already allowed to be inaccurate for perf
+        // frozen snapshot is different as it is a fork that is already allowed to be inaccurate for perf
         // reasons (for example, missing trees, or missing references).
         //
         // The 'forceEvenIfTreesWouldDiffer' flag here allows us to share the doc contents even in the case where

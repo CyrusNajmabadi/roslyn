@@ -47,7 +47,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
 
             var tokensData = await HandleRequestHelperAsync(contextDocument, spans.MoveToImmutable(), supportsVisualStudioExtensions, options, cancellationToken).ConfigureAwait(false);
 
-            // The above call to get semantic tokens may be inaccurate (because we use frozen partial semantics).  Kick
+            // The above call to get semantic tokens may be inaccurate (because we use frozen semantics).  Kick
             // off a request to ensure that the OOP side gets a fully up to compilation for this project.  Once it does
             // we can optionally choose to notify our caller to do a refresh if we computed a compilation for a new
             // solution snapshot.
@@ -59,8 +59,8 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
         {
             // If the full compilation is not yet available, we'll try getting a partial one. It may contain inaccurate
             // results but will speed up how quickly we can respond to the client's request.
-            document = document.WithFrozenPartialSemantics(cancellationToken);
-            options = options with { FrozenPartialSemantics = true };
+            document = document.WithFullOrFrozenSemantics(cancellationToken);
+            options = options with { FrozenSemantics = true };
 
             // The results from the range handler should not be cached since we don't want to cache
             // partial token results. In addition, a range request is only ever called with a whole

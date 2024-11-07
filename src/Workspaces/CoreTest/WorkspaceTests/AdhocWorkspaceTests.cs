@@ -387,7 +387,7 @@ language: LanguageNames.CSharp);
             pws.SetParseOptions(projid, parseOptions.WithLanguageVersion(CS.LanguageVersion.CSharp3));
 
             // get partial semantics doc
-            var frozen = pws.CurrentSolution.GetDocument(docid1).WithFrozenPartialSemantics(CancellationToken.None);
+            var frozen = pws.CurrentSolution.GetDocument(docid1).WithFullOrFrozenSemantics(CancellationToken.None);
         }
 
         public class WorkspaceWithPartialSemantics : Workspace

@@ -69,7 +69,7 @@ public abstract partial class CompletionService
          CancellationToken cancellationToken = default)
     {
         // We don't need SemanticModel here, just want to make sure it won't get GC'd before CompletionProviders are able to get it.
-        document = GetDocumentWithFrozenPartialSemantics(document, cancellationToken);
+        document = GetDocumentWithFrozenSemantics(document, cancellationToken);
         var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
 
         var text = await document.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
@@ -173,17 +173,17 @@ public abstract partial class CompletionService
     }
 
     /// <summary>
-    /// Returns a document with frozen partial semantic unless we already have a complete compilation available.
+    /// Returns a document with frozen semantic unless we already have a complete compilation available.
     /// Getting full semantic could be costly in certain scenarios and would cause significant delay in completion. 
     /// In most cases we'd still end up with complete document, but we'd consider it an acceptable trade-off even when 
     /// we get into this transient state.
     /// </summary>
-    private Document GetDocumentWithFrozenPartialSemantics(Document document, CancellationToken cancellationToken)
+    private Document GetDocumentWithFrozenSemantics(Document document, CancellationToken cancellationToken)
     {
         if (_suppressPartialSemantics)
             return document;
 
-        return document.WithFrozenPartialSemantics(cancellationToken);
+        return document.WithFullOrFrozenSemantics(cancellationToken);
     }
 
     private static bool ValidatePossibleTriggerCharacterSet(CompletionTriggerKind completionTriggerKind, IEnumerable<CompletionProvider> triggeredProviders,

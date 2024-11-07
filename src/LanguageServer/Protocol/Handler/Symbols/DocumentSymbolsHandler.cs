@@ -53,7 +53,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
             Document document, bool useHierarchicalSymbols, bool supportsVSExtensions, CancellationToken cancellationToken)
         {
             var navBarService = document.Project.Services.GetRequiredService<INavigationBarItemService>();
-            var navBarItems = await navBarService.GetItemsAsync(document, supportsCodeGeneration: false, frozenPartialSemantics: false, cancellationToken).ConfigureAwait(false);
+            var navBarItems = await navBarService.GetItemsAsync(document, supportsCodeGeneration: false, frozenSemantics: false, cancellationToken).ConfigureAwait(false);
             if (navBarItems.IsEmpty)
                 return Array.Empty<DocumentSymbol>();
 

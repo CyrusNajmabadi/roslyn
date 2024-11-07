@@ -215,7 +215,7 @@ public abstract partial class CompletionService : ILanguageService
         var extensionManager = document.Project.Solution.Services.GetRequiredService<IExtensionManager>();
 
         // We don't need SemanticModel here, just want to make sure it won't get GC'd before CompletionProviders are able to get it.
-        document = document.WithFrozenPartialSemantics(cancellationToken);
+        document = document.WithFullOrFrozenSemantics(cancellationToken);
         var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
         var description = await extensionManager.PerformFunctionAsync(
             provider,
@@ -247,7 +247,7 @@ public abstract partial class CompletionService : ILanguageService
             var extensionManager = document.Project.Solution.Services.GetRequiredService<IExtensionManager>();
 
             // We don't need SemanticModel here, just want to make sure it won't get GC'd before CompletionProviders are able to get it.
-            document = document.WithFrozenPartialSemantics(cancellationToken);
+            document = document.WithFullOrFrozenSemantics(cancellationToken);
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
 
             var change = await extensionManager.PerformFunctionAsync(

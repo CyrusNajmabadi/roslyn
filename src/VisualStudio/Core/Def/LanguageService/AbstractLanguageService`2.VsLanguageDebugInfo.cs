@@ -287,7 +287,7 @@ internal abstract partial class AbstractLanguageService<TPackage, TLanguageServi
                     return VSConstants.E_FAIL;
                 }
 
-                var document = snapshot.AsText().GetDocumentWithFrozenPartialSemantics(cancellationToken);
+                var document = snapshot.AsText().GetDocumentWithFrozenSemantics(cancellationToken);
                 if (document != null)
                 {
                     var point = nullablePoint.Value;

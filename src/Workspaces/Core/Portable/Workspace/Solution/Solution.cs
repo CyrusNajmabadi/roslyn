@@ -1497,7 +1497,7 @@ public partial class Solution
     /// assuming a background compiler is busy building this compilations.
     /// <para/> A compilation for the project containing the specified document id will be guaranteed to exist with
     /// at least the syntax tree for the document.
-    /// <para/> This not intended to be the public API, use Document.WithFrozenPartialSemantics() instead.
+    /// <para/> This not intended to be the public API, use Document.WithFrozenSemantics() instead.
     /// </summary>
     internal Solution WithFrozenPartialCompilationIncludingSpecificDocument(DocumentId documentId, CancellationToken cancellationToken)
     {
@@ -1528,7 +1528,7 @@ public partial class Solution
             var newCompilationState = compilationState.WithFrozenPartialCompilationIncludingSpecificDocument(documentId, cancellationToken);
             var solution = new Solution(newCompilationState);
 
-            // ensure that this document is within the frozen-partial-document for the solution we're creating.  That
+            // ensure that this document is within the frozen-document for the solution we're creating.  That
             // way, if we ask to freeze it again, we'll just the same document back.
             Contract.ThrowIfTrue(solution._documentIdToFrozenSolution.Count != 0);
             solution._documentIdToFrozenSolution.Add(documentId, AsyncLazy.Create(solution));

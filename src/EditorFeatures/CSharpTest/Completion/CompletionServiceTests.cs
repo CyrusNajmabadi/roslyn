@@ -225,7 +225,7 @@ public class CompletionServiceTests
         var options = CompletionOptions.Default with { ShowItemsFromUnimportedNamespaces = true };
         var completionList = await completionService.GetCompletionsAsync(document, position.Value, options, OptionSet.Empty);
 
-        // We expect completion to run on frozen partial semantic, which won't run source generator.
+        // We expect completion to run on frozen semantic, which won't run source generator.
         Assert.Equal(0, generatorRanCount);
 
         var expectedItem = forkBeforeFreeze ? "C2" : "C1";

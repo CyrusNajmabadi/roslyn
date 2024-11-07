@@ -10,11 +10,11 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
 {
     /// <param name="HighPriority">Specifies if this is the initial set of tags being computed or not, and no
     /// artificial delays should be inserted when computing the tags.</param>
-    /// <param name="FrozenPartialSemantics">Indicates if we should
-    /// compute with frozen partial semantics or not.</param>
-    /// <param name="NonFrozenComputationToken">If <paramref name="FrozenPartialSemantics"/> is false, and this
-    /// queue does support computing frozen partial semantics (see <see cref="SupportsFrozenPartialSemantics"/>)
-    /// then this is a cancellation token that can cancel the expensive work being done if new frozen-partial work
+    /// <param name="FrozenSemantics">Indicates if we should
+    /// compute with frozen semantics or not.</param>
+    /// <param name="NonFrozenComputationToken">If <paramref name="FrozenSemantics"/> is false, and this
+    /// queue does support computing frozen semantics (see <see cref="SupportsFrozenSemantics"/>)
+    /// then this is a cancellation token that can cancel the expensive work being done if new frozen work
     /// is requested.</param>
-    private record struct TagSourceQueueItem(bool HighPriority, bool FrozenPartialSemantics, CancellationToken? NonFrozenComputationToken);
+    private record struct TagSourceQueueItem(bool HighPriority, bool FrozenSemantics, CancellationToken? NonFrozenComputationToken);
 }

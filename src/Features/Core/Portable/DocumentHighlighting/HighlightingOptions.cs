@@ -11,7 +11,7 @@ internal readonly record struct HighlightingOptions()
 {
     [DataMember] public bool HighlightRelatedRegexComponentsUnderCursor { get; init; } = true;
     [DataMember] public bool HighlightRelatedJsonComponentsUnderCursor { get; init; } = true;
-    [DataMember] public bool FrozenPartialSemantics { get; init; }
+    [DataMember] public bool FrozenSemantics { get; init; }
 
     public static HighlightingOptions Default = new();
 }

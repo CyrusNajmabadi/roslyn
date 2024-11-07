@@ -72,7 +72,7 @@ public sealed class AsynchronousTaggerTests
                 .Range(0, tagsProduced)
                 .Select(i => new TagSpan<TextMarkerTag>(new SnapshotSpan(s.SnapshotSpan.Snapshot, new Span(50 + i * 2, 1)), new TextMarkerTag($"Test{i}"))),
             eventSource,
-            supportsFrozenPartialSemantics: false,
+            supportsFrozenSemantics: false,
             FeatureAttribute.Tagger);
 
         var document = workspace.Documents.First();
@@ -141,7 +141,7 @@ public sealed class AsynchronousTaggerTests
     }
 
     [WpfFact, WorkItem("https://devdiv.visualstudio.com/DevDiv/_workitems/edit/2016199")]
-    public async Task TestFrozenPartialSemantics1()
+    public async Task TestFrozenSemantics1()
     {
         using var workspace = EditorTestWorkspace.CreateCSharp("""
             class Program
@@ -149,7 +149,7 @@ public sealed class AsynchronousTaggerTests
             }
             """);
 
-        WpfTestRunner.RequireWpfFact($"{nameof(AsynchronousTaggerTests)}.{nameof(TestFrozenPartialSemantics1)} creates asynchronous taggers");
+        WpfTestRunner.RequireWpfFact($"{nameof(AsynchronousTaggerTests)}.{nameof(TestFrozenSemantics1)} creates asynchronous taggers");
 
         var testDocument = workspace.Documents.First();
 
@@ -166,13 +166,13 @@ public sealed class AsynchronousTaggerTests
                 var document = workspace.CurrentSolution.GetRequiredDocument(testDocument.Id);
                 if (callbackCounter is 0)
                 {
-                    Assert.True(c.FrozenPartialSemantics);
+                    Assert.True(c.FrozenSemantics);
                     // Should be getting a frozen document here.
                     Assert.NotSame(document, c.SpansToTag.First().Document);
                 }
                 else
                 {
-                    Assert.False(c.FrozenPartialSemantics);
+                    Assert.False(c.FrozenSemantics);
                     Assert.Same(document, c.SpansToTag.First().Document);
                 }
 
@@ -180,7 +180,7 @@ public sealed class AsynchronousTaggerTests
                 return [new TagSpan<TextMarkerTag>(new SnapshotSpan(s.SnapshotSpan.Snapshot, new Span(0, 1)), new TextMarkerTag($"Test"))];
             },
             eventSource,
-            supportsFrozenPartialSemantics: true,
+            supportsFrozenSemantics: true,
             FeatureAttribute.Tagger);
 
         var textBuffer = testDocument.GetTextBuffer();
@@ -197,7 +197,7 @@ public sealed class AsynchronousTaggerTests
     }
 
     [WpfFact, WorkItem("https://devdiv.visualstudio.com/DevDiv/_workitems/edit/2016199")]
-    public async Task TestFrozenPartialSemantics2()
+    public async Task TestFrozenSemantics2()
     {
         using var workspace = EditorTestWorkspace.CreateCSharp("""
             class Program
@@ -205,7 +205,7 @@ public sealed class AsynchronousTaggerTests
             }
             """);
 
-        WpfTestRunner.RequireWpfFact($"{nameof(AsynchronousTaggerTests)}.{nameof(TestFrozenPartialSemantics2)} creates asynchronous taggers");
+        WpfTestRunner.RequireWpfFact($"{nameof(AsynchronousTaggerTests)}.{nameof(TestFrozenSemantics2)} creates asynchronous taggers");
 
         var testDocument = workspace.Documents.First();
 
@@ -220,14 +220,14 @@ public sealed class AsynchronousTaggerTests
             {
                 var document = workspace.CurrentSolution.GetRequiredDocument(testDocument.Id);
                 Assert.True(callbackCounter == 0);
-                Assert.False(c.FrozenPartialSemantics);
+                Assert.False(c.FrozenSemantics);
                 Assert.Same(document, c.SpansToTag.First().Document);
 
                 callbackCounter++;
                 return [new TagSpan<TextMarkerTag>(new SnapshotSpan(s.SnapshotSpan.Snapshot, new Span(0, 1)), new TextMarkerTag($"Test"))];
             },
             eventSource,
-            supportsFrozenPartialSemantics: false,
+            supportsFrozenSemantics: false,
             FeatureAttribute.Tagger);
 
         var textBuffer = testDocument.GetTextBuffer();
@@ -247,14 +247,14 @@ public sealed class AsynchronousTaggerTests
         TaggerHost taggerHost,
         Func<TaggerContext<TextMarkerTag>, DocumentSnapshotSpan, IEnumerable<TagSpan<TextMarkerTag>>> callback,
         ITaggerEventSource eventSource,
-        bool supportsFrozenPartialSemantics,
+        bool supportsFrozenSemantics,
         string featureName)
         : AsynchronousTaggerProvider<TextMarkerTag>(taggerHost, featureName)
     {
         protected override TaggerDelay EventChangeDelay
             => TaggerDelay.NearImmediate;
 
-        protected override bool SupportsFrozenPartialSemantics => supportsFrozenPartialSemantics;
+        protected override bool SupportsFrozenSemantics => supportsFrozenSemantics;
 
         protected override ITaggerEventSource CreateEventSource(ITextView? textView, ITextBuffer subjectBuffer)
             => eventSource;

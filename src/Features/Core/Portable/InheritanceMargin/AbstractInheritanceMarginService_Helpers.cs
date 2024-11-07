@@ -44,14 +44,14 @@ internal abstract partial class AbstractInheritanceMarginService
         Project project,
         Document? document,
         SymbolAndLineNumberArray symbolAndLineNumbers,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken)
     {
-        // If we're starting from a document, use it to go to a frozen partial version of it to lower the amount of
+        // If we're starting from a document, use it to go to a frozen version of it to lower the amount of
         // work we need to do running source generators or producing skeleton references.
-        if (document != null && frozenPartialSemantics)
+        if (document != null && frozenSemantics)
         {
-            document = document.WithFrozenPartialSemantics(cancellationToken);
+            document = document.WithFullOrFrozenSemantics(cancellationToken);
             project = document.Project;
         }
 
@@ -126,7 +126,7 @@ internal abstract partial class AbstractInheritanceMarginService
         Document document,
         TextSpan spanToSearch,
         bool includeGlobalImports,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken)
     {
         var (remappedProject, symbolAndLineNumbers) = await GetMemberSymbolsAsync(document, spanToSearch, cancellationToken).ConfigureAwait(false);
@@ -139,7 +139,7 @@ internal abstract partial class AbstractInheritanceMarginService
         using var _ = ArrayBuilder<InheritanceMarginItem>.GetInstance(out var result);
 
         if (includeGlobalImports && !remapped)
-            result.AddRange(await GetGlobalImportsItemsAsync(document, spanToSearch, frozenPartialSemantics, cancellationToken).ConfigureAwait(false));
+            result.AddRange(await GetGlobalImportsItemsAsync(document, spanToSearch, frozenSemantics, cancellationToken).ConfigureAwait(false));
 
         if (!symbolAndLineNumbers.IsEmpty)
         {
@@ -147,7 +147,7 @@ internal abstract partial class AbstractInheritanceMarginService
                 remappedProject,
                 document: remapped ? null : document,
                 symbolAndLineNumbers,
-                frozenPartialSemantics,
+                frozenSemantics,
                 cancellationToken).ConfigureAwait(false));
         }
 
@@ -157,11 +157,11 @@ internal abstract partial class AbstractInheritanceMarginService
     private async Task<ImmutableArray<InheritanceMarginItem>> GetGlobalImportsItemsAsync(
         Document document,
         TextSpan spanToSearch,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken)
     {
-        if (frozenPartialSemantics)
-            document = document.WithFrozenPartialSemantics(cancellationToken);
+        if (frozenSemantics)
+            document = document.WithFullOrFrozenSemantics(cancellationToken);
 
         var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 

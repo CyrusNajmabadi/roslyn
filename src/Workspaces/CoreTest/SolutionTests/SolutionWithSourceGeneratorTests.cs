@@ -339,7 +339,7 @@ public sealed class SolutionWithSourceGeneratorTests : TestBase
 
         Assert.Equal(2, fullCompilation.SyntaxTrees.Count());
 
-        var partialProject = project.Documents.Single().WithFrozenPartialSemantics(forceFreeze, CancellationToken.None).Project;
+        var partialProject = project.Documents.Single().WithFrozenSemantics(forceFreeze, CancellationToken.None).Project;
 
         // If we're forcing the freeze, we must get a difference project instance.  If we're not, we'll get the same
         // project since the compilation was already available.
@@ -459,7 +459,7 @@ public sealed class SolutionWithSourceGeneratorTests : TestBase
         await project.GetCompilationAsync();
 
         // Produce an in-progress snapshot
-        project = project.Documents.Single(d => d.Name == "RegularDocument.cs").WithFrozenPartialSemantics(CancellationToken.None).Project;
+        project = project.Documents.Single(d => d.Name == "RegularDocument.cs").WithFullOrFrozenSemantics(CancellationToken.None).Project;
 
         // The generated tree should still be there; even if the regular compilation fell away we've now cached the 
         // generated trees.
@@ -729,7 +729,7 @@ public sealed class SolutionWithSourceGeneratorTests : TestBase
             documentToFreeze = documentToFreeze.WithText(SourceText.From("// Changed Source File"));
         }
 
-        var frozenDocument = documentToFreeze.WithFrozenPartialSemantics(CancellationToken.None);
+        var frozenDocument = documentToFreeze.WithFullOrFrozenSemantics(CancellationToken.None);
         Assert.NotSame(frozenDocument, documentToFreeze);
         await frozenDocument.GetSemanticModelAsync(CancellationToken.None);
 
@@ -752,7 +752,7 @@ public sealed class SolutionWithSourceGeneratorTests : TestBase
         Assert.True(generatorRan);
         generatorRan = false;
 
-        var document = project.Documents.Single().WithFrozenPartialSemantics(forceFreeze: true, CancellationToken.None);
+        var document = project.Documents.Single().WithFrozenSemantics(forceFreeze: true, CancellationToken.None);
 
         // And fork with new contents; we'll ensure the contents of this tree are different, but the generator will not
         // run since we explicitly force froze.
@@ -781,7 +781,7 @@ public sealed class SolutionWithSourceGeneratorTests : TestBase
         Assert.True(generatorRan);
         generatorRan = false;
 
-        var document = project.Documents.Single().WithFrozenPartialSemantics(CancellationToken.None);
+        var document = project.Documents.Single().WithFullOrFrozenSemantics(CancellationToken.None);
 
         // And fork with new contents; we'll ensure the contents of this tree are different, but the generator will run
         // since we didn't force freeze, and we got the frozen document after its compilation was already computed.
@@ -810,7 +810,7 @@ public sealed class SolutionWithSourceGeneratorTests : TestBase
             .AddAnalyzerReference(analyzerReference)
             .AddDocument(originalDocument1.Name, await originalDocument1.GetTextAsync().ConfigureAwait(false), filePath: originalDocument1.FilePath);
 
-        var frozenSolution = originalDocument2.WithFrozenPartialSemantics(CancellationToken.None).Project.Solution;
+        var frozenSolution = originalDocument2.WithFullOrFrozenSemantics(CancellationToken.None).Project.Solution;
         var documentIdsToTest = new[] { originalDocument1.Id, originalDocument2.Id };
 
         foreach (var documentIdToTest in documentIdsToTest)

@@ -85,7 +85,7 @@ internal abstract partial class AbstractMemberInsertingCompletionProvider : LSPC
         // Make sure the new document is frozen before we try to get the semantic model. This is to avoid trigger source
         // generator, which is expensive and not needed for calculating the change.  Pass in 'forceFreeze: true' to
         // ensure all further transformations we make do not run generators either.
-        document = document.WithSyntaxRoot(annotatedRoot).WithFrozenPartialSemantics(forceFreeze: true, cancellationToken);
+        document = document.WithSyntaxRoot(annotatedRoot).WithFrozenSemantics(forceFreeze: true, cancellationToken);
 
         var memberContainingDocument = await GenerateMemberAndUsingsAsync(document, completionItem, line, cancellationToken).ConfigureAwait(false);
         if (memberContainingDocument == null)

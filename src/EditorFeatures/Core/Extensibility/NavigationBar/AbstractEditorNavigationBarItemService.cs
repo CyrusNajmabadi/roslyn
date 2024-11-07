@@ -30,12 +30,12 @@ internal abstract class AbstractEditorNavigationBarItemService : INavigationBarI
     public async Task<ImmutableArray<NavigationBarItem>> GetItemsAsync(
         Document document,
         bool workspaceSupportsDocumentChanges,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         ITextVersion textVersion,
         CancellationToken cancellationToken)
     {
         var service = document.GetRequiredLanguageService<CodeAnalysis.NavigationBar.INavigationBarItemService>();
-        var items = await service.GetItemsAsync(document, workspaceSupportsDocumentChanges, frozenPartialSemantics, cancellationToken).ConfigureAwait(false);
+        var items = await service.GetItemsAsync(document, workspaceSupportsDocumentChanges, frozenSemantics, cancellationToken).ConfigureAwait(false);
         return items.SelectAsArray(v => (NavigationBarItem)new WrappedNavigationBarItem(textVersion, v));
     }
 

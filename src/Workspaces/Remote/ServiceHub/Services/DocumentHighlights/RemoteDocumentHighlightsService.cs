@@ -34,7 +34,7 @@ internal sealed class RemoteDocumentHighlightsService : BrokeredServiceBase, IRe
         return RunServiceAsync(solutionChecksum, async solution =>
         {
             var document = await solution.GetRequiredDocumentAsync(documentId, includeSourceGenerated: true, cancellationToken).ConfigureAwait(false);
-            document = options.FrozenPartialSemantics ? document.WithFrozenPartialSemantics(cancellationToken) : document;
+            document = options.FrozenSemantics ? document.WithFullOrFrozenSemantics(cancellationToken) : document;
             solution = document.Project.Solution;
 
             var documentsToSearch = await documentIdsToSearch.SelectAsArrayAsync(id => solution.GetDocumentAsync(id, includeSourceGenerated: true, cancellationToken)).ConfigureAwait(false);

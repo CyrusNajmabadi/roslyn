@@ -166,8 +166,8 @@ public sealed class GlobalOptionsTests
              property.DeclaringType == typeof(AddImportPlacementOptions) && property.Name == nameof(AddImportPlacementOptions.UsingDirectivePlacement) && language == LanguageNames.VisualBasic ||
              property.DeclaringType == typeof(DocumentFormattingOptions) && property.Name == nameof(DocumentFormattingOptions.FileHeaderTemplate) ||
              property.DeclaringType == typeof(DocumentFormattingOptions) && property.Name == nameof(DocumentFormattingOptions.InsertFinalNewLine) ||
-             property.DeclaringType == typeof(ClassificationOptions) && property.Name == nameof(ClassificationOptions.FrozenPartialSemantics) ||
-             property.DeclaringType == typeof(HighlightingOptions) && property.Name == nameof(HighlightingOptions.FrozenPartialSemantics) ||
+             property.DeclaringType == typeof(ClassificationOptions) && property.Name == nameof(ClassificationOptions.FrozenSemantics) ||
+             property.DeclaringType == typeof(HighlightingOptions) && property.Name == nameof(HighlightingOptions.FrozenSemantics) ||
              property.DeclaringType == typeof(BlockStructureOptions) && property.Name == nameof(BlockStructureOptions.IsMetadataAsSource));
 
     /// <summary>

@@ -40,10 +40,10 @@ internal sealed class InheritanceMarginTaggerProvider(TaggerHost taggerHost)
     protected override TaggerDelay EventChangeDelay => TaggerDelay.OnIdle;
 
     /// <summary>
-    /// We support frozen partial semantics, so we can quickly get inheritance margin items without building SG docs.
+    /// We support frozen semantics, so we can quickly get inheritance margin items without building SG docs.
     /// We will still run a tagging pass after the frozen-pass where we run again on non-frozen docs.
     /// </summary>
-    protected override bool SupportsFrozenPartialSemantics => true;
+    protected override bool SupportsFrozenSemantics => true;
 
     protected override bool CanCreateTagger(ITextView textView, ITextBuffer buffer)
     {
@@ -94,7 +94,7 @@ internal sealed class InheritanceMarginTaggerProvider(TaggerHost taggerHost)
             document,
             spanToSearch,
             includeGlobalImports,
-            context.FrozenPartialSemantics,
+            context.FrozenSemantics,
             cancellationToken).ConfigureAwait(false);
         var elapsed = stopwatch.Elapsed;
 

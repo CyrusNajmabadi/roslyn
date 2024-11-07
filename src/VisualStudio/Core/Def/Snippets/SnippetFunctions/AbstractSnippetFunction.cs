@@ -27,7 +27,7 @@ internal abstract partial class AbstractSnippetFunction : IVsExpansionFunction
     }
 
     protected Document? GetDocument(CancellationToken cancellationToken)
-        => _subjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges()?.WithFrozenPartialSemantics(cancellationToken);
+        => _subjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges()?.WithFullOrFrozenSemantics(cancellationToken);
 
     private int GetDefaultValue(CancellationToken cancellationToken, out string value, out int hasDefaultValue)
     {

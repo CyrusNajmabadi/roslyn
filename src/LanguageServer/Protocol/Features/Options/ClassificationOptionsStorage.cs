@@ -15,7 +15,7 @@ internal static class ClassificationOptionsStorage
             ClassifyObsoleteSymbols = globalOptions.GetOption(ClassifyObsoleteSymbols, language),
             ColorizeRegexPatterns = globalOptions.GetOption(ColorizeRegexPatterns, language),
             ColorizeJsonPatterns = globalOptions.GetOption(ColorizeJsonPatterns, language),
-            // ForceFrozenPartialSemanticsForCrossProcessOperations not stored in global options
+            // ForceFrozenSemanticsForCrossProcessOperations not stored in global options
         };
 
     public static OptionsProvider<ClassificationOptions> GetClassificationOptionsProvider(this IOptionsReader globalOptions)

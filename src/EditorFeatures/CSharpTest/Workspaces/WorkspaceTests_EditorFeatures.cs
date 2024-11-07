@@ -623,7 +623,7 @@ public class WorkspaceTests_EditorFeatures : TestBase
         var classCy = classDy.BaseType;
         Assert.NotEqual(TypeKind.Error, classCy.TypeKind);
 
-        // Make the second document active.  As there is no automatic background compiler, no changes will be seen as long as we keep asking for frozen-partial semantics.
+        // Make the second document active.  As there is no automatic background compiler, no changes will be seen as long as we keep asking for frozen semantics.
         trackingService.SetActiveDocument(document2.Id);
 
         workspace.OpenDocument(document1.Id);
@@ -647,7 +647,7 @@ public class WorkspaceTests_EditorFeatures : TestBase
             if (hasX)
             {
                 var doc2Z = cs.GetDocument(document2.Id);
-                var partialDoc2Z = doc2Z.WithFrozenPartialSemantics(CancellationToken.None);
+                var partialDoc2Z = doc2Z.WithFullOrFrozenSemantics(CancellationToken.None);
                 var compilation2Z = await partialDoc2Z.Project.GetCompilationAsync();
                 var classDz = compilation2Z.SourceModule.GlobalNamespace.GetTypeMembers("D").Single();
                 var classCz = classDz.BaseType;

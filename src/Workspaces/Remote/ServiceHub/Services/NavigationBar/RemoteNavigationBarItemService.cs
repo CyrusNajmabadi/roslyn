@@ -21,19 +21,19 @@ internal sealed class RemoteNavigationBarItemService(in BrokeredServiceBase.Serv
     }
 
     public ValueTask<ImmutableArray<SerializableNavigationBarItem>> GetItemsAsync(
-        Checksum solutionChecksum, DocumentId documentId, bool supportsCodeGeneration, bool frozenPartialSemantics, CancellationToken cancellationToken)
+        Checksum solutionChecksum, DocumentId documentId, bool supportsCodeGeneration, bool frozenSemantics, CancellationToken cancellationToken)
     {
         return RunServiceAsync(solutionChecksum, async solution =>
         {
             var document = await solution.GetDocumentAsync(documentId, includeSourceGenerated: true, cancellationToken).ConfigureAwait(false);
             Contract.ThrowIfNull(document);
 
-            // Frozen partial semantics is not automatically passed to OOP, so enable it explicitly when desired
-            if (frozenPartialSemantics)
-                document = document.WithFrozenPartialSemantics(cancellationToken);
+            // frozen semantics is not automatically passed to OOP, so enable it explicitly when desired
+            if (frozenSemantics)
+                document = document.WithFullOrFrozenSemantics(cancellationToken);
 
             var navigationBarService = document.GetRequiredLanguageService<INavigationBarItemService>();
-            var result = await navigationBarService.GetItemsAsync(document, supportsCodeGeneration, frozenPartialSemantics, cancellationToken).ConfigureAwait(false);
+            var result = await navigationBarService.GetItemsAsync(document, supportsCodeGeneration, frozenSemantics, cancellationToken).ConfigureAwait(false);
 
             return SerializableNavigationBarItem.Dehydrate(result);
         }, cancellationToken);

@@ -16,7 +16,7 @@ internal interface INavigationBarItemService : ILanguageService
     Task<ImmutableArray<NavigationBarItem>> GetItemsAsync(
         Document document,
         bool workspaceSupportsDocumentChanges,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         ITextVersion textVersion,
         CancellationToken cancellationToken);
     bool ShowItemGrayedIfNear(NavigationBarItem item);

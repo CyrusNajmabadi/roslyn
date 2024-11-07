@@ -12386,7 +12386,7 @@ public static class Ext
                 Dim compilation As Compilation = Nothing
                 If (hasCompilationAvailable) Then
                     ' Ensure the compilation is created therefore a non-frozen document would be used for completion
-                    ' See CompletionService.GetDocumentWithFrozenPartialSemanticsAsync for how it is implemented
+                    ' See CompletionService.GetDocumentWithFrozenSemanticsAsync for how it is implemented
                     compilation = Await projectWithGenerator.GetCompilationAsync()
 
                     ' We should have ran the generator

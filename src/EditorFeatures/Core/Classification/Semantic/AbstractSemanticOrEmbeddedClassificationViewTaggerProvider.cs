@@ -57,12 +57,12 @@ internal abstract class AbstractSemanticOrEmbeddedClassificationViewTaggerProvid
     /// skeletons to be built.
     /// </para>
     /// <para>
-    /// In the second pass though, we will go and do things without frozen-partial semantics, so that we do always snap
+    /// In the second pass though, we will go and do things without frozen semantics, so that we do always snap
     /// to a final correct state.  Note: the expensive second pass will be kicked down the road as new events come in to
     /// classify things.
     /// </para>
     /// </summary>
-    protected sealed override bool SupportsFrozenPartialSemantics => true;
+    protected sealed override bool SupportsFrozenSemantics => true;
 
     protected override bool TagEquals(IClassificationTag tag1, IClassificationTag tag2)
         => tag1.ClassificationType.Classification == tag2.ClassificationType.Classification;
@@ -229,9 +229,9 @@ internal abstract class AbstractSemanticOrEmbeddedClassificationViewTaggerProvid
             {
                 using var _ = Classifier.GetPooledList(out var classifiedSpans);
 
-                // Ensure that if we're producing tags for frozen/partial documents, that we pass along that info so
+                // Ensure that if we're producing tags for frozen documents, that we pass along that info so
                 // that we preserve that same behavior in OOP if we end up computing the tags there.
-                options = options with { FrozenPartialSemantics = context.FrozenPartialSemantics };
+                options = options with { FrozenSemantics = context.FrozenSemantics };
 
                 var span = snapshotSpan.Span;
                 var snapshot = snapshotSpan.Snapshot;

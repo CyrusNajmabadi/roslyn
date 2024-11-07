@@ -108,7 +108,7 @@ public class InheritanceMarginTests
             document,
             searchingSpan,
             includeGlobalImports: true,
-            frozenPartialSemantics: true,
+            frozenSemantics: true,
             cancellationToken).ConfigureAwait(false);
 
         var sortedActualItems = actualItems.OrderBy(item => item.LineNumber).ToImmutableArray();

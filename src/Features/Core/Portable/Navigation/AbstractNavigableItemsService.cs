@@ -19,11 +19,11 @@ internal abstract class AbstractNavigableItemsService : INavigableItemsService
     {
         var symbolService = document.GetRequiredLanguageService<IGoToDefinitionSymbolService>();
 
-        // First try with frozen partial semantics.  For the common case where no symbols referenced though skeleton
+        // First try with frozen semantics.  For the common case where no symbols referenced though skeleton
         // references are involved, this can be much faster.  If that fails, try again, this time allowing skeletons to
         // be built.
         var symbolAndSolution =
-            await GetSymbolAsync(document.WithFrozenPartialSemantics(cancellationToken)).ConfigureAwait(false) ??
+            await GetSymbolAsync(document.WithFullOrFrozenSemantics(cancellationToken)).ConfigureAwait(false) ??
             await GetSymbolAsync(document).ConfigureAwait(false);
 
         if (symbolAndSolution is null)

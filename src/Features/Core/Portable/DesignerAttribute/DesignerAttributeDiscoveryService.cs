@@ -131,7 +131,7 @@ internal sealed partial class DesignerAttributeDiscoveryService() : IDesignerAtt
         // separate solutions.
         var frozenDocument = solution
             .GetRequiredDocument(priorityDocumentId)
-            .WithFrozenPartialSemantics(cancellationToken);
+            .WithFullOrFrozenSemantics(cancellationToken);
 
         var frozenProject = frozenDocument.Project;
 

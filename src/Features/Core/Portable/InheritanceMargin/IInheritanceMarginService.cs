@@ -21,6 +21,6 @@ internal interface IInheritanceMarginService : ILanguageService
         Document document,
         TextSpan spanToSearch,
         bool includeGlobalImports,
-        bool frozenPartialSemantics,
+        bool frozenSemantics,
         CancellationToken cancellationToken);
 }

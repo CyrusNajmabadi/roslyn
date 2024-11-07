@@ -33,13 +33,13 @@ internal class VSTypeScriptNavigationBarItemService(
         Document document, ITextVersion textVersion, CancellationToken cancellationToken)
     {
         return ((INavigationBarItemService)this).GetItemsAsync(
-            document, workspaceSupportsDocumentChanges: true, frozenPartialSemantics: false, textVersion, cancellationToken);
+            document, workspaceSupportsDocumentChanges: true, frozenSemantics: false, textVersion, cancellationToken);
     }
 
     async Task<ImmutableArray<NavigationBarItem>> INavigationBarItemService.GetItemsAsync(
         Document document,
         bool workspaceSupportsDocumentChanges,
-        bool forceFrozenPartialSemanticsForCrossProcessOperations,
+        bool frozenSemantics,
         ITextVersion textVersion,
         CancellationToken cancellationToken)
     {

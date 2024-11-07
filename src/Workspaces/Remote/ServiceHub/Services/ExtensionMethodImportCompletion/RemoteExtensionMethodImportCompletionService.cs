@@ -43,8 +43,8 @@ internal sealed class RemoteExtensionMethodImportCompletionService : BrokeredSer
         {
             var assetSyncTime = stopwatch.Elapsed;
 
-            // Completion always uses frozen-partial semantic in-proc, which is not automatically passed to OOP, so enable it explicitly
-            var document = solution.GetRequiredDocument(documentId).WithFrozenPartialSemantics(cancellationToken);
+            // Completion always uses frozen semantic in-proc, which is not automatically passed to OOP, so enable it explicitly
+            var document = solution.GetRequiredDocument(documentId).WithFullOrFrozenSemantics(cancellationToken);
             var compilation = await document.Project.GetRequiredCompilationAsync(cancellationToken).ConfigureAwait(false);
             var symbol = SymbolKey.ResolveString(receiverTypeSymbolKeyData, compilation, cancellationToken: cancellationToken).GetAnySymbol();
 
