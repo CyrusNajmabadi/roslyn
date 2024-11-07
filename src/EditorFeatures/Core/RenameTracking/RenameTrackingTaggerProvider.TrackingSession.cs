@@ -130,17 +130,24 @@ internal sealed partial class RenameTrackingTaggerProvider
         {
             _threadingContext.ThrowIfNotOnUIThread();
 
-            _newIdentifierBindsTask = _isRenamableIdentifierTask.SafeContinueWithFromAsync(
-                async t => t.Result != TriggerIdentifierKind.NotRenamable &&
-                           TriggerIdentifierKind.RenamableReference ==
-                               await DetermineIfRenamableIdentifierAsync(
-                                   TrackingSpan.GetSpan(snapshot),
-                                   initialCheck: false).ConfigureAwait(false),
-                _cancellationToken,
-                TaskContinuationOptions.OnlyOnRanToCompletion,
-                TaskScheduler.Default);
-
+            _newIdentifierBindsTask = UpdateIdentifierBindsTaskAsync();
             QueueUpdateToStateMachine(stateMachine, _newIdentifierBindsTask);
+
+            return;
+
+            async Task<bool> UpdateIdentifierBindsTaskAsync()
+            {
+                var isRenamableIdentifier = await _isRenamableIdentifierTask.ConfigureAwait(false);
+                if (isRenamableIdentifier == TriggerIdentifierKind.NotRenamable)
+                    return false;
+
+                _cancellationToken.ThrowIfCancellationRequested();
+                var triggerKind = await DetermineIfRenamableIdentifierAsync(
+                    TrackingSpan.GetSpan(snapshot),
+                    initialCheck: false).ConfigureAwait(false);
+
+                return triggerKind == TriggerIdentifierKind.RenamableReference;
+            }
         }
 
         internal bool IsDefinitelyRenamableIdentifier()
@@ -157,6 +164,7 @@ internal sealed partial class RenameTrackingTaggerProvider
 
         private async Task<TriggerIdentifierKind> DetermineIfRenamableIdentifierAsync(SnapshotSpan snapshotSpan, bool initialCheck)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             _threadingContext.ThrowIfNotOnBackgroundThread();
             var document = snapshotSpan.Snapshot.GetOpenDocumentInCurrentContextWithChanges();
             if (document != null)

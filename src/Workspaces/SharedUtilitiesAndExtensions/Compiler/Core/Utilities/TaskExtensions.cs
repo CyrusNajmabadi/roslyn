@@ -151,19 +151,6 @@ internal static partial class TaskExtensions
         return task.SafeContinueWith(continuationAction, CancellationToken.None, TaskContinuationOptions.None, scheduler);
     }
 
-    public static Task<TResult> SafeContinueWithFromAsync<TInput, TResult>(
-        this Task<TInput> task,
-        Func<Task<TInput>, Task<TResult>> continuationFunction,
-        CancellationToken cancellationToken,
-        TaskContinuationOptions continuationOptions,
-        TaskScheduler scheduler)
-    {
-        Contract.ThrowIfNull(continuationFunction, nameof(continuationFunction));
-
-        return task.SafeContinueWithFromAsync<TResult>(
-            (Task antecedent) => continuationFunction((Task<TInput>)antecedent), cancellationToken, continuationOptions, scheduler);
-    }
-
     public static Task<TResult> SafeContinueWithFromAsync<TResult>(
         this Task task,
         Func<Task, Task<TResult>> continuationFunction,
@@ -197,15 +184,6 @@ internal static partial class TaskExtensions
            TaskScheduler.Default);
 
         return nextTask;
-    }
-
-    public static Task SafeContinueWithFromAsync(
-       this Task task,
-       Func<Task, Task> continuationFunction,
-       CancellationToken cancellationToken,
-       TaskScheduler scheduler)
-    {
-        return task.SafeContinueWithFromAsync(continuationFunction, cancellationToken, TaskContinuationOptions.None, scheduler);
     }
 
     public static Task SafeContinueWithFromAsync(

@@ -163,14 +163,20 @@ internal sealed class KeybindingResetDetector : IOleCommandTarget
 
         // make sure all state machine change work is serialized so that cancellation
         // doesn't mess the state up.   
-        _lastTask = _lastTask.SafeContinueWithFromAsync(_ =>
+        _lastTask = UpdateLastTaskAsync(_lastTask, cancellationToken);
+
+        return;
+
+        async Task UpdateLastTaskAsync(Task lastTask, CancellationToken cancellationToken)
         {
-            return UpdateStateMachineWorkerAsync(cancellationToken);
-        }, cancellationToken, TaskScheduler.Default);
+            await lastTask.ConfigureAwait(false);
+            await UpdateStateMachineWorkerAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task UpdateStateMachineWorkerAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var options = _globalOptions.GetOptions(s_statusOptions);
         var lastStatus = (ReSharperStatus)options[0];
         var needsReset = (bool)options[1];
