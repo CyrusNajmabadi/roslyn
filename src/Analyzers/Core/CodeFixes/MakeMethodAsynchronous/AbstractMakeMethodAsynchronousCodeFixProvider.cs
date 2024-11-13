@@ -17,6 +17,8 @@ namespace Microsoft.CodeAnalysis.MakeMethodAsynchronous;
 
 internal abstract partial class AbstractMakeMethodAsynchronousCodeFixProvider : CodeFixProvider
 {
+    private const string AsyncSuffix = "Async";
+
     protected abstract bool IsSupportedDiagnostic(Diagnostic diagnostic, CancellationToken cancellationToken);
     protected abstract bool IsAsyncSupportingFunctionSyntax(SyntaxNode node);
 
@@ -96,8 +98,6 @@ internal abstract partial class AbstractMakeMethodAsynchronousCodeFixProvider : 
         var syntaxFacts = document.GetRequiredLanguageService<ISyntaxFactsService>();
         return syntaxFacts.StringComparer.Equals(name, "Main");
     }
-
-    private const string AsyncSuffix = "Async";
 
     private async Task<Solution> FixNodeAsync(
         Document document,

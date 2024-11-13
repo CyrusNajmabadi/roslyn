@@ -66,18 +66,14 @@ internal abstract class AbstractAwaitCompletionProvider : LSPCompletionProvider
     protected abstract SyntaxNode? GetExpressionToPlaceAwaitInFrontOf(SyntaxTree syntaxTree, int position, CancellationToken cancellationToken);
     protected abstract SyntaxToken? GetDotTokenLeftOfPosition(SyntaxTree syntaxTree, int position, CancellationToken cancellationToken);
 
-    protected virtual bool IsAwaitKeywordContext(SyntaxContext syntaxContext)
+    protected virtual Task<TextChange?> GetReturnTypeEditAsync(Document document, SyntaxNode declaration, CancellationToken cancellationToken)
+        => Task.FromResult<TextChange?>(null);
+
+    private static bool IsAwaitKeywordContext(SyntaxContext syntaxContext)
         => syntaxContext.IsAwaitKeywordContext;
 
     private static bool IsConfigureAwaitable(Compilation compilation, ITypeSymbol symbol)
-    {
-        var originalDefinition = symbol.OriginalDefinition;
-        return
-            originalDefinition.Equals(compilation.TaskOfTType()) ||
-            originalDefinition.Equals(compilation.TaskType()) ||
-            originalDefinition.Equals(compilation.ValueTaskOfTType()) ||
-            originalDefinition.Equals(compilation.ValueTaskType());
-    }
+        => new KnownTaskTypes(compilation).IsTaskLike(symbol);
 
     public sealed override async Task ProvideCompletionsAsync(CompletionContext context)
     {
@@ -165,7 +161,8 @@ internal abstract class AbstractAwaitCompletionProvider : LSPCompletionProvider
         }
     }
 
-    public sealed override async Task<CompletionChange> GetChangeAsync(Document document, CompletionItem item, char? commitKey, CancellationToken cancellationToken)
+    public sealed override async Task<CompletionChange> GetChangeAsync(
+        Document document, CompletionItem item, char? commitKey, CancellationToken cancellationToken)
     {
         // IsComplexTextEdit is true when we want to add async to the container or place await in front of the expression.
         if (!item.IsComplexTextEdit)
@@ -192,6 +189,9 @@ internal abstract class AbstractAwaitCompletionProvider : LSPCompletionProvider
             }
 
             builder.Add(new TextChange(new TextSpan(GetSpanStart(declaration), 0), syntaxFacts.GetText(syntaxKinds.AsyncKeyword) + " "));
+            var returnTypeEdit = await GetReturnTypeEditAsync(document, declaration, cancellationToken).ConfigureAwait(false);
+            if (returnTypeEdit is not null)
+                builder.Add(returnTypeEdit.Value);
         }
 
         if (item.TryGetProperty(AddAwaitAtCurrentPosition, out var _))

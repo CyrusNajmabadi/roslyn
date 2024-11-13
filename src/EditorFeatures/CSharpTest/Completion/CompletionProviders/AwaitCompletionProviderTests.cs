@@ -14,13 +14,12 @@ using Xunit;
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Recommendations;
 
 /// <summary>
-/// The <see cref="AwaitCompletionProvider"/> adds async modifier if the return type is Task or ValueTask.
-/// The tests here are only checking whether the completion item is provided or not.
-/// Tests for checking adding async modifier are in:
-/// src/EditorFeatures/Test2/IntelliSense/CSharpCompletionCommandHandlerTests_AwaitCompletion.vb
+/// The <see cref="AwaitCompletionProvider"/> adds async modifier if the return type is Task or ValueTask. The tests
+/// here are only checking whether the completion item is provided or not. Tests for checking adding async modifier are
+/// in: src/EditorFeatures/Test2/IntelliSense/CSharpCompletionCommandHandlerTests_AwaitCompletion.vb
 /// </summary>
 [Trait(Traits.Feature, Traits.Features.Completion)]
-public class AwaitCompletionProviderTests : AbstractCSharpCompletionProviderTests
+public sealed class AwaitCompletionProviderTests : AbstractCSharpCompletionProviderTests
 {
     internal override Type GetCompletionProviderType() => typeof(AwaitCompletionProvider);
 

@@ -16,13 +16,9 @@ using Xunit.Abstractions;
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.MakeMethodAsynchronous;
 
 [Trait(Traits.Feature, Traits.Features.CodeActionsMakeMethodAsynchronous)]
-public partial class MakeMethodAsynchronousTests : AbstractCSharpDiagnosticProviderBasedUserDiagnosticTest_NoEditor
+public sealed class MakeMethodAsynchronousTests(ITestOutputHelper logger)
+    : AbstractCSharpDiagnosticProviderBasedUserDiagnosticTest_NoEditor(logger)
 {
-    public MakeMethodAsynchronousTests(ITestOutputHelper logger)
-       : base(logger)
-    {
-    }
-
     internal override (DiagnosticAnalyzer?, CodeFixProvider) CreateDiagnosticProviderAndFixer(Workspace workspace)
         => (null, new CSharpMakeMethodAsynchronousCodeFixProvider());
 

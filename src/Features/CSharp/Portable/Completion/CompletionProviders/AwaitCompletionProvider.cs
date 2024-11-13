@@ -7,14 +7,17 @@ using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.LanguageService;
+using Microsoft.CodeAnalysis.CSharp.MakeMethodAsynchronous;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Extensions.ContextQuery;
+using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers;
@@ -28,9 +31,6 @@ internal sealed class AwaitCompletionProvider() : AbstractAwaitCompletionProvide
     internal override string Language => LanguageNames.CSharp;
 
     public override ImmutableHashSet<char> TriggerCharacters => CompletionUtilities.CommonTriggerCharactersWithArgumentList;
-
-    protected override bool IsAwaitKeywordContext(SyntaxContext syntaxContext)
-        => base.IsAwaitKeywordContext(syntaxContext);
 
     /// <summary>
     /// Gets the span start where async keyword should go.
@@ -49,6 +49,35 @@ internal sealed class AwaitCompletionProvider() : AbstractAwaitCompletionProvide
             SimpleLambdaExpressionSyntax simpleLambda => simpleLambda.Parameter.SpanStart,
             _ => throw ExceptionUtilities.UnexpectedValue(declaration.Kind())
         };
+    }
+
+    protected override async Task<TextChange?> GetReturnTypeEditAsync(
+        Document document, SyntaxNode declaration, CancellationToken cancellationToken)
+    {
+        var returnType = declaration switch
+        {
+            MethodDeclarationSyntax method => method.ReturnType,
+            LocalFunctionStatementSyntax local => local.ReturnType,
+            ParenthesizedLambdaExpressionSyntax parenthesizedLambda => parenthesizedLambda.ReturnType,
+            _ => null,
+        };
+
+        if (returnType is null)
+            return null;
+
+        var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var symbol = semanticModel.GetDeclaredSymbol(declaration, cancellationToken) ?? semanticModel.GetSymbolInfo(declaration, cancellationToken).GetAnySymbol();
+        if (symbol is not IMethodSymbol methodSymbol)
+            return null;
+
+        var newReturnType = MakeMethodAsynchronousHelpers.MakeTaskLike(
+            keepVoid: false,
+            methodSymbol,
+            returnType,
+            new KnownTaskTypes(semanticModel.Compilation),
+            cancellationToken);
+
+        return new TextChange(returnType.Span, newReturnType.ToString());
     }
 
     protected override SyntaxNode? GetAsyncSupportingDeclaration(SyntaxToken leftToken, int position)

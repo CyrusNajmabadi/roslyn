@@ -2,13 +2,10 @@
 ' The .NET Foundation licenses this file to you under the MIT license.
 ' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.CSharp
-
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
     <UseExportProvider>
     <Trait(Traits.Feature, Traits.Features.Completion)>
-    Public Class CSharpCompletionCommandHandlerTests_Await
-
+    Public NotInheritable Class CSharpCompletionCommandHandlerTests_Await
         Private Shared Function GetTestClassDocument(containerHasAsyncModifier As Boolean, testExpression As String) As XElement
             Return _
 <Document>
