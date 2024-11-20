@@ -51,9 +51,10 @@ internal abstract class AbstractConvertAnonymousTypeToClassCodeRefactoringProvid
         // Check if the anonymous type actually references another anonymous type inside of it.
         // If it does, we can't convert this.  There is no way to describe this anonymous type
         // in the concrete type we create.
-        var containsAnonymousType = anonymousType.GetMembers()
-                                                 .OfType<IPropertySymbol>()
-                                                 .Any(p => p.Type.ContainsAnonymousType());
+        var containsAnonymousType = anonymousType
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Any(p => p.Type.ContainsAnonymousType());
         if (containsAnonymousType)
             return;
 
@@ -63,7 +64,7 @@ internal abstract class AbstractConvertAnonymousTypeToClassCodeRefactoringProvid
             context.RegisterRefactoring(
                 CodeAction.Create(
                     FeaturesResources.Convert_to_record,
-                    c => ConvertAsync(document, textSpan, isRecord: true, c),
+                    cancellationToken => ConvertAsync(document, textSpan, isRecord: true, cancellationToken),
                     nameof(FeaturesResources.Convert_to_record)),
                 anonymousObject.Span);
         }
@@ -71,7 +72,7 @@ internal abstract class AbstractConvertAnonymousTypeToClassCodeRefactoringProvid
         context.RegisterRefactoring(
             CodeAction.Create(
                 FeaturesResources.Convert_to_class,
-                c => ConvertAsync(document, textSpan, isRecord: false, c),
+                cancellationToken => ConvertAsync(document, textSpan, isRecord: false, cancellationToken),
                 nameof(FeaturesResources.Convert_to_class)),
             anonymousObject.Span);
     }

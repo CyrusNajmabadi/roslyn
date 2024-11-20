@@ -13,11 +13,14 @@ using Microsoft.CodeAnalysis.Shared.Extensions;
 namespace Microsoft.CodeAnalysis.CSharp.ConvertAnonymousType;
 
 using static CSharpSyntaxTokens;
+using static SyntaxFactory;
 
 [ExtensionOrder(Before = PredefinedCodeRefactoringProviderNames.IntroduceVariable)]
 [ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = PredefinedCodeRefactoringProviderNames.ConvertAnonymousTypeToClass), Shared]
-internal class CSharpConvertAnonymousTypeToClassCodeRefactoringProvider :
-    AbstractConvertAnonymousTypeToClassCodeRefactoringProvider<
+[method: ImportingConstructor]
+[method: SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification = "Used in test code: https://github.com/dotnet/roslyn/issues/42814")]
+internal class CSharpConvertAnonymousTypeToClassCodeRefactoringProvider()
+    : AbstractConvertAnonymousTypeToClassCodeRefactoringProvider<
         ExpressionSyntax,
         NameSyntax,
         IdentifierNameSyntax,
@@ -25,27 +28,17 @@ internal class CSharpConvertAnonymousTypeToClassCodeRefactoringProvider :
         AnonymousObjectCreationExpressionSyntax,
         BaseNamespaceDeclarationSyntax>
 {
-    [ImportingConstructor]
-    [SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification = "Used in test code: https://github.com/dotnet/roslyn/issues/42814")]
-    public CSharpConvertAnonymousTypeToClassCodeRefactoringProvider()
-    {
-    }
-
-    protected override ObjectCreationExpressionSyntax CreateObjectCreationExpression(
-        NameSyntax nameNode, AnonymousObjectCreationExpressionSyntax anonymousObject)
-    {
-        return SyntaxFactory.ObjectCreationExpression(
-            nameNode, CreateArgumentList(anonymousObject), initializer: null);
-    }
+    protected override ObjectCreationExpressionSyntax CreateObjectCreationExpression(NameSyntax nameNode, AnonymousObjectCreationExpressionSyntax anonymousObject)
+        => ObjectCreationExpression(nameNode, CreateArgumentList(anonymousObject), initializer: null);
 
     private ArgumentListSyntax CreateArgumentList(AnonymousObjectCreationExpressionSyntax anonymousObject)
-        => SyntaxFactory.ArgumentList(
+        => ArgumentList(
             OpenParenToken.WithTriviaFrom(anonymousObject.OpenBraceToken),
             CreateArguments(anonymousObject.Initializers),
             CloseParenToken.WithTriviaFrom(anonymousObject.CloseBraceToken));
 
     private SeparatedSyntaxList<ArgumentSyntax> CreateArguments(SeparatedSyntaxList<AnonymousObjectMemberDeclaratorSyntax> initializers)
-        => SyntaxFactory.SeparatedList<ArgumentSyntax>(CreateArguments(OmitTrailingComma(initializers.GetWithSeparators())));
+        => SeparatedList<ArgumentSyntax>(CreateArguments(OmitTrailingComma(initializers.GetWithSeparators())));
 
     private static SyntaxNodeOrTokenList OmitTrailingComma(SyntaxNodeOrTokenList list)
     {
@@ -66,7 +59,7 @@ internal class CSharpConvertAnonymousTypeToClassCodeRefactoringProvider :
     }
 
     private SyntaxNodeOrTokenList CreateArguments(SyntaxNodeOrTokenList list)
-        => new(list.Select(CreateArgumentOrComma));
+        => [.. list.Select(CreateArgumentOrComma)];
 
     private SyntaxNodeOrToken CreateArgumentOrComma(SyntaxNodeOrToken declOrComma)
         => declOrComma.IsToken
@@ -74,5 +67,5 @@ internal class CSharpConvertAnonymousTypeToClassCodeRefactoringProvider :
             : CreateArgument((AnonymousObjectMemberDeclaratorSyntax)declOrComma.AsNode()!);
 
     private static ArgumentSyntax CreateArgument(AnonymousObjectMemberDeclaratorSyntax decl)
-        => SyntaxFactory.Argument(decl.Expression);
+        => Argument(decl.Expression);
 }
