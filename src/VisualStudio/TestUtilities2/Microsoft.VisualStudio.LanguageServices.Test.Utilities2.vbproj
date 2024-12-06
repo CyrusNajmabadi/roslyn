@@ -9,6 +9,11 @@
     <IsShipping>false</IsShipping>
     <IsTestUtilityProject>true</IsTestUtilityProject>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="NavigateTo\AbstractNavigateToTests.cs" />
+    <Compile Include="NavigateTo\NavigateToTestAggregator.Callback.cs" />
+    <Compile Include="NavigateTo\NavigateToTestAggregator.cs" />
+  </ItemGroup>
   <ItemGroup Label="Project References">
     <ProjectReference Include="..\..\Compilers\Core\Portable\Microsoft.CodeAnalysis.csproj" />
     <ProjectReference Include="..\..\Compilers\CSharp\Portable\Microsoft.CodeAnalysis.CSharp.csproj" />
@@ -43,7 +48,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests" />
     <InternalsVisibleTo Include="Microsoft.VisualStudio.LanguageServices.UnitTests" />
-    <InternalsVisibleTo Include="Roslyn.VisualStudio.Next.UnitTests"/>
+    <InternalsVisibleTo Include="Roslyn.VisualStudio.Next.UnitTests" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
@@ -52,7 +57,7 @@
     <PackageReference Include="Microsoft.VisualStudio.Text.Internal" IncludeAssets="runtime" />
   </ItemGroup>
   <ItemGroup>
-    <Import Include="System.Threading.Tasks"/>
+    <Import Include="System.Threading.Tasks" />
     <Import Include="System.Xml.Linq" />
     <Import Include="Xunit" />
   </ItemGroup>
