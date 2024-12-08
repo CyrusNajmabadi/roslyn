@@ -13,19 +13,14 @@ using Microsoft.CodeAnalysis.Shared.Extensions;
 namespace Microsoft.CodeAnalysis.CSharp.UseExpressionBody;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-internal sealed class UseExpressionBodyDiagnosticAnalyzer : AbstractBuiltInCodeStyleDiagnosticAnalyzer
+internal sealed class UseExpressionBodyDiagnosticAnalyzer()
+    : AbstractBuiltInCodeStyleDiagnosticAnalyzer(GetSupportedDescriptorsWithOptions())
 {
     public const string FixesError = nameof(FixesError);
 
-    private readonly ImmutableArray<SyntaxKind> _syntaxKinds;
+    private readonly ImmutableArray<SyntaxKind> _syntaxKinds = UseExpressionBodyHelper.Helpers.SelectManyAsArray(h => h.SyntaxKinds);
 
     private static readonly ImmutableArray<UseExpressionBodyHelper> _helpers = UseExpressionBodyHelper.Helpers;
-
-    public UseExpressionBodyDiagnosticAnalyzer()
-        : base(GetSupportedDescriptorsWithOptions())
-    {
-        _syntaxKinds = _helpers.SelectManyAsArray(h => h.SyntaxKinds);
-    }
 
     private static ImmutableArray<(DiagnosticDescriptor, IOption2)> GetSupportedDescriptorsWithOptions()
     {

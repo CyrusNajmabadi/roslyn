@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.CSharp;
@@ -20,9 +21,12 @@ using VerifyCS = CSharpCodeFixVerifier<
     UseExpressionBodyCodeFixProvider>;
 
 [Trait(Traits.Feature, Traits.Features.CodeActionsUseExpressionBody)]
-public class UseExpressionBodyForPropertiesAnalyzerTests
+public sealed class UseExpressionBodyForPropertiesAnalyzerTests
 {
-    private static async Task TestWithUseExpressionBody(string code, string fixedCode, LanguageVersion version = LanguageVersion.CSharp8)
+    private static async Task TestWithUseExpressionBody(
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string code,
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string fixedCode,
+        LanguageVersion version = LanguageVersion.CSharp8)
     {
         await new VerifyCS.Test
         {
@@ -38,7 +42,9 @@ public class UseExpressionBodyForPropertiesAnalyzerTests
         }.RunAsync();
     }
 
-    private static async Task TestWithUseBlockBody(string code, string fixedCode)
+    private static async Task TestWithUseBlockBody(
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string code,
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string fixedCode)
     {
         await new VerifyCS.Test
         {
@@ -579,5 +585,29 @@ public class UseExpressionBodyForPropertiesAnalyzerTests
             }
             """;
         await TestWithUseExpressionBody(code, fixedCode);
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/38057")]
+    public async Task TestCommentAfterPropertyName()
+    {
+        await TestWithUseExpressionBody("""
+            using System;
+
+            class Program
+            {
+                {|IDE0025:private static string Foo // cool prop
+                {
+                    get { return "blah"; }
+                }|}
+            }
+            """, """
+            using System;
+
+            class Program
+            {
+                private static string Foo // cool prop
+                    => "blah";
+            }
+            """);
     }
 }
