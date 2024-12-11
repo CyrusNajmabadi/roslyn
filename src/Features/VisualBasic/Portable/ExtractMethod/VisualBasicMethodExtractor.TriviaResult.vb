@@ -162,7 +162,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             End Function
 
             Private Shared Function ReplaceElasticToEndOfLine(list As IEnumerable(Of SyntaxTrivia)) As IEnumerable(Of SyntaxTrivia)
-                Return list.Select(Function(t) If(t.IsElastic, SyntaxFactory.CarriageReturnLineFeed, t))
+                Return list.Select(Function(t) If(t.IsElastic, SyntaxFactory.ElasticCarriageReturnLineFeed, t))
             End Function
 
             Private Shared Function SingleLineStatement(token As SyntaxToken) As Boolean
