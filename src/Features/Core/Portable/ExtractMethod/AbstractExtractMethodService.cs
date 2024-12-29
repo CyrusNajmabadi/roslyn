@@ -30,7 +30,7 @@ internal abstract partial class AbstractExtractMethodService<
     where TExpressionSyntax : SyntaxNode
 {
     protected abstract TValidator CreateSelectionValidator(SemanticDocument document, TextSpan textSpan, bool localFunction);
-    protected abstract TExtractor CreateMethodExtractor(TSelectionResult selectionResult, ExtractMethodGenerationOptions options, bool localFunction);
+    protected abstract TExtractor CreateMethodExtractor(ExtractMethodGenerationOptions options, bool localFunction);
 
     public async Task<ExtractMethodResult> ExtractMethodAsync(
         Document document,
@@ -50,7 +50,7 @@ internal abstract partial class AbstractExtractMethodService<
         cancellationToken.ThrowIfCancellationRequested();
 
         // extract method
-        var extractor = CreateMethodExtractor(selectionResult, options, localFunction);
-        return extractor.ExtractMethod(status, cancellationToken);
+        var extractor = CreateMethodExtractor(options, localFunction);
+        return extractor.ExtractMethod(selectionResult, status, cancellationToken);
     }
 }

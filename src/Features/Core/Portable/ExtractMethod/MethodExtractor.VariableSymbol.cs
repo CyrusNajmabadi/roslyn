@@ -116,7 +116,7 @@ internal abstract partial class AbstractExtractMethodService<
             public override SyntaxAnnotation IdentifierTokenAnnotation => throw ExceptionUtilities.Unreachable();
 
             public override void AddIdentifierTokenAnnotationPair(
-                List<(SyntaxToken, SyntaxAnnotation)> annotations, CancellationToken cancellationToken)
+                MultiDictionary<SyntaxToken, SyntaxAnnotation> annotations, CancellationToken cancellationToken)
             {
                 // do nothing for parameter
             }
@@ -269,9 +269,9 @@ internal abstract partial class AbstractExtractMethodService<
             public override bool CanBeCapturedByLocalFunction => true;
 
             public override void AddIdentifierTokenAnnotationPair(
-                List<(SyntaxToken, SyntaxAnnotation)> annotations, CancellationToken cancellationToken)
+                MultiDictionary<SyntaxToken, SyntaxAnnotation> annotations, CancellationToken cancellationToken)
             {
-                annotations.Add((GetOriginalIdentifierToken(cancellationToken), _annotation));
+                annotations.Add(GetOriginalIdentifierToken(cancellationToken), _annotation);
             }
 
             public override bool GetUseSaferDeclarationBehavior(CancellationToken cancellationToken)

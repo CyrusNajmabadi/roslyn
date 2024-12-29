@@ -19,8 +19,8 @@ namespace Microsoft.CodeAnalysis.CSharp.ExtractMethod;
 
 internal sealed partial class CSharpExtractMethodService
 {
-    internal sealed partial class CSharpMethodExtractor(CSharpSelectionResult result, ExtractMethodGenerationOptions options, bool localFunction)
-        : MethodExtractor(result, options, localFunction)
+    internal sealed partial class CSharpMethodExtractor(ExtractMethodGenerationOptions options, bool localFunction)
+        : MethodExtractor(options, localFunction)
     {
         protected override CodeGenerator CreateCodeGenerator(AnalyzerResult analyzerResult)
             => CSharpCodeGenerator.Create(this.OriginalSelectionResult, analyzerResult, this.Options, this.LocalFunction);

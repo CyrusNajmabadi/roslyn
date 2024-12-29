@@ -26,6 +26,6 @@ internal sealed partial class CSharpExtractMethodService() : AbstractExtractMeth
     protected override CSharpSelectionValidator CreateSelectionValidator(SemanticDocument document, TextSpan textSpan, bool localFunction)
         => new(document, textSpan, localFunction);
 
-    protected override CSharpMethodExtractor CreateMethodExtractor(CSharpSelectionResult selectionResult, ExtractMethodGenerationOptions options, bool localFunction)
+    protected override CSharpMethodExtractor CreateMethodExtractor(ExtractMethodGenerationOptions options, bool localFunction)
         => new(selectionResult, options, localFunction);
 }

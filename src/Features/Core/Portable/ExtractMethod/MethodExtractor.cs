@@ -29,11 +29,9 @@ internal abstract partial class AbstractExtractMethodService<
     TExpressionSyntax>
 {
     internal abstract partial class MethodExtractor(
-        TSelectionResult selectionResult,
         ExtractMethodGenerationOptions options,
         bool localFunction)
     {
-        protected readonly TSelectionResult OriginalSelectionResult = selectionResult;
         protected readonly ExtractMethodGenerationOptions Options = options;
         protected readonly bool LocalFunction = localFunction;
 
@@ -52,9 +50,10 @@ internal abstract partial class AbstractExtractMethodService<
         protected abstract Task<(Document document, SyntaxToken? invocationNameToken)> InsertNewLineBeforeLocalFunctionIfNecessaryAsync(
             Document document, SyntaxToken? invocationNameToken, SyntaxNode methodDefinition, CancellationToken cancellationToken);
 
-        public ExtractMethodResult ExtractMethod(OperationStatus initialStatus, CancellationToken cancellationToken)
+        public ExtractMethodResult ExtractMethod(
+            TSelectionResult originalSelectionResult, OperationStatus initialStatus, CancellationToken cancellationToken)
         {
-            var analyzeResult = Analyze(OriginalSelectionResult, LocalFunction, cancellationToken);
+            var analyzeResult = Analyze(originalSelectionResult, LocalFunction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
             var status = CheckVariableTypes(analyzeResult.Status.With(initialStatus), analyzeResult, cancellationToken);
@@ -63,7 +62,7 @@ internal abstract partial class AbstractExtractMethodService<
 
             var insertionPointNode = GetInsertionPointNode(analyzeResult, cancellationToken);
 
-            if (!CanAddTo(OriginalSelectionResult.SemanticDocument.Document, insertionPointNode, out var canAddStatus))
+            if (!CanAddTo(originalSelectionResult.SemanticDocument.Document, insertionPointNode, out var canAddStatus))
                 return ExtractMethodResult.Fail(canAddStatus);
 
             var codeGenerator = this.CreateCodeGenerator(analyzeResult);
