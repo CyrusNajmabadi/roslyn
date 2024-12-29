@@ -27,33 +27,34 @@ internal sealed partial class CSharpExtractMethodService
         SelectionType selectionType,
         TextSpan originalSpan,
         TextSpan finalSpan,
+        SyntaxToken firstTokenInSelection,
+        SyntaxToken lastTokenInSelection,
         bool selectionChanged)
         : SelectionResult(
-            document, selectionType, originalSpan, finalSpan, selectionChanged)
+            document, selectionType, originalSpan, finalSpan, firstTokenInSelection, lastTokenInSelection, selectionChanged)
     {
-        public static async Task<CSharpSelectionResult> CreateAsync(
+        public static CSharpSelectionResult Create(
             SemanticDocument document,
             SelectionInfo selectionInfo,
-            bool selectionChanged,
-            CancellationToken cancellationToken)
+            bool selectionChanged)
         {
             Contract.ThrowIfNull(document);
 
-            var root = await document.Document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            var newDocument = await SemanticDocument.CreateAsync(document.Document.WithSyntaxRoot(AddAnnotations(
-                root,
-                [
-                    (selectionInfo.FirstTokenInFinalSpan, s_firstTokenAnnotation),
-                    (selectionInfo.LastTokenInFinalSpan, s_lastTokenAnnotation)
-                ])), cancellationToken).ConfigureAwait(false);
+            //var root = await document.Document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            //var newDocument = await SemanticDocument.CreateAsync(document.Document.WithSyntaxRoot(AddAnnotations(
+            //    root,
+            //    [
+            //        (selectionInfo.FirstTokenInFinalSpan, s_firstTokenAnnotation),
+            //        (selectionInfo.LastTokenInFinalSpan, s_lastTokenAnnotation)
+            //    ])), cancellationToken).ConfigureAwait(false);
 
             var selectionType = selectionInfo.GetSelectionType();
             var originalSpan = selectionInfo.OriginalSpan;
             var finalSpan = selectionInfo.FinalSpan;
 
             return selectionType == SelectionType.Expression
-                ? new ExpressionResult(newDocument, selectionType, originalSpan, finalSpan, selectionChanged)
-                : new StatementResult(newDocument, selectionType, originalSpan, finalSpan, selectionChanged);
+                ? new ExpressionResult(document, selectionType, originalSpan, finalSpan, selectionChanged)
+                : new StatementResult(document, selectionType, originalSpan, finalSpan, selectionChanged);
         }
 
         protected override ISyntaxFacts SyntaxFacts
@@ -133,7 +134,7 @@ internal sealed partial class CSharpExtractMethodService
         {
             Contract.ThrowIfTrue(IsExtractMethodOnExpression);
 
-            var firstToken = GetFirstTokenInSelection();
+            var firstToken = this.FirstTokenInSelection;
             var statement = firstToken.Parent.GetStatementUnderContainer();
             Contract.ThrowIfNull(statement);
 
@@ -144,7 +145,7 @@ internal sealed partial class CSharpExtractMethodService
         {
             Contract.ThrowIfTrue(IsExtractMethodOnExpression);
 
-            var lastToken = GetLastTokenInSelection();
+            var lastToken = this.LastTokenInSelection;
             var statement = lastToken.Parent.GetStatementUnderContainer();
 
             return statement;
@@ -195,7 +196,7 @@ internal sealed partial class CSharpExtractMethodService
 
         public bool ShouldPutUnsafeModifier()
         {
-            var token = GetFirstTokenInSelection();
+            var token = this.FirstTokenInSelection;
             var ancestors = token.GetAncestors<SyntaxNode>();
 
             // if enclosing type contains unsafe keyword, we don't need to put it again
@@ -217,7 +218,7 @@ internal sealed partial class CSharpExtractMethodService
 
         private SyntaxKind UnderCheckedContext<T>() where T : SyntaxNode
         {
-            var token = GetFirstTokenInSelection();
+            var token = this.FirstTokenInSelection;
             var contextNode = token.Parent.GetAncestor<T>();
             if (contextNode == null)
             {

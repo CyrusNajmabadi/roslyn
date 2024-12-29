@@ -36,18 +36,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
                 Return selectionInfo
             End Function
 
-            Protected Overrides Function CreateSelectionResultAsync(
-                    selectionInfo As SelectionInfo,
-                    cancellationToken As CancellationToken) As Task(Of VisualBasicSelectionResult)
+            Protected Overrides Function CreateSelectionResult(
+                    selectionInfo As SelectionInfo) As VisualBasicSelectionResult
 
                 Contract.ThrowIfFalse(ContainsValidSelection)
                 Contract.ThrowIfFalse(selectionInfo.Status.Succeeded)
 
-                Return VisualBasicSelectionResult.CreateResultAsync(
+                Return VisualBasicSelectionResult.CreateResult(
                     Me.SemanticDocument,
                     selectionInfo,
-                    SelectionChanged(selectionInfo),
-                    cancellationToken)
+                    SelectionChanged(selectionInfo))
             End Function
 
             Private Shared Function CheckErrorCasesAndAppendDescriptions(

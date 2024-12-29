@@ -686,8 +686,8 @@ internal abstract partial class AbstractExtractMethodService<
                     return false;
                 }
 
-                var firstToken = SelectionResult.GetFirstTokenInSelection();
-                var lastToken = SelectionResult.GetLastTokenInSelection();
+                var firstToken = SelectionResult.FirstTokenInSelection;
+                var lastToken = SelectionResult.LastTokenInSelection;
 
                 if (!firstToken.Equals(lastToken))
                 {

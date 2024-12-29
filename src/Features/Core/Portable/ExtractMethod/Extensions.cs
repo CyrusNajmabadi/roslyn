@@ -30,8 +30,8 @@ internal static class Extensions
     /// <summary>
     /// get tokens with given annotation in current document
     /// </summary>
-    public static SyntaxToken GetTokenWithAnnotation(this SemanticDocument document, SyntaxAnnotation annotation)
-        => document.Root.GetAnnotatedNodesAndTokens(annotation).Single().AsToken();
+    //public static SyntaxToken GetTokenWithAnnotation(this SemanticDocument document, SyntaxAnnotation annotation)
+    //    => document.Root.GetAnnotatedNodesAndTokens(annotation).Single().AsToken();
 
     /// <summary>
     /// resolve the given symbol against compilation this snapshot has

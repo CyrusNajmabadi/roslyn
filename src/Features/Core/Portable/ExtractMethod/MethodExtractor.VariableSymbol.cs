@@ -74,7 +74,7 @@ internal abstract partial class AbstractExtractMethodService<
             public abstract SyntaxToken GetOriginalIdentifierToken(CancellationToken cancellationToken);
 
             public abstract void AddIdentifierTokenAnnotationPair(
-                List<(SyntaxToken, SyntaxAnnotation)> annotations, CancellationToken cancellationToken);
+                MultiDictionary<SyntaxToken, SyntaxAnnotation> annotations, CancellationToken cancellationToken);
 
             protected abstract int CompareTo(VariableSymbol right);
 

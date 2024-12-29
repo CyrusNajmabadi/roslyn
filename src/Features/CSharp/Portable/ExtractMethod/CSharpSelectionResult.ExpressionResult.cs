@@ -26,8 +26,10 @@ internal sealed partial class CSharpExtractMethodService
             SelectionType selectionType,
             TextSpan originalSpan,
             TextSpan finalSpan,
+            SyntaxToken firstTokenInSelection,
+            SyntaxToken lastTokenInSelection,
             bool selectionChanged) : CSharpSelectionResult(
-                document, selectionType, originalSpan, finalSpan, selectionChanged)
+                document, selectionType, originalSpan, finalSpan, firstTokenInSelection, lastTokenInSelection, selectionChanged)
         {
             public override bool ContainingScopeHasAsyncKeyword()
                 => false;
@@ -37,8 +39,8 @@ internal sealed partial class CSharpExtractMethodService
                 Contract.ThrowIfNull(SemanticDocument);
                 Contract.ThrowIfFalse(IsExtractMethodOnExpression);
 
-                var firstToken = GetFirstTokenInSelection();
-                var lastToken = GetLastTokenInSelection();
+                var firstToken = this.FirstTokenInSelection;
+                var lastToken = this.LastTokenInSelection;
 
                 var scope = firstToken.GetCommonRoot(lastToken).GetAncestorOrThis<ExpressionSyntax>();
                 Contract.ThrowIfNull(scope);

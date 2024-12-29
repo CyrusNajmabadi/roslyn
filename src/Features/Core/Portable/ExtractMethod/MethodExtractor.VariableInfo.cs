@@ -103,7 +103,7 @@ internal abstract partial class AbstractExtractMethodService<
             }
 
             public void AddIdentifierTokenAnnotationPair(
-                List<(SyntaxToken, SyntaxAnnotation)> annotations, CancellationToken cancellationToken)
+                MultiDictionary<SyntaxToken, SyntaxAnnotation> annotations, CancellationToken cancellationToken)
             {
                 _variableSymbol.AddIdentifierTokenAnnotationPair(annotations, cancellationToken);
             }
@@ -125,7 +125,7 @@ internal abstract partial class AbstractExtractMethodService<
                 => _variableSymbol.OriginalType;
 
             public SyntaxToken GetIdentifierTokenAtDeclaration(SemanticDocument document)
-                => document.GetTokenWithAnnotation(_variableSymbol.IdentifierTokenAnnotation);
+                => document.Root.GetAnnotatedTokens(_variableSymbol.IdentifierTokenAnnotation).Single();
 
             public SyntaxToken GetIdentifierTokenAtDeclaration(SyntaxNode node)
                 => node.GetAnnotatedTokens(_variableSymbol.IdentifierTokenAnnotation).SingleOrDefault();

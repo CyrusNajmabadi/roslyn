@@ -4,6 +4,7 @@
 
 #nullable disable
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -53,7 +54,6 @@ internal abstract partial class AbstractExtractMethodService<
 
         public ExtractMethodResult ExtractMethod(OperationStatus initialStatus, CancellationToken cancellationToken)
         {
-            var originalSemanticDocument = OriginalSelectionResult.SemanticDocument;
             var analyzeResult = Analyze(OriginalSelectionResult, LocalFunction, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -63,10 +63,9 @@ internal abstract partial class AbstractExtractMethodService<
 
             var insertionPointNode = GetInsertionPointNode(analyzeResult, cancellationToken);
 
-            if (!CanAddTo(originalSemanticDocument.Document, insertionPointNode, out var canAddStatus))
+            if (!CanAddTo(OriginalSelectionResult.SemanticDocument.Document, insertionPointNode, out var canAddStatus))
                 return ExtractMethodResult.Fail(canAddStatus);
 
-            cancellationToken.ThrowIfCancellationRequested();
             var codeGenerator = this.CreateCodeGenerator(analyzeResult);
 
             var statements = codeGenerator.GetNewMethodStatements(insertionPointNode, cancellationToken);
@@ -75,42 +74,8 @@ internal abstract partial class AbstractExtractMethodService<
 
             return ExtractMethodResult.Success(
                 status,
-                async cancellationToken =>
-                {
-                    var (analyzedDocument, insertionPoint) = await GetAnnotatedDocumentAndInsertionPointAsync(
-                        originalSemanticDocument, analyzeResult, insertionPointNode, cancellationToken).ConfigureAwait(false);
-
-                    var triviaResult = await PreserveTriviaAsync(analyzedDocument.Root, cancellationToken).ConfigureAwait(false);
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var generatedCode = await GenerateCodeAsync(
-                        insertionPoint.With(triviaResult.SemanticDocument),
-                        (TSelectionResult)OriginalSelectionResult.With(triviaResult.SemanticDocument),
-                        analyzeResult,
-                        Options,
-                        cancellationToken).ConfigureAwait(false);
-
-                    var afterTriviaRestored = await triviaResult.ApplyAsync(generatedCode, cancellationToken).ConfigureAwait(false);
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var documentWithoutFinalFormatting = afterTriviaRestored.Document;
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var newRoot = afterTriviaRestored.Root;
-                    var invocationNameToken = GetInvocationNameToken(newRoot.GetAnnotatedTokens(generatedCode.MethodNameAnnotation));
-
-                    // Do some final patchups of whitespace when inserting a local function.
-                    if (LocalFunction)
-                    {
-                        var methodDefinition = newRoot.GetAnnotatedNodesAndTokens(generatedCode.MethodDefinitionAnnotation).FirstOrDefault().AsNode();
-                        (documentWithoutFinalFormatting, invocationNameToken) = await InsertNewLineBeforeLocalFunctionIfNecessaryAsync(
-                            documentWithoutFinalFormatting, invocationNameToken, methodDefinition, cancellationToken).ConfigureAwait(false);
-                    }
-
-                    return await GetFormattedDocumentAsync(
-                        documentWithoutFinalFormatting, invocationNameToken, cancellationToken).ConfigureAwait(false);
-                });
+                cancellationToken => PerformExtractMethodAsync(
+                    this.OriginalSelectionResult, this.LocalFunction, analyzeResult, cancellationToken));
 
             bool CanAddTo(Document document, SyntaxNode insertionPointNode, out OperationStatus status)
             {
@@ -142,6 +107,51 @@ internal abstract partial class AbstractExtractMethodService<
                 status = OperationStatus.SucceededStatus;
                 return true;
             }
+        }
+
+        private static async Task<(Document document, SyntaxToken? invocationNameToken)> PerformExtractMethodAsync(
+            TSelectionResult originalSelectionResult,
+            bool localFunction,
+            AnalyzerResult analyzeResult,
+            CancellationToken cancellationToken)
+        {
+            // We're about to start mutating the document.  Annotate the original document so we can track where
+            // the original selection moves to as we make changes.
+            var selectionResult = this.OriginalSelectionResult.GetAnnotatedResult();
+
+            var (analyzedDocument, insertionPoint) = await GetAnnotatedDocumentAndInsertionPointAsync(
+                originalSemanticDocument, analyzeResult, insertionPointNode, cancellationToken).ConfigureAwait(false);
+
+            var triviaResult = await PreserveTriviaAsync(analyzedDocument.Root, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var generatedCode = await GenerateCodeAsync(
+                insertionPoint.With(triviaResult.SemanticDocument),
+                (TSelectionResult)OriginalSelectionResult.With(triviaResult.SemanticDocument),
+                analyzeResult,
+                Options,
+                cancellationToken).ConfigureAwait(false);
+
+            var afterTriviaRestored = await triviaResult.ApplyAsync(generatedCode, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var documentWithoutFinalFormatting = afterTriviaRestored.Document;
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var newRoot = afterTriviaRestored.Root;
+            var invocationNameToken = GetInvocationNameToken(newRoot.GetAnnotatedTokens(generatedCode.MethodNameAnnotation));
+
+            // Do some final patchups of whitespace when inserting a local function.
+            if (localFunction)
+            {
+                var methodDefinition = newRoot.GetAnnotatedNodesAndTokens(generatedCode.MethodDefinitionAnnotation).FirstOrDefault().AsNode();
+                (documentWithoutFinalFormatting, invocationNameToken) = await InsertNewLineBeforeLocalFunctionIfNecessaryAsync(
+                    documentWithoutFinalFormatting, invocationNameToken, methodDefinition, cancellationToken).ConfigureAwait(false);
+            }
+
+            return await GetFormattedDocumentAsync(
+                documentWithoutFinalFormatting, invocationNameToken, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<(Document document, SyntaxToken? invocationNameToken)> GetFormattedDocumentAsync(
@@ -177,11 +187,9 @@ internal abstract partial class AbstractExtractMethodService<
             SyntaxNode insertionPointNode,
             CancellationToken cancellationToken)
         {
-            var annotations = new List<(SyntaxToken, SyntaxAnnotation)>(analyzeResult.Variables.Length);
+            var tokenMap = new MultiDictionary<SyntaxToken, SyntaxAnnotation>();
             foreach (var variable in analyzeResult.Variables)
-                variable.AddIdentifierTokenAnnotationPair(annotations, cancellationToken);
-
-            var tokenMap = annotations.GroupBy(p => p.Item1, p => p.Item2).ToDictionary(g => g.Key, g => g.ToArray());
+                variable.AddIdentifierTokenAnnotationPair(tokenMap, cancellationToken);
 
             var insertionPointAnnotation = new SyntaxAnnotation();
 
@@ -211,7 +219,7 @@ internal abstract partial class AbstractExtractMethodService<
             var semanticModel = OriginalSelectionResult.SemanticDocument.SemanticModel;
 
             // sync selection result to same semantic data as analyzeResult
-            var firstToken = OriginalSelectionResult.GetFirstTokenInSelection();
+            var firstToken = OriginalSelectionResult.FirstTokenInSelection;
             var context = firstToken.Parent;
 
             status = TryCheckVariableType(semanticModel, context, analyzeResult.GetVariablesToMoveIntoMethodDefinition(cancellationToken), status);

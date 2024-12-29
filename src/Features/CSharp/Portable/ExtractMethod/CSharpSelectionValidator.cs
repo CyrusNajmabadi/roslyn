@@ -59,19 +59,17 @@ internal sealed partial class CSharpExtractMethodService
             return selectionInfo;
         }
 
-        protected override Task<CSharpSelectionResult> CreateSelectionResultAsync(
-            SelectionInfo selectionInfo, CancellationToken cancellationToken)
+        protected override CSharpSelectionResult CreateSelectionResult(SelectionInfo selectionInfo)
         {
             Contract.ThrowIfFalse(ContainsValidSelection);
             Contract.ThrowIfFalse(selectionInfo.Status.Succeeded);
 
             var selectionChanged = selectionInfo.FirstTokenInOriginalSpan != selectionInfo.FirstTokenInFinalSpan || selectionInfo.LastTokenInOriginalSpan != selectionInfo.LastTokenInFinalSpan;
 
-            return CSharpSelectionResult.CreateAsync(
+            return CSharpSelectionResult.Create(
                 SemanticDocument,
                 selectionInfo,
-                selectionChanged,
-                cancellationToken);
+                selectionChanged);
         }
 
         private SelectionInfo ApplySpecialCases(SelectionInfo selectionInfo, SourceText text, ParseOptions options, bool localFunction)

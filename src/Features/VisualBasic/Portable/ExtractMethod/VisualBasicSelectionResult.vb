@@ -18,23 +18,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
         Friend NotInheritable Class VisualBasicSelectionResult
             Inherits SelectionResult
 
-            Public Shared Async Function CreateResultAsync(
+            Public Shared Function CreateResult(
                     document As SemanticDocument,
                     selectionInfo As SelectionInfo,
-                    selectionChanged As Boolean,
-                    cancellationToken As CancellationToken) As Task(Of VisualBasicSelectionResult)
+                    selectionChanged As Boolean) As VisualBasicSelectionResult
 
                 Contract.ThrowIfNull(document)
 
-                Dim root = document.Root
-                Dim newDocument = Await SemanticDocument.CreateAsync(document.Document.WithSyntaxRoot(AddAnnotations(
-                    root, {(selectionInfo.FirstTokenInFinalSpan, s_firstTokenAnnotation), (selectionInfo.LastTokenInFinalSpan, s_lastTokenAnnotation)})), cancellationToken).ConfigureAwait(False)
+                'Dim root = document.Root
+                'Dim newDocument = Await SemanticDocument.CreateAsync(document.Document.WithSyntaxRoot(AddAnnotations(
+                '    root, {(selectionInfo.FirstTokenInFinalSpan, s_firstTokenAnnotation), (selectionInfo.LastTokenInFinalSpan, s_lastTokenAnnotation)})), cancellationToken).ConfigureAwait(False)
 
                 Return New VisualBasicSelectionResult(
-                    newDocument,
+                    document,
                     selectionInfo.GetSelectionType(),
                     selectionInfo.OriginalSpan,
                     selectionInfo.FinalSpan,
+                    selectionInfo.FirstTokenInFinalSpan,
+                    selectionInfo.LastTokenInFinalSpan,
                     selectionChanged)
             End Function
 
@@ -43,6 +44,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
                 selectionType As SelectionType,
                 originalSpan As TextSpan,
                 finalSpan As TextSpan,
+                firstTokenInSelection As SyntaxToken,
+                lastTokenInSelection As SyntaxToken,
                 selectionChanged As Boolean)
 
                 MyBase.New(
@@ -50,6 +53,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
                     selectionType,
                     originalSpan,
                     finalSpan,
+                    firstTokenInSelection,
+                    lastTokenInSelection,
                     selectionChanged)
             End Sub
 
@@ -122,10 +127,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             Public Overrides Function GetContainingScope() As SyntaxNode
                 Contract.ThrowIfNull(Me.SemanticDocument)
 
-                Dim first = GetFirstTokenInSelection()
+                Dim first = Me.FirstTokenInSelection
 
                 If IsExtractMethodOnExpression Then
-                    Dim last = GetLastTokenInSelection()
+                    Dim last = Me.LastTokenInSelection
 
                     Dim scope = first.GetCommonRoot(last).GetAncestorOrThis(Of ExpressionSyntax)()
                     Contract.ThrowIfNull(scope, "Should always find an expression given that SelectionInExpression was true")
@@ -230,8 +235,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             Public Overrides Function GetFirstStatementUnderContainer() As ExecutableStatementSyntax
                 Contract.ThrowIfTrue(IsExtractMethodOnExpression)
 
-                Dim firstToken = GetFirstTokenInSelection()
-                Dim lastToken = GetLastTokenInSelection()
+                Dim firstToken = Me.FirstTokenInSelection
+                Dim lastToken = Me.LastTokenInSelection
                 Dim commonRoot = firstToken.GetCommonRoot(lastToken)
 
                 Dim statement As ExecutableStatementSyntax
@@ -306,8 +311,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             End Function
 
             Public Function ContainsInstanceExpression() As Boolean
-                Dim first = GetFirstTokenInSelection()
-                Dim last = GetLastTokenInSelection()
+                Dim first = Me.FirstTokenInSelection
+                Dim last = Me.LastTokenInSelection
                 Dim node = first.GetCommonRoot(last)
 
                 Return node.DescendantNodesAndSelf(
@@ -404,8 +409,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
             End Function
 
             Private Function ContainsAllStaticLocalUsagesDefinedInSelectionIfExist() As Boolean
-                If Me.GetFirstTokenInSelection().GetAncestor(Of FieldDeclarationSyntax)() IsNot Nothing OrElse
-                   Me.GetFirstTokenInSelection().GetAncestor(Of PropertyStatementSyntax)() IsNot Nothing Then
+                If Me.FirstTokenInSelection.GetAncestor(Of FieldDeclarationSyntax)() IsNot Nothing OrElse
+                   Me.FirstTokenInSelection.GetAncestor(Of PropertyStatementSyntax)() IsNot Nothing Then
                     ' static local can't exist in field initializer
                     Return True
                 End If
@@ -414,7 +419,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExtractMethod
 
                 Dim semanticModel = Me.SemanticDocument.SemanticModel
                 If Me.IsExtractMethodOnExpression Then
-                    Dim expression = Me.GetFirstTokenInSelection().GetCommonRoot(Me.GetLastTokenInSelection()).GetAncestorOrThis(Of ExpressionSyntax)()
+                    Dim expression = Me.FirstTokenInSelection.GetCommonRoot(Me.LastTokenInSelection).GetAncestorOrThis(Of ExpressionSyntax)()
                     result = SemanticModel.AnalyzeDataFlow(expression)
                 Else
                     Dim range = Me.GetFlowAnalysisNodeRange()

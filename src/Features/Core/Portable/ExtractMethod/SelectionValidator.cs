@@ -34,11 +34,11 @@ internal abstract partial class AbstractExtractMethodService<
 
         protected abstract SelectionInfo UpdateSelectionInfo(
             SelectionInfo selectionInfo, TStatementSyntax? firstStatement, TStatementSyntax? lastStatement, CancellationToken cancellationToken);
-        protected abstract Task<TSelectionResult> CreateSelectionResultAsync(SelectionInfo selectionInfo, CancellationToken cancellationToken);
+        protected abstract TSelectionResult CreateSelectionResult(SelectionInfo selectionInfo);
 
         protected abstract bool AreStatementsInSameContainer(TStatementSyntax statement1, TStatementSyntax statement2);
 
-        public async Task<(TSelectionResult?, OperationStatus)> GetValidSelectionAsync(CancellationToken cancellationToken)
+        public (TSelectionResult?, OperationStatus) GetValidSelection(CancellationToken cancellationToken)
         {
             if (!this.ContainsValidSelection)
                 return (null, OperationStatus.FailedWithUnknownReason);
@@ -71,7 +71,7 @@ internal abstract partial class AbstractExtractMethodService<
                 return (null, selectionInfo.Status.With(succeeded: false, FeaturesResources.Cannot_determine_valid_range_of_statements_to_extract));
             }
 
-            var selectionResult = await CreateSelectionResultAsync(selectionInfo, cancellationToken).ConfigureAwait(false);
+            var selectionResult = CreateSelectionResult(selectionInfo);
 
             var status = selectionInfo.Status.With(
                 selectionResult.ValidateSelectionResult(cancellationToken));

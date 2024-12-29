@@ -28,10 +28,12 @@ internal abstract partial class AbstractExtractMethodService<
         SelectionType selectionType,
         TextSpan originalSpan,
         TextSpan finalSpan,
+        SyntaxToken firstTokenInSelection,
+        SyntaxToken lastTokenInSelection,
         bool selectionChanged)
     {
-        protected static readonly SyntaxAnnotation s_firstTokenAnnotation = new();
-        protected static readonly SyntaxAnnotation s_lastTokenAnnotation = new();
+        //protected static readonly SyntaxAnnotation s_firstTokenAnnotation = new();
+        //protected static readonly SyntaxAnnotation s_lastTokenAnnotation = new();
 
         private bool? _createAsyncMethod;
 
@@ -40,6 +42,9 @@ internal abstract partial class AbstractExtractMethodService<
         public TextSpan FinalSpan { get; } = finalSpan;
         public SelectionType SelectionType { get; } = selectionType;
         public bool SelectionChanged { get; } = selectionChanged;
+
+        public SyntaxToken FirstTokenInSelection { get; private set; } = firstTokenInSelection;
+        public SyntaxToken LastTokenInSelection { get; private set; } = lastTokenInSelection;
 
         protected abstract ISyntaxFacts SyntaxFacts { get; }
         protected abstract bool UnderAnonymousOrLocalMethod(SyntaxToken token, SyntaxToken firstToken, SyntaxToken lastToken);
@@ -85,11 +90,11 @@ internal abstract partial class AbstractExtractMethodService<
             return clone;
         }
 
-        public SyntaxToken GetFirstTokenInSelection()
-            => SemanticDocument.GetTokenWithAnnotation(s_firstTokenAnnotation);
+        //public SyntaxToken GetFirstTokenInSelection()
+        //    =>  SemanticDocument.GetTokenWithAnnotation(s_firstTokenAnnotation);
 
-        public SyntaxToken GetLastTokenInSelection()
-            => SemanticDocument.GetTokenWithAnnotation(s_lastTokenAnnotation);
+        //public SyntaxToken GetLastTokenInSelection()
+        //    => SemanticDocument.GetTokenWithAnnotation(s_lastTokenAnnotation);
 
         public TNode? GetContainingScopeOf<TNode>() where TNode : SyntaxNode
         {
@@ -101,7 +106,7 @@ internal abstract partial class AbstractExtractMethodService<
         {
             Contract.ThrowIfTrue(IsExtractMethodOnExpression);
 
-            var token = GetFirstTokenInSelection();
+            var token = this.FirstTokenInSelection;
             return token.GetRequiredAncestor<TExecutableStatementSyntax>();
         }
 
@@ -109,7 +114,7 @@ internal abstract partial class AbstractExtractMethodService<
         {
             Contract.ThrowIfTrue(IsExtractMethodOnExpression);
 
-            var token = GetLastTokenInSelection();
+            var token = this.LastTokenInSelection;
             return token.GetRequiredAncestor<TExecutableStatementSyntax>();
         }
 
@@ -120,8 +125,8 @@ internal abstract partial class AbstractExtractMethodService<
 
             bool CreateAsyncMethodWorker()
             {
-                var firstToken = GetFirstTokenInSelection();
-                var lastToken = GetLastTokenInSelection();
+                var firstToken = this.FirstTokenInSelection;
+                var lastToken = this.LastTokenInSelection;
                 var syntaxFacts = SemanticDocument.GetRequiredLanguageService<ISyntaxFactsService>();
 
                 for (var currentToken = firstToken;
@@ -149,8 +154,8 @@ internal abstract partial class AbstractExtractMethodService<
         {
             var syntaxFacts = SemanticDocument.GetRequiredLanguageService<ISyntaxFactsService>();
 
-            var firstToken = GetFirstTokenInSelection();
-            var lastToken = GetLastTokenInSelection();
+            var firstToken = this.FirstTokenInSelection;
+            var lastToken = this.LastTokenInSelection;
 
             var span = TextSpan.FromBounds(firstToken.SpanStart, lastToken.Span.End);
 
