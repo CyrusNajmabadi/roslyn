@@ -157,13 +157,10 @@ internal sealed class ParameterSymbolReferenceFinder : AbstractReferenceFinder<I
 
     private static bool ParameterNamesMatch(ISyntaxFactsService syntaxFacts, IMethodSymbol methodSymbol1, IMethodSymbol methodSymbol2)
     {
-        for (int i = 0, n = methodSymbol1.Parameters.Length; i < n; i++)
-        {
-            if (!syntaxFacts.TextMatch(methodSymbol1.Parameters[i].Name, methodSymbol2.Parameters[i].Name))
-                return false;
-        }
-
-        return true;
+        return methodSymbol1.Parameters.SequenceEqual(
+            methodSymbol2.Parameters,
+            syntaxFacts,
+            static (p1, p2, syntaxFacts) => syntaxFacts.TextMatch(p1.Name, p2.Name));
     }
 
     private static SyntaxNode? GetContainer(SemanticModel semanticModel, SyntaxNode parameterNode, ISyntaxFactsService syntaxFactsService)

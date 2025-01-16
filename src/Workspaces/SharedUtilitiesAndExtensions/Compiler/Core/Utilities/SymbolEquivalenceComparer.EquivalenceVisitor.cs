@@ -466,21 +466,10 @@ internal sealed partial class SymbolEquivalenceComparer
         {
             // Note the special parameter comparer we pass in.  We do this so we don't end up
             // infinitely looping between parameters -> type parameters -> methods -> parameters
-            var count = xParameters.Length;
-            if (yParameters.Length != count)
-            {
-                return false;
-            }
-
-            for (var i = 0; i < count; i++)
-            {
-                if (!symbolEquivalenceComparer.ParameterEquivalenceComparer.Equals(xParameters[i], yParameters[i], equivalentTypesWithDifferingAssemblies, compareParameterName, isParameterNameCaseSensitive))
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return xParameters.SequenceEqual(
+                yParameters,
+                (symbolEquivalenceComparer, equivalentTypesWithDifferingAssemblies, compareParameterName, isParameterNameCaseSensitive),
+                static (p1, p2, t) => t.symbolEquivalenceComparer.ParameterEquivalenceComparer.Equals(p1, p2, t.equivalentTypesWithDifferingAssemblies, t.compareParameterName, t.isParameterNameCaseSensitive));
         }
 
         internal bool ReturnTypesAreEquivalent(IMethodSymbol x, IMethodSymbol y, Dictionary<INamedTypeSymbol, INamedTypeSymbol>? equivalentTypesWithDifferingAssemblies = null)

@@ -524,15 +524,9 @@ internal static partial class ISymbolExtensions
                 return false;
             }
 
-            for (var i = 0; i < left.Parameters.Length; i++)
-            {
-                if (!left.Parameters[i].Type.Equals(right.Parameters[i].Type))
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return left.Parameters.SequenceEqual(
+                right.Parameters,
+                static (p1, p2) => p1.Type.Equals(p2.Type));
         }
 
         static string BuildXPathForElement(XElement element)

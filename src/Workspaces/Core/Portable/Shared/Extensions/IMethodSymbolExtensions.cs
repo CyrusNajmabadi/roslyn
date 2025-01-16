@@ -43,15 +43,9 @@ internal static partial class IMethodSymbolExtensions
             return false;
         }
 
-        for (var i = 0; i < method.Parameters.Length; i++)
-        {
-            if (!invoke.Parameters[i].Type.InheritsFromOrEquals(method.Parameters[i].Type))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return invoke.Parameters.SequenceEqual(
+            method.Parameters,
+            static (p1, p2) => p1.Type.InheritsFromOrEquals(p2.Type))
     }
 
     public static bool? IsMoreSpecificThan(this IMethodSymbol method1, IMethodSymbol method2)
