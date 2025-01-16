@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable disable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -52,7 +50,6 @@ internal sealed class SignatureComparer
     public bool HaveSameSignature(IPropertySymbol property1, IPropertySymbol property2, bool caseSensitive)
     {
         if (!IdentifiersMatch(property1.Name, property2.Name, caseSensitive) ||
-            property1.Parameters.Length != property2.Parameters.Length ||
             property1.IsIndexer != property2.IsIndexer)
         {
             return false;
@@ -63,7 +60,7 @@ internal sealed class SignatureComparer
             this.ParameterEquivalenceComparer);
     }
 
-    public static bool BadPropertyAccessor(IMethodSymbol method1, IMethodSymbol method2)
+    public static bool BadPropertyAccessor(IMethodSymbol? method1, IMethodSymbol? method2)
     {
         return method1 != null &&
             (method2 == null || method2.DeclaredAccessibility != Accessibility.Public);
@@ -81,16 +78,16 @@ internal sealed class SignatureComparer
             return false;
         }
 
-        if (method1.MethodKind != MethodKind.AnonymousFunction)
-        {
-            if (!IdentifiersMatch(method1.Name, method2.Name, caseSensitive))
-                return false;
-        }
-
         if (method1.MethodKind != method2.MethodKind ||
             method1.Arity != method2.Arity)
         {
             return false;
+        }
+
+        if (method1.MethodKind != MethodKind.AnonymousFunction)
+        {
+            if (!IdentifiersMatch(method1.Name, method2.Name, caseSensitive))
+                return false;
         }
 
         return HaveSameSignature(method1.Parameters, method2.Parameters, compareParameterName, isParameterCaseSensitive);
@@ -107,9 +104,6 @@ internal sealed class SignatureComparer
         ImmutableArray<IParameterSymbol> parameters1,
         ImmutableArray<IParameterSymbol> parameters2)
     {
-        if (parameters1.Length != parameters2.Length)
-            return false;
-
         return parameters1.SequenceEqual(parameters2, this.ParameterEquivalenceComparer);
     }
 
@@ -119,16 +113,10 @@ internal sealed class SignatureComparer
         bool compareParameterName,
         bool isCaseSensitive)
     {
-        if (parameters1.Length != parameters2.Length)
-            return false;
-
-        for (var i = 0; i < parameters1.Length; ++i)
-        {
-            if (!_symbolEquivalenceComparer.ParameterEquivalenceComparer.Equals(parameters1[i], parameters2[i], compareParameterName, isCaseSensitive))
-                return false;
-        }
-
-        return true;
+        return parameters1.SequenceEqual(
+            parameters2,
+            (compareParameterName, isCaseSensitive, _symbolEquivalenceComparer),
+            static (p1, p2, t) => t._symbolEquivalenceComparer.ParameterEquivalenceComparer.Equals(p1, p2, t.compareParameterName, t.isCaseSensitive));
     }
 
     public bool HaveSameSignatureAndConstraintsAndReturnTypeAndAccessors(ISymbol symbol1, ISymbol symbol2, bool caseSensitive)
@@ -158,10 +146,7 @@ internal sealed class SignatureComparer
         switch (symbol1.Kind)
         {
             case SymbolKind.Method:
-                var method1 = (IMethodSymbol)symbol1;
-                var method2 = (IMethodSymbol)symbol2;
-
-                return HaveSameSignatureAndConstraintsAndReturnType(method1, method2);
+                return HaveSameSignatureAndConstraintsAndReturnType((IMethodSymbol)symbol1, (IMethodSymbol)symbol2);
             case SymbolKind.Property:
                 var property1 = (IPropertySymbol)symbol1;
                 var property2 = (IPropertySymbol)symbol2;
@@ -170,10 +155,7 @@ internal sealed class SignatureComparer
                        property1.ReturnsByRefReadonly == property2.ReturnsByRefReadonly &&
                        this.SignatureTypeEquivalenceComparer.Equals(property1.Type, property2.Type);
             case SymbolKind.Event:
-                var ev1 = (IEventSymbol)symbol1;
-                var ev2 = (IEventSymbol)symbol2;
-
-                return HaveSameReturnType(ev1, ev2);
+                return HaveSameReturnType((IEventSymbol)symbol1, (IEventSymbol)symbol2);
         }
 
         return true;
@@ -216,16 +198,8 @@ internal sealed class SignatureComparer
         if (!method1.ReturnsVoid && !this.SignatureTypeEquivalenceComparer.Equals(method1.ReturnType, method2.ReturnType))
             return false;
 
-        for (var i = 0; i < method1.TypeParameters.Length; i++)
-        {
-            var typeParameter1 = method1.TypeParameters[i];
-            var typeParameter2 = method2.TypeParameters[i];
-
-            if (!HaveSameConstraints(typeParameter1, typeParameter2))
-                return false;
-        }
-
-        return true;
+        return method1.TypeParameters.SequenceEqual(
+            method2.TypeParameters, this, static (t1, t2, @this) => @this.HaveSameConstraints(t1, t2));
     }
 
     private bool HaveSameConstraints(ITypeParameterSymbol typeParameter1, ITypeParameterSymbol typeParameter2)
