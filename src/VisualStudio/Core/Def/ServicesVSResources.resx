@@ -964,8 +964,8 @@ Additional information: {1}</value>
   <data name="_0_will_be_changed_to_non_static" xml:space="preserve">
     <value>'{0}' will be changed to non-static.</value>
   </data>
-  <data name="_0_will_be_changed_to_public" xml:space="preserve">
-    <value>'{0}' will be changed to public.</value>
+  <data name="_0_will_change_accessibility" xml:space="preserve">
+    <value>'{0}' will change accessibility.</value>
   </data>
   <data name="Calculating_dependents" xml:space="preserve">
     <value>Calculating dependents...</value>

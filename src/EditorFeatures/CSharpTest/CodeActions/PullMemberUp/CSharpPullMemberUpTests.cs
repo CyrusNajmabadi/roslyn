@@ -4,23 +4,24 @@
 
 #nullable disable
 
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.AddImport;
+using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.CodeRefactorings.PullMemberUp.Dialog;
 using Microsoft.CodeAnalysis.CSharp.CodeRefactorings.PullMemberUp;
 using Microsoft.CodeAnalysis.CSharp.CodeStyle;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings;
+using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
 using Microsoft.CodeAnalysis.Test.Utilities;
-using Xunit;
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.CodeActions;
-using Microsoft.CodeAnalysis.CodeRefactorings.PullMemberUp.Dialog;
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Test.Utilities.PullMemberUp;
 using Roslyn.Test.Utilities;
-using Microsoft.CodeAnalysis.Editing;
-using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
+using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.PullMemberUp;
 
@@ -4248,8 +4249,8 @@ public class Bar : BaseClass
     #region Dialog
 
     internal Task TestWithPullMemberDialogAsync(
-        string initialMarkUp,
-        string expectedResult,
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string initialMarkUp,
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string expectedResult,
         IEnumerable<(string name, bool makeAbstract)> selection = null,
         string destinationName = null,
         int index = 0,

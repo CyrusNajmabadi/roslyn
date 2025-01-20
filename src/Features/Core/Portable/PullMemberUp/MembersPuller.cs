@@ -131,9 +131,9 @@ internal static class MembersPuller
                 }
                 else
                 {
-                    if (analysisResult.ChangeOriginalToNonStatic || analysisResult.ChangeOriginalToPublic)
+                    if (analysisResult.ChangeOriginalToNonStatic || analysisResult.Accessibility != analysisResult.Member.DeclaredAccessibility)
                     {
-                        ChangeMemberToPublicAndNonStatic(
+                        ChangeMemberModifiers(
                             codeGenerationService, originalMemberEditor,
                             declaration, analysisResult.Member,
                             info, cancellationToken);
@@ -154,7 +154,7 @@ internal static class MembersPuller
         {
             // Property is treated differently since we need to make sure it gives right accessor symbol to ICodeGenerationService,
             // otherwise ICodeGenerationService won't give the expected declaration.
-            if (analysisResult.ChangeOriginalToPublic)
+            if (analysisResult.Accessibility != analysisResult.Member.DeclaredAccessibility)
             {
                 // We are pulling a non-public property, change its getter/setter to public and itself to be public.
                 return CodeGenerationSymbolFactory.CreatePropertySymbol(
@@ -191,7 +191,7 @@ internal static class MembersPuller
         return member;
     }
 
-    private static void ChangeMemberToPublicAndNonStatic(
+    private static void ChangeMemberModifiers(
         ICodeGenerationService codeGenerationService,
         DocumentEditor editor,
         SyntaxNode memberDeclaration,
@@ -309,10 +309,9 @@ internal static class MembersPuller
 
         var syntaxFacts = destinationEditor.OriginalDocument.GetRequiredLanguageService<ISyntaxFactsService>();
 
-        // Remove some original members since we are pulling members into class.
-        // Note: If the user chooses to make the member abstract, then the original member will be changed to an override,
-        // and it will pull an abstract declaration up to the destination.
-        // But if the member is abstract itself, it will still be removed.
+        // Remove some original members since we are pulling members into class. Note: If the user chooses to make the
+        // member abstract, then the original member will be changed to an override, and it will pull an abstract
+        // declaration up to the destination. But if the member is abstract itself, it will still be removed.
         foreach (var analysisResult in result.MemberAnalysisResults)
         {
             var resultNamespace = analysisResult.Member.ContainingNamespace;
@@ -350,7 +349,8 @@ internal static class MembersPuller
 
         // Change the destination to abstract class if needed.
         if (!result.Destination.IsAbstract &&
-            result.MemberAnalysisResults.Any(static analysis => analysis.Member.IsAbstract || analysis.MakeMemberDeclarationAbstract))
+            result.MemberAnalysisResults.Any(
+                static analysis => analysis.Member.IsAbstract || analysis.MakeMemberDeclarationAbstract))
         {
             var modifiers = DeclarationModifiers.From(result.Destination).WithIsAbstract(true);
             newDestination = destinationEditor.Generator.WithModifiers(newDestination, modifiers);

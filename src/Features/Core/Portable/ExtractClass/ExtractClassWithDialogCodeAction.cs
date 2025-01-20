@@ -131,7 +131,7 @@ internal sealed class ExtractClassWithDialogCodeAction(
             extractClassOptions.MemberAnalysisResults,
             cancellationToken).ConfigureAwait(false);
 
-        return new[] { new ApplyChangesOperation(finalSolution) };
+        return [new ApplyChangesOperation(finalSolution)];
     }
 
     private async Task<Solution> PullMembersUpAsync(

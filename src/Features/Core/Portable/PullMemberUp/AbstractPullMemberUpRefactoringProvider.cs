@@ -59,13 +59,13 @@ internal abstract partial class AbstractPullMemberUpRefactoringProvider(IPullMem
             return;
 
         context.RegisterRefactoring(CodeAction.Create(
-                selectedMembers.IsSingle()
-                    ? string.Format(FeaturesResources.Pull_0_up_to, selectedMembers.Single().ToNameDisplayString())
-                    : FeaturesResources.Pull_selected_members_up,
+            selectedMembers is [var singleMember]
+                ? string.Format(FeaturesResources.Pull_0_up_to, singleMember.ToNameDisplayString())
+                : FeaturesResources.Pull_selected_members_up,
                 [
-                    .. allDestinations.Select(destination => MembersPuller.TryComputeCodeAction(document, selectedMembers, destination))
-                        .WhereNotNull()
-,
+                    .. allDestinations
+                        .Select(destination => MembersPuller.TryComputeCodeAction(document, selectedMembers, destination))
+                        .WhereNotNull(),
                     new PullMemberUpWithDialogCodeAction(document, selectedMembers, _service),
                 ],
                 isInlinable: false),

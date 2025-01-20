@@ -8,7 +8,7 @@ namespace Microsoft.CodeAnalysis.PullMemberUp;
 
 internal readonly struct MemberAnalysisResult(
     ISymbol member,
-    bool changeOriginalToPublic,
+    Accessibility accessibility,
     bool changeOriginalToNonStatic,
     bool makeMemberDeclarationAbstract,
     bool changeDestinationTypeToAbstract)
@@ -19,9 +19,9 @@ internal readonly struct MemberAnalysisResult(
     public readonly ISymbol Member = member;
 
     /// <summary>
-    /// Indicate whether this member needs to be changed to public so it won't cause error after it is pulled up to destination.
+    /// The desired final accessibility of the member.
     /// </summary>
-    public readonly bool ChangeOriginalToPublic = changeOriginalToPublic;
+    public readonly Accessibility Accessibility = accessibility;
 
     /// <summary>
     /// Indicate whether this member needs to be changed to non-static so it won't cause error after it is pulled up to destination.
@@ -45,5 +45,5 @@ internal readonly struct MemberAnalysisResult(
     /// <summary>
     /// Indicate whether it would cause error if we directly pull Member into destination.
     /// </summary>
-    public bool PullMemberUpNeedsToDoExtraChanges => ChangeOriginalToPublic || ChangeOriginalToNonStatic || ChangeDestinationTypeToAbstract;
+    public bool PullMemberUpNeedsToDoExtraChanges => Accessibility != Member.DeclaredAccessibility || ChangeOriginalToNonStatic || ChangeDestinationTypeToAbstract;
 }

@@ -1877,9 +1877,9 @@
         <target state="translated">“{0}”将更改为“非静态”。</target>
         <note />
       </trans-unit>
-      <trans-unit id="_0_will_be_changed_to_public">
-        <source>'{0}' will be changed to public.</source>
-        <target state="translated">“{0}”将更改为“公共”。</target>
+      <trans-unit id="_0_will_change_accessibility">
+        <source>'{0}' will change accessibility.</source>
+        <target state="new">'{0}' will change accessibility.</target>
         <note />
       </trans-unit>
       <trans-unit id="_Highlight_matching_portions_of_completion_list_items">
