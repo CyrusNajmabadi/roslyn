@@ -16,6 +16,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.LanguageService;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.LanguageService;
@@ -378,6 +379,23 @@ internal class CSharpDeclaredSymbolInfoFactoryService : AbstractDeclaredSymbolIn
                     property.Identifier.Span,
                     inheritanceNames: []));
                 return;
+            case SyntaxKind.OperatorDeclaration:
+                var op = (OperatorDeclarationSyntax)node;
+                declaredSymbolInfos.Add(DeclaredSymbolInfo.Create(
+                    stringTable,
+                    name: "",
+                    nameSuffix: null,
+                    containerDisplayName: null,
+                    fullyQualifiedContainerName,
+                    isPartial: false,
+                    op.AttributeLists.Any(),
+                    DeclaredSymbolInfoKind.Operator,
+                    GetAccessibility(container, op.Modifiers),
+                    op.OperatorToken.Span,
+                    inheritanceNames: [],
+                    parameterCount: op.ParameterList.Parameters.Count,
+                    operatorKind: GetOperatorKind(op)));
+                return;
             case SyntaxKind.FieldDeclaration:
             case SyntaxKind.EventFieldDeclaration:
                 var fieldDeclaration = (BaseFieldDeclarationSyntax)node;
@@ -404,6 +422,15 @@ internal class CSharpDeclaredSymbolInfoFactoryService : AbstractDeclaredSymbolIn
 
                 return;
         }
+    }
+
+    private OperatorKind GetOperatorKind(OperatorDeclarationSyntax op)
+    {
+        return (op.OperatorToken.Kind(), op.ParameterList.Parameters.Count) switch
+        {
+
+            _ => DeclaredSymbolInfo.UnsetOperatorKind,
+        };
     }
 
     protected override void AddSynthesizedDeclaredSymbolInfos(

@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Threading;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
@@ -30,6 +31,7 @@ internal enum DeclaredSymbolInfoKind : byte
     Method,
     Module,
     Namespace,
+    Operator,
     Property,
     Record,
     RecordStruct,
@@ -88,13 +90,17 @@ internal readonly struct DeclaredSymbolInfo(
     [DataMember(Order = 5)]
     public ImmutableArray<string> InheritanceNames { get; } = inheritanceNames;
 
-    // Store the kind (5 bits), accessibility (4 bits), parameter-count (4 bits), and type-parameter-count (4 bits)
-    // in a single int.
+    /// <summary>
+    /// Store the kind (5 bits), accessibility (4 bits), parameter-count (4 bits), type-parameter-count (4 bits), and
+    /// the <see cref="OperatorKind"/> in a single uint.
+    /// </summary>
     [DataMember(Order = 6)]
     private readonly uint _flags = flags;
 
     private const uint Lower4BitMask = 0b1111;
     private const uint Lower5BitMask = 0b11111;
+
+    public const OperatorKind UnsetOperatorKind = (OperatorKind)Lower5BitMask;
 
     public DeclaredSymbolInfoKind Kind => GetKind(_flags);
     public Accessibility Accessibility => GetAccessibility(_flags);
@@ -103,6 +109,7 @@ internal readonly struct DeclaredSymbolInfo(
     public bool IsNestedType => GetIsNestedType(_flags);
     public bool IsPartial => GetIsPartial(_flags);
     public bool HasAttributes => GetHasAttributes(_flags);
+    public OperatorKind? OperatorKind => GetOperatorKind(_flags);
 
     public static DeclaredSymbolInfo Create(
         StringTable stringTable,
@@ -118,17 +125,15 @@ internal readonly struct DeclaredSymbolInfo(
         ImmutableArray<string> inheritanceNames,
         bool isNestedType = false,
         int parameterCount = 0,
-        int typeParameterCount = 0)
+        int typeParameterCount = 0,
+        OperatorKind operatorKind = UnsetOperatorKind)
     {
-        // Max value that we can store depending on how many bits we have to store that particular value in.
-        const uint Max5BitValue = 0b11111;
-        const uint Max4BitValue = 0b1111;
 
-        Contract.ThrowIfTrue((uint)accessibility > Max4BitValue);
-        Contract.ThrowIfTrue((uint)kind > Max5BitValue);
+        Contract.ThrowIfTrue((uint)accessibility > Lower4BitMask);
+        Contract.ThrowIfTrue((uint)kind > Lower5BitMask);
 
-        parameterCount = Math.Min(parameterCount, (byte)Max4BitValue);
-        typeParameterCount = Math.Min(typeParameterCount, (byte)Max4BitValue);
+        parameterCount = Math.Min(parameterCount, (byte)Lower4BitMask);
+        typeParameterCount = Math.Min(typeParameterCount, (byte)Lower4BitMask);
 
         var flags =
             (uint)kind |
@@ -137,7 +142,8 @@ internal readonly struct DeclaredSymbolInfo(
             ((uint)typeParameterCount << 13) |
             ((isNestedType ? 1u : 0u) << 17) |
             ((isPartial ? 1u : 0u) << 18) |
-            ((hasAttributes ? 1u : 0u) << 19);
+            ((hasAttributes ? 1u : 0u) << 19) |
+            ((Lower5BitMask & (uint)operatorKind) << 20);
 
 #pragma warning disable CS0618 // Type or member is obsolete
         return new DeclaredSymbolInfo(
@@ -175,6 +181,15 @@ internal readonly struct DeclaredSymbolInfo(
 
     private static bool GetHasAttributes(uint flags)
         => ((flags >> 19) & 1) == 1;
+
+    private static OperatorKind? GetOperatorKind(uint flags)
+    {
+        var shifted = (flags >> 20) & Lower5BitMask;
+        if (shifted == Lower5BitMask)
+            return null;
+
+        return (OperatorKind)shifted;
+    }
 
     internal void WriteTo(ObjectWriter writer)
     {
@@ -229,9 +244,11 @@ internal readonly struct DeclaredSymbolInfo(
         else
         {
             var message =
-$@"Invalid span in {nameof(DeclaredSymbolInfo)}.
-{nameof(this.Span)} = {this.Span}
-{nameof(root.FullSpan)} = {root.FullSpan}";
+                $"""
+                Invalid span in {nameof(DeclaredSymbolInfo)}.
+                {nameof(this.Span)} = {this.Span}
+                {nameof(root.FullSpan)} = {root.FullSpan}
+                """;
 
             FatalError.ReportAndCatch(new InvalidOperationException(message));
 

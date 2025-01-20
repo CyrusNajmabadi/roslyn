@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.PatternMatching;
 using Microsoft.CodeAnalysis.PooledObjects;
@@ -41,6 +42,7 @@ internal abstract partial class AbstractNavigateToSearchService
         Document document,
         string patternName,
         string? patternContainer,
+        OperatorKind operatorKind,
         DeclaredSymbolInfoKindSet kinds,
         Action<RoslynNavigateToItem> onItemFound,
         CancellationToken cancellationToken)
@@ -61,7 +63,8 @@ internal abstract partial class AbstractNavigateToSearchService
         }
 
         ProcessIndex(
-            DocumentKey.ToDocumentKey(document), document, patternName, patternContainer, kinds,
+            DocumentKey.ToDocumentKey(document), document,
+            patternName, patternContainer, operatorKind, kinds,
             index, linkedIndices, onItemFound, cancellationToken);
     }
 
@@ -70,6 +73,7 @@ internal abstract partial class AbstractNavigateToSearchService
         Document? document,
         string patternName,
         string? patternContainer,
+        OperatorKind operatorKind,
         DeclaredSymbolInfoKindSet kinds,
         TopLevelSyntaxTreeIndex index,
         ArrayBuilder<(TopLevelSyntaxTreeIndex, ProjectId)>? linkedIndices,
@@ -86,6 +90,9 @@ internal abstract partial class AbstractNavigateToSearchService
         using var nameMatcher = PatternMatcher.CreatePatternMatcher(patternName, includeMatchedSpans: true, allowFuzzyMatching: true);
         using var _1 = containerMatcher;
 
+        using var nameMatches = TemporaryArray<PatternMatch>.Empty;
+        using var containerMatches = TemporaryArray<PatternMatch>.Empty;
+
         foreach (var declaredSymbolInfo in index.DeclaredSymbolInfos)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -95,12 +102,7 @@ internal abstract partial class AbstractNavigateToSearchService
             if (declaredSymbolInfo.Kind == DeclaredSymbolInfoKind.Namespace)
                 continue;
 
-            using var nameMatches = TemporaryArray<PatternMatch>.Empty;
-            using var containerMatches = TemporaryArray<PatternMatch>.Empty;
-
-            if (kinds.Contains(declaredSymbolInfo.Kind) &&
-                nameMatcher.AddMatches(declaredSymbolInfo.Name, ref nameMatches.AsRef()) &&
-                containerMatcher?.AddMatches(declaredSymbolInfo.FullyQualifiedContainerName, ref containerMatches.AsRef()) != false)
+            if (IsMatch(declaredSymbolInfo))
             {
                 if (cancellationToken.IsCancellationRequested)
                     return;
@@ -120,6 +122,21 @@ internal abstract partial class AbstractNavigateToSearchService
                     documentKey, document, declaredSymbolInfo, nameMatches, containerMatches, additionalMatchingProjects);
                 onItemFound(result);
             }
+        }
+
+        bool IsMatch(DeclaredSymbolInfo declaredSymbolInfo)
+        {
+            if (declaredSymbolInfo.OperatorKind != null)
+                return declaredSymbolInfo.OperatorKind == operatorKind;
+
+            if (kinds.Contains(declaredSymbolInfo.Kind) &&
+                nameMatcher.AddMatches(declaredSymbolInfo.Name, ref nameMatches.AsRef()) &&
+                containerMatcher?.AddMatches(declaredSymbolInfo.FullyQualifiedContainerName, ref containerMatches.AsRef()) != false)
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 
