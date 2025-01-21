@@ -4,6 +4,7 @@
 
 #nullable disable
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -284,15 +285,15 @@ internal static class MembersPuller
         var pullUpMembersSymbols = result.MemberAnalysisResults.SelectAsArray(
             memberResult =>
             {
+                var member = memberResult.Member;
+
+                // Change the member to abstract if user choose to make them abstract
                 if (memberResult.MakeMemberDeclarationAbstract && !memberResult.Member.IsKind(SymbolKind.Field))
-                {
-                    // Change the member to abstract if user choose to make them abstract
-                    return MakeAbstractVersion(memberResult.Member);
-                }
-                else
-                {
-                    return memberResult.Member;
-                }
+                    member = WithModifierChange(member, changeModifiers: m => m.WithIsAbstract(true));
+
+                member = WithModifierChange(member, changeAccessibility: _ => memberResult.Accessibility);
+
+                return member;
             });
 
         var context = new CodeGenerationContext(
@@ -438,30 +439,27 @@ internal static class MembersPuller
                 : syntaxFacts.GetImportsOfBaseNamespaceDeclaration(node));
     }
 
-    private static ISymbol MakeAbstractVersion(ISymbol member)
+    private static ISymbol WithModifierChange(
+        ISymbol member,
+        Func<DeclarationModifiers, DeclarationModifiers> changeModifiers = null,
+        Func<Accessibility, Accessibility> changeAccessibility = null)
     {
-        if (member.IsAbstract)
-        {
-            return member;
-        }
+        var oldModifiers = DeclarationModifiers.From(member);
+        var oldAccessibility = member.DeclaredAccessibility;
 
-        var modifier = DeclarationModifiers.From(member).WithIsAbstract(true);
-        if (member is IMethodSymbol methodSymbol)
+        var newModifiers = changeModifiers?.Invoke(oldModifiers) ?? oldModifiers;
+        var newAccessibility = changeAccessibility?.Invoke(oldAccessibility) ?? oldAccessibility;
+        if (newModifiers == oldModifiers && newAccessibility == oldAccessibility)
+            return member;
+
+        return member switch
         {
-            return CodeGenerationSymbolFactory.CreateMethodSymbol(methodSymbol, modifiers: modifier);
-        }
-        else if (member is IPropertySymbol propertySymbol)
-        {
-            return CodeGenerationSymbolFactory.CreatePropertySymbol(propertySymbol, modifiers: modifier, getMethod: propertySymbol.GetMethod, setMethod: propertySymbol.SetMethod);
-        }
-        else if (member is IEventSymbol eventSymbol)
-        {
-            return CodeGenerationSymbolFactory.CreateEventSymbol(eventSymbol, modifiers: modifier);
-        }
-        else
-        {
-            throw ExceptionUtilities.UnexpectedValue(member);
-        }
+            IMethodSymbol methodSymbol => CodeGenerationSymbolFactory.CreateMethodSymbol(methodSymbol, modifiers: newModifiers),
+            IPropertySymbol propertySymbol => CodeGenerationSymbolFactory.CreatePropertySymbol(propertySymbol, modifiers: newModifiers, getMethod: propertySymbol.GetMethod, setMethod: propertySymbol.SetMethod),
+            IEventSymbol eventSymbol => CodeGenerationSymbolFactory.CreateEventSymbol(eventSymbol, modifiers: newModifiers),
+            IFieldSymbol fieldSymbol => CodeGenerationSymbolFactory.CreateFieldSymbol(fieldSymbol, modifiers: newModifiers),
+            _ => throw ExceptionUtilities.UnexpectedValue(member)
+        };
     }
 
     private static async Task<ImmutableDictionary<ISymbol, ImmutableArray<SyntaxNode>>> InitializeSymbolToDeclarationsMapAsync(

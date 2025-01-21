@@ -39,7 +39,7 @@ internal sealed class PullMembersUpOptionsBuilder
                     ? Accessibility.Protected
                     : member.DeclaredAccessibility;
                 return new MemberAnalysisResult(member,
-                    accessibility: member.DeclaredAccessibility,
+                    desiredAccessibility,
                     changeOriginalToNonStatic: false,
                     makeAbstract,
                     changeDestinationTypeToAbstract: changeDestinationToAbstract);

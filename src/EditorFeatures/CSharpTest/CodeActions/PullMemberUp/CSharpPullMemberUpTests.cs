@@ -3672,7 +3672,7 @@ public sealed class CSharpPullMemberUpTests : AbstractCSharpCodeActionTest
             {
                 public class BaseClass
                 {
-                    private int k = 10;
+                    protected int k = 10;
                 }
             }
                     </Document>
@@ -4800,9 +4800,9 @@ public sealed class CSharpPullMemberUpTests : AbstractCSharpCodeActionTest
             {
                 public class Base2
                 {
-                    private static event EventHandler Event1;
-                    private static event EventHandler Event3;
-                    private static event EventHandler Event4;
+                    protected static event EventHandler Event1;
+                    protected static event EventHandler Event3;
+                    protected static event EventHandler Event4;
                 }
 
                 public class Testclass2 : Base2
@@ -5226,13 +5226,13 @@ public sealed class CSharpPullMemberUpTests : AbstractCSharpCodeActionTest
             {
                 public abstract class Base2
                 {
-                    private abstract event EventHandler Event3;
+                    protected abstract event EventHandler Event3;
                 }
 
                 public class Testclass2 : Base2
                 {
                     private event EventHandler Event1;
-                    private override event EventHandler Eve[||]nt3;
+                    protected override event EventHandler Eve[||]nt3;
                     private event EventHandler Event4;
                 }
             }
@@ -6401,6 +6401,46 @@ public sealed class CSharpPullMemberUpTests : AbstractCSharpCodeActionTest
             """;
         // we expect a diagnostic/error, but also we shouldn't provide the refactoring
         await TestQuickActionNotProvidedAsync(text);
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/36786")]
+    public async Task TestPullPrivateMethodUpToBaseClass()
+    {
+        var testText = """
+            using System;
+            namespace PushUpTest
+            {
+                class BaseClass
+                {
+                }
+
+                public class TestClass : BaseClass
+                {
+                    private void TestM[||]ethod()
+                    {
+                        System.Console.WriteLine("Hello World");
+                    }
+                }
+            }
+            """;
+        var expected = """
+            using System;
+            namespace PushUpTest
+            {
+                class BaseClass
+                {
+                    protected void TestMethod()
+                    {
+                        System.Console.WriteLine("Hello World");
+                    }
+                }
+
+                public class TestClass : BaseClass
+                {
+                }
+            }
+            """;
+        await TestWithPullMemberDialogAsync(testText, expected);
     }
     #endregion
 }
