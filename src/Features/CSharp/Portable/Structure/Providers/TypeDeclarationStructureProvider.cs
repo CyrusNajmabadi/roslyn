@@ -46,7 +46,8 @@ internal class TypeDeclarationStructureProvider : AbstractSyntaxNodeStructurePro
                 compressEmptyLines: compressEmptyLines,
                 autoCollapse: false,
                 type: BlockTypes.Type,
-                isCollapsible: true));
+                isCollapsible: true,
+                cancellationToken));
         }
 
         // add any leading comments before the end of the type block

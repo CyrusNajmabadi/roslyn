@@ -44,6 +44,7 @@ internal class ParenthesizedLambdaExpressionStructureProvider : AbstractSyntaxNo
             compressEmptyLines: false,
             autoCollapse: false,
             type: BlockTypes.Expression,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }

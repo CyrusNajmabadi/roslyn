@@ -44,6 +44,7 @@ internal class SimpleLambdaExpressionStructureProvider : AbstractSyntaxNodeStruc
             compressEmptyLines: false,
             autoCollapse: false,
             type: BlockTypes.Expression,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }

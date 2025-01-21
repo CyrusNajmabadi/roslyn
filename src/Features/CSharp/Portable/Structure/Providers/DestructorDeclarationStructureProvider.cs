@@ -34,6 +34,7 @@ internal class DestructorDeclarationStructureProvider : AbstractSyntaxNodeStruct
             compressEmptyLines: false,
             autoCollapse: true,
             type: BlockTypes.Member,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }

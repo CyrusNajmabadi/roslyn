@@ -45,6 +45,7 @@ internal class ConversionOperatorDeclarationStructureProvider : AbstractSyntaxNo
             compressEmptyLines: compressEmptyLines,
             autoCollapse: true,
             type: BlockTypes.Member,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }

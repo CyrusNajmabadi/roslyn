@@ -9,7 +9,8 @@ using Microsoft.CodeAnalysis.Structure;
 
 namespace Microsoft.CodeAnalysis.CSharp.Structure;
 
-internal class AnonymousMethodExpressionStructureProvider : AbstractSyntaxNodeStructureProvider<AnonymousMethodExpressionSyntax>
+internal sealed class AnonymousMethodExpressionStructureProvider
+    : AbstractSyntaxNodeStructureProvider<AnonymousMethodExpressionSyntax>
 {
     protected override void CollectBlockSpans(
         SyntaxToken previousToken,
@@ -43,6 +44,7 @@ internal class AnonymousMethodExpressionStructureProvider : AbstractSyntaxNodeSt
             compressEmptyLines: false,
             autoCollapse: false,
             type: BlockTypes.Expression,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }

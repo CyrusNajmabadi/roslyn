@@ -5,10 +5,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.PooledObjects;
-using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Structure;
 using Microsoft.CodeAnalysis.Text;
@@ -329,13 +329,18 @@ internal static class CSharpStructureHelpers
     }
 
     public static BlockSpan? CreateBlockSpan(
-        SyntaxNode node, SyntaxToken syntaxToken, bool compressEmptyLines,
-        string bannerText, bool autoCollapse,
-        string type, bool isCollapsible)
+        SyntaxNode node,
+        SyntaxToken syntaxToken,
+        bool compressEmptyLines,
+        string bannerText,
+        bool autoCollapse,
+        string type,
+        bool isCollapsible,
+        CancellationToken cancellationToken)
     {
         return CreateBlockSpan(
             node, syntaxToken, node.GetLastToken(), compressEmptyLines,
-            bannerText, autoCollapse, type, isCollapsible);
+            bannerText, autoCollapse, type, isCollapsible, cancellationToken);
     }
 
     public static BlockSpan? CreateBlockSpan(
@@ -384,14 +389,46 @@ internal static class CSharpStructureHelpers
     }
 
     public static BlockSpan? CreateBlockSpan(
-        SyntaxNode node, SyntaxToken startToken,
-        SyntaxToken endToken, bool compressEmptyLines, string bannerText, bool autoCollapse,
-        string type, bool isCollapsible)
+        SyntaxNode node,
+        SyntaxToken startToken,
+        SyntaxToken endToken,
+        bool compressEmptyLines,
+        string bannerText, bool autoCollapse,
+        string type, bool isCollapsible,
+        CancellationToken cancellationToken)
     {
-        var (spanEnd, hintEnd) = GetCollapsibleEnd(endToken, compressEmptyLines);
+        var (spanEnd, hintEnd) = GetEndPointIfFollowedByDirectives() ?? GetCollapsibleEnd(endToken, compressEmptyLines);
         return CreateBlockSpan(
             node, startToken, spanEnd, hintEnd,
             bannerText, autoCollapse, type, isCollapsible);
+
+        (int spanEnd, int hintEnd)? GetEndPointIfFollowedByDirectives()
+        {
+            var nextToken = endToken.GetNextToken();
+            if (nextToken == default)
+                return null;
+
+            foreach (var trivia in nextToken.LeadingTrivia)
+            {
+                if (trivia.IsDirective)
+                {
+                    var directive = (DirectiveTriviaSyntax)trivia.GetStructure()!;
+                    var matchingDirectives = directive.GetMatchingConditionalDirectives(cancellationToken);
+                    if (matchingDirectives.Length > 0 &&
+                        matchingDirectives[0].Span.Start >= node.Span.Start &&
+                        matchingDirectives.All(d => d.Span.End <= nextToken.Span.Start))
+                    {
+                        // The directives start within the node we're collapsing, but end outside of it (since we have
+                        // at least one on the leading trivia of the next token).  Collapse all the directives along
+                        // with the node itself since we're collapsing the node.
+                        var lastDirective = matchingDirectives.Last();
+                        return (lastDirective.FullSpan.End, lastDirective.FullSpan.End);
+                    }
+                }
+            }
+
+            return null;
+        }
     }
 
     public static BlockSpan CreateBlockSpan(
@@ -409,28 +446,36 @@ internal static class CSharpStructureHelpers
     // of node as a region.  The snippet to display is just "..."
     public static BlockSpan? CreateBlockSpan(
         SyntaxNode node, SyntaxToken syntaxToken, bool compressEmptyLines,
-        bool autoCollapse, string type, bool isCollapsible)
+        bool autoCollapse, string type, bool isCollapsible, CancellationToken cancellationToken)
     {
         return CreateBlockSpan(
             node, syntaxToken, compressEmptyLines,
             bannerText: Ellipsis,
             autoCollapse: autoCollapse,
-            type: type,
-            isCollapsible: isCollapsible);
+            type,
+            isCollapsible,
+            cancellationToken);
     }
 
     // Adds everything after 'syntaxToken' up to and including the end 
     // of node as a region.  The snippet to display is just "..."
     public static BlockSpan? CreateBlockSpan(
-        SyntaxNode node, SyntaxToken startToken, SyntaxToken endToken, bool compressEmptyLines,
-        bool autoCollapse, string type, bool isCollapsible)
+        SyntaxNode node,
+        SyntaxToken startToken,
+        SyntaxToken endToken,
+        bool compressEmptyLines,
+        bool autoCollapse,
+        string type,
+        bool isCollapsible,
+        CancellationToken cancellationToken)
     {
         return CreateBlockSpan(
             node, startToken, endToken, compressEmptyLines,
             bannerText: Ellipsis,
             autoCollapse: autoCollapse,
             type: type,
-            isCollapsible: isCollapsible);
+            isCollapsible: isCollapsible,
+            cancellationToken);
     }
 
     // Adds the span surrounding the syntax list as a region.  The

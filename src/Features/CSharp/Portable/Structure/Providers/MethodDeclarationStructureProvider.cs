@@ -43,6 +43,7 @@ internal class MethodDeclarationStructureProvider : AbstractSyntaxNodeStructureP
             compressEmptyLines: compressEmptyLines,
             autoCollapse: true,
             type: BlockTypes.Member,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }

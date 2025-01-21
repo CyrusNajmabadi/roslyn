@@ -31,7 +31,8 @@ internal class NamespaceDeclarationStructureProvider : AbstractSyntaxNodeStructu
                 compressEmptyLines: false,
                 autoCollapse: false,
                 type: BlockTypes.Namespace,
-                isCollapsible: true));
+                isCollapsible: true,
+                cancellationToken));
         }
 
         // extern aliases and usings are outlined in a single region

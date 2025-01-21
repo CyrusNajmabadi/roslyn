@@ -44,6 +44,7 @@ internal class EventDeclarationStructureProvider : AbstractSyntaxNodeStructurePr
             compressEmptyLines: compressEmptyLines,
             autoCollapse: true,
             type: BlockTypes.Member,
-            isCollapsible: true));
+            isCollapsible: true,
+            cancellationToken));
     }
 }
