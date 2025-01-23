@@ -12,11 +12,14 @@ namespace Microsoft.CodeAnalysis.Completion.Providers;
 
 internal static class CompletionUtilities
 {
-    public static bool IsTypeImplicitlyConvertible(Compilation compilation, ITypeSymbol sourceType, ImmutableArray<ITypeSymbol> targetTypes)
+    public static bool IsTypeImplicitlyConvertible(
+        Compilation compilation, ITypeSymbol sourceType, ImmutableArray<ITypeSymbol> targetTypes)
     {
+        sourceType = sourceType.OriginalDefinition;
         foreach (var targetType in targetTypes)
         {
-            if (compilation.ClassifyCommonConversion(sourceType, targetType).IsImplicit)
+            if (compilation.ClassifyCommonConversion(sourceType, targetType).IsImplicit ||
+                compilation.ClassifyCommonConversion(sourceType, targetType.OriginalDefinition).IsImplicit)
             {
                 return true;
             }

@@ -50,44 +50,43 @@ internal abstract partial class AbstractSymbolCompletionProvider<TSyntaxContext>
         TSyntaxContext syntaxContext,
         Dictionary<ITypeSymbol, bool> typeConvertibilityCache)
     {
+        symbol = symbol.OriginalDefinition;
+
         // When searching for identifiers of type C, exclude the symbol for the `C` type itself except in an object creation context.
         if (symbol is INamedTypeSymbol namedType)
         {
-            return ShouldIncludeInTargetTypedCompletionListForNamedType(namedType, syntaxContext, typeConvertibilityCache);
+            return ShouldIncludeInTargetTypedCompletionListForNamedType(
+                namedType, syntaxContext, typeConvertibilityCache);
         }
 
         // Avoid offering members of object since they too commonly show up and are infrequently desired.
         if (symbol.ContainingType?.SpecialType == SpecialType.System_Object)
-        {
             return false;
-        }
 
         // Don't offer locals on the right-hand-side of their declaration: `int x = x`
         if (symbol is ILocalSymbol local)
         {
             var declarationSyntax = symbol.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).SingleOrDefault();
             if (declarationSyntax != null && syntaxContext.Position < declarationSyntax.FullSpan.End)
-            {
                 return false;
-            }
         }
 
         var type = symbol.GetMemberType() ?? symbol.GetSymbolType();
         if (type == null)
-        {
             return false;
-        }
 
         if (typeConvertibilityCache.TryGetValue(type, out var isConvertible))
-        {
             return isConvertible;
-        }
 
-        typeConvertibilityCache[type] = CompletionUtilities.IsTypeImplicitlyConvertible(syntaxContext.SemanticModel.Compilation, type, syntaxContext.InferredTypes);
+        typeConvertibilityCache[type] = CompletionUtilities.IsTypeImplicitlyConvertible(
+            syntaxContext.SemanticModel.Compilation, type, syntaxContext.InferredTypes);
         return typeConvertibilityCache[type];
     }
 
-    private static bool ShouldIncludeInTargetTypedCompletionListForNamedType(INamedTypeSymbol symbol, TSyntaxContext syntaxContext, Dictionary<ITypeSymbol, bool> typeConvertibilityCache)
+    private static bool ShouldIncludeInTargetTypedCompletionListForNamedType(
+        INamedTypeSymbol symbol,
+        TSyntaxContext syntaxContext,
+        Dictionary<ITypeSymbol, bool> typeConvertibilityCache)
     {
         // Only create target typed completion entries in the object creation context
         if (!syntaxContext.IsObjectCreationTypeContext)
@@ -96,7 +95,6 @@ internal abstract partial class AbstractSymbolCompletionProvider<TSyntaxContext>
         if (!typeConvertibilityCache.TryGetValue(symbol, out var isConvertible))
         {
             isConvertible = IsConvertible(symbol, syntaxContext);
-
             typeConvertibilityCache[symbol] = isConvertible;
         }
 
@@ -126,12 +124,11 @@ internal abstract partial class AbstractSymbolCompletionProvider<TSyntaxContext>
                 }
                 else
                 {
-                    var typeToCheck = symbol;
-                    while (typeToCheck != null && !Equals(typeToCheck.OriginalDefinition, inferredType.OriginalDefinition))
-                        typeToCheck = typeToCheck.BaseType;
-
-                    if (typeToCheck != null)
-                        return true;
+                    for (var current = symbol; current != null; current = current.BaseType)
+                    {
+                        if (Equals(current.OriginalDefinition, inferredType.OriginalDefinition))
+                            return true;
+                    }
                 }
             }
 
@@ -232,15 +229,19 @@ internal abstract partial class AbstractSymbolCompletionProvider<TSyntaxContext>
         Dictionary<ITypeSymbol, bool> typeConvertibilityCache,
         out int index)
     {
-        for (index = 0; index < symbolList.Length; ++index)
+        for (var i = 0; i < symbolList.Length; i++)
         {
-            var symbol = symbolList[index];
+            var symbol = symbolList[i];
             var syntaxContext = contextLookup(symbol);
             if (ShouldIncludeInTargetTypedCompletionList(symbol.Symbol, syntaxContext, typeConvertibilityCache))
-                break;
+            {
+                index = i;
+                return true;
+            }
         }
 
-        return index < symbolList.Length;
+        index = -1;
+        return false;
     }
 
     private static SupportedPlatformData? ComputeSupportedPlatformData(

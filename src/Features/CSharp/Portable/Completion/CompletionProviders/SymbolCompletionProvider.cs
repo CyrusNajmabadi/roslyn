@@ -21,9 +21,8 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers;
 
-[ExportCompletionProvider(nameof(SymbolCompletionProvider), LanguageNames.CSharp)]
+[ExportCompletionProvider(nameof(SymbolCompletionProvider), LanguageNames.CSharp), Shared]
 [ExtensionOrder(After = nameof(SpeculativeTCompletionProvider))]
-[Shared]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
 internal sealed class SymbolCompletionProvider() : AbstractRecommendationServiceBasedCompletionProvider<CSharpSyntaxContext>
