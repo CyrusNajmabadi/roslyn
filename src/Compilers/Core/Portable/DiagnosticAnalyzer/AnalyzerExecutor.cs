@@ -686,9 +686,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// Execute code block actions for the given analyzer for the given declaration.
         /// </summary>
         public void ExecuteCodeBlockActions<TLanguageKindEnum>(
-            IEnumerable<CodeBlockStartAnalyzerAction<TLanguageKindEnum>> codeBlockStartActions,
-            IEnumerable<CodeBlockAnalyzerAction> codeBlockActions,
-            IEnumerable<CodeBlockAnalyzerAction> codeBlockEndActions,
+            ImmutableArray<CodeBlockStartAnalyzerAction<TLanguageKindEnum>> codeBlockStartActions,
+            ImmutableArray<CodeBlockAnalyzerAction> codeBlockActions,
+            ImmutableArray<CodeBlockAnalyzerAction> codeBlockEndActions,
             DiagnosticAnalyzer analyzer,
             SyntaxNode declaredNode,
             ISymbol declaredSymbol,
@@ -723,9 +723,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// Execute operation block actions for the given analyzer for the given declaration.
         /// </summary>
         public void ExecuteOperationBlockActions(
-            IEnumerable<OperationBlockStartAnalyzerAction> operationBlockStartActions,
-            IEnumerable<OperationBlockAnalyzerAction> operationBlockActions,
-            IEnumerable<OperationBlockAnalyzerAction> operationBlockEndActions,
+            ImmutableArray<OperationBlockStartAnalyzerAction> operationBlockStartActions,
+            ImmutableArray<OperationBlockAnalyzerAction> operationBlockActions,
+            ImmutableArray<OperationBlockAnalyzerAction> operationBlockEndActions,
             DiagnosticAnalyzer analyzer,
             SyntaxNode declaredNode,
             ISymbol declaredSymbol,
@@ -743,14 +743,14 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         }
 
         private void ExecuteBlockActionsCore<TBlockStartAction, TBlockAction, TNodeAction, TNode, TLanguageKindEnum>(
-           IEnumerable<TBlockStartAction> startActions,
-           IEnumerable<TBlockAction> actions,
-           IEnumerable<TBlockAction> endActions,
+           ImmutableArray<TBlockStartAction> startActions,
+           ImmutableArray<TBlockAction> actions,
+           ImmutableArray<TBlockAction> endActions,
            DiagnosticAnalyzer analyzer,
            SyntaxNode declaredNode,
            ISymbol declaredSymbol,
            ImmutableArray<TNode> executableBlocks,
-           Func<ImmutableArray<TNode>, IEnumerable<TNode>> getNodesToAnalyze,
+           Func<ImmutableArray<TNode>, ImmutableArray<TNode>> getNodesToAnalyze,
            SemanticModel semanticModel,
            Func<SyntaxNode, TLanguageKindEnum>? getKind,
            TextSpan? filterSpan,
@@ -778,8 +778,8 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             var blockEndActions = PooledHashSet<TBlockAction>.GetInstance();
             var blockActions = PooledHashSet<TBlockAction>.GetInstance();
             var executableNodeActions = ArrayBuilder<TNodeAction>.GetInstance();
-            var syntaxNodeActions = executableNodeActions as ArrayBuilder<SyntaxNodeAnalyzerAction<TLanguageKindEnum>>;
-            var operationActions = executableNodeActions as ArrayBuilder<OperationAnalyzerAction>;
+            var syntaxNodeActions = executableNodeActions as ImmutableArray<SyntaxNodeAnalyzerAction<TLanguageKindEnum>>;
+            var operationActions = executableNodeActions as ImmutableArray<OperationAnalyzerAction>;
             ImmutableArray<IOperation> operationBlocks = executableBlocks[0] is IOperation ? (ImmutableArray<IOperation>)(object)executableBlocks : ImmutableArray<IOperation>.Empty;
 
             // Include the code block actions.
@@ -849,13 +849,13 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     Debug.Assert(getKind != null);
 
                     var executableNodeActionsByKind = GetNodeActionsByKind(syntaxNodeActions);
-                    var syntaxNodesToAnalyze = (IEnumerable<SyntaxNode>)getNodesToAnalyze(executableBlocks);
+                    var syntaxNodesToAnalyze = getNodesToAnalyze(executableBlocks).CastArray<SyntaxNode>();
                     ExecuteSyntaxNodeActions(syntaxNodesToAnalyze, executableNodeActionsByKind, analyzer, declaredSymbol, semanticModel, getKind, diagReporter, isSupportedDiagnostic, filterSpan, isGeneratedCode, hasCodeBlockStartOrSymbolStartActions: startActions.Any(), cancellationToken);
                 }
                 else if (operationActions != null)
                 {
                     var operationActionsByKind = GetOperationActionsByKind(operationActions);
-                    var operationsToAnalyze = (IEnumerable<IOperation>)getNodesToAnalyze(executableBlocks);
+                    var operationsToAnalyze = getNodesToAnalyze(executableBlocks).CastArray<IOperation>();
                     ExecuteOperationActions(operationsToAnalyze, operationActionsByKind, analyzer, declaredSymbol, semanticModel, diagReporter, isSupportedDiagnostic, filterSpan, isGeneratedCode, hasOperationBlockStartOrSymbolStartActions: startActions.Any(), cancellationToken);
                 }
             }
@@ -922,7 +922,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         }
 
         internal static ImmutableSegmentedDictionary<TLanguageKindEnum, ImmutableArray<SyntaxNodeAnalyzerAction<TLanguageKindEnum>>> GetNodeActionsByKind<TLanguageKindEnum>(
-            IEnumerable<SyntaxNodeAnalyzerAction<TLanguageKindEnum>> nodeActions)
+            ImmutableArray<SyntaxNodeAnalyzerAction<TLanguageKindEnum>> nodeActions)
             where TLanguageKindEnum : struct
         {
             Debug.Assert(nodeActions != null && nodeActions.Any());
@@ -951,7 +951,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// Execute syntax node actions for the given analyzer for the given declaration.
         /// </summary>
         public void ExecuteSyntaxNodeActions<TLanguageKindEnum>(
-           IEnumerable<SyntaxNode> nodesToAnalyze,
+           ImmutableArray<SyntaxNode> nodesToAnalyze,
            ImmutableSegmentedDictionary<TLanguageKindEnum, ImmutableArray<SyntaxNodeAnalyzerAction<TLanguageKindEnum>>> nodeActionsByKind,
            DiagnosticAnalyzer analyzer,
            SemanticModel model,
@@ -978,7 +978,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         }
 
         private void ExecuteSyntaxNodeActions<TLanguageKindEnum>(
-            IEnumerable<SyntaxNode> nodesToAnalyze,
+            ImmutableArray<SyntaxNode> nodesToAnalyze,
             ImmutableSegmentedDictionary<TLanguageKindEnum, ImmutableArray<SyntaxNodeAnalyzerAction<TLanguageKindEnum>>> nodeActionsByKind,
             DiagnosticAnalyzer analyzer,
             ISymbol containingSymbol,
@@ -1022,7 +1022,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             }
         }
 
-        internal static ImmutableSegmentedDictionary<OperationKind, ImmutableArray<OperationAnalyzerAction>> GetOperationActionsByKind(IEnumerable<OperationAnalyzerAction> operationActions)
+        internal static ImmutableSegmentedDictionary<OperationKind, ImmutableArray<OperationAnalyzerAction>> GetOperationActionsByKind(ImmutableArray<OperationAnalyzerAction> operationActions)
         {
             Debug.Assert(operationActions.Any());
 
@@ -1054,7 +1054,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// False, if there are some pending actions that are currently being executed on another thread.
         /// </returns>
         public void ExecuteOperationActions(
-            IEnumerable<IOperation> operationsToAnalyze,
+            ImmutableArray<IOperation> operationsToAnalyze,
             ImmutableSegmentedDictionary<OperationKind, ImmutableArray<OperationAnalyzerAction>> operationActionsByKind,
             DiagnosticAnalyzer analyzer,
             SemanticModel model,
@@ -1079,7 +1079,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         }
 
         private void ExecuteOperationActions(
-            IEnumerable<IOperation> operationsToAnalyze,
+            ImmutableArray<IOperation> operationsToAnalyze,
             ImmutableSegmentedDictionary<OperationKind, ImmutableArray<OperationAnalyzerAction>> operationActionsByKind,
             DiagnosticAnalyzer analyzer,
             ISymbol containingSymbol,
