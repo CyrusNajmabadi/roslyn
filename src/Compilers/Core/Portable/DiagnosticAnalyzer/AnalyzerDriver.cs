@@ -2786,8 +2786,10 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     }
 
                     AnalyzerExecutor.ExecuteOperationBlockActions(
-                        analyzerActions.OperationBlockStartActions, analyzerActions.OperationBlockActions,
-                        analyzerActions.OperationBlockEndActions, analyzerActions.Analyzer, declarationAnalysisData.TopmostNodeForAnalysis, symbol,
+                        analyzerActions.OperationBlockStartActions.AsSpan(),
+                        analyzerActions.OperationBlockActions.AsSpan(),
+                        analyzerActions.OperationBlockEndActions.AsSpan(),
+                        analyzerActions.Analyzer, declarationAnalysisData.TopmostNodeForAnalysis, symbol,
                         operationBlocksToAnalyze, operationsToAnalyze, semanticModel, analysisScope.FilterSpanOpt, isInGeneratedCode, cancellationToken);
                 }
             }
@@ -2814,8 +2816,10 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     }
 
                     AnalyzerExecutor.ExecuteCodeBlockActions(
-                        analyzerActions.CodeBlockStartActions, analyzerActions.CodeBlockActions,
-                        analyzerActions.CodeBlockEndActions, analyzerActions.Analyzer, declarationAnalysisData.TopmostNodeForAnalysis, symbol,
+                        analyzerActions.CodeBlockStartActions.AsSpan(),
+                        analyzerActions.CodeBlockActions.AsSpan(),
+                        analyzerActions.CodeBlockEndActions.AsSpan(),
+                        analyzerActions.Analyzer, declarationAnalysisData.TopmostNodeForAnalysis, symbol,
                         executableCodeBlocks, semanticModel, _getKind, analysisScope.FilterSpanOpt, isInGeneratedCode, cancellationToken);
                 }
             }

@@ -929,6 +929,7 @@ namespace Microsoft.CodeAnalysis.PooledObjects
 
         public Span<T> AsSpan(int start, int length)
         {
+            Debug.Assert(start + length <= _count);
             return new Span<T>(_elements, start, length);
         }
 

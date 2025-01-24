@@ -769,7 +769,7 @@ End Namespace
 
         Public Shared Function FindNodes(node As SyntaxNode, ParamArray kinds() As SyntaxKind) As List(Of SyntaxNode)
             Dim finder As New SyntaxNodeFinder()
-            finder._kinds.AddAll(kinds)
+            finder._kinds.AddAll(kinds.AsSpan())
             finder.Visit(node)
             Return finder._nodes
         End Function
