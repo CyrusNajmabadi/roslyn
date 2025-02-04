@@ -13,15 +13,8 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Diagnostics;
 
-internal interface IDiagnosticAnalyzerService
+internal interface ICachedDiagnosticAnalyzerService
 {
-    public IGlobalOptionService GlobalOptions { get; }
-
-    /// <summary>
-    /// Provides and caches analyzer information.
-    /// </summary>
-    DiagnosticAnalyzerInfoCache AnalyzerInfoCache { get; }
-
     /// <summary>
     /// Re-analyze all projects and documents.  This will cause an LSP diagnostic refresh request to be sent.
     /// </summary>
@@ -51,6 +44,21 @@ internal interface IDiagnosticAnalyzerService
     /// Force analyzes the given project by running all applicable analyzers on the project and caching the reported analyzer diagnostics.
     /// </summary>
     Task ForceAnalyzeProjectAsync(Project project, CancellationToken cancellationToken);
+}
+
+internal interface IDiagnosticAnalyzerService
+{
+    public IGlobalOptionService GlobalOptions { get; }
+
+    /// <summary>
+    /// Provides and caches analyzer information.
+    /// </summary>
+    DiagnosticAnalyzerInfoCache AnalyzerInfoCache { get; }
+
+    /// <summary>
+    /// Re-analyze all projects and documents.  This will cause an LSP diagnostic refresh request to be sent.
+    /// </summary>
+    void RequestDiagnosticRefresh();
 
     /// <summary>
     /// Get diagnostics of the given diagnostic ids and/or analyzers from the given solution. all diagnostics returned

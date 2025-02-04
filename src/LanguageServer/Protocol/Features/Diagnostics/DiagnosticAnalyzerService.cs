@@ -21,6 +21,36 @@ using Microsoft.VisualStudio.Threading;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
+    [Export(typeof(ICachedDiagnosticAnalyzerService)), Shared]
+    internal partial class CachedDiagnosticAnalyzerService : ICachedDiagnosticAnalyzerService
+    {
+        private readonly IDiagnosticsRefresher _diagnosticsRefresher;
+
+        [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public CachedDiagnosticAnalyzerService(
+            IAsynchronousOperationListenerProvider listenerProvider,
+            DiagnosticAnalyzerInfoCache.SharedGlobalCache globalCache,
+            IGlobalOptionService globalOptions,
+            IDiagnosticsRefresher diagnosticsRefresher)
+        {
+            _diagnosticsRefresher = diagnosticsRefresher;
+        }
+
+        public void RequestDiagnosticRefresh()
+            => _diagnosticsRefresher.RequestWorkspaceRefresh();
+
+        public Task<ImmutableArray<DiagnosticData>> GetCachedDiagnosticsAsync(Workspace workspace, ProjectId projectId, DocumentId? documentId, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task ForceAnalyzeProjectAsync(Project project, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     [Export(typeof(IDiagnosticAnalyzerService)), Shared]
     internal partial class DiagnosticAnalyzerService : IDiagnosticAnalyzerService
     {
@@ -70,7 +100,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                option == s_crashOnAnalyzerException;
 
         public void RequestDiagnosticRefresh()
-            => _diagnosticsRefresher?.RequestWorkspaceRefresh();
+            => _diagnosticsRefresher.RequestWorkspaceRefresh();
 
         public async Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForSpanAsync(
             TextDocument document,
