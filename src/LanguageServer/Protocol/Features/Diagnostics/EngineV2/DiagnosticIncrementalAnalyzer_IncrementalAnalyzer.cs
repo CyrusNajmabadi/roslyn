@@ -7,7 +7,6 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.ErrorReporting;
-using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.SolutionCrawler;
@@ -55,18 +54,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics.EngineV2
             catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, cancellationToken))
             {
                 throw ExceptionUtilities.Unreachable();
-            }
-        }
-
-        private async Task TextDocumentOpenAsync(TextDocument document, CancellationToken cancellationToken)
-        {
-            using (Logger.LogBlock(FunctionId.Diagnostics_DocumentOpen, GetOpenLogMessage, document, cancellationToken))
-            {
-                var stateSets = _stateManager.GetStateSets(document.Project);
-
-                // can not be canceled
-                foreach (var stateSet in stateSets)
-                    await stateSet.OnDocumentOpenedAsync(document).ConfigureAwait(false);
             }
         }
 
@@ -145,15 +132,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics.EngineV2
             var analyzerConfigOptions = project.GetAnalyzerConfigOptions();
 
             return descriptors.Any(static (d, arg) => d.GetEffectiveSeverity(arg.CompilationOptions, arg.isHostAnalyzer ? arg.analyzerConfigOptions?.ConfigOptionsWithFallback : arg.analyzerConfigOptions?.ConfigOptionsWithoutFallback, arg.analyzerConfigOptions?.TreeOptions) != ReportDiagnostic.Hidden, (project.CompilationOptions, isHostAnalyzer, analyzerConfigOptions));
-        }
-
-        public TestAccessor GetTestAccessor()
-            => new(this);
-
-        public readonly struct TestAccessor(DiagnosticIncrementalAnalyzer diagnosticIncrementalAnalyzer)
-        {
-            public Task TextDocumentOpenAsync(TextDocument document)
-                => diagnosticIncrementalAnalyzer.TextDocumentOpenAsync(document, CancellationToken.None);
         }
     }
 }

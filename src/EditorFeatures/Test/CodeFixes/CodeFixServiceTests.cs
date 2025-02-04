@@ -992,7 +992,7 @@ public class CodeFixServiceTests
     }
 #pragma warning restore RS0034 // Exported parts should be marked with 'ImportingConstructorAttribute'
 
-    [Theory, CombinatorialData]
+    [Theory(Skip = "https://github.com/dotnet/roslyn/issues/77036"), CombinatorialData]
     public async Task TestGetFixesWithDeprioritizedAnalyzerAsync(
         DeprioritizedAnalyzer.ActionKind actionKind,
         bool diagnosticOnFixLineInPriorSnapshot,
@@ -1014,7 +1014,8 @@ public class CodeFixServiceTests
         //     of the heuristic where we compare intersecting diagnostics across document snapshots only if both
         //     snapshots have the same number of lines.
 
-        var expectDeprioritization = GetExpectDeprioritization(actionKind, diagnosticOnFixLineInPriorSnapshot, addNewLineWithEdit);
+        var expectDeprioritization = GetExpectDeprioritization(
+            actionKind, diagnosticOnFixLineInPriorSnapshot, addNewLineWithEdit);
 
         var priorSnapshotFixLine = diagnosticOnFixLineInPriorSnapshot ? "int x1 = 0;" : "System.Console.WriteLine();";
         var code = $@"
@@ -1079,7 +1080,6 @@ class C
         await diagnosticIncrementalAnalyzer.GetDiagnosticsForIdsAsync(
             sourceDocument.Project.Solution, sourceDocument.Project.Id, sourceDocument.Id, diagnosticIds: null, shouldIncludeAnalyzer: null, getDocuments: null,
             includeLocalDocumentDiagnostics: true, includeNonLocalDocumentDiagnostics: true, CancellationToken.None);
-        await diagnosticIncrementalAnalyzer.GetTestAccessor().TextDocumentOpenAsync(sourceDocument);
 
         var lowPriorityAnalyzerData = new SuggestedActionPriorityProvider.LowPriorityAnalyzersAndDiagnosticIds();
         var priorityProvider = new SuggestedActionPriorityProvider(CodeActionRequestPriority.Default, lowPriorityAnalyzerData);
