@@ -67,7 +67,7 @@ public class DiagnosticAnalyzerServiceTests
         var globalOptions = exportProvider.GetExportedValue<IGlobalOptionService>();
 
         var diagnostics = await service.GetDiagnosticsForIdsAsync(
-            workspace.CurrentSolution, projectId: workspace.CurrentSolution.ProjectIds.Single(), documentId: null, diagnosticIds: null, shouldIncludeAnalyzer: null, getDocumentIds: null,
+            workspace.CurrentSolution, projectId: workspace.CurrentSolution.ProjectIds.Single(), documentId: null, diagnosticIds: null, shouldIncludeAnalyzer: null,
             includeLocalDocumentDiagnostics: true, includeNonLocalDocumentDiagnostics: false, CancellationToken.None);
         Assert.NotEmpty(diagnostics);
     }
