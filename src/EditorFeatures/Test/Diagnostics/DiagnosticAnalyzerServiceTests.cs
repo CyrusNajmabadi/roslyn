@@ -18,7 +18,6 @@ using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Remote.Diagnostics;
 using Microsoft.CodeAnalysis.Remote.Testing;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.CodeAnalysis.SolutionCrawler;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
@@ -31,7 +30,7 @@ using static Microsoft.CodeAnalysis.CommonDiagnosticAnalyzers;
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics;
 
 [UseExportProvider]
-public class DiagnosticAnalyzerServiceTests
+public sealed class DiagnosticAnalyzerServiceTests
 {
     private static readonly TestComposition s_featuresCompositionWithMockDiagnosticUpdateSourceRegistrationService = EditorTestCompositions.EditorFeatures
         .AddParts(typeof(TestDocumentTrackingService));
