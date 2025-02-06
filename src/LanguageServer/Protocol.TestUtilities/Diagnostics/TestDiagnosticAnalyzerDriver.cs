@@ -2,15 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable disable
-
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
@@ -21,7 +17,7 @@ namespace Microsoft.CodeAnalysis.UnitTests.Diagnostics
 {
     public class TestDiagnosticAnalyzerDriver
     {
-        private readonly DiagnosticAnalyzerService _diagnosticAnalyzerService;
+        private readonly IDiagnosticAnalyzerService _diagnosticAnalyzerService;
         private readonly bool _includeSuppressedDiagnostics;
         private readonly bool _includeNonLocalDocumentDiagnostics;
 
@@ -29,15 +25,14 @@ namespace Microsoft.CodeAnalysis.UnitTests.Diagnostics
         {
             var mefServices = workspace.Services.SolutionServices.ExportProvider;
 
-            _diagnosticAnalyzerService = Assert.IsType<DiagnosticAnalyzerService>(mefServices.GetExportedValue<IDiagnosticAnalyzerService>());
-            _diagnosticAnalyzerService.CreateIncrementalAnalyzer(workspace);
+            _diagnosticAnalyzerService = mefServices.GetExportedValue<IDiagnosticAnalyzerService>();
             _includeSuppressedDiagnostics = includeSuppressedDiagnostics;
             _includeNonLocalDocumentDiagnostics = includeNonLocalDocumentDiagnostics;
         }
 
         private async Task<IEnumerable<Diagnostic>> GetDiagnosticsAsync(
             Project project,
-            Document document,
+            Document? document,
             TextSpan? filterSpan,
             bool getDocumentDiagnostics,
             bool getProjectDiagnostics)
@@ -47,6 +42,7 @@ namespace Microsoft.CodeAnalysis.UnitTests.Diagnostics
 
             if (getDocumentDiagnostics)
             {
+                Contract.ThrowIfNull(document);
                 var text = await document.GetTextAsync().ConfigureAwait(false);
                 var dxs = await _diagnosticAnalyzerService.GetDiagnosticsForIdsAsync(
                     project.Solution, project.Id, document.Id, diagnosticIds: null, shouldIncludeAnalyzer: null,
@@ -87,7 +83,7 @@ namespace Microsoft.CodeAnalysis.UnitTests.Diagnostics
             var diagnostics = new List<Diagnostic>();
             foreach (var document in project.Documents)
             {
-                var span = (await document.GetSyntaxRootAsync()).FullSpan;
+                var span = (await document.GetRequiredSyntaxRootAsync(CancellationToken.None)).FullSpan;
                 var documentDiagnostics = await GetDocumentDiagnosticsAsync(document, span);
                 diagnostics.AddRange(documentDiagnostics);
             }
