@@ -2,99 +2,147 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
-using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.Formatting.Rules;
-using Microsoft.CodeAnalysis.Host;
-using Microsoft.CodeAnalysis.Internal.Log;
-using Microsoft.CodeAnalysis.Options;
-using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Text;
+using System;
 using Microsoft.VisualStudio.Text;
-using Microsoft.VisualStudio.Utilities;
+using Microsoft.VisualStudio.Text.Tagging;
 
-namespace Microsoft.CodeAnalysis.Editor.Shared.Extensions;
-
-internal static partial class ITextSnapshotExtensions
+namespace Microsoft.CodeAnalysis.Text.Shared.Extensions
 {
-    /// <summary>
-    /// format given snapshot and apply text changes to buffer
-    /// </summary>
-    public static void FormatAndApplyToBuffer(
-        this ITextBuffer textBuffer,
-        TextSpan span,
-        EditorOptionsService editorOptionsService,
-        CancellationToken cancellationToken)
+    internal static partial class ITextSnapshotExtensions
     {
-        var document = textBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges();
-        if (document == null)
+        public static SnapshotPoint GetPoint(this ITextSnapshot snapshot, int position)
+            => new SnapshotPoint(snapshot, position);
+
+        public static SnapshotPoint? TryGetPoint(this ITextSnapshot snapshot, int lineNumber, int columnIndex)
         {
-            return;
-        }
-
-        var documentSyntax = ParsedDocument.CreateSynchronously(document, cancellationToken);
-        var rules = FormattingRuleUtilities.GetFormattingRules(documentSyntax, span, additionalRules: null);
-
-        var formatter = document.GetRequiredLanguageService<ISyntaxFormattingService>();
-
-        var options = textBuffer.GetSyntaxFormattingOptions(editorOptionsService, document.Project.GetFallbackAnalyzerOptions(), document.Project.Services, explicitFormat: false);
-        var result = formatter.GetFormattingResult(documentSyntax.Root, [span], options, rules, cancellationToken);
-        var changes = result.GetTextChanges(cancellationToken);
-
-        using (Logger.LogBlock(FunctionId.Formatting_ApplyResultToBuffer, cancellationToken))
-        {
-            textBuffer.ApplyChanges(changes);
-        }
-    }
-
-    /// <summary>
-    /// Get <see cref="Document"/> from <see cref="Text.Extensions.GetOpenDocumentInCurrentContextWithChanges(ITextSnapshot)"/>
-    /// once <see cref="IWorkspaceStatusService.WaitUntilFullyLoadedAsync(CancellationToken)"/> returns
-    /// 
-    /// for synchronous code path, make sure to use synchronous version 
-    /// <see cref="GetFullyLoadedOpenDocumentInCurrentContextWithChanges(ITextSnapshot, IUIThreadOperationContext, IThreadingContext)"/>.
-    /// otherwise, one can get into a deadlock
-    /// </summary>
-    public static async Task<Document?> GetFullyLoadedOpenDocumentInCurrentContextWithChangesAsync(
-        this ITextSnapshot snapshot, IUIThreadOperationContext operationContext)
-    {
-        // just get a document from whatever we have
-        var document = snapshot.TextBuffer.AsTextContainer().GetOpenDocumentInCurrentContext();
-        if (document == null)
-        {
-            // we don't know about this buffer yet
-            return null;
-        }
-
-        // partial mode is always cancellable
-        using (operationContext.AddScope(allowCancellation: true, EditorFeaturesResources.Waiting_for_background_work_to_finish))
-        {
-            var service = document.Project.Solution.Services.GetService<IWorkspaceStatusService>();
-            if (service != null)
+            var position = snapshot.TryGetPosition(lineNumber, columnIndex);
+            if (position.HasValue)
             {
-                // TODO: decide for prototype, we don't do anything complex and just ask workspace whether it is fully loaded
-                // later we might need to go and change all these with more specific info such as document/project/solution
-                await service.WaitUntilFullyLoadedAsync(operationContext.UserCancellationToken).ConfigureAwait(false);
+                return new SnapshotPoint(snapshot, position.Value);
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Convert a <see cref="LinePositionSpan"/> to <see cref="TextSpan"/>.
+        /// </summary>
+        public static TextSpan GetTextSpan(this ITextSnapshot snapshot, LinePositionSpan span)
+        {
+            return TextSpan.FromBounds(
+                GetPosition(snapshot, span.Start.Line, span.Start.Character),
+                GetPosition(snapshot, span.End.Line, span.End.Character));
+        }
+
+        public static int GetPosition(this ITextSnapshot snapshot, int lineNumber, int columnIndex)
+            => TryGetPosition(snapshot, lineNumber, columnIndex) ?? throw new InvalidOperationException(TextEditorResources.The_snapshot_does_not_contain_the_specified_position);
+
+        public static int? TryGetPosition(this ITextSnapshot snapshot, int lineNumber, int columnIndex)
+        {
+            if (lineNumber < 0 || lineNumber >= snapshot.LineCount)
+            {
+                return null;
             }
 
-            // get proper document
-            return snapshot.GetOpenDocumentInCurrentContextWithChanges();
+            var end = snapshot.GetLineFromLineNumber(lineNumber).Start.Position + columnIndex;
+            if (end < 0 || end > snapshot.Length)
+            {
+                return null;
+            }
+
+            return end;
         }
-    }
 
-    /// <summary>
-    /// Get <see cref="Document"/> from <see cref="Text.Extensions.GetOpenDocumentInCurrentContextWithChanges(ITextSnapshot)"/>
-    /// once <see cref="IWorkspaceStatusService.WaitUntilFullyLoadedAsync(CancellationToken)"/> returns
-    /// </summary>
-    public static Document? GetFullyLoadedOpenDocumentInCurrentContextWithChanges(
-        this ITextSnapshot snapshot, IUIThreadOperationContext operationContext, IThreadingContext threadingContext)
-    {
-        // make sure this is only called from UI thread
-        threadingContext.ThrowIfNotOnUIThread();
+        public static bool TryGetPosition(this ITextSnapshot snapshot, int lineNumber, int columnIndex, out SnapshotPoint position)
+        {
+            position = new SnapshotPoint();
 
-        return threadingContext.JoinableTaskFactory.Run(() =>
-            snapshot.GetFullyLoadedOpenDocumentInCurrentContextWithChangesAsync(operationContext));
+            if (lineNumber < 0 || lineNumber >= snapshot.LineCount)
+            {
+                return false;
+            }
+
+            var line = snapshot.GetLineFromLineNumber(lineNumber);
+            if (columnIndex < 0 || columnIndex >= line.Length)
+            {
+                return false;
+            }
+
+            var result = line.Start.Position + columnIndex;
+            position = new SnapshotPoint(snapshot, result);
+            return true;
+        }
+
+        public static SnapshotSpan GetSpan(this ITextSnapshot snapshot, int start, int length)
+            => new SnapshotSpan(snapshot, new Span(start, length));
+
+        public static SnapshotSpan GetSpanFromBounds(this ITextSnapshot snapshot, int start, int end)
+            => new SnapshotSpan(snapshot, Span.FromBounds(start, end));
+
+        public static SnapshotSpan GetSpan(this ITextSnapshot snapshot, Span span)
+            => new SnapshotSpan(snapshot, span);
+
+        public static TagSpan<TTag> GetTagSpan<TTag>(this ITextSnapshot snapshot, Span span, TTag tag) where TTag : ITag
+            => new(new SnapshotSpan(snapshot, span), tag);
+
+        public static SnapshotSpan GetSpan(this ITextSnapshot snapshot, int startLine, int startIndex, int endLine, int endIndex)
+            => TryGetSpan(snapshot, startLine, startIndex, endLine, endIndex) ?? throw new InvalidOperationException(TextEditorResources.The_snapshot_does_not_contain_the_specified_span);
+
+        public static SnapshotSpan? TryGetSpan(this ITextSnapshot snapshot, int startLine, int startIndex, int endLine, int endIndex)
+        {
+            var startPosition = snapshot.TryGetPosition(startLine, startIndex);
+            var endPosition = snapshot.TryGetPosition(endLine, endIndex);
+            if (startPosition == null || endPosition == null)
+            {
+                return null;
+            }
+
+            return new SnapshotSpan(snapshot, Span.FromBounds(startPosition.Value, endPosition.Value));
+        }
+
+        public static SnapshotSpan GetFullSpan(this ITextSnapshot snapshot)
+        {
+            Contract.ThrowIfNull(snapshot);
+
+            return new SnapshotSpan(snapshot, new Span(0, snapshot.Length));
+        }
+
+        public static NormalizedSnapshotSpanCollection GetSnapshotSpanCollection(this ITextSnapshot snapshot)
+        {
+            Contract.ThrowIfNull(snapshot);
+
+            return new NormalizedSnapshotSpanCollection(snapshot.GetFullSpan());
+        }
+
+        public static void GetLineAndCharacter(this ITextSnapshot snapshot, int position, out int lineNumber, out int characterIndex)
+        {
+            var line = snapshot.GetLineFromPosition(position);
+
+            lineNumber = line.LineNumber;
+            characterIndex = position - line.Start.Position;
+        }
+
+        /// <summary>
+        /// Returns the leading whitespace of the line located at the specified position in the given snapshot.
+        /// </summary>
+        public static string GetLeadingWhitespaceOfLineAtPosition(this ITextSnapshot snapshot, int position)
+        {
+            Contract.ThrowIfNull(snapshot);
+
+            var line = snapshot.GetLineFromPosition(position);
+            var linePosition = line.GetFirstNonWhitespacePosition();
+            if (!linePosition.HasValue)
+            {
+                return line.GetText();
+            }
+
+            var lineText = line.GetText();
+            return lineText[..(linePosition.Value - line.Start)];
+        }
+
+        public static bool AreOnSameLine(this ITextSnapshot snapshot, int x1, int x2)
+            => snapshot.GetLineNumberFromPosition(x1) == snapshot.GetLineNumberFromPosition(x2);
     }
 }
