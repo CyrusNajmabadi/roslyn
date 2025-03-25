@@ -11,21 +11,17 @@ using Microsoft.CodeAnalysis.Shared.Extensions;
 
 namespace Microsoft.CodeAnalysis.CSharp.Analyzers.RemoveUnnecessaryNullableDirective;
 
-[DiagnosticAnalyzer(LanguageNames.CSharp)]
-internal sealed class CSharpRemoveRedundantNullableDirectiveDiagnosticAnalyzer
-    : AbstractBuiltInUnnecessaryCodeStyleDiagnosticAnalyzer
-{
-    public CSharpRemoveRedundantNullableDirectiveDiagnosticAnalyzer()
-        : base(
-            IDEDiagnosticIds.RemoveRedundantNullableDirectiveDiagnosticId,
-            EnforceOnBuildValues.RemoveRedundantNullableDirective,
-            option: null,
-            fadingOption: null,
-            new LocalizableResourceString(nameof(CSharpAnalyzersResources.Remove_redundant_nullable_directive), CSharpAnalyzersResources.ResourceManager, typeof(CSharpAnalyzersResources)),
-            new LocalizableResourceString(nameof(CSharpAnalyzersResources.Nullable_directive_is_redundant), CSharpAnalyzersResources.ResourceManager, typeof(CSharpAnalyzersResources)))
-    {
-    }
 
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+internal sealed class CSharpRemoveRedundantNullableDirectiveDiagnosticAnalyzer()
+    : AbstractBuiltInUnnecessaryCodeStyleDiagnosticAnalyzer(
+        IDEDiagnosticIds.RemoveRedundantNullableDirectiveDiagnosticId,
+        EnforceOnBuildValues.RemoveRedundantNullableDirective,
+        option: null,
+        fadingOption: null,
+        new LocalizableResourceString(nameof(CSharpAnalyzersResources.Remove_redundant_nullable_directive), CSharpAnalyzersResources.ResourceManager, typeof(CSharpAnalyzersResources)),
+        new LocalizableResourceString(nameof(CSharpAnalyzersResources.Nullable_directive_is_redundant), CSharpAnalyzersResources.ResourceManager, typeof(CSharpAnalyzersResources)))
+{
     public override DiagnosticAnalyzerCategory GetAnalyzerCategory()
         => DiagnosticAnalyzerCategory.SyntaxTreeWithoutSemanticsAnalysis;
 

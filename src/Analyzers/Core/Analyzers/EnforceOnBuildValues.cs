@@ -84,6 +84,7 @@ internal static class EnforceOnBuildValues
     public const EnforceOnBuild SimplifyPropertyPattern = /*IDE0170*/ EnforceOnBuild.Recommended;
     public const EnforceOnBuild RemoveRedundantNullableDirective = /*IDE0240*/ EnforceOnBuild.Recommended;
     public const EnforceOnBuild RemoveUnnecessaryNullableDirective = /*IDE0241*/ EnforceOnBuild.Recommended;
+    public const EnforceOnBuild RemoveUnnecessaryNullableDisableDirective = /*IDE0242*/ EnforceOnBuild.Recommended;
     public const EnforceOnBuild MakeStructReadOnly = /*IDE0250*/ EnforceOnBuild.Recommended;
     public const EnforceOnBuild MakeStructMemberReadOnly = /*IDE0251*/ EnforceOnBuild.Recommended;
     public const EnforceOnBuild UsePatternMatchingAsAndMemberAccess = /*IDE0260*/ EnforceOnBuild.Recommended;

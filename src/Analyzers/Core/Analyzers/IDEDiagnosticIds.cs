@@ -181,6 +181,7 @@ internal static class IDEDiagnosticIds
 
     public const string RemoveRedundantNullableDirectiveDiagnosticId = "IDE0240";
     public const string RemoveUnnecessaryNullableDirectiveDiagnosticId = "IDE0241";
+    public const string RemoveUnnecessaryNullableDisableDirectiveDiagnosticId = "IDE0242";
 
     public const string MakeStructReadOnlyDiagnosticId = "IDE0250";
     public const string MakeStructMemberReadOnlyDiagnosticId = "IDE0251";
