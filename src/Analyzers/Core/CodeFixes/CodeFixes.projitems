@@ -94,6 +94,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)ImplementType\ImplementTypeOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImplementType\ImplementTypePropertyGenerationBehavior.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Iterator\AbstractIteratorCodeFixProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)makeclasssealed\MakeClassSealedCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeFieldReadonly\AbstractMakeFieldReadonlyCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeMemberStatic\AbstractMakeMemberStaticCodeFixProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MakeMethodAsynchronous\AbstractMakeMethodAsynchronousCodeFixProvider.cs" />
@@ -149,6 +150,7 @@
     <ExpectedCompile Include="$(MSBuildThisFileDirectory)**\*$(DefaultLanguageSourceExtension)" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)MakeClassSealed\" />
     <Folder Include="$(MSBuildThisFileDirectory)UseCollectionExpression\" />
   </ItemGroup>
 </Project>

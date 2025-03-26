@@ -141,6 +141,7 @@ internal static class EnforceOnBuildValues
     public const EnforceOnBuild RemoveUnreachableCode = /*IDE0035*/ EnforceOnBuild.Never; // Non-configurable fading diagnostic corresponding to CS0162.
     public const EnforceOnBuild RemoveUnnecessarySuppression = /*IDE0079*/ EnforceOnBuild.Never; // IDE-only analyzer.
     public const EnforceOnBuild CopilotImplementNotImplementedException = /*IDE3000*/ EnforceOnBuild.Never; // IDE-only analyzer.
+    public const EnforceOnBuild MakeClassSealed = /*IDE3000*/ EnforceOnBuild.Never; // IDE-only analyzer.
 
     // Pure IDE feature for lighting up editor features.  Do not enforce on build.
     public const EnforceOnBuild DetectProbableJsonStrings = /*JSON002*/ EnforceOnBuild.Never;
