@@ -70,7 +70,8 @@ internal sealed class MakeClassSealedCodeRefactoringProvider() : SyntaxEditorBas
             {
                 editor.ReplaceNode(
                     current,
-                    static (currentTypeDeclaration, generator) => generator.WithModifiers(currentTypeDeclaration, DeclarationModifiers.Sealed));
+                    static (currentTypeDeclaration, generator) =>
+                        generator.WithModifiers(currentTypeDeclaration, generator.GetModifiers(currentTypeDeclaration).WithIsSealed(true)));
             }
         }
     }
