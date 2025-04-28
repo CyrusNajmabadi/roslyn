@@ -19,11 +19,6 @@ internal interface IDiagnosticAnalyzerService
     DiagnosticAnalyzerInfoCache AnalyzerInfoCache { get; }
 
     /// <summary>
-    /// Re-analyze all projects and documents.  This will cause an LSP diagnostic refresh request to be sent.
-    /// </summary>
-    void RequestDiagnosticRefresh();
-
-    /// <summary>
     /// Force analyzes the given project by running all applicable analyzers on the project.
     /// </summary>
     Task<ImmutableArray<DiagnosticData>> ForceAnalyzeProjectAsync(Project project, CancellationToken cancellationToken);

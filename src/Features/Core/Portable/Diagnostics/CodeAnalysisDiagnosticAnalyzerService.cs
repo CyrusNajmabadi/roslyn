@@ -20,16 +20,16 @@ namespace Microsoft.CodeAnalysis.Diagnostics;
 [ExportWorkspaceServiceFactory(typeof(ICodeAnalysisDiagnosticAnalyzerService)), Shared]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-internal sealed class CodeAnalysisDiagnosticAnalyzerServiceFactory() : IWorkspaceServiceFactory
+internal sealed class CodeAnalysisDiagnosticAnalyzerServiceFactory(
+    IDiagnosticsRefresher diagnosticsRefresher,
+    IDiagnosticAnalyzerService diagnosticAnalyzerService) : IWorkspaceServiceFactory
 {
     public IWorkspaceService CreateService(HostWorkspaceServices workspaceServices)
-    {
-        var diagnosticAnalyzerService = workspaceServices.SolutionServices.ExportProvider.GetExports<IDiagnosticAnalyzerService>().Single().Value;
-        return new CodeAnalysisDiagnosticAnalyzerService(diagnosticAnalyzerService, workspaceServices.Workspace);
-    }
+        => new CodeAnalysisDiagnosticAnalyzerService(diagnosticsRefresher, diagnosticAnalyzerService, workspaceServices.Workspace);
 
     private sealed class CodeAnalysisDiagnosticAnalyzerService : ICodeAnalysisDiagnosticAnalyzerService
     {
+        private readonly IDiagnosticsRefresher _diagnosticsRefresher;
         private readonly IDiagnosticAnalyzerService _diagnosticAnalyzerService;
         private readonly Workspace _workspace;
 
@@ -50,9 +50,11 @@ internal sealed class CodeAnalysisDiagnosticAnalyzerServiceFactory() : IWorkspac
         private readonly ConcurrentSet<ProjectId> _clearedProjectIds = [];
 
         public CodeAnalysisDiagnosticAnalyzerService(
+            IDiagnosticsRefresher diagnosticsRefresher,
             IDiagnosticAnalyzerService diagnosticAnalyzerService,
             Workspace workspace)
         {
+            _diagnosticsRefresher = diagnosticsRefresher;
             _diagnosticAnalyzerService = diagnosticAnalyzerService;
             _workspace = workspace;
 
@@ -72,7 +74,7 @@ internal sealed class CodeAnalysisDiagnosticAnalyzerServiceFactory() : IWorkspac
                     _clearedProjectIds.Clear();
 
                     // Let LSP know so that it requests up to date info, and will see our cached info disappear.
-                    _diagnosticAnalyzerService.RequestDiagnosticRefresh();
+                    _diagnosticsRefresher.RequestWorkspaceRefresh();
                     break;
             }
         }
@@ -83,7 +85,7 @@ internal sealed class CodeAnalysisDiagnosticAnalyzerServiceFactory() : IWorkspac
             _clearedProjectIds.AddRange(_analyzedProjectToDiagnostics.Keys);
 
             // Let LSP know so that it requests up to date info, and will see our cached info disappear.
-            _diagnosticAnalyzerService.RequestDiagnosticRefresh();
+            _diagnosticsRefresher.RequestWorkspaceRefresh();
         }
 
         public bool HasProjectBeenAnalyzed(ProjectId projectId)
@@ -109,7 +111,7 @@ internal sealed class CodeAnalysisDiagnosticAnalyzerServiceFactory() : IWorkspac
             //
             // TODO: Below call will eventually be replaced with a special workspace refresh request that skips pulling
             // document diagnostics and also does not add any delay for pulling workspace diagnostics.
-            _diagnosticAnalyzerService.RequestDiagnosticRefresh();
+            _diagnosticsRefresher.RequestWorkspaceRefresh();
         }
 
         /// <summary>
