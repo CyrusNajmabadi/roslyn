@@ -18,10 +18,9 @@ internal sealed partial class WorkspacePullDiagnosticHandler(
     LspWorkspaceManager workspaceManager,
     LspWorkspaceRegistrationService registrationService,
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticsRefresher,
     IGlobalOptionService globalOptions)
     : AbstractWorkspacePullDiagnosticsHandler<VSInternalWorkspaceDiagnosticsParams, VSInternalWorkspaceDiagnosticReport[], VSInternalWorkspaceDiagnosticReport[]>(
-        workspaceManager, registrationService, diagnosticSourceManager, diagnosticsRefresher, globalOptions)
+        workspaceManager, registrationService, diagnosticSourceManager, globalOptions)
 {
     // All workspace diagnostics are potential duplicates given that they can be overridden by the diagnostics
     // produced by document diagnostics.

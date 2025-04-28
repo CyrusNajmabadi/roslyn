@@ -34,8 +34,7 @@ internal sealed class EditAndContinueLanguageService(
     Lazy<IHostWorkspaceProvider> workspaceProvider,
     Lazy<IManagedHotReloadService> debuggerService,
     PdbMatchingSourceTextProvider sourceTextProvider,
-    IEditAndContinueLogReporter logReporter,
-    IDiagnosticsRefresher diagnosticRefresher) : IManagedHotReloadLanguageService2, IEditAndContinueSolutionProvider
+    IEditAndContinueLogReporter logReporter) : IManagedHotReloadLanguageService2, IEditAndContinueSolutionProvider
 {
     private sealed class NoSessionException : InvalidOperationException
     {
@@ -95,7 +94,7 @@ internal sealed class EditAndContinueLanguageService(
     private void UpdateApplyChangesDiagnostics(ImmutableArray<DiagnosticData> diagnostics)
     {
         sessionState.ApplyChangesDiagnostics = diagnostics;
-        diagnosticRefresher.RequestWorkspaceRefresh();
+        this.Services.GetRequiredService<IDiagnosticsRefresher>().RequestWorkspaceRefresh();
     }
 
     /// <summary>

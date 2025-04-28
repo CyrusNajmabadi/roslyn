@@ -17,12 +17,11 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.Diagnostics;
 internal class WorkspacePullDiagnosticHandlerFactory(
     LspWorkspaceRegistrationService registrationService,
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticsRefresher,
     IGlobalOptionService globalOptions) : ILspServiceFactory
 {
     public ILspService CreateILspService(LspServices lspServices, WellKnownLspServerKinds serverKind)
     {
         var workspaceManager = lspServices.GetRequiredService<LspWorkspaceManager>();
-        return new WorkspacePullDiagnosticHandler(workspaceManager, registrationService, diagnosticSourceManager, diagnosticsRefresher, globalOptions);
+        return new WorkspacePullDiagnosticHandler(workspaceManager, registrationService, diagnosticSourceManager, globalOptions);
     }
 }

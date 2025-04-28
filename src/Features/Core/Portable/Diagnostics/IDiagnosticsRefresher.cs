@@ -5,6 +5,7 @@
 using System;
 using System.Composition;
 using System.Threading;
+using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
 
 namespace Microsoft.CodeAnalysis.Diagnostics;
@@ -12,7 +13,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics;
 /// <summary>
 /// Used to send request for diagnostic pull to the client.
 /// </summary>
-internal interface IDiagnosticsRefresher
+internal interface IDiagnosticsRefresher : IWorkspaceService
 {
     event Action? WorkspaceRefreshRequested;
 
@@ -30,7 +31,7 @@ internal interface IDiagnosticsRefresher
     int GlobalStateVersion { get; }
 }
 
-[Export(typeof(IDiagnosticsRefresher)), Shared]
+[ExportWorkspaceService(typeof(IDiagnosticsRefresher)), Shared]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
 internal sealed class DefaultDiagnosticsRefresher() : IDiagnosticsRefresher

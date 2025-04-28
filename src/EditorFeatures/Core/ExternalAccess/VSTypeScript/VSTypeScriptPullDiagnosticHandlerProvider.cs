@@ -4,7 +4,6 @@
 
 using System;
 using System.Composition;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.LanguageServer;
 using Microsoft.CodeAnalysis.LanguageServer.Handler.Diagnostics;
@@ -18,9 +17,8 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.VSTypeScript;
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
 internal class VSTypeScriptDocumentPullDiagnosticHandlerFactory(
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticsRefresher,
     IGlobalOptionService globalOptions)
-    : DocumentPullDiagnosticHandlerFactory(diagnosticSourceManager, diagnosticsRefresher, globalOptions);
+    : DocumentPullDiagnosticHandlerFactory(diagnosticSourceManager, globalOptions);
 
 [ExportLspServiceFactory(typeof(WorkspacePullDiagnosticHandler), ProtocolConstants.TypeScriptLanguageContract), Shared]
 [method: ImportingConstructor]
@@ -28,6 +26,5 @@ internal class VSTypeScriptDocumentPullDiagnosticHandlerFactory(
 internal class VSTypeScriptWorkspacePullDiagnosticHandler(
     LspWorkspaceRegistrationService registrationService,
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticsRefresher,
     IGlobalOptionService globalOptions)
-    : WorkspacePullDiagnosticHandlerFactory(registrationService, diagnosticSourceManager, diagnosticsRefresher, globalOptions);
+    : WorkspacePullDiagnosticHandlerFactory(registrationService, diagnosticSourceManager, globalOptions);

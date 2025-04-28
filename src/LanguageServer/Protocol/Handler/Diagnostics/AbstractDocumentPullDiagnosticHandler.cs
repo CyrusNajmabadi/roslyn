@@ -5,7 +5,6 @@
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.LanguageServer.Handler.Diagnostics.DiagnosticSources;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CommonLanguageServerProtocol.Framework;
@@ -14,12 +13,10 @@ using Roslyn.LanguageServer.Protocol;
 namespace Microsoft.CodeAnalysis.LanguageServer.Handler.Diagnostics;
 
 internal abstract class AbstractDocumentPullDiagnosticHandler<TDiagnosticsParams, TReport, TReturn>(
-    IDiagnosticsRefresher diagnosticRefresher,
     IDiagnosticSourceManager diagnosticSourceManager,
     IGlobalOptionService globalOptions)
-    : AbstractPullDiagnosticHandler<TDiagnosticsParams, TReport, TReturn>(
-        diagnosticRefresher,
-        globalOptions), ITextDocumentIdentifierHandler<TDiagnosticsParams, TextDocumentIdentifier?>
+    : AbstractPullDiagnosticHandler<TDiagnosticsParams, TReport, TReturn>(globalOptions),
+      ITextDocumentIdentifierHandler<TDiagnosticsParams, TextDocumentIdentifier?>
     where TDiagnosticsParams : IPartialResultParams<TReport>
 {
     protected readonly IDiagnosticSourceManager DiagnosticSourceManager = diagnosticSourceManager;

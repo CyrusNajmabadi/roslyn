@@ -24,10 +24,9 @@ internal sealed partial class PublicWorkspacePullDiagnosticsHandler(
     LspWorkspaceManager workspaceManager,
     LspWorkspaceRegistrationService registrationService,
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticRefresher,
     IGlobalOptionService globalOptions)
     : AbstractWorkspacePullDiagnosticsHandler<WorkspaceDiagnosticParams, WorkspaceDiagnosticPartialReport, WorkspaceDiagnosticReport?>(
-        workspaceManager, registrationService, diagnosticSourceManager, diagnosticRefresher, globalOptions), IDisposable
+        workspaceManager, registrationService, diagnosticSourceManager, globalOptions), IDisposable
 {
     protected override string? GetRequestDiagnosticCategory(WorkspaceDiagnosticParams diagnosticsParams)
         => diagnosticsParams.Identifier;

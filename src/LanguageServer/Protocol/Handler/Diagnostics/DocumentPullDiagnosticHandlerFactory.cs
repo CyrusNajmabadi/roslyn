@@ -4,7 +4,6 @@
 
 using System;
 using System.Composition;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.LanguageServer.Handler.Diagnostics.DiagnosticSources;
 using Microsoft.CodeAnalysis.Options;
@@ -16,9 +15,8 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.Diagnostics;
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
 internal class DocumentPullDiagnosticHandlerFactory(
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticsRefresher,
     IGlobalOptionService globalOptions) : ILspServiceFactory
 {
     public ILspService CreateILspService(LspServices lspServices, WellKnownLspServerKinds serverKind)
-        => new DocumentPullDiagnosticHandler(diagnosticSourceManager, diagnosticsRefresher, globalOptions);
+        => new DocumentPullDiagnosticHandler(diagnosticSourceManager, globalOptions);
 }

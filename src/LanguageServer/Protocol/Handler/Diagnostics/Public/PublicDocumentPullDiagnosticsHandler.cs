@@ -21,10 +21,9 @@ using DocumentDiagnosticReport = SumType<RelatedFullDocumentDiagnosticReport, Re
 internal sealed partial class PublicDocumentPullDiagnosticsHandler(
     IClientLanguageServerManager clientLanguageServerManager,
     IDiagnosticSourceManager diagnosticSourceManager,
-    IDiagnosticsRefresher diagnosticsRefresher,
     IGlobalOptionService globalOptions)
     : AbstractDocumentPullDiagnosticHandler<DocumentDiagnosticParams, DocumentDiagnosticPartialReport, DocumentDiagnosticReport?>(
-        diagnosticsRefresher, diagnosticSourceManager, globalOptions)
+        diagnosticSourceManager, globalOptions)
 {
     private readonly IClientLanguageServerManager _clientLanguageServerManager = clientLanguageServerManager;
 
