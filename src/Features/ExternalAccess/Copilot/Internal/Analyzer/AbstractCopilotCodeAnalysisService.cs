@@ -27,7 +27,7 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.Copilot.Internal.Analyzer;
 /// Additionally, it performs all the option checks and Copilot service availability checks
 /// to determine if we should skip analysis or not.
 /// </summary>
-internal abstract class AbstractCopilotCodeAnalysisService(IDiagnosticsRefresher diagnosticsRefresher) : ICopilotCodeAnalysisService
+internal abstract class AbstractCopilotCodeAnalysisService() : ICopilotCodeAnalysisService
 {
     // The _diagnosticsCache is a cache for computed diagnostics via `AnalyzeDocumentAsync`.
     // Each document maps to a dictionary, which in tern maps a prompt title to a list of existing Diagnostics and a boolean flag.
@@ -128,6 +128,7 @@ internal abstract class AbstractCopilotCodeAnalysisService(IDiagnosticsRefresher
 
         // For LSP pull diagnostics, request a diagnostic workspace refresh.
         // We will include the cached copilot diagnostics from this service as part of that pull request.
+        var diagnosticsRefresher = document.Project.Solution.Services.GetRequiredService<IDiagnosticsRefresher>();
         diagnosticsRefresher.RequestWorkspaceRefresh();
     }
 

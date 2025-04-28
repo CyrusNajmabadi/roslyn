@@ -37,9 +37,7 @@ internal sealed class CSharpCopilotCodeAnalysisService : AbstractCopilotCodeAnal
         [Import(AllowDefault = true)] IExternalCSharpCopilotCodeAnalysisService? externalCopilotService,
         [Import(AllowDefault = true)] IExternalCSharpCopilotGenerateDocumentationService? externalCSharpCopilotGenerateDocumentationService,
         [Import(AllowDefault = true)] IExternalCSharpOnTheFlyDocsService? externalCSharpOnTheFlyDocsService,
-        [Import(AllowDefault = true)] IExternalCSharpCopilotGenerateImplementationService? externalCSharpCopilotGenerateImplementationService,
-        IDiagnosticsRefresher diagnosticsRefresher
-        ) : base(diagnosticsRefresher)
+        [Import(AllowDefault = true)] IExternalCSharpCopilotGenerateImplementationService? externalCSharpCopilotGenerateImplementationService)
     {
         if (externalCopilotService is null)
             FatalError.ReportAndCatch(new ArgumentNullException(nameof(externalCopilotService)), ErrorSeverity.Diagnostic);

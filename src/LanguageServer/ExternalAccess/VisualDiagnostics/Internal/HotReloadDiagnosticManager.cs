@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.ExternalAccess.VisualDiagnostics.Contracts;
 using Microsoft.CodeAnalysis.Host.Mef;
 
@@ -15,13 +14,13 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.VisualDiagnostics.Internal;
 [Export(typeof(IHotReloadDiagnosticManager)), Shared]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-internal sealed class HotReloadDiagnosticManager([Import] IDiagnosticsRefresher diagnosticsRefresher) : IHotReloadDiagnosticManager
+internal sealed class HotReloadDiagnosticManager() : IHotReloadDiagnosticManager
 {
     private readonly object _syncLock = new();
     public ImmutableArray<IHotReloadDiagnosticSourceProvider> Providers { get; private set; } = [];
 
     public void RequestRefresh()
-            => diagnosticsRefresher.RequestWorkspaceRefresh();
+        => diagnosticsRefresher.RequestWorkspaceRefresh();
 
     public void Register(IEnumerable<IHotReloadDiagnosticSourceProvider> providers)
     {
