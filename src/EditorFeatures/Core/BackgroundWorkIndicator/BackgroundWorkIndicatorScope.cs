@@ -15,7 +15,7 @@ internal partial class WpfBackgroundWorkIndicatorFactory
     /// features to create nested work with descriptions/progress that will update the all-up indicator tool-tip
     /// shown to the user.
     /// </summary>
-    private sealed class BackgroundWorkIndicatorScope : IUIThreadOperationScope, IProgress<ProgressInfo>
+    private sealed class BackgroundWorkIndicatorScope : /*IUIThreadOperationScope*/ IDisposable, IProgress<ProgressInfo>
     {
         private readonly BackgroundWorkIndicatorContext _context;
 
@@ -25,7 +25,7 @@ internal partial class WpfBackgroundWorkIndicatorFactory
         private string _description;
         private ProgressInfo _progressInfo;
 
-        public IUIThreadOperationContext Context => _context;
+        // public IUIThreadOperationContext Context => _context;
         public IProgress<ProgressInfo> Progress => this;
 
         public BackgroundWorkIndicatorScope(
@@ -50,30 +50,30 @@ internal partial class WpfBackgroundWorkIndicatorFactory
         void IDisposable.Dispose()
             => _context.RemoveScope(this);
 
-        bool IUIThreadOperationScope.AllowCancellation
-        {
-            get => true;
-            set { }
-        }
+        //bool IUIThreadOperationScope.AllowCancellation
+        //{
+        //    get => true;
+        //    set { }
+        //}
 
-        string IUIThreadOperationScope.Description
-        {
-            get
-            {
-                lock (_context.Gate)
-                    return _description;
-            }
-            set
-            {
-                lock (_context.Gate)
-                {
-                    _description = value;
-                }
+        //string IUIThreadOperationScope.Description
+        //{
+        //    get
+        //    {
+        //        lock (_context.Gate)
+        //            return _description;
+        //    }
+        //    set
+        //    {
+        //        lock (_context.Gate)
+        //        {
+        //            _description = value;
+        //        }
 
-                // We changed.  Enqueue work to make sure the UI reflects this.
-                _context.EnqueueUIUpdate();
-            }
-        }
+        //        // We changed.  Enqueue work to make sure the UI reflects this.
+        //        _context.EnqueueUIUpdate();
+        //    }
+        //}
 
         void IProgress<ProgressInfo>.Report(ProgressInfo value)
         {

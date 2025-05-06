@@ -75,7 +75,7 @@ internal partial class WpfBackgroundWorkIndicatorFactory
 
         public PropertyCollection Properties { get; } = new();
         public CancellationToken UserCancellationToken => _cancellationTokenSource.Token;
-        public IEnumerable<IUIThreadOperationScope> Scopes => _scopes;
+        // public IEnumerable<IUIThreadOperationScope> Scopes => _scopes;
 
         private bool _cancelOnEdit_DoNotAccessDirectly;
         private bool _cancelOnFocusLost_DoNotAccessDirectly;
@@ -243,18 +243,18 @@ internal partial class WpfBackgroundWorkIndicatorFactory
             }
         }
 
-        public IUIThreadOperationScope AddScope(bool allowCancellation, string description)
-        {
-            var scope = new BackgroundWorkIndicatorScope(this, description);
-            lock (this.Gate)
-            {
-                _scopes = _scopes.Add(scope);
-            }
+        //public IUIThreadOperationScope AddScope(bool allowCancellation, string description)
+        //{
+        //    var scope = new BackgroundWorkIndicatorScope(this, description);
+        //    lock (this.Gate)
+        //    {
+        //        _scopes = _scopes.Add(scope);
+        //    }
 
-            // We changed.  Enqueue work to make sure the UI reflects this.
-            this.EnqueueUIUpdate();
-            return scope;
-        }
+        //    // We changed.  Enqueue work to make sure the UI reflects this.
+        //    this.EnqueueUIUpdate();
+        //    return scope;
+        //}
 
         public void RemoveScope(BackgroundWorkIndicatorScope scope)
         {
@@ -293,9 +293,9 @@ internal partial class WpfBackgroundWorkIndicatorFactory
             }
         }
 
-        string IUIThreadOperationContext.Description => BuildData().description;
+        //string IUIThreadOperationContext.Description => BuildData().description;
 
-        bool IUIThreadOperationContext.AllowCancellation => true;
+        //bool IUIThreadOperationContext.AllowCancellation => true;
 
         public IDisposable SuppressAutoCancel()
         {
