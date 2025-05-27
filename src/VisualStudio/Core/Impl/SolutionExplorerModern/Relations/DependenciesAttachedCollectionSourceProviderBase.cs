@@ -36,8 +36,8 @@ public abstract class DependenciesAttachedCollectionSourceProviderBase : IAttach
     /// <param name="containsCollectionSource">The returned collection source.</param>
     protected abstract bool TryCreateCollectionSource(
         IVsHierarchyItem hierarchyItem,
-        string unused,
-        string? target,
+        //string unused,
+        //string? target,
         IRelationProvider relationProvider,
         [NotNullWhen(returnValue: true)] out AggregateRelationCollectionSource? containsCollectionSource);
 
@@ -49,15 +49,15 @@ public abstract class DependenciesAttachedCollectionSourceProviderBase : IAttach
             {
                 if (hierarchyItem.TryGetFlags(out ProjectTreeFlags flags) && flags.Contains(_flags))
                 {
-                    hierarchyItem.TryFindTarget(out string? target);
+                    //hierarchyItem.TryFindTarget(out string? target);
 
-                    // NOTE historically we used to pass a string having all project tree flags concatenated
-                    // in a single string. Nothing actually uses this value, and it's expensive to create.
-                    // Unfortunately this is a public API and the signature of the method cannot change.
-                    // So instead, we always just pass an empty string.
-                    string flagsString = "";
+                    //// NOTE historically we used to pass a string having all project tree flags concatenated
+                    //// in a single string. Nothing actually uses this value, and it's expensive to create.
+                    //// Unfortunately this is a public API and the signature of the method cannot change.
+                    //// So instead, we always just pass an empty string.
+                    //string flagsString = "";
 
-                    if (TryCreateCollectionSource(hierarchyItem, flagsString, target, RelationProvider, out AggregateRelationCollectionSource? containsCollection))
+                    if (TryCreateCollectionSource(hierarchyItem, /*flagsString, target,*/ RelationProvider, out AggregateRelationCollectionSource? containsCollection))
                     {
                         return containsCollection;
                     }
