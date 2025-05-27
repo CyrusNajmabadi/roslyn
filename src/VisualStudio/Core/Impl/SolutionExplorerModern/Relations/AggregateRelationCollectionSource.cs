@@ -3,6 +3,8 @@
 using System;
 using System.Collections;
 using System.ComponentModel;
+using Microsoft.VisualStudio.ProjectSystem.VS.Utilities;
+
 //using Microsoft.VisualStudio.ProjectSystem.VS.Utilities;
 using Microsoft.VisualStudio.Shell;
 

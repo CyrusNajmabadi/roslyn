@@ -11,6 +11,7 @@ using System.ComponentModel.Composition;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using EnvDTE;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
@@ -22,6 +23,8 @@ using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.CodeAnalysis.Shared.Utilities;
 using Microsoft.CodeAnalysis.Threading;
 using Microsoft.Internal.VisualStudio.PlatformUI;
+using Microsoft.VisualStudio.ProjectSystem;
+using Microsoft.VisualStudio.ProjectSystem.VS.Tree.Dependencies.AttachedCollections;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Utilities;
@@ -31,13 +34,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
 
 [Export(typeof(IAttachedCollectionSourceProvider))]
 [Name(nameof(RootSymbolTreeItemSourceProvider))]
-[Order(Before = HierarchyItemsProviderNames.Contains)]
+[VisualStudio.Utilities.Order(Before = HierarchyItemsProviderNames.Contains)]
 [AppliesToProject("CSharp | VB")]
-internal sealed class RootSymbolTreeItemSourceProvider : AttachedCollectionSourceProvider<IVsHierarchyItem>
+internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCollectionSourceProviderBase
 {
-    private readonly ConcurrentSet<WeakReference<RootSymbolTreeItemCollectionSource>> _weakCollectionSources = [];
+    private readonly ConcurrentSet<WeakReference<AggregateContainsRelationCollection>> _weakCollectionSources = [];
 
-    private readonly AsyncBatchingWorkQueue<DocumentId> _updateSourcesQueue;
+    private readonly AsyncBatchingWorkQueue _updateSourcesQueue;
     private readonly Workspace _workspace;
     private readonly CancellationSeries _navigationCancellationSeries = new();
 
@@ -50,23 +53,22 @@ internal sealed class RootSymbolTreeItemSourceProvider : AttachedCollectionSourc
         IThreadingContext threadingContext,
         VisualStudioWorkspace workspace,
         IAsynchronousOperationListenerProvider listenerProvider)
+        : base(ProjectTreeFlags.SourceFile | ProjectTreeFlags.FileOnDisk)
     {
         ThreadingContext = threadingContext;
         _workspace = workspace;
         Listener = listenerProvider.GetListener(FeatureAttribute.SolutionExplorer);
 
-        _updateSourcesQueue = new AsyncBatchingWorkQueue<DocumentId>(
+        _updateSourcesQueue = new AsyncBatchingWorkQueue(
             DelayTimeSpan.Medium,
             UpdateCollectionSourcesAsync,
-            EqualityComparer<DocumentId>.Default,
             this.Listener,
             this.ThreadingContext.DisposalToken);
 
         this._workspace.RegisterWorkspaceChangedHandler(
             e =>
             {
-                if (e is { Kind: WorkspaceChangeKind.DocumentChanged or WorkspaceChangeKind.DocumentAdded, DocumentId: not null })
-                    _updateSourcesQueue.AddWork(e.DocumentId);
+                _updateSourcesQueue.AddWork();
             },
             options: new WorkspaceEventOptions(RequiresMainThread: false));
     }
@@ -90,13 +92,9 @@ internal sealed class RootSymbolTreeItemSourceProvider : AttachedCollectionSourc
             cancellationToken).ReportNonFatalErrorUnlessCancelledAsync(cancellationToken).CompletesAsyncOperation(token);
     }
 
-    private async ValueTask UpdateCollectionSourcesAsync(
-        ImmutableSegmentedList<DocumentId> documentIds, CancellationToken cancellationToken)
+    private async ValueTask UpdateCollectionSourcesAsync(CancellationToken cancellationToken)
     {
-        using var _1 = Microsoft.CodeAnalysis.PooledObjects.PooledHashSet<DocumentId>.GetInstance(out var documentIdSet);
-        using var _2 = Microsoft.CodeAnalysis.PooledObjects.ArrayBuilder<RootSymbolTreeItemCollectionSource>.GetInstance(out var sources);
-
-        documentIdSet.AddRange(documentIds);
+        using var _2 = Microsoft.CodeAnalysis.PooledObjects.ArrayBuilder<AggregateContainsRelationCollection>.GetInstance(out var sources);
 
         foreach (var weakSource in _weakCollectionSources)
         {
@@ -110,46 +108,94 @@ internal sealed class RootSymbolTreeItemSourceProvider : AttachedCollectionSourc
             sources.Add(source);
         }
 
-        await RoslynParallel.ForEachAsync(
-            sources,
-            cancellationToken,
-            async (source, cancellationToken) =>
-            {
-                await source.UpdateIfAffectedAsync(documentIdSet, cancellationToken)
-                    .ReportNonFatalErrorUnlessCancelledAsync(cancellationToken)
-                    .ConfigureAwait(false);
-            }).ConfigureAwait(false);
+        await this.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+        foreach (var source in sources)
+            source.OnStateUpdated();
+        //await RoslynParallel.ForEachAsync(
+        //    sources,
+        //    cancellationToken,
+        //    (source, cancellationToken) =>
+        //    {
+        //        source.OnStateUpdated();
+        //        //await source.UpdateIfAffectedAsync(documentIdSet, cancellationToken)
+        //        //    .ReportNonFatalErrorUnlessCancelledAsync(cancellationToken)
+        //        //    .ConfigureAwait(false);
+        //    }).ConfigureAwait(false);
     }
 
-    protected override IAttachedCollectionSource? CreateCollectionSource(IVsHierarchyItem item, string relationshipName)
+    protected override bool TryCreateCollectionSource(
+        IVsHierarchyItem hierarchyItem,
+        IRelationProvider relationProvider,
+        [NotNullWhen(true)] out AggregateRelationCollectionSource? containsCollectionSource)
     {
-        if (item == null ||
-            item.HierarchyIdentity == null ||
-            item.HierarchyIdentity.NestedHierarchy == null ||
-            relationshipName != KnownRelationships.Contains)
+        containsCollectionSource = null;
+
+        if (hierarchyItem == null ||
+            hierarchyItem.HierarchyIdentity == null ||
+            hierarchyItem.HierarchyIdentity.NestedHierarchy == null)
         {
-            return null;
+            return false;
         }
 
-        var hierarchy = item.HierarchyIdentity.NestedHierarchy;
-        var itemId = item.HierarchyIdentity.NestedItemID;
+        var item = new VsHierarchySymbolItem(this, hierarchyItem);
 
-        if (hierarchy.GetProperty(itemId, (int)__VSHPROPID7.VSHPROPID_ProjectTreeCapabilities, out var capabilitiesObj) != VSConstants.S_OK ||
-            capabilitiesObj is not string capabilities)
+        if (AggregateContainsRelationCollection.TryCreate(item, relationProvider, out var collection))
         {
-            return null;
+            containsCollectionSource = new AggregateRelationCollectionSource(hierarchyItem, collection);
+            _weakCollectionSources.Add(new WeakReference<AggregateContainsRelationCollection>(collection));
+            return true;
         }
 
-        if (!capabilities.Contains(nameof(VisualStudio.ProjectSystem.ProjectTreeFlags.SourceFile)) ||
-            !capabilities.Contains(nameof(VisualStudio.ProjectSystem.ProjectTreeFlags.FileOnDisk)))
-        {
-            return null;
-        }
+        return false;
+        //var hierarchy = item.HierarchyIdentity.NestedHierarchy;
+        //var itemId = item.HierarchyIdentity.NestedItemID;
 
-        var source = new RootSymbolTreeItemCollectionSource(this, item);
-        _weakCollectionSources.Add(new WeakReference<RootSymbolTreeItemCollectionSource>(source));
-        return source;
+        //if (hierarchy.GetProperty(itemId, (int)__VSHPROPID7.VSHPROPID_ProjectTreeCapabilities, out var capabilitiesObj) != VSConstants.S_OK ||
+        //    capabilitiesObj is not string capabilities)
+        //{
+        //    return null;
+        //}
+
+        //if (!capabilities.Contains(nameof(VisualStudio.ProjectSystem.ProjectTreeFlags.SourceFile)) ||
+        //    !capabilities.Contains(nameof(VisualStudio.ProjectSystem.ProjectTreeFlags.FileOnDisk)))
+        //{
+        //    return null;
+        //}
+
+        //var source = new RootSymbolTreeItemCollectionSource(this, item);
+        //_weakCollectionSources.Add(new WeakReference<RootSymbolTreeItemCollectionSource>(source));
+        //return source;
     }
+
+    //protected override IAttachedCollectionSource? CreateCollectionSource(IVsHierarchyItem item, string relationshipName)
+    //{
+    //    if (item == null ||
+    //        item.HierarchyIdentity == null ||
+    //        item.HierarchyIdentity.NestedHierarchy == null ||
+    //        relationshipName != KnownRelationships.Contains)
+    //    {
+    //        return null;
+    //    }
+
+    //    var hierarchy = item.HierarchyIdentity.NestedHierarchy;
+    //    var itemId = item.HierarchyIdentity.NestedItemID;
+
+    //    if (hierarchy.GetProperty(itemId, (int)__VSHPROPID7.VSHPROPID_ProjectTreeCapabilities, out var capabilitiesObj) != VSConstants.S_OK ||
+    //        capabilitiesObj is not string capabilities)
+    //    {
+    //        return null;
+    //    }
+
+    //    if (!capabilities.Contains(nameof(VisualStudio.ProjectSystem.ProjectTreeFlags.SourceFile)) ||
+    //        !capabilities.Contains(nameof(VisualStudio.ProjectSystem.ProjectTreeFlags.FileOnDisk)))
+    //    {
+    //        return null;
+    //    }
+
+    //    var source = new RootSymbolTreeItemCollectionSource(this, item);
+    //    _weakCollectionSources.Add(new WeakReference<RootSymbolTreeItemCollectionSource>(source));
+    //    return source;
+    //}
 
     private sealed class RootSymbolTreeItemCollectionSource(
         RootSymbolTreeItemSourceProvider rootProvider,

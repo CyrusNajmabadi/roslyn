@@ -38,12 +38,12 @@ public sealed class AggregateContainsRelationCollection : IAggregateRelationColl
     private event EventHandler? HasItemsChanged;
 
     private readonly AggregateContainsRelationCollectionSpan[] _spans;
-    private readonly IRelatableItem _item;
+    public readonly IRelatableItem Item;
     private bool _isMaterialized;
 
     private AggregateContainsRelationCollection(IRelatableItem item, ImmutableArray<IRelation> containsRelations)
     {
-        _item = item;
+        Item = item;
         _spans = containsRelations
             .Select(relation => new AggregateContainsRelationCollectionSpan(this, relation))
             .ToArray();
@@ -64,7 +64,7 @@ public sealed class AggregateContainsRelationCollection : IAggregateRelationColl
             {
                 beforeCount += span.Items?.Count ?? 0;
                 span.BaseIndex = afterCount;
-                span.Relation.UpdateContainsCollection(parent: _item, span);
+                span.Relation.UpdateContainsCollection(parent: Item, span);
                 afterCount += span.Items?.Count ?? 0;
             }
 
@@ -90,7 +90,7 @@ public sealed class AggregateContainsRelationCollection : IAggregateRelationColl
     bool IAggregateRelationCollection.HasItems
         => _isMaterialized
             ? _spans.Any(static span => span.Items?.Count > 0)
-            : _spans.Any(static (span, item) => span.Relation.HasContainedItem(item), _item);
+            : _spans.Any(static (span, item) => span.Relation.HasContainedItem(item), Item);
 
     int ICollection.Count => _spans.Sum(span => span.Items?.Count ?? 0);
 
