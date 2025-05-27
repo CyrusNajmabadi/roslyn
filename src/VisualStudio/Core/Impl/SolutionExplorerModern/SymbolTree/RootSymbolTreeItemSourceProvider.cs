@@ -38,7 +38,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
 [AppliesToProject("CSharp | VB")]
 internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCollectionSourceProviderBase
 {
-    private readonly ConcurrentSet<WeakReference<AggregateContainsRelationCollection>> _weakCollectionSources = [];
+    private sealed record CachedSourceData(
+        WeakReference<AggregateRelationCollectionSource> WeakCollectionSource,
+        HierarchySymbolTreeItemComputer ItemComputer);
+
+    private readonly ConcurrentSet<CachedSourceData> _weakCollectionSources = [];
 
     private readonly AsyncBatchingWorkQueue _updateSourcesQueue;
     private readonly Workspace _workspace;
@@ -94,33 +98,45 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
 
     private async ValueTask UpdateCollectionSourcesAsync(CancellationToken cancellationToken)
     {
-        using var _2 = Microsoft.CodeAnalysis.PooledObjects.ArrayBuilder<AggregateContainsRelationCollection>.GetInstance(out var sources);
+        using var _1 = Microsoft.CodeAnalysis.PooledObjects.ArrayBuilder<
+            (AggregateRelationCollectionSource source, HierarchySymbolTreeItemComputer computer)>.GetInstance(out var sources);
 
-        foreach (var weakSource in _weakCollectionSources)
+        foreach (var cachedDataSource in _weakCollectionSources)
         {
             // If solution explorer has released this collection source, we can drop it as well.
-            if (!weakSource.TryGetTarget(out var source))
+            if (!cachedDataSource.WeakCollectionSource.TryGetTarget(out var source))
             {
-                _weakCollectionSources.Remove(weakSource);
+                _weakCollectionSources.Remove(cachedDataSource);
                 continue;
             }
 
-            sources.Add(source);
+            sources.Add((source, cachedDataSource.ItemComputer));
         }
 
+        await RoslynParallel.ForEachAsync(
+            sources,
+            cancellationToken,
+            async (sourceAndComputer, cancellationToken) =>
+            {
+                var (source, computer) = sourceAndComputer;
+                await computer.UpdateIfChangedAsync(cancellationToken)
+                    .ReportNonFatalErrorUnlessCancelledAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }).ConfigureAwait(false);
+
         await this.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-        foreach (var source in sources)
-            source.OnStateUpdated();
-        //await RoslynParallel.ForEachAsync(
-        //    sources,
-        //    cancellationToken,
-        //    (source, cancellationToken) =>
-        //    {
-        //        source.OnStateUpdated();
-        //        //await source.UpdateIfAffectedAsync(documentIdSet, cancellationToken)
-        //        //    .ReportNonFatalErrorUnlessCancelledAsync(cancellationToken)
-        //        //    .ConfigureAwait(false);
-        //    }).ConfigureAwait(false);
+        foreach (var (source, computer) in sources)
+        {
+            if (source.IsUpdatingHasItems)
+            {
+                if (computer.Collection != null)
+                    source.SetCollection(computer.Collection);
+            }
+            else
+            {
+                computer.Collection?.OnStateUpdated();
+            }
+        }
     }
 
     protected override bool TryCreateCollectionSource(
@@ -137,16 +153,23 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
             return false;
         }
 
-        var item = new VsHierarchySymbolItem(this, hierarchyItem);
+        containsCollectionSource = new AggregateRelationCollectionSource(hierarchyItem);
+        _weakCollectionSources.Add(new CachedSourceData(
+            new(containsCollectionSource),
+            new(this, hierarchyItem, relationProvider)));
+        return true;
 
-        if (AggregateContainsRelationCollection.TryCreate(item, relationProvider, out var collection))
-        {
-            containsCollectionSource = new AggregateRelationCollectionSource(hierarchyItem, collection);
-            _weakCollectionSources.Add(new WeakReference<AggregateContainsRelationCollection>(collection));
-            return true;
-        }
 
-        return false;
+        //var item = new VsHierarchySymbolItem(this, hierarchyItem);
+
+        //if (AggregateContainsRelationCollection.TryCreate(item, relationProvider, out var collection))
+        //{
+        //    containsCollectionSource = new AggregateRelationCollectionSource(hierarchyItem, collection);
+        //    _weakCollectionSources.Add(new WeakReference<AggregateContainsRelationCollection>(collection));
+        //    return true;
+        //}
+
+        //return false;
         //var hierarchy = item.HierarchyIdentity.NestedHierarchy;
         //var itemId = item.HierarchyIdentity.NestedItemID;
 
@@ -166,6 +189,68 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
         //_weakCollectionSources.Add(new WeakReference<RootSymbolTreeItemCollectionSource>(source));
         //return source;
     }
+
+    private sealed class HierarchySymbolTreeItemComputer
+    {
+        private readonly RootSymbolTreeItemSourceProvider _rootProvider;
+        private readonly IVsHierarchyItem _hierarchyItem;
+        private readonly IRelationProvider _relationProvider;
+
+        private bool _initialized;
+
+        public AggregateContainsRelationCollection? Collection;
+
+        public HierarchySymbolTreeItemComputer(
+            RootSymbolTreeItemSourceProvider rootProvider,
+            IVsHierarchyItem hierarchyItem,
+            IRelationProvider relationProvider)
+        {
+            _rootProvider = rootProvider;
+            _hierarchyItem = hierarchyItem;
+            _relationProvider = relationProvider;
+        }
+
+        public async Task UpdateIfChangedAsync(CancellationToken cancellationToken)
+        {
+            var idMap = _rootProvider._workspace.Services.GetService<IHierarchyItemToProjectIdMap>();
+            idMap?.TryGetDocumentId(_hierarchyItem, targetFrameworkMoniker: null, out var _documentId);
+
+            if (!_initialized)
+            {
+                var item = new VsHierarchyRelatableItem();
+                AggregateContainsRelationCollection.TryCreate(item, _relationProvider, out Collection);
+                _initialized = true;
+            }
+            else
+            {
+
+            }
+        }
+    }
+
+    //private sealed class VsHierarchySymbolItem : RelationBase<IVsHierarchyItem, SymbolTreeItem>
+    //{
+    //    private readonly IVsHierarchyItem _hierarchyItem;
+    //    private readonly ImmutableArray<SymbolTreeItem> _childItems = [];
+
+    //    public VsHierarchySymbolItem(IVsHierarchyItem hierarchyItem)
+    //    {
+    //        _hierarchyItem = hierarchyItem;
+    //    }
+
+    //    protected override bool HasContainedItems(IVsHierarchyItem parent)
+    //        => true;
+
+    //    protected override void UpdateContainsCollection(IVsHierarchyItem parent, AggregateContainsRelationCollectionSpan span)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+
+    //    protected override IEnumerable<IVsHierarchyItem>? CreateContainedByItems(SymbolTreeItem child)
+    //    {
+    //        return null;
+    //    }
+    //}
 
     //protected override IAttachedCollectionSource? CreateCollectionSource(IVsHierarchyItem item, string relationshipName)
     //{
@@ -197,84 +282,84 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
     //    return source;
     //}
 
-    private sealed class RootSymbolTreeItemCollectionSource(
-        RootSymbolTreeItemSourceProvider rootProvider,
-        IVsHierarchyItem hierarchyItem) : IAttachedCollectionSource, INotifyPropertyChanged
-    {
-        private readonly RootSymbolTreeItemSourceProvider _rootProvider = rootProvider;
-        private readonly IVsHierarchyItem _hierarchyItem = hierarchyItem;
+    //private sealed class RootSymbolTreeItemCollectionSource(
+    //    RootSymbolTreeItemSourceProvider rootProvider,
+    //    IVsHierarchyItem hierarchyItem) : IAttachedCollectionSource, INotifyPropertyChanged
+    //{
+    //    private readonly RootSymbolTreeItemSourceProvider _rootProvider = rootProvider;
+    //    private readonly IVsHierarchyItem _hierarchyItem = hierarchyItem;
 
-        // Mark hasItems as null as we don't know up front if we have items, and instead have to compute it on demand.
-        private readonly SymbolTreeChildCollection _childCollection = new(rootProvider, hierarchyItem, hasItems: null);
+    //    // Mark hasItems as null as we don't know up front if we have items, and instead have to compute it on demand.
+    //    private readonly SymbolTreeChildCollection _childCollection = new(rootProvider, hierarchyItem, hasItems: null);
 
-        private DocumentId? _documentId;
+    //    private DocumentId? _documentId;
 
-        internal async Task UpdateIfAffectedAsync(
-            HashSet<DocumentId> updateSet,
-            CancellationToken cancellationToken)
-        {
-            var documentId = DetermineDocumentId();
+    //    internal async Task UpdateIfAffectedAsync(
+    //        HashSet<DocumentId> updateSet,
+    //        CancellationToken cancellationToken)
+    //    {
+    //        var documentId = DetermineDocumentId();
 
-            // If we successfully handle this request, we're done.
-            if (documentId != null && await TryUpdateItemsAsync(updateSet, documentId, cancellationToken).ConfigureAwait(false))
-                return;
+    //        // If we successfully handle this request, we're done.
+    //        if (documentId != null && await TryUpdateItemsAsync(updateSet, documentId, cancellationToken).ConfigureAwait(false))
+    //            return;
 
-            // If we didn't have a doc id, or we failed for any reason, clear out all our items and set that as our
-            // current state.
-            await _rootProvider.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-            _childCollection.ClearAndMarkComputed_OnMainThread();
-        }
+    //        // If we didn't have a doc id, or we failed for any reason, clear out all our items and set that as our
+    //        // current state.
+    //        await _rootProvider.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+    //        _childCollection.ClearAndMarkComputed_OnMainThread();
+    //    }
 
-        private async ValueTask<bool> TryUpdateItemsAsync(
-            HashSet<DocumentId> updateSet, DocumentId documentId, CancellationToken cancellationToken)
-        {
-            if (!updateSet.Contains(documentId))
-            {
-                // Note: we intentionally return 'true' here.  There was no failure here. We just got a notification
-                // to update a different document than our own.  So we can just ignore this.
-                return true;
-            }
+    //    private async ValueTask<bool> TryUpdateItemsAsync(
+    //        HashSet<DocumentId> updateSet, DocumentId documentId, CancellationToken cancellationToken)
+    //    {
+    //        if (!updateSet.Contains(documentId))
+    //        {
+    //            // Note: we intentionally return 'true' here.  There was no failure here. We just got a notification
+    //            // to update a different document than our own.  So we can just ignore this.
+    //            return true;
+    //        }
 
-            var solution = _rootProvider._workspace.CurrentSolution;
-            var document = solution.GetDocument(documentId);
+    //        var solution = _rootProvider._workspace.CurrentSolution;
+    //        var document = solution.GetDocument(documentId);
 
-            // If we can't find this document anymore, clear everything out.
-            if (document is null)
-                return false;
+    //        // If we can't find this document anymore, clear everything out.
+    //        if (document is null)
+    //            return false;
 
-            var itemProvider = document.Project.GetLanguageService<ISolutionExplorerSymbolTreeItemProvider>();
-            if (itemProvider is null)
-                return false;
+    //        var itemProvider = document.Project.GetLanguageService<ISolutionExplorerSymbolTreeItemProvider>();
+    //        if (itemProvider is null)
+    //            return false;
 
-            var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            var items = itemProvider.GetItems(root, cancellationToken);
+    //        var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+    //        var items = itemProvider.GetItems(root, cancellationToken);
 
-            await _rootProvider.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-            _childCollection.SetItemsAndMarkComputed_OnMainThread(documentId, itemProvider, items);
-            return true;
-        }
+    //        await _rootProvider.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+    //        _childCollection.SetItemsAndMarkComputed_OnMainThread(documentId, itemProvider, items);
+    //        return true;
+    //    }
 
-        private DocumentId? DetermineDocumentId()
-        {
-            if (_documentId == null)
-            {
-                var idMap = _rootProvider._workspace.Services.GetService<IHierarchyItemToProjectIdMap>();
-                idMap?.TryGetDocumentId(_hierarchyItem, targetFrameworkMoniker: null, out _documentId);
-            }
+    //    private DocumentId? DetermineDocumentId()
+    //    {
+    //        if (_documentId == null)
+    //        {
+    //            var idMap = _rootProvider._workspace.Services.GetService<IHierarchyItemToProjectIdMap>();
+    //            idMap?.TryGetDocumentId(_hierarchyItem, targetFrameworkMoniker: null, out _documentId);
+    //        }
 
-            return _documentId;
-        }
+    //        return _documentId;
+    //    }
 
-        object IAttachedCollectionSource.SourceItem => _childCollection.SourceItem;
+    //    object IAttachedCollectionSource.SourceItem => _childCollection.SourceItem;
 
-        bool IAttachedCollectionSource.HasItems => _childCollection.HasItems;
+    //    bool IAttachedCollectionSource.HasItems => _childCollection.HasItems;
 
-        IEnumerable IAttachedCollectionSource.Items => _childCollection.Items;
+    //    IEnumerable IAttachedCollectionSource.Items => _childCollection.Items;
 
-        event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
-        {
-            add => _childCollection.PropertyChanged += value;
-            remove => _childCollection.PropertyChanged -= value;
-        }
-    }
+    //    event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
+    //    {
+    //        add => _childCollection.PropertyChanged += value;
+    //        remove => _childCollection.PropertyChanged -= value;
+    //    }
+    //}
 }

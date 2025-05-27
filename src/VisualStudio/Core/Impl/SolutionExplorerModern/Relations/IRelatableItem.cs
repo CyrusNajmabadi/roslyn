@@ -66,20 +66,20 @@ public interface IRelatableItem
         IRelationProvider relationProvider,
         [NotNullWhen(returnValue: true)] out AggregateContainsRelationCollection? relationCollection);
 
-    /// <summary>
-    /// Attempts to find the <see cref="IProjectTree"/> item that corresponds to the top-level dependency modeled by this item.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// This method should only be implemented for item types that correspond to top-level project dependencies. All other item
-    /// types may <see langword="false"/>.
-    /// </para>
-    /// <para>
-    /// This value is used during search to connection a search result's ancestry to existing tree items.
-    /// </para>
-    /// </remarks>
-    bool TryGetProjectNode(
-        IProjectTree targetRootNode,
-        IRelatableItem item,
-        [NotNullWhen(returnValue: true)] out IProjectTree? projectTree);
+    ///// <summary>
+    ///// Attempts to find the <see cref="IProjectTree"/> item that corresponds to the top-level dependency modeled by this item.
+    ///// </summary>
+    ///// <remarks>
+    ///// <para>
+    ///// This method should only be implemented for item types that correspond to top-level project dependencies. All other item
+    ///// types may <see langword="false"/>.
+    ///// </para>
+    ///// <para>
+    ///// This value is used during search to connection a search result's ancestry to existing tree items.
+    ///// </para>
+    ///// </remarks>
+    //bool TryGetProjectNode(
+    //    IProjectTree targetRootNode,
+    //    IRelatableItem item,
+    //    [NotNullWhen(returnValue: true)] out IProjectTree? projectTree);
 }

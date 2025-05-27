@@ -14,7 +14,7 @@ public abstract partial class RelatableItemBase : AttachedCollectionItemBase, IR
 {
     private const int IDM_VS_CTXT_DEPENDENCY_TRANSITIVE_ITEM = 0x04B0;
 
-    private static readonly IContextMenuController s_defaultMenuController = CreateContextMenuController(VsMenus.guidSHLMainMenu, IDM_VS_CTXT_DEPENDENCY_TRANSITIVE_ITEM);
+    // private static readonly IContextMenuController s_defaultMenuController = CreateContextMenuController(VsMenus.guidSHLMainMenu, IDM_VS_CTXT_DEPENDENCY_TRANSITIVE_ITEM);
 
     private AggregateContainsRelationCollection? _containsCollection;
 
@@ -25,7 +25,7 @@ public abstract partial class RelatableItemBase : AttachedCollectionItemBase, IR
 
     public abstract object Identity { get; }
 
-    protected override IContextMenuController? ContextMenuController => s_defaultMenuController;
+    protected override IContextMenuController? ContextMenuController => null;// s_defaultMenuController;
 
     AggregateContainsRelationCollection? IRelatableItem.ContainsCollection => _containsCollection;
 
@@ -44,15 +44,15 @@ public abstract partial class RelatableItemBase : AttachedCollectionItemBase, IR
         return relationCollection is not null;
     }
 
-    bool IRelatableItem.TryGetProjectNode(IProjectTree targetRootNode, IRelatableItem item, [NotNullWhen(returnValue: true)] out IProjectTree? projectTree)
-    {
-        return TryGetProjectNode(targetRootNode, item, out projectTree);
-    }
+    //bool IRelatableItem.TryGetProjectNode(IProjectTree targetRootNode, IRelatableItem item, [NotNullWhen(returnValue: true)] out IProjectTree? projectTree)
+    //{
+    //    return TryGetProjectNode(targetRootNode, item, out projectTree);
+    //}
 
-    /// <inheritdoc cref="IRelatableItem.TryGetProjectNode" />
-    protected virtual bool TryGetProjectNode(IProjectTree targetRootNode, IRelatableItem item, [NotNullWhen(returnValue: true)] out IProjectTree? projectTree)
-    {
-        projectTree = null;
-        return false;
-    }
+    ///// <inheritdoc cref="IRelatableItem.TryGetProjectNode" />
+    //protected virtual bool TryGetProjectNode(IProjectTree targetRootNode, IRelatableItem item, [NotNullWhen(returnValue: true)] out IProjectTree? projectTree)
+    //{
+    //    projectTree = null;
+    //    return false;
+    //}
 }

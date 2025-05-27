@@ -53,7 +53,7 @@ public sealed class AggregateRelationCollectionSource : IAsyncAttachedCollection
     bool IAttachedCollectionSource.HasItems => _collection?.HasItems == true;
 
     // We are updating items until they are provided
-    bool IAsyncAttachedCollectionSource.IsUpdatingHasItems => _collection is null;
+    public bool IsUpdatingHasItems => _collection is null;
 
     /// <summary>
     /// Sets the backing collection for this source, for cases where that collection was not available at the time

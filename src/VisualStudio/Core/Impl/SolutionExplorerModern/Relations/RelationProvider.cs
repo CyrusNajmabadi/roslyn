@@ -3,8 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Composition;
+using System.ComponentModel.Composition;
 using System.Linq;
+using Microsoft.CodeAnalysis.Host.Mef;
 
 namespace Microsoft.VisualStudio.ProjectSystem.VS.Tree.Dependencies.AttachedCollections;
 
@@ -16,6 +17,7 @@ internal sealed class RelationProvider : IRelationProvider
     private ImmutableDictionary<Type, ImmutableArray<IRelation>> _containedByRelationsByTypes = ImmutableDictionary<Type, ImmutableArray<IRelation>>.Empty;
 
     [ImportingConstructor]
+    [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
     public RelationProvider([ImportMany] IEnumerable<IRelation> allRelations)
     {
         _allRelations = allRelations;
