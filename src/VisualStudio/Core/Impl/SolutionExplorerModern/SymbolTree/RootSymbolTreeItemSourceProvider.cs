@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
@@ -38,13 +39,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
 [AppliesToProject("CSharp | VB")]
 internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCollectionSourceProviderBase
 {
-    private sealed record CachedSourceData(
-        WeakReference<AggregateRelationCollectionSource> WeakCollectionSource,
-        HierarchySymbolTreeItemComputer ItemComputer);
+    //private sealed record CachedSourceData(
+    //    WeakReference<AggregateRelationCollectionSource> WeakCollectionSource,
+    //    HierarchySymbolTreeItemComputer ItemComputer);
 
-    private readonly ConcurrentSet<CachedSourceData> _weakCollectionSources = [];
+    // private readonly ConcurrentSet<CachedSourceData> _weakCollectionSources = [];
+    private readonly ConcurrentDictionary<
+        IVsHierarchyItem, (AggregateRelationCollectionSource source, HierarchySymbolTreeItemComputer computer)> _hierarchyItemToSource = [];
 
-    private readonly AsyncBatchingWorkQueue _updateSourcesQueue;
+    private readonly AsyncBatchingWorkQueue<DocumentId> _updateSourcesQueue;
     private readonly Workspace _workspace;
     private readonly CancellationSeries _navigationCancellationSeries = new();
 
@@ -63,16 +66,18 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
         _workspace = workspace;
         Listener = listenerProvider.GetListener(FeatureAttribute.SolutionExplorer);
 
-        _updateSourcesQueue = new AsyncBatchingWorkQueue(
+        _updateSourcesQueue = new AsyncBatchingWorkQueue<DocumentId>(
             DelayTimeSpan.Medium,
             UpdateCollectionSourcesAsync,
+            EqualityComparer<DocumentId>.Default,
             this.Listener,
             this.ThreadingContext.DisposalToken);
 
         this._workspace.RegisterWorkspaceChangedHandler(
             e =>
             {
-                _updateSourcesQueue.AddWork();
+                if (e.DocumentId != null)
+                    _updateSourcesQueue.AddWork(e.DocumentId);
             },
             options: new WorkspaceEventOptions(RequiresMainThread: false));
     }
@@ -96,41 +101,45 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
             cancellationToken).ReportNonFatalErrorUnlessCancelledAsync(cancellationToken).CompletesAsyncOperation(token);
     }
 
-    private async ValueTask UpdateCollectionSourcesAsync(CancellationToken cancellationToken)
+    private async ValueTask UpdateCollectionSourcesAsync(
+        ImmutableSegmentedList<DocumentId> documentIds, CancellationToken cancellationToken)
     {
-        using var _1 = Microsoft.CodeAnalysis.PooledObjects.ArrayBuilder<
-            (AggregateRelationCollectionSource source, HierarchySymbolTreeItemComputer computer)>.GetInstance(out var sources);
+        using var _1 = Microsoft.CodeAnalysis.PooledObjects.PooledHashSet<DocumentId>.GetInstance(out var changedDocumentIds);
+        using var _2 = Microsoft.CodeAnalysis.PooledObjects.ArrayBuilder<
+            (AggregateRelationCollectionSource source, HierarchySymbolTreeItemComputer computer)>.GetInstance(out var copy);
 
-        foreach (var cachedDataSource in _weakCollectionSources)
-        {
-            // If solution explorer has released this collection source, we can drop it as well.
-            if (!cachedDataSource.WeakCollectionSource.TryGetTarget(out var source))
-            {
-                _weakCollectionSources.Remove(cachedDataSource);
-                continue;
-            }
+        changedDocumentIds.AddRange(documentIds);
 
-            sources.Add((source, cachedDataSource.ItemComputer));
-        }
+        foreach (var tuple in _hierarchyItemToSource)
+            copy.Add(tuple.Value);
+        //{
+        //    // If solution explorer has released this collection source, we can drop it as well.
+        //    if (!cachedDataSource.WeakCollectionSource.TryGetTarget(out var source))
+        //    {
+        //        _weakCollectionSources.Remove(cachedDataSource);
+        //        continue;
+        //    }
+
+        //    sources.Add((source, cachedDataSource.ItemComputer));
+        //}
 
         await RoslynParallel.ForEachAsync(
-            sources,
+            copy,
             cancellationToken,
-            async (sourceAndComputer, cancellationToken) =>
+            async (tuple, cancellationToken) =>
             {
-                var (source, computer) = sourceAndComputer;
-                await computer.UpdateIfChangedAsync(cancellationToken)
+                var (source, computer) = tuple;
+                await computer.UpdateIfChangedAsync(changedDocumentIds, cancellationToken)
                     .ReportNonFatalErrorUnlessCancelledAsync(cancellationToken)
                     .ConfigureAwait(false);
             }).ConfigureAwait(false);
 
         await this.ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-        foreach (var (source, computer) in sources)
+        foreach (var (source, computer) in copy)
         {
             if (source.IsUpdatingHasItems)
             {
-                if (computer.Collection != null)
-                    source.SetCollection(computer.Collection);
+                source.SetCollection(computer.Collection);
             }
             else
             {
@@ -196,8 +205,8 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
         private readonly IVsHierarchyItem _hierarchyItem;
         private readonly IRelationProvider _relationProvider;
 
-        private bool _initialized;
-
+        private VsHierarchyRelatableItem? _item;
+        private DocumentId? _documentId;
         public AggregateContainsRelationCollection? Collection;
 
         public HierarchySymbolTreeItemComputer(
@@ -210,21 +219,23 @@ internal sealed class RootSymbolTreeItemSourceProvider : DependenciesAttachedCol
             _relationProvider = relationProvider;
         }
 
-        public async Task UpdateIfChangedAsync(CancellationToken cancellationToken)
+        public async Task UpdateIfChangedAsync(
+            HashSet<DocumentId> changedDocumentIds, CancellationToken cancellationToken)
         {
-            var idMap = _rootProvider._workspace.Services.GetService<IHierarchyItemToProjectIdMap>();
-            idMap?.TryGetDocumentId(_hierarchyItem, targetFrameworkMoniker: null, out var _documentId);
-
-            if (!_initialized)
+            if (_item is null)
             {
-                var item = new VsHierarchyRelatableItem();
-                AggregateContainsRelationCollection.TryCreate(item, _relationProvider, out Collection);
-                _initialized = true;
-            }
-            else
-            {
+                var idMap = _rootProvider._workspace.Services.GetRequiredService<IHierarchyItemToProjectIdMap>();
+                idMap.TryGetDocumentId(_hierarchyItem, targetFrameworkMoniker: null, out var _documentId);
 
+                var document = _rootProvider._workspace.CurrentSolution.GetDocument(_documentId);
+                var service = document?.GetLanguageService<ISolutionExplorerSymbolTreeItemProvider>();
+                var root = document is null ? null : await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+
+                _item = new VsHierarchyRelatableItem(service);
+                AggregateContainsRelationCollection.TryCreate(_item, _relationProvider, out Collection);
             }
+
+            if (changedDocumentIds.)
         }
     }
 
