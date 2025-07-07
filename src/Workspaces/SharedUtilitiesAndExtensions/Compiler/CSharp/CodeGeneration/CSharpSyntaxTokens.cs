@@ -30,6 +30,7 @@ internal static class CSharpSyntaxTokens
     public static readonly SyntaxToken DotDotToken = Token(SyntaxKind.DotDotToken);
     public static readonly SyntaxToken DoubleKeyword = Token(SyntaxKind.DoubleKeyword);
     public static readonly SyntaxToken EndOfDocumentationCommentToken = Token(SyntaxKind.EndOfDocumentationCommentToken);
+    public static readonly SyntaxToken EqualsGreaterThanToken = Token(SyntaxKind.EqualsGreaterThanToken);
     public static readonly SyntaxToken EqualsToken = Token(SyntaxKind.EqualsToken);
     public static readonly SyntaxToken ExplicitKeyword = Token(SyntaxKind.ExplicitKeyword);
 #if !ROSLYN_4_12_OR_LOWER
