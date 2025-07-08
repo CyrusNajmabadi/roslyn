@@ -18,6 +18,7 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.TestCleanup;
 
@@ -41,6 +42,9 @@ internal sealed class CSharpInlineTestCodeCodeRefactoringProvider() : SyntaxEdit
         if (localDeclaration is not { Declaration.Variables: [var variable] })
             return false;
 
+        if (localDeclaration.Modifiers.Any(SyntaxKind.ConstKeyword))
+            return false;
+
         var initializer = variable.Initializer?.Value;
         if (initializer is null)
             return false;
@@ -61,16 +65,27 @@ internal sealed class CSharpInlineTestCodeCodeRefactoringProvider() : SyntaxEdit
             return false;
 
         var identifierReference = matches[0];
-        if (identifierReference.Parent is not AssignmentExpressionSyntax assignment ||
-            assignment.Parent is not InitializerExpressionSyntax ||
-            assignment.Right != identifierReference)
-        {
+        if (!IsAcceptableReference(identifierReference))
             return false;
-        }
 
         stringExpression = initializer;
         reference = identifierReference;
         return true;
+
+        static bool IsAcceptableReference(IdentifierNameSyntax identifierReference)
+        {
+            if (identifierReference.Parent is AssignmentExpressionSyntax assignment &&
+                assignment.Parent is InitializerExpressionSyntax &&
+                assignment.Right == identifierReference)
+            {
+                return true;
+            }
+
+            if (identifierReference.Parent is ArgumentSyntax)
+                return true;
+
+            return false;
+        }
     }
 
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
@@ -97,11 +112,15 @@ internal sealed class CSharpInlineTestCodeCodeRefactoringProvider() : SyntaxEdit
         var localDeclarations = root
             .DescendantNodesAndSelf()
             .OfType<LocalDeclarationStatementSyntax>()
-            .Where(l => fixAllSpans.Any(static (s, l) => l.Span.IntersectsWith(s), l))
-            .OrderByDescending(d => d.SpanStart);
+            .Where(l => fixAllSpans.Any(static (s, l) => l.Span.IntersectsWith(s), l));
+
+        using var _ = PooledHashSet<LocalDeclarationStatementSyntax>.GetInstance(out var localDeclarationSet);
+        localDeclarationSet.AddRange(localDeclarations);
+
         foreach (var localDeclaration in localDeclarations)
         {
-            if (IsInlinable(localDeclaration, out var stringExpression, out var reference))
+            if (IsInlinable(localDeclaration, out var stringExpression, out var reference) &&
+                !reference.GetAncestors().Any(static (r, localDeclarationSet) => localDeclarationSet.Contains(r), localDeclarationSet))
             {
                 editor.ReplaceNode(reference, stringExpression.WithTriviaFrom(reference));
 
