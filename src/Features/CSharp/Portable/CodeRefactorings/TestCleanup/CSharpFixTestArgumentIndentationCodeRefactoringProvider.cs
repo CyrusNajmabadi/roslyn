@@ -62,7 +62,11 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
             return false;
 
         var argumentLine = text.Lines.GetLineFromPosition(argument.SpanStart);
-        if (argumentLine.GetFirstNonWhitespaceOffset() == stringArgumentOffset)
+        var argumentLineWhitespaceOffset = argumentLine.GetFirstNonWhitespaceOffset();
+        if (argumentLineWhitespaceOffset == stringArgumentOffset)
+            return false;
+
+        if (argumentLineWhitespaceOffset + argumentLine.Start != argument.SpanStart)
             return false;
 
         var leadingTrivia = argument.GetLeadingTrivia();
