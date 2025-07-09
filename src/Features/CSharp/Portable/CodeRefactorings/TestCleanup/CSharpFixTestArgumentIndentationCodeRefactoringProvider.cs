@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CodeGeneration;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -18,6 +19,7 @@ using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.TestCleanup;
 
@@ -38,21 +40,36 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
             return;
 
         var text = await context.Document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-        var (firstIndentedStringArgument, _, _) = GetFirstIndentedStringArgument(text, invocation);
+        var (firstIndentedStringArgument, stringArgumentOffset, _) = GetFirstIndentedStringArgument(text, invocation);
         if (firstIndentedStringArgument is null)
             return;
 
         foreach (var argument in invocation.ArgumentList.Arguments)
         {
-            var line = text.Lines.GetLineFromPosition(argument.SpanStart);
-            if (line.Span.Start != argument.SpanStart)
+            if (!ShouldIndentArgument(text, stringArgumentOffset, argument))
                 continue;
 
             context.RegisterRefactoring(CodeAction.Create(
                 "Fix argument indentation",
-                cancellationToken => FixAsync(document, span, equivalenceKey: null, cancellationToken)));
+                cancellationToken => FixAsync(document, invocation.Span, equivalenceKey: null, cancellationToken)));
             return;
         }
+    }
+
+    private static bool ShouldIndentArgument(SourceText text, int stringArgumentOffset, ArgumentSyntax argument)
+    {
+        if (!text.AreOnSameLine(argument.SpanStart, argument.Span.End))
+            return false;
+
+        var argumentLine = text.Lines.GetLineFromPosition(argument.SpanStart);
+        if (argumentLine.GetFirstNonWhitespaceOffset() == stringArgumentOffset)
+            return false;
+
+        var leadingTrivia = argument.GetLeadingTrivia();
+        if (leadingTrivia is not ([] or [SyntaxTrivia(SyntaxKind.WhitespaceTrivia)]))
+            return false;
+
+        return true;
     }
 
     private static (ArgumentSyntax? argument, int offset, SyntaxTrivia whitespace) GetFirstIndentedStringArgument(SourceText text, InvocationExpressionSyntax invocation)
@@ -113,15 +130,7 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
                 if (argument == firstIndentedStringArgument)
                     continue;
 
-                if (!text.AreOnSameLine(argument.SpanStart, argument.Span.End))
-                    continue;
-
-                var argumentLine = text.Lines.GetLineFromPosition(argument.SpanStart);
-                if (argumentLine.GetFirstNonWhitespaceOffset() == stringArgumentOffset)
-                    continue;
-
-                var leadingTrivia = argument.GetLeadingTrivia();
-                if (leadingTrivia is not [SyntaxTrivia(SyntaxKind.WhitespaceTrivia)])
+                if (!ShouldIndentArgument(text, stringArgumentOffset, argument))
                     continue;
 
                 // Reasonable argument to indent.
