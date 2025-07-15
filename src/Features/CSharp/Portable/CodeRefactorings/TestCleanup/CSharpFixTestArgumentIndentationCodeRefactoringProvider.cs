@@ -183,7 +183,7 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
         var indentLine = !text.AreOnSameLine(expression.GetFirstToken().GetPreviousToken().Span.End, expression.SpanStart);
         foreach (var line in contents.Lines)
         {
-            if (indentLine && !line.IsEmptyOrWhitespace())
+            if (indentLine && line.Span.Length > 0)
                 stringBuilder.Append(stringArgumentWhitespace.ToString());
 
             indentLine = true;
