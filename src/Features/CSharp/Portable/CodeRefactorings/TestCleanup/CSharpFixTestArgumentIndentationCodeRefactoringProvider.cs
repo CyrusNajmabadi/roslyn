@@ -6,6 +6,7 @@ using System;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
@@ -19,7 +20,6 @@ using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.TestCleanup;
 
@@ -46,7 +46,9 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
 
         foreach (var argument in invocation.ArgumentList.Arguments)
         {
-            if (!ShouldIndentArgument(text, stringArgumentOffset, argument))
+            var canBeMultiLine = CanBeMultiLine(argument.Expression);
+            var (shouldIndentExpression, shouldIndentArgument) = ShouldIndent(text, stringArgumentOffset, argument, canBeMultiLine);
+            if (!shouldIndentExpression && !shouldIndentArgument)
                 continue;
 
             context.RegisterRefactoring(CodeAction.Create(
@@ -56,20 +58,24 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
         }
     }
 
-    private static bool ShouldIndentArgument(SourceText text, int stringArgumentOffset, ArgumentSyntax argument)
+    private static bool CanBeMultiLine(ExpressionSyntax expression)
+        => expression is LiteralExpressionSyntax { Token.RawKind: (int)SyntaxKind.MultiLineRawStringLiteralToken } ||
+           expression is InterpolatedStringExpressionSyntax { StringStartToken.RawKind: (int)SyntaxKind.InterpolatedMultiLineRawStringStartToken };
+
+    private static bool ShouldIndentNode(SourceText text, int stringArgumentOffset, SyntaxNode node, bool canBeMultiLine)
     {
-        if (!text.AreOnSameLine(argument.SpanStart, argument.Span.End))
+        if (!text.AreOnSameLine(node.SpanStart, node.Span.End) && !canBeMultiLine)
             return false;
 
-        var argumentLine = text.Lines.GetLineFromPosition(argument.SpanStart);
-        var argumentLineWhitespaceOffset = argumentLine.GetFirstNonWhitespaceOffset();
-        if (argumentLineWhitespaceOffset == stringArgumentOffset)
+        var nodeLine = text.Lines.GetLineFromPosition(node.SpanStart);
+        var nodeLineWhitespaceOffset = nodeLine.GetFirstNonWhitespaceOffset();
+        if (nodeLineWhitespaceOffset == stringArgumentOffset)
             return false;
 
-        if (argumentLineWhitespaceOffset + argumentLine.Start != argument.SpanStart)
+        if (nodeLineWhitespaceOffset + nodeLine.Start != node.SpanStart)
             return false;
 
-        var leadingTrivia = argument.GetLeadingTrivia();
+        var leadingTrivia = node.GetLeadingTrivia();
         if (leadingTrivia is not ([] or [SyntaxTrivia(SyntaxKind.WhitespaceTrivia)]))
             return false;
 
@@ -80,9 +86,6 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
     {
         foreach (var argument in invocation.ArgumentList.Arguments)
         {
-            if (argument.NameColon is not null)
-                continue;
-
             if (argument.Expression is not InterpolatedStringExpressionSyntax and not LiteralExpressionSyntax(SyntaxKind.StringLiteralExpression))
                 continue;
 
@@ -134,13 +137,21 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
                 if (argument == firstIndentedStringArgument)
                     continue;
 
-                if (!ShouldIndentArgument(text, stringArgumentOffset, argument))
+                var canBeMultiLine = CanBeMultiLine(argument.Expression);
+
+                var (shouldIndentExpression, shouldIndentArgument) = ShouldIndent(text, stringArgumentOffset, argument, canBeMultiLine);
+                if (!shouldIndentExpression && !shouldIndentArgument)
                     continue;
 
+                var newArgument = argument;
+                if (shouldIndentExpression)
+                    newArgument = newArgument.WithExpression(IndentExpression(text, argument.Expression, stringArgumentWhitespace));
+
+                if (shouldIndentArgument)
+                    newArgument = newArgument.WithLeadingTrivia(stringArgumentWhitespace);
+
                 // Reasonable argument to indent.
-                editor.ReplaceNode(
-                    argument,
-                    argument.WithLeadingTrivia(stringArgumentWhitespace));
+                editor.ReplaceNode(argument, newArgument);
                 madeChanges = true;
             }
 
@@ -150,5 +161,35 @@ internal sealed class CSharpFixTestArgumentIndentationCodeRefactoringProvider() 
             // We did update this invocation.  Keep track so that we ignore future inner invocations.
             invocationSet.Add(invocation);
         }
+    }
+
+    private static (bool shouldIndentExpression, bool shouldIndentArgument) ShouldIndent(SourceText text, int stringArgumentOffset, ArgumentSyntax argument, bool canBeMultiLine)
+    {
+        var shouldIndentExpression = ShouldIndentNode(text, stringArgumentOffset, argument.Expression, canBeMultiLine);
+        var shouldIndentArgument = argument.NameColon is not null && ShouldIndentNode(text, stringArgumentOffset, argument, canBeMultiLine);
+
+        return (shouldIndentExpression, shouldIndentArgument);
+    }
+
+    private static ExpressionSyntax IndentExpression(SourceText text, ExpressionSyntax expression, SyntaxTrivia stringArgumentWhitespace)
+    {
+        var contents = SourceText.From(expression.ToString());
+        using var _ = PooledStringBuilder.GetInstance(out var stringBuilder);
+
+        // If the expression is on the line after the `name:` in the argument, then indent
+        // every line of it.  Otherwise, indent all but the first line.
+        var argument = expression.GetRequiredParent();
+
+        var indentLine = !text.AreOnSameLine(expression.GetFirstToken().GetPreviousToken().Span.End, expression.SpanStart);
+        foreach (var line in contents.Lines)
+        {
+            if (indentLine && !line.IsEmptyOrWhitespace())
+                stringBuilder.Append(stringArgumentWhitespace.ToString());
+
+            indentLine = true;
+            stringBuilder.Append(contents.ToString(line.SpanIncludingLineBreak));
+        }
+
+        return SyntaxFactory.ParseExpression(stringBuilder.ToString());
     }
 }
