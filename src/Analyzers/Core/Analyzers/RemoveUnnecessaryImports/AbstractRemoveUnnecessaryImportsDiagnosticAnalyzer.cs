@@ -87,6 +87,12 @@ internal abstract class AbstractRemoveUnnecessaryImportsDiagnosticAnalyzer<TSynt
         var tree = context.SemanticModel.SyntaxTree;
         var cancellationToken = context.CancellationToken;
 
+        //// Don't offer to remove usings/imports in files with parse errors in them.  We have received
+        //// many reports of users having features like 
+        //var root = tree.GetRoot(cancellationToken);
+        //if (root.GetDiagnostics().Any(d => d.Severity == DiagnosticSeverity.Error))
+        //    return;
+
         var unnecessaryImports = UnnecessaryImportsProvider.GetUnnecessaryImports(context.SemanticModel, context.FilterSpan, cancellationToken);
         if (unnecessaryImports.Any())
         {
