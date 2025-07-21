@@ -30,10 +30,6 @@ internal abstract partial class AbstractPackage<TPackage, TLanguageService> : Ab
     private VisualStudioSymbolSearchService? _symbolSearchService;
     private IVsShell? _shell;
 
-    protected AbstractPackage()
-    {
-    }
-
     protected override void RegisterInitializeAsyncWork(PackageLoadTasks packageInitializationTasks)
     {
         base.RegisterInitializeAsyncWork(packageInitializationTasks);
@@ -138,7 +134,7 @@ internal abstract partial class AbstractPackage<TPackage, TLanguageService> : Ab
 
     // When registering a language service, we need to take its ComAggregate wrapper.
     protected void RegisterLanguageService(Type t, Func<CancellationToken, Task<object>> serviceCreator)
-        => AddService(t, async (container, cancellationToken, type) => await serviceCreator(cancellationToken).ConfigureAwait(true), promote: true);
+        => AddService(t, (container, cancellationToken, type) => serviceCreator(cancellationToken)!, promote: true);
 
     protected override void Dispose(bool disposing)
     {

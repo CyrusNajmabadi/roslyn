@@ -66,24 +66,20 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
         End Sub
 
         Protected Overrides Sub RegisterInitializeAsyncWork(packageInitializationTasks As PackageLoadTasks)
-
             MyBase.RegisterInitializeAsyncWork(packageInitializationTasks)
+            RegisterTempPEService()
+        End Sub
 
-            packageInitializationTasks.AddTask(
-                isMainThreadTask:=False,
-                task:=Function() As Task
-                          Try
-                              RegisterLanguageService(GetType(IVbCompilerService), Function() Task.FromResult(_comAggregate))
+        Private Sub RegisterTempPEService()
+            Try
+                RegisterLanguageService(GetType(IVbCompilerService), Function() Task.FromResult(_comAggregate))
 
-                              DirectCast(Me, IServiceContainer).AddService(
-                                  GetType(IVbTempPECompilerFactory),
-                                  Function(_1, _2) New TempPECompilerFactory(Me.ComponentModel.GetService(Of VisualStudioWorkspace)()))
-                          Catch ex As Exception When FatalError.ReportAndPropagateUnlessCanceled(ex)
-                              Throw ExceptionUtilities.Unreachable
-                          End Try
-
-                          Return Task.CompletedTask
-                      End Function)
+                DirectCast(Me, IServiceContainer).AddService(
+                    GetType(IVbTempPECompilerFactory),
+                    Function(_1, _2) New TempPECompilerFactory(Me.ComponentModel.GetService(Of VisualStudioWorkspace)()))
+            Catch ex As Exception When FatalError.ReportAndPropagateUnlessCanceled(ex)
+                Throw ExceptionUtilities.Unreachable
+            End Try
         End Sub
 
         Protected Overrides Sub RegisterObjectBrowserLibraryManager()

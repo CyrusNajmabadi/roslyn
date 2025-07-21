@@ -63,11 +63,10 @@ internal sealed class CSharpPackage : AbstractPackage<CSharpPackage, CSharpLangu
     protected override void RegisterInitializeAsyncWork(PackageLoadTasks packageInitializationTasks)
     {
         base.RegisterInitializeAsyncWork(packageInitializationTasks);
-
-        packageInitializationTasks.AddTask(isMainThreadTask: false, task: PackageInitializationBackgroundThreadAsync);
+        RegisterTempPEService();
     }
 
-    private Task PackageInitializationBackgroundThreadAsync(PackageLoadTasks packageInitializationTasks, CancellationToken cancellationToken)
+    private void RegisterTempPEService()
     {
         try
         {
@@ -80,8 +79,6 @@ internal sealed class CSharpPackage : AbstractPackage<CSharpPackage, CSharpLangu
         catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e, ErrorSeverity.General))
         {
         }
-
-        return Task.CompletedTask;
     }
 
     protected override void RegisterObjectBrowserLibraryManager()
