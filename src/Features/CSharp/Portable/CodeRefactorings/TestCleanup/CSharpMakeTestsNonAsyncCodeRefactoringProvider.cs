@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp.CodeGeneration;
+using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -35,13 +36,18 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
 
     private static bool ShouldMakeSynchronous(
         [NotNullWhen(true)] MethodDeclarationSyntax? methodDeclaration,
+        [NotNullWhen(true)] out StatementSyntax? bodyStatement,
         [NotNullWhen(true)] out ExpressionSyntax? bodyExpression,
         [NotNullWhen(true)] out SyntaxToken semicolonToken)
     {
+        bodyStatement = null;
         bodyExpression = null;
         semicolonToken = default;
 
         if (methodDeclaration?.Body is not BlockSyntax { Statements: [var statement] })
+            return false;
+
+        if (methodDeclaration.AttributeLists.Count == 0)
             return false;
 
         if (methodDeclaration.Modifiers.Any(SyntaxKind.AsyncKeyword))
@@ -56,6 +62,7 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
                 return false;
             }
 
+            bodyStatement = exprStatement;
             bodyExpression = awaitExpression.Expression;
             semicolonToken = exprStatement.SemicolonToken;
             return true;
@@ -64,12 +71,14 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
         {
             if (statement is ExpressionStatementSyntax exprStatement)
             {
+                bodyStatement = exprStatement;
                 bodyExpression = exprStatement.Expression;
                 semicolonToken = exprStatement.SemicolonToken;
                 return true;
             }
             else if (statement is ReturnStatementSyntax { Expression: { } expression } returnStatement)
             {
+                bodyStatement = returnStatement;
                 bodyExpression = expression;
                 semicolonToken = returnStatement.SemicolonToken;
                 return true;
@@ -84,7 +93,10 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
         var (document, span, cancellationToken) = context;
 
         var methodDeclaration = await context.TryGetRelevantNodeAsync<MethodDeclarationSyntax>().ConfigureAwait(false);
-        if (!ShouldMakeSynchronous(methodDeclaration, out _, out _))
+        if (!ShouldMakeSynchronous(methodDeclaration, out var statement, out _, out _))
+            return;
+
+        if (statement.GetLeadingTrivia().Any(d => d.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)))
             return;
 
         context.RegisterRefactoring(CodeAction.Create(
@@ -108,7 +120,7 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
             .OrderByDescending(d => d.SpanStart);
         foreach (var methodDeclaration in methodDeclarations)
         {
-            if (ShouldMakeSynchronous(methodDeclaration, out var expression, out var semicolonToken))
+            if (ShouldMakeSynchronous(methodDeclaration, out _, out var expression, out var semicolonToken))
             {
                 editor.ReplaceNode(
                     methodDeclaration,
@@ -131,7 +143,7 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
 
         var arrow = ArrowExpressionClause(
             EqualsGreaterThanToken.WithTrailingTrivia(Space),
-            expression).WithLeadingTrivia(block.GetLeadingTrivia().Add(Whitespace("    ")));
+            expression.WithoutLeadingTrivia()).WithLeadingTrivia(block.GetLeadingTrivia().Add(Whitespace("    ")));
         methodDeclaration = methodDeclaration
             .WithBody(null)
             .WithSemicolonToken(semicolonToken)
