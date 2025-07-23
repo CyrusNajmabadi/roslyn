@@ -35,31 +35,48 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
 
     private static bool ShouldMakeSynchronous(
         [NotNullWhen(true)] MethodDeclarationSyntax? methodDeclaration,
-        [NotNullWhen(true)] out ExpressionStatementSyntax? expressionStatement,
-        [NotNullWhen(true)] out ExpressionSyntax? bodyExpression)
+        [NotNullWhen(true)] out ExpressionSyntax? bodyExpression,
+        [NotNullWhen(true)] out SyntaxToken semicolonToken)
     {
         bodyExpression = null;
-        expressionStatement = null;
+        semicolonToken = default;
 
         if (methodDeclaration?.Body is not BlockSyntax { Statements: [var statement] })
             return false;
 
-        if (!methodDeclaration.Modifiers.Any(SyntaxKind.AsyncKeyword))
-            return false;
-
-        if (statement is not ExpressionStatementSyntax { Expression: AwaitExpressionSyntax awaitExpression } exprStatement)
-            return false;
-
-        if (awaitExpression.Expression is InvocationExpressionSyntax invocation &&
-            invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
-            memberAccess.Name.Identifier.ValueText == "ConfigureAwait")
+        if (methodDeclaration.Modifiers.Any(SyntaxKind.AsyncKeyword))
         {
-            return false;
+            if (statement is not ExpressionStatementSyntax { Expression: AwaitExpressionSyntax awaitExpression } exprStatement)
+                return false;
+
+            if (awaitExpression.Expression is InvocationExpressionSyntax invocation &&
+                invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+                memberAccess.Name.Identifier.ValueText == "ConfigureAwait")
+            {
+                return false;
+            }
+
+            bodyExpression = awaitExpression.Expression;
+            semicolonToken = exprStatement.SemicolonToken;
+            return true;
+        }
+        else
+        {
+            if (statement is ExpressionStatementSyntax exprStatement)
+            {
+                bodyExpression = exprStatement.Expression;
+                semicolonToken = exprStatement.SemicolonToken;
+                return true;
+            }
+            else if (statement is ReturnStatementSyntax { Expression: { } expression } returnStatement)
+            {
+                bodyExpression = expression;
+                semicolonToken = returnStatement.SemicolonToken;
+                return true;
+            }
         }
 
-        expressionStatement = exprStatement;
-        bodyExpression = awaitExpression.Expression;
-        return true;
+        return false;
     }
 
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
@@ -91,19 +108,19 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
             .OrderByDescending(d => d.SpanStart);
         foreach (var methodDeclaration in methodDeclarations)
         {
-            if (ShouldMakeSynchronous(methodDeclaration, out var expressionStatement, out var expression))
+            if (ShouldMakeSynchronous(methodDeclaration, out var expression, out var semicolonToken))
             {
                 editor.ReplaceNode(
                     methodDeclaration,
-                    UpdateMethodDeclaration(methodDeclaration, expressionStatement, expression));
+                    UpdateMethodDeclaration(methodDeclaration, expression, semicolonToken));
             }
         }
     }
 
     private static MethodDeclarationSyntax UpdateMethodDeclaration(
         MethodDeclarationSyntax methodDeclaration,
-        ExpressionStatementSyntax expressionStatement,
-        ExpressionSyntax expression)
+        ExpressionSyntax expression,
+        SyntaxToken semicolonToken)
     {
         var generator = CSharpSyntaxGenerator.Instance;
         methodDeclaration = generator.WithModifiers(
@@ -117,7 +134,7 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
             expression).WithLeadingTrivia(block.GetLeadingTrivia().Add(Whitespace("    ")));
         methodDeclaration = methodDeclaration
             .WithBody(null)
-            .WithSemicolonToken(expressionStatement.SemicolonToken)
+            .WithSemicolonToken(semicolonToken)
             .WithExpressionBody(arrow);
 
         return methodDeclaration;
