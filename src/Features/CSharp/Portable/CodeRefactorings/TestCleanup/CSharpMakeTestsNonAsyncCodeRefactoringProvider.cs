@@ -88,7 +88,7 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
             return;
 
         context.RegisterRefactoring(CodeAction.Create(
-            "Make method non-async",
+            "Use expression body for test",
             cancellationToken => FixAsync(document, span, equivalenceKey: null, cancellationToken)));
 
     }
