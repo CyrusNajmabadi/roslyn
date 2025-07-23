@@ -50,6 +50,9 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
         if (methodDeclaration.AttributeLists.Count == 0)
             return false;
 
+        if (statement.GetLeadingTrivia().Any(d => d.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)))
+            return false;
+
         if (methodDeclaration.Modifiers.Any(SyntaxKind.AsyncKeyword))
         {
             if (statement is not ExpressionStatementSyntax { Expression: AwaitExpressionSyntax awaitExpression } exprStatement)
@@ -96,13 +99,9 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
         if (!ShouldMakeSynchronous(methodDeclaration, out var statement, out _, out _))
             return;
 
-        if (statement.GetLeadingTrivia().Any(d => d.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)))
-            return;
-
         context.RegisterRefactoring(CodeAction.Create(
             "Use expression body for test",
             cancellationToken => FixAsync(document, span, equivalenceKey: null, cancellationToken)));
-
     }
 
     protected override async Task FixAllAsync(
