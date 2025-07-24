@@ -13,12 +13,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Simplification;
 
 internal sealed partial class CSharpVarReducer
 {
-    private sealed class Rewriter : AbstractReductionRewriter
+    private sealed class Rewriter(ObjectPool<IReductionRewriter> pool) : AbstractReductionRewriter(pool)
     {
-        public Rewriter(ObjectPool<IReductionRewriter> pool)
-            : base(pool)
-        {
-        }
+        private static readonly IdentifierNameSyntax s_varName = SyntaxFactory.IdentifierName("var");
 
         private SyntaxNode ProcessTypeSyntax(TypeSyntax typeSyntax)
         {
@@ -26,27 +23,19 @@ internal sealed partial class CSharpVarReducer
 
             // Only simplify if us, or a parent, was marked as needing simplification.
             if (!alwaysSimplify && !typeSyntax.HasAnnotation(Simplifier.Annotation))
-            {
                 return typeSyntax;
-            }
 
             // Definitely do not simplify us if we were told to not simplify.
             if (typeSyntax.HasAnnotation(SimplificationHelpers.DoNotSimplifyAnnotation))
-            {
                 return typeSyntax;
-            }
 
             var typeStyle = CSharpUseImplicitTypeHelper.Instance.AnalyzeTypeName(
                 typeSyntax, this.SemanticModel, this.Options, this.CancellationToken);
 
-            if (!typeStyle.IsStylePreferred || !typeStyle.CanConvert())
-            {
+            if (!typeStyle.IsStylePreferred || !typeStyle.CanConvert(this.CancellationToken))
                 return typeSyntax;
-            }
 
-            return SyntaxFactory.IdentifierName("var")
-                .WithLeadingTrivia(typeSyntax.GetLeadingTrivia())
-                .WithTrailingTrivia(typeSyntax.GetTrailingTrivia());
+            return s_varName.WithTriviaFrom(typeSyntax);
         }
 
         public override SyntaxNode VisitAliasQualifiedName(AliasQualifiedNameSyntax node) => ProcessTypeSyntax(node);

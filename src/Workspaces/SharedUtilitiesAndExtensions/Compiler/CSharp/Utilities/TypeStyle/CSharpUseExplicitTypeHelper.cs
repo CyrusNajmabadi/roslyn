@@ -28,7 +28,7 @@ internal sealed class CSharpUseExplicitTypeHelper : CSharpTypeStyleHelper
         {
             return !stylePreferences.HasFlag(UseVarPreference.ForBuiltInTypes);
         }
-        else if (state.IsTypeApparentInContext)
+        else if (state.IsInApparentTypeContext)
         {
             return !stylePreferences.HasFlag(UseVarPreference.WhenTypeIsApparent);
         }

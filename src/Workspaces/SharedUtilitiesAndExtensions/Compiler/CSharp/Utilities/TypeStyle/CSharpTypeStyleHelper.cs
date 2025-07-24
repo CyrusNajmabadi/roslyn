@@ -11,13 +11,20 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Microsoft.CodeAnalysis.CSharp.Utilities;
 
-internal readonly struct TypeStyleResult
+internal readonly struct TypeStyleResult(
+    CSharpTypeStyleHelper helper,
+    TypeSyntax typeName,
+    SemanticModel semanticModel,
+    CSharpSimplifierOptions options,
+    bool isStylePreferred,
+    NotificationOption2 notificationOption,
+    bool isInApparentTypeContext,
+    bool isInIntrinsicTypeContext)
 {
-    private readonly CSharpTypeStyleHelper _helper;
-    private readonly TypeSyntax _typeName;
-    private readonly SemanticModel _semanticModel;
-    private readonly CSharpSimplifierOptions _options;
-    private readonly CancellationToken _cancellationToken;
+    private readonly CSharpTypeStyleHelper _helper = helper;
+    private readonly TypeSyntax _typeName = typeName;
+    private readonly SemanticModel _semanticModel = semanticModel;
+    private readonly CSharpSimplifierOptions _options = options;
 
     /// <summary>
     /// Whether or not converting would transition the code to the style the user prefers. i.e. if the user likes
@@ -31,23 +38,14 @@ internal readonly struct TypeStyleResult
     /// <see langword="true"/>. The one exception is the refactoring, which is explicitly there to still let people
     /// convert things quickly, even if it's going against their stated style.</para>
     /// </remarks>
-    public readonly bool IsStylePreferred;
-    public readonly NotificationOption2 Notification;
+    public readonly bool IsStylePreferred = isStylePreferred;
+    public readonly NotificationOption2 Notification = notificationOption;
 
-    public TypeStyleResult(CSharpTypeStyleHelper helper, TypeSyntax typeName, SemanticModel semanticModel, CSharpSimplifierOptions options, bool isStylePreferred, NotificationOption2 notificationOption, CancellationToken cancellationToken) : this()
-    {
-        _helper = helper;
-        _typeName = typeName;
-        _semanticModel = semanticModel;
-        _options = options;
-        _cancellationToken = cancellationToken;
+    public readonly bool IsInApparentTypeContext = isInApparentTypeContext;
+    public readonly bool IsInIntrinsicTypeContext = isInIntrinsicTypeContext;
 
-        IsStylePreferred = isStylePreferred;
-        Notification = notificationOption;
-    }
-
-    public bool CanConvert()
-        => _helper.TryAnalyzeVariableDeclaration(_typeName, _semanticModel, _options, _cancellationToken);
+    public bool CanConvert(CancellationToken cancellationToken)
+        => _helper.TryAnalyzeVariableDeclaration(_typeName, _semanticModel, _options, cancellationToken);
 }
 
 internal abstract partial class CSharpTypeStyleHelper
@@ -69,7 +67,8 @@ internal abstract partial class CSharpTypeStyleHelper
         var notificationOption = state.GetDiagnosticSeverityPreference();
 
         return new TypeStyleResult(
-            this, typeName, semanticModel, options, isStylePreferred, notificationOption, cancellationToken);
+            this, typeName, semanticModel, options, isStylePreferred, notificationOption,
+            state.IsInApparentTypeContext, state.IsInIntrinsicTypeContext);
     }
 
     internal abstract bool TryAnalyzeVariableDeclaration(

@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable disable
-
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +11,7 @@ using Microsoft.CodeAnalysis.CSharp.Simplification;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Utilities;
 using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.UseType;
@@ -28,24 +27,18 @@ internal abstract class AbstractUseTypeCodeRefactoringProvider : CodeRefactoring
     {
         var (document, textSpan, cancellationToken) = context;
         if (document.Project.Solution.WorkspaceKind == WorkspaceKind.MiscellaneousFiles)
-        {
             return;
-        }
 
         var declaration = await GetDeclarationAsync(context).ConfigureAwait(false);
         if (declaration == null)
-        {
             return;
-        }
 
         Debug.Assert(declaration.Kind() is SyntaxKind.VariableDeclaration or SyntaxKind.ForEachStatement or SyntaxKind.DeclarationExpression);
 
-        var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
         var declaredType = FindAnalyzableType(declaration, semanticModel, cancellationToken);
         if (declaredType == null)
-        {
             return;
-        }
 
         var simplifierOptions = (CSharpSimplifierOptions)await document.GetSimplifierOptionsAsync(cancellationToken).ConfigureAwait(false);
         var typeStyle = AnalyzeTypeName(declaredType, semanticModel, simplifierOptions, cancellationToken);
@@ -55,20 +48,18 @@ internal abstract class AbstractUseTypeCodeRefactoringProvider : CodeRefactoring
             return;
         }
 
-        if (!typeStyle.CanConvert())
-        {
+        if (!typeStyle.CanConvert(cancellationToken))
             return;
-        }
 
         context.RegisterRefactoring(
             CodeAction.Create(
                 Title,
-                c => UpdateDocumentAsync(document, declaredType, c),
+                cancellationToken => UpdateDocumentAsync(document, declaredType, cancellationToken),
                 Title),
             declaredType.Span);
     }
 
-    private static async Task<SyntaxNode> GetDeclarationAsync(CodeRefactoringContext context)
+    private static async Task<SyntaxNode?> GetDeclarationAsync(CodeRefactoringContext context)
     {
         // We want to provide refactoring for changing the Type of newly introduced variables in following cases:
         // - DeclarationExpressionSyntax: `"42".TryParseInt32(out var number)`
@@ -117,7 +108,7 @@ internal abstract class AbstractUseTypeCodeRefactoringProvider : CodeRefactoring
 
     private async Task<Document> UpdateDocumentAsync(Document document, TypeSyntax type, CancellationToken cancellationToken)
     {
-        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         var editor = new SyntaxEditor(root, document.Project.Solution.Services);
 
         await HandleDeclarationAsync(document, editor, type, cancellationToken).ConfigureAwait(false);

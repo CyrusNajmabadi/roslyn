@@ -24,7 +24,7 @@ internal partial class CSharpTypeStyleHelper
         private readonly NotificationOption2 _elsewhere;
 
         public readonly bool IsInIntrinsicTypeContext;
-        public readonly bool IsTypeApparentInContext;
+        public readonly bool IsInApparentTypeContext;
 
         public State(
             SyntaxNode declaration, SemanticModel semanticModel,
@@ -32,7 +32,7 @@ internal partial class CSharpTypeStyleHelper
         {
             TypeStylePreference = default;
             IsInIntrinsicTypeContext = default;
-            IsTypeApparentInContext = default;
+            IsInApparentTypeContext = default;
 
             var styleForIntrinsicTypes = options.VarForBuiltInTypes;
             var styleForApparent = options.VarWhenTypeIsApparent;
@@ -44,7 +44,7 @@ internal partial class CSharpTypeStyleHelper
 
             this.TypeStylePreference = options.GetUseVarPreference();
 
-            IsTypeApparentInContext =
+            IsInApparentTypeContext =
                     declaration is VariableDeclarationSyntax varDecl
                  && IsTypeApparentInDeclaration(varDecl, semanticModel, TypeStylePreference, cancellationToken);
 
@@ -55,7 +55,7 @@ internal partial class CSharpTypeStyleHelper
 
         public NotificationOption2 GetDiagnosticSeverityPreference()
             => IsInIntrinsicTypeContext ? _forBuiltInTypes :
-               IsTypeApparentInContext ? _whenTypeIsApparent : _elsewhere;
+               IsInApparentTypeContext ? _whenTypeIsApparent : _elsewhere;
 
         /// <summary>
         /// Returns true if type information could be gleaned by simply looking at the given statement.
