@@ -43,9 +43,9 @@ public partial class UseExplicitTypeTests
             {
                 static int F(int x, int y)
                 {
-                    int i1 = 0;
-                    Program2 p = new Program2();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var i1 = 0;
+                    var p = new Program2();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -60,9 +60,9 @@ public partial class UseExplicitTypeTests
             {
                 static int F(int x, int y)
                 {
-                    int i1 = 0;
-                    Program2 p = new Program2();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var i1 = 0;
+                    var p = new Program2();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -81,8 +81,8 @@ public partial class UseExplicitTypeTests
                 static int F(int x, int y)
                 {
                     int i1 = 0;
-                    Program p = new Program();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var p = new Program();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -95,9 +95,9 @@ public partial class UseExplicitTypeTests
             {
                 static int F(int x, int y)
                 {
-                    int i1 = 0;
-                    Program2 p = new Program2();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var i1 = 0;
+                    var p = new Program2();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -112,9 +112,9 @@ public partial class UseExplicitTypeTests
             {
                 static int F(int x, int y)
                 {
-                    int i1 = 0;
-                    Program2 p = new Program2();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var i1 = 0;
+                    var p = new Program2();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -166,13 +166,13 @@ public partial class UseExplicitTypeTests
                     <Document>
             using System;
 
-            class Program2
+            class Program3
             {
                 static int F(int x, int y)
                 {
-                    int i3 = 0;
-                    Program2 p3 = new Program2();
-                    Tuple&lt;bool, int&gt; tuple3 = Tuple.Create(true, 1);
+                    var i3 = 0;
+                    var p3 = new Program2();
+                    var tuple3 = Tuple.Create(true, 1);
 
                     return i3;
                 }
@@ -191,8 +191,8 @@ public partial class UseExplicitTypeTests
                 static int F(int x, int y)
                 {
                     int i1 = 0;
-                    Program p = new Program();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var p = new Program();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -206,8 +206,8 @@ public partial class UseExplicitTypeTests
                 static int F(int x, int y)
                 {
                     int i2 = 0;
-                    Program2 p2 = new Program2();
-                    Tuple&lt;bool, int&gt; tuple2 = Tuple.Create(true, 1);
+                    var p2 = new Program2();
+                    var tuple2 = Tuple.Create(true, 1);
 
                     return i2;
                 }
@@ -218,13 +218,13 @@ public partial class UseExplicitTypeTests
                     <Document>
             using System;
 
-            class Program2
+            class Program3
             {
                 static int F(int x, int y)
                 {
-                    int i3 = 0;
-                    Program2 p3 = new Program2();
-                    Tuple&lt;bool, int&gt; tuple3 = Tuple.Create(true, 1);
+                    var i3 = 0;
+                    var p3 = new Program2();
+                    var tuple3 = Tuple.Create(true, 1);
 
                     return i3;
                 }
@@ -237,7 +237,7 @@ public partial class UseExplicitTypeTests
     [Fact]
     [Trait(Traits.Feature, Traits.Features.CodeActionsUseImplicitType)]
     [Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)]
-    public Task TestFixAllInSolution_PreferExplicitTypeEverywhere()
+    public Task TestFixAllInSolution_PreferExplicitTypeEverywhere_Intrinsic()
         => TestInRegularAndScriptAsync("""
             <Workspace>
                 <Project Language="C#" AssemblyName="Assembly1" CommonReferences="true">
@@ -276,7 +276,7 @@ public partial class UseExplicitTypeTests
                     <Document>
             using System;
 
-            class Program2
+            class Program3
             {
                 static int F(int x, int y)
                 {
@@ -301,8 +301,8 @@ public partial class UseExplicitTypeTests
                 static int F(int x, int y)
                 {
                     int i1 = 0;
-                    Program p = new Program();
-                    Tuple&lt;bool, int&gt; tuple = Tuple.Create(true, 1);
+                    var p = new Program();
+                    var tuple = Tuple.Create(true, 1);
 
                     return i1;
                 }
@@ -316,8 +316,8 @@ public partial class UseExplicitTypeTests
                 static int F(int x, int y)
                 {
                     int i2 = 0;
-                    Program2 p2 = new Program2();
-                    Tuple&lt;bool, int&gt; tuple2 = Tuple.Create(true, 1);
+                    var p2 = new Program2();
+                    var tuple2 = Tuple.Create(true, 1);
 
                     return i2;
                 }
@@ -328,13 +328,233 @@ public partial class UseExplicitTypeTests
                     <Document>
             using System;
 
-            class Program2
+            class Program3
             {
                 static int F(int x, int y)
                 {
                     int i3 = 0;
+                    var p3 = new Program2();
+                    var tuple3 = Tuple.Create(true, 1);
+
+                    return i3;
+                }
+            }
+                    </Document>
+                </Project>
+            </Workspace>
+            """, new(options: ExplicitTypeEverywhere()));
+
+    [Fact]
+    [Trait(Traits.Feature, Traits.Features.CodeActionsUseImplicitType)]
+    [Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)]
+    public Task TestFixAllInSolution_PreferExplicitTypeEverywhere_Apparent()
+        => TestInRegularAndScriptAsync("""
+            <Workspace>
+                <Project Language="C#" AssemblyName="Assembly1" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program
+            {
+                static int F(int x, int y)
+                {
+                    var i1 = 0;
+                    {|FixAllInSolution:var|} p = new Program();
+                    var tuple = Tuple.Create(true, 1);
+
+                    return i1;
+                }
+            }
+                    </Document>
+                    <Document>
+            using System;
+
+            class Program2
+            {
+                static int F(int x, int y)
+                {
+                    var i2 = 0;
+                    var p2 = new Program2();
+                    var tuple2 = Tuple.Create(true, 1);
+
+                    return i2;
+                }
+            }
+                    </Document>
+                </Project>
+                <Project Language="C#" AssemblyName="Assembly2" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program3
+            {
+                static int F(int x, int y)
+                {
+                    var i3 = 0;
+                    var p3 = new Program2();
+                    var tuple3 = Tuple.Create(true, 1);
+
+                    return i3;
+                }
+            }
+                    </Document>
+                </Project>
+            </Workspace>
+            """, """
+            <Workspace>
+                <Project Language="C#" AssemblyName="Assembly1" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program
+            {
+                static int F(int x, int y)
+                {
+                    var i1 = 0;
+                    Program p = new Program();
+                    var tuple = Tuple.Create(true, 1);
+
+                    return i1;
+                }
+            }
+                    </Document>
+                    <Document>
+            using System;
+
+            class Program2
+            {
+                static int F(int x, int y)
+                {
+                    var i2 = 0;
+                    Program2 p2 = new Program2();
+                    var tuple2 = Tuple.Create(true, 1);
+
+                    return i2;
+                }
+            }
+                    </Document>
+                </Project>
+                <Project Language="C#" AssemblyName="Assembly2" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program3
+            {
+                static int F(int x, int y)
+                {
+                    var i3 = 0;
                     Program2 p3 = new Program2();
-                    Tuple&lt;bool, int&gt; tuple3 = Tuple.Create(true, 1);
+                    var tuple3 = Tuple.Create(true, 1);
+
+                    return i3;
+                }
+            }
+                    </Document>
+                </Project>
+            </Workspace>
+            """, new(options: ExplicitTypeEverywhere()));
+
+    [Fact]
+    [Trait(Traits.Feature, Traits.Features.CodeActionsUseImplicitType)]
+    [Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)]
+    public Task TestFixAllInSolution_PreferExplicitTypeEverywhere_Elsewhere()
+        => TestInRegularAndScriptAsync("""
+            <Workspace>
+                <Project Language="C#" AssemblyName="Assembly1" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program
+            {
+                static int F(int x, int y)
+                {
+                    var i1 = 0;
+                    var p = new Program();
+                    {|FixAllInSolution:var|} tuple = Tuple.Create(true, 1);
+
+                    return i1;
+                }
+            }
+                    </Document>
+                    <Document>
+            using System;
+
+            class Program2
+            {
+                static int F(int x, int y)
+                {
+                    var i2 = 0;
+                    var p2 = new Program2();
+                    var tuple2 = Tuple.Create(true, 1);
+
+                    return i2;
+                }
+            }
+                    </Document>
+                </Project>
+                <Project Language="C#" AssemblyName="Assembly2" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program3
+            {
+                static int F(int x, int y)
+                {
+                    var i3 = 0;
+                    var p3 = new Program2();
+                    var tuple3 = Tuple.Create(true, 1);
+
+                    return i3;
+                }
+            }
+                    </Document>
+                </Project>
+            </Workspace>
+            """, """
+            <Workspace>
+                <Project Language="C#" AssemblyName="Assembly1" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program
+            {
+                static int F(int x, int y)
+                {
+                    var i1 = 0;
+                    var p = new Program();
+                    Tuple&ltbool, int&gt; tuple = Tuple.Create(true, 1);
+
+                    return i1;
+                }
+            }
+                    </Document>
+                    <Document>
+            using System;
+
+            class Program2
+            {
+                static int F(int x, int y)
+                {
+                    var i2 = 0;
+                    var p2 = new Program2();
+                    Tuple&ltbool, int&gt; tuple2 = Tuple.Create(true, 1);
+
+                    return i2;
+                }
+            }
+                    </Document>
+                </Project>
+                <Project Language="C#" AssemblyName="Assembly2" CommonReferences="true">
+                    <Document>
+            using System;
+
+            class Program3
+            {
+                static int F(int x, int y)
+                {
+                    var i3 = 0;
+                    var p3 = new Program2();
+                    Tuple&ltbool, int&gt; tuple3 = Tuple.Create(true, 1);
 
                     return i3;
                 }
@@ -379,7 +599,7 @@ public partial class UseExplicitTypeTests
                 static int F(int x, int y)
                 {
                     Program p = this;
-                    int i1 = 0;
+                    var i1 = 0;
                     var tuple = Tuple.Create(true, 1);
 
                     return i1;
