@@ -7,8 +7,6 @@ using System.Collections.Immutable;
 using System.Composition;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
@@ -44,8 +42,8 @@ internal sealed class CSharpInlineTestCodeCodeRefactoringProvider() : SyntaxEdit
         if (localDeclaration is not { Declaration.Variables: [var variable] })
             return false;
 
-        if (localDeclaration.Modifiers.Any(SyntaxKind.ConstKeyword))
-            return false;
+        //if (localDeclaration.Modifiers.Any(SyntaxKind.ConstKeyword))
+        //    return false;
 
         var initializer = variable.Initializer?.Value;
         if (initializer is null)
