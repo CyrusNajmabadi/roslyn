@@ -13,7 +13,6 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp.CodeGeneration;
-using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -38,7 +37,7 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
         [NotNullWhen(true)] MethodDeclarationSyntax? methodDeclaration,
         [NotNullWhen(true)] out StatementSyntax? bodyStatement,
         [NotNullWhen(true)] out ExpressionSyntax? bodyExpression,
-        [NotNullWhen(true)] out SyntaxToken semicolonToken)
+        out SyntaxToken semicolonToken)
     {
         bodyStatement = null;
         bodyExpression = null;
