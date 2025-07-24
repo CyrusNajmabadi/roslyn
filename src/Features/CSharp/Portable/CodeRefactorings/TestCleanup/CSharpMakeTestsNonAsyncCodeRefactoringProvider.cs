@@ -44,13 +44,16 @@ internal sealed class CSharpMakeTestsNonAsyncCodeRefactoringProvider() : SyntaxE
         bodyExpression = null;
         semicolonToken = default;
 
-        if (methodDeclaration?.Body is not BlockSyntax { Statements: [var statement] })
+        if (methodDeclaration?.Body is not BlockSyntax { Statements: [var statement] } block)
             return false;
 
         if (methodDeclaration.AttributeLists.Count == 0)
             return false;
 
         if (statement.GetLeadingTrivia().Any(d => d.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)))
+            return false;
+
+        if (block.CloseBraceToken.LeadingTrivia.Any(d => d.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)))
             return false;
 
         if (methodDeclaration.Modifiers.Any(SyntaxKind.AsyncKeyword))
