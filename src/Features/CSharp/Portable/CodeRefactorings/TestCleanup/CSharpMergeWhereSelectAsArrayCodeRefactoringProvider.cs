@@ -22,10 +22,10 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.TestCleanup;
 
 using static SyntaxFactory;
 
-[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(CSharpSelectAsArrayCodeRefactoringProvider)), Shared]
+[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(CSharpMergeWhereSelectAsArrayCodeRefactoringProvider)), Shared]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-internal sealed class CSharpWhereSelectAsArrayCodeRefactoringProvider() : SyntaxEditorBasedCodeRefactoringProvider
+internal sealed class CSharpMergeWhereSelectAsArrayCodeRefactoringProvider() : SyntaxEditorBasedCodeRefactoringProvider
 {
     protected override ImmutableArray<FixAllScope> SupportedFixAllScopes => DefaultFixAllScopes;
 

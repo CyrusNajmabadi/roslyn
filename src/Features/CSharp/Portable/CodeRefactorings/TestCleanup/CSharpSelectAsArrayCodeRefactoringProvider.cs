@@ -22,10 +22,10 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.TestCleanup;
 
 using static SyntaxFactory;
 
-[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(CSharpSelectAsArrayCodeRefactoringProvider)), Shared]
+[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(CSharpWhereOrSelectThenToImmutableArrayCodeRefactoringProvider)), Shared]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-internal sealed class CSharpSelectAsArrayCodeRefactoringProvider() : SyntaxEditorBasedCodeRefactoringProvider
+internal sealed class CSharpWhereOrSelectThenToImmutableArrayCodeRefactoringProvider() : SyntaxEditorBasedCodeRefactoringProvider
 {
     protected override ImmutableArray<FixAllScope> SupportedFixAllScopes => DefaultFixAllScopes;
 
@@ -37,7 +37,7 @@ internal sealed class CSharpSelectAsArrayCodeRefactoringProvider() : SyntaxEdito
         return invocationExpression is
         {
             ArgumentList.Arguments.Count: 1,
-            Expression: MemberAccessExpressionSyntax { Name: IdentifierNameSyntax { Identifier.ValueText: "Select" } },
+            Expression: MemberAccessExpressionSyntax { Name: IdentifierNameSyntax { Identifier.ValueText: "Select" or "Where" } },
             Parent: MemberAccessExpressionSyntax
             {
                 Name: IdentifierNameSyntax { Identifier.ValueText: "ToImmutableArray" },
@@ -53,7 +53,7 @@ internal sealed class CSharpSelectAsArrayCodeRefactoringProvider() : SyntaxEdito
             return;
 
         context.RegisterRefactoring(CodeAction.Create(
-            "Use SelectAsArray",
+            "Use Where/SelectAsArray",
             cancellationToken => this.FixAsync(context.Document, invocationExpression.Span, equivalenceKey: null, cancellationToken),
             equivalenceKey: null));
     }
@@ -82,7 +82,7 @@ internal sealed class CSharpSelectAsArrayCodeRefactoringProvider() : SyntaxEdito
 
             editor.ReplaceNode(
                 selectName,
-                IdentifierName("SelectAsArray").WithTriviaFrom(selectName));
+                IdentifierName(selectName.Identifier.ValueText + "AsArray").WithTriviaFrom(selectName));
             editor.ReplaceNode(
                 parentInvocation,
                 (current, _) => ((MemberAccessExpressionSyntax)((InvocationExpressionSyntax)current).Expression).Expression.WithTrailingTrivia(current.GetTrailingTrivia()));
