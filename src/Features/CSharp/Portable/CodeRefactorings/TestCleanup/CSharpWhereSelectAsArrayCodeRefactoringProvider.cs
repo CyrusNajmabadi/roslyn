@@ -29,6 +29,8 @@ internal sealed class CSharpWhereSelectAsArrayCodeRefactoringProvider() : Syntax
 {
     protected override ImmutableArray<FixAllScope> SupportedFixAllScopes => DefaultFixAllScopes;
 
+    protected override CodeActionCleanup Cleanup => CodeActionCleanup.SyntaxOnly;
+
     private static bool CanSimplify(
         [NotNullWhen(true)] InvocationExpressionSyntax? invocationExpression)
     {
