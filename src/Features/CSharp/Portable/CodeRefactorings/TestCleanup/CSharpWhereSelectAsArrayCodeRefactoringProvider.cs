@@ -1,0 +1,100 @@
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Immutable;
+using System.Composition;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Text;
+
+namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.TestCleanup;
+
+using static SyntaxFactory;
+
+[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(CSharpSelectAsArrayCodeRefactoringProvider)), Shared]
+[method: ImportingConstructor]
+[method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+internal sealed class CSharpWhereSelectAsArrayCodeRefactoringProvider() : SyntaxEditorBasedCodeRefactoringProvider
+{
+    protected override ImmutableArray<FixAllScope> SupportedFixAllScopes => DefaultFixAllScopes;
+
+    private static bool CanSimplify(
+        [NotNullWhen(true)] InvocationExpressionSyntax? invocationExpression)
+    {
+        return invocationExpression is
+        {
+            ArgumentList.Arguments.Count: 1,
+            Expression: MemberAccessExpressionSyntax
+            {
+                Name: IdentifierNameSyntax { Identifier.ValueText: "SelectAsArray" },
+                Expression: InvocationExpressionSyntax
+                {
+                    ArgumentList.Arguments.Count: 1,
+                    Expression: MemberAccessExpressionSyntax { Name: IdentifierNameSyntax { Identifier.ValueText: "Where" } },
+                }
+            },
+        };
+    }
+
+    public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
+    {
+        var invocationExpression = await context.TryGetRelevantNodeAsync<InvocationExpressionSyntax>().ConfigureAwait(false);
+        if (!CanSimplify(invocationExpression))
+            return;
+
+        context.RegisterRefactoring(CodeAction.Create(
+            "Combine Where and SelectAsArray",
+            cancellationToken => this.FixAsync(context.Document, invocationExpression.Span, equivalenceKey: null, cancellationToken),
+            equivalenceKey: null));
+    }
+
+    protected override async Task FixAllAsync(
+        Document document,
+        ImmutableArray<TextSpan> fixAllSpans,
+        SyntaxEditor editor,
+        string? equivalenceKey,
+        CancellationToken cancellationToken)
+    {
+        var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var invocationExpressions = root
+            .DescendantNodes(n => fixAllSpans.Any(span => n.Span.IntersectsWith(span)))
+            .OfType<InvocationExpressionSyntax>()
+            .Where(i => fixAllSpans.Any(span => i.Span.IntersectsWith(span)))
+            .OrderByDescending(i => i.SpanStart);
+
+        foreach (var invocationExpression in invocationExpressions)
+        {
+            if (!CanSimplify(invocationExpression))
+                continue;
+
+            var selectAsArrayMemberAccess = (MemberAccessExpressionSyntax)invocationExpression.Expression;
+            var whereInvocation = (InvocationExpressionSyntax)selectAsArrayMemberAccess.Expression;
+            var whereMemberAccess = (MemberAccessExpressionSyntax)whereInvocation.Expression;
+
+            editor.ReplaceNode(
+                selectAsArrayMemberAccess.Expression,
+                whereMemberAccess.Expression);
+            editor.ReplaceNode(
+                invocationExpression,
+                (current, _) =>
+                {
+                    var currentInvocation = (InvocationExpressionSyntax)current;
+                    return currentInvocation.WithArgumentList(
+                        currentInvocation.ArgumentList.WithArguments(
+                            currentInvocation.ArgumentList.Arguments
+                                .Insert(0, Argument(whereInvocation.ArgumentList.Arguments[0].Expression))));
+                });
+        }
+    }
+}
