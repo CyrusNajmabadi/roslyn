@@ -31,10 +31,10 @@ internal sealed class PullMemberUpWarningViewModel : AbstractNotifyPropertyChang
 
         foreach (var result in options.MemberAnalysisResults)
         {
-            if (result.ChangeOriginalToPublic)
+            if (result.FinalAccessibility != result.Member.DeclaredAccessibility)
             {
                 Logger.Log(FunctionId.PullMembersUpWarning_ChangeOriginToPublic);
-                warningMessagesBuilder.Add(string.Format(ServicesVSResources._0_will_be_changed_to_public, result.Member.Name));
+                warningMessagesBuilder.Add(string.Format(ServicesVSResources._0_will_change_accessibility, result.Member.Name));
             }
 
             if (result.ChangeOriginalToNonStatic)

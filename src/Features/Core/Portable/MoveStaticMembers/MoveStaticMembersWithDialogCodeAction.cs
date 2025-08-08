@@ -127,7 +127,7 @@ internal sealed class MoveStaticMembersWithDialogCodeAction(
         var members = memberNodes
             .Select(node => root.GetCurrentNode(node))
             .WhereNotNull()
-            .SelectAsArray(node => (semanticModel.GetRequiredDeclaredSymbol(node, cancellationToken), false));
+            .SelectAsArray(node => (semanticModel.GetRequiredDeclaredSymbol(node, cancellationToken), makeAbstract: false));
 
         var pullMembersUpOptions = PullMembersUpOptionsBuilder.BuildPullMembersUpOptions(newType, members);
         var movedSolution = await MembersPuller.PullMembersUpAsync(sourceDoc, pullMembersUpOptions, cancellationToken).ConfigureAwait(false);

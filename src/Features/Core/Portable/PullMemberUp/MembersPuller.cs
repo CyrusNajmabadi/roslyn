@@ -79,13 +79,13 @@ internal static class MembersPuller
         return getterOrSetter?.DeclaredAccessibility == Accessibility.Public ? getterOrSetter : null;
     }
 
-    private static IMethodSymbol MakePublicAccessor(IMethodSymbol getterOrSetter)
+    private static IMethodSymbol MakeAccessor(IMethodSymbol getterOrSetter, Accessibility accessibility)
     {
         // Create a public getter/setter since user is trying to pull a non-public property to an interface.
         // If getterOrSetter is null, it means this property doesn't have a getter/setter, so just don't generate it.
         return getterOrSetter == null
             ? getterOrSetter
-            : CodeGenerationSymbolFactory.CreateMethodSymbol(getterOrSetter, accessibility: Accessibility.Public);
+            : CodeGenerationSymbolFactory.CreateMethodSymbol(getterOrSetter, accessibility: accessibility);
     }
 
     private static async Task<Solution> PullMembersIntoInterfaceAsync(
@@ -132,7 +132,8 @@ internal static class MembersPuller
                 }
                 else
                 {
-                    if (analysisResult.ChangeOriginalToNonStatic || analysisResult.ChangeOriginalToPublic)
+                    if (analysisResult.ChangeOriginalToNonStatic ||
+                        analysisResult.FinalAccessibility != analysisResult.Member.DeclaredAccessibility)
                     {
                         ChangeMemberToPublicAndNonStatic(
                             codeGenerationService, originalMemberEditor,
@@ -149,21 +150,22 @@ internal static class MembersPuller
     private static ISymbol GetSymbolsToPullUp(MemberAnalysisResult analysisResult)
     {
         var member = analysisResult.Member;
+
         // We don't support generating static interface members, so we need to update to non-static before generating.
         var modifier = DeclarationModifiers.From(member).WithIsStatic(false);
         if (member is IPropertySymbol propertySymbol)
         {
             // Property is treated differently since we need to make sure it gives right accessor symbol to ICodeGenerationService,
             // otherwise ICodeGenerationService won't give the expected declaration.
-            if (analysisResult.ChangeOriginalToPublic)
+            if (analysisResult.FinalAccessibility != propertySymbol.DeclaredAccessibility)
             {
                 // We are pulling a non-public property, change its getter/setter to public and itself to be public.
                 return CodeGenerationSymbolFactory.CreatePropertySymbol(
                     propertySymbol,
-                    accessibility: Accessibility.Public,
+                    accessibility: analysisResult.FinalAccessibility,
                     modifiers: modifier,
-                    getMethod: MakePublicAccessor(propertySymbol.GetMethod),
-                    setMethod: MakePublicAccessor(propertySymbol.SetMethod));
+                    getMethod: MakeAccessor(propertySymbol.GetMethod, analysisResult.FinalAccessibility),
+                    setMethod: MakeAccessor(propertySymbol.SetMethod, analysisResult.FinalAccessibility));
             }
             else
             {

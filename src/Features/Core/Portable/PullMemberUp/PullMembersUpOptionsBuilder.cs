@@ -13,26 +13,26 @@ internal sealed class PullMembersUpOptionsBuilder
         INamedTypeSymbol destination,
         ImmutableArray<(ISymbol member, bool makeAbstract)> members)
     {
-        var membersAnalysisResult = members.SelectAsArray(memberAndMakeAbstract =>
+        var membersAnalysisResult = members.SelectAsArray(tuple =>
         {
+            var (member, makeAbstract) = tuple;
             if (destination.TypeKind == TypeKind.Interface)
             {
-                var changeOriginalToPublic = memberAndMakeAbstract.member.DeclaredAccessibility != Accessibility.Public;
-                var changeOriginalToNonStatic = memberAndMakeAbstract.member.IsStatic;
                 return new MemberAnalysisResult(
-                    memberAndMakeAbstract.member,
-                    changeOriginalToPublic,
-                    changeOriginalToNonStatic,
+                    member,
+                    Accessibility.Public,
+                    member.IsStatic,
                     makeMemberDeclarationAbstract: false,
                     changeDestinationTypeToAbstract: false);
             }
             else
             {
-                var changeDestinationToAbstract = !destination.IsAbstract && (memberAndMakeAbstract.makeAbstract || memberAndMakeAbstract.member.IsAbstract);
-                return new MemberAnalysisResult(memberAndMakeAbstract.member,
-                    changeOriginalToPublic: false,
+                var changeDestinationToAbstract = !destination.IsAbstract && (makeAbstract || member.IsAbstract);
+                return new MemberAnalysisResult(
+                    member,
+                    member.DeclaredAccessibility,
                     changeOriginalToNonStatic: false,
-                    memberAndMakeAbstract.makeAbstract,
+                    makeAbstract,
                     changeDestinationTypeToAbstract: changeDestinationToAbstract);
             }
         });
