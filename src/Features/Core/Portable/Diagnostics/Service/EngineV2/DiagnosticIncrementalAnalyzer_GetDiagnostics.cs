@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Workspaces.Diagnostics;
 using Roslyn.Utilities;
 
@@ -58,14 +59,31 @@ internal sealed partial class DiagnosticAnalyzerService
             bool includeProjectNonLocalResult,
             CancellationToken cancellationToken)
         {
-            using var _ = ArrayBuilder<DiagnosticData>.GetInstance(out var builder);
-
             var solution = project.Solution;
             var analyzersForProject = await _stateManager.GetOrCreateAnalyzersAsync(
                 solution.SolutionState, project.State, cancellationToken).ConfigureAwait(false);
+            var analyzers = analyzersForProject.WhereAsArray(a => ShouldIncludeAnalyzer(project, a));
+
+            var client = await RemoteHostClient.TryGetClientAsync(project, cancellationToken).ConfigureAwait(false);
+            if (client is not null)
+            {
+                var result = await client.TryInvokeAsync<IRemoteDiagnosticAnalyzerService, ImmutableArray<DiagnosticData>>(
+                    project,
+                    (service, solution, cancellationToken) => service.ProduceProjectDiagnosticsAsync(
+                        solution, project.Id, diagnosticIds, documentIds,  cancellationToken),
+                    cancellationToken).ConfigureAwait(false);
+
+                return result.HasValue ? result.Value : [];
+            }
+
+
+
             var hostAnalyzerInfo = await _stateManager.GetOrCreateHostAnalyzerInfoAsync(
                 solution.SolutionState, project.State, cancellationToken).ConfigureAwait(false);
-            var analyzers = analyzersForProject.WhereAsArray(a => ShouldIncludeAnalyzer(project, a));
+
+
+
+            using var _ = ArrayBuilder<DiagnosticData>.GetInstance(out var builder);
 
             var result = await GetOrComputeDiagnosticAnalysisResultsAsync(analyzers).ConfigureAwait(false);
 
