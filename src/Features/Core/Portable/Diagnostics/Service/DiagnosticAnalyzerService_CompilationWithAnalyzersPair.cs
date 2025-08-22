@@ -5,11 +5,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Roslyn.Utilities;
 
@@ -44,7 +42,6 @@ internal sealed partial class DiagnosticAnalyzerService
         Project project,
         ImmutableArray<DiagnosticAnalyzer> analyzers,
         HostAnalyzerInfo hostAnalyzerInfo,
-        bool crashOnAnalyzerException,
         CancellationToken cancellationToken)
     {
         if (!project.SupportsCompilation)
@@ -65,7 +62,7 @@ internal sealed partial class DiagnosticAnalyzerService
             {
                 lazy = AsyncLazy.Create(
                     asynchronousComputeFunction: CreateCompilationWithAnalyzersAsync,
-                    arg: (project, analyzers, hostAnalyzerInfo, crashOnAnalyzerException));
+                    arg: (project, analyzers, hostAnalyzerInfo));
                 map.Add(checksumAndAnalyzers, lazy);
             }
         }
@@ -78,11 +75,10 @@ internal sealed partial class DiagnosticAnalyzerService
         static async Task<CompilationWithAnalyzersPair?> CreateCompilationWithAnalyzersAsync(
             (Project project,
              ImmutableArray<DiagnosticAnalyzer> analyzers,
-             HostAnalyzerInfo hostAnalyzerInfo,
-             bool crashOnAnalyzerException) tuple,
+             HostAnalyzerInfo hostAnalyzerInfo) tuple,
             CancellationToken cancellationToken)
         {
-            var (project, analyzers, hostAnalyzerInfo, crashOnAnalyzerException) = tuple;
+            var (project, analyzers, hostAnalyzerInfo) = tuple;
 
             var compilation = await project.GetRequiredCompilationAsync(cancellationToken).ConfigureAwait(false);
 
@@ -98,35 +94,18 @@ internal sealed partial class DiagnosticAnalyzerService
             // PERF: there is no analyzers for this compilation.
             //       compilationWithAnalyzer will throw if it is created with no analyzers which is perf optimization.
             if (filteredProjectAnalyzers.IsEmpty && filteredHostAnalyzers.IsEmpty)
-            {
                 return null;
-            }
-
-            var exceptionFilter = (Exception ex) =>
-            {
-                if (ex is not OperationCanceledException && crashOnAnalyzerException)
-                {
-                    // report telemetry
-                    FatalError.ReportAndPropagate(ex);
-
-                    // force fail fast (the host might not crash when reporting telemetry):
-                    FailFast.OnFatalException(ex);
-                }
-
-                return true;
-            };
 
             // Create driver that holds onto compilation and associated analyzers
             return new(
-                CreateCompilationWithAnalyzers(compilation, filteredProjectAnalyzers, project.State.ProjectAnalyzerOptions, exceptionFilter),
-                CreateCompilationWithAnalyzers(compilation, filteredHostAnalyzers, project.HostAnalyzerOptions, exceptionFilter));
+                CreateCompilationWithAnalyzers(compilation, filteredProjectAnalyzers, project.State.ProjectAnalyzerOptions),
+                CreateCompilationWithAnalyzers(compilation, filteredHostAnalyzers, project.HostAnalyzerOptions));
         }
 
         static CompilationWithAnalyzers? CreateCompilationWithAnalyzers(
             Compilation compilation,
             ImmutableArray<DiagnosticAnalyzer> analyzers,
-            AnalyzerOptions? options,
-            Func<Exception, bool> exceptionFilter)
+            AnalyzerOptions? options)
         {
             if (analyzers.Length == 0)
                 return null;
@@ -134,7 +113,7 @@ internal sealed partial class DiagnosticAnalyzerService
             return compilation.WithAnalyzers(analyzers, new CompilationWithAnalyzersOptions(
                 options: options,
                 onAnalyzerException: null,
-                analyzerExceptionFilter: exceptionFilter,
+                analyzerExceptionFilter: static _ => true,
                 // in IDE, we always set concurrentAnalysis == false otherwise, we can get into thread starvation due to
                 // async being used with synchronous blocking concurrency.
                 concurrentAnalysis: false,

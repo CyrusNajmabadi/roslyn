@@ -347,7 +347,6 @@ internal abstract class VisualStudioOptionStorage
         {"dotnet_rename_in_comments", new RoamingProfileStorage("TextEditor.Specific.RenameInComments")},
         {"dotnet_rename_in_strings", new RoamingProfileStorage("TextEditor.Specific.RenameInStrings")},
         {"dotnet_rename_overloads", new RoamingProfileStorage("TextEditor.Specific.RenameOverloads")},
-        {"dotnet_crash_on_analyzer_exception", new LocalUserProfileStorage(@"Roslyn\Internal\Diagnostics", "CrashOnAnalyzerException")},
         {"visual_studio_enable_file_logging_for_diagnostics", new LocalUserProfileStorage(@"Roslyn\Internal\Diagnostics", "EnableFileLoggingForDiagnostics")},
         {"dotnet_enable_automatic_line_ender", new LocalUserProfileStorage(@"Roslyn\Internal\OnOff\Features", "Automatic Line Ender")},
         {"dotnet_enable_brace_matching", new LocalUserProfileStorage(@"Roslyn\Internal\OnOff\Features", "Brace Matching")},

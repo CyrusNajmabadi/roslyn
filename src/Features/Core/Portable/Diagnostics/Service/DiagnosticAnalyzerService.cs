@@ -51,8 +51,6 @@ internal sealed partial class DiagnosticAnalyzerService
     // Shared with Compiler
     public const string AnalyzerExceptionDiagnosticId = "AD0001";
 
-    private static readonly Option2<bool> s_crashOnAnalyzerException = new("dotnet_crash_on_analyzer_exception", defaultValue: false);
-
     private readonly IAsynchronousOperationListener _listener;
     private readonly IGlobalOptionService _globalOptions;
 
@@ -101,15 +99,11 @@ internal sealed partial class DiagnosticAnalyzerService
     public static Task<VersionStamp> GetDiagnosticVersionAsync(Project project, CancellationToken cancellationToken)
         => project.GetDependentVersionAsync(cancellationToken);
 
-    public bool CrashOnAnalyzerException
-        => _globalOptions.GetOption(s_crashOnAnalyzerException);
-
     public static bool IsGlobalOptionAffectingDiagnostics(IOption2 option)
         => option == NamingStyleOptions.NamingPreferences ||
            option.Definition.Group.Parent == CodeStyleOptionGroups.CodeStyle ||
            option == SolutionCrawlerOptionsStorage.BackgroundAnalysisScopeOption ||
            option == SolutionCrawlerOptionsStorage.CompilerDiagnosticsScopeOption ||
-           option == s_crashOnAnalyzerException ||
            // Fading is controlled by reporting diagnostics for the faded region.  So if a fading option changes we
            // want to recompute and rereport up to date diagnostics.
            option == FadingOptions.FadeOutUnusedImports ||
