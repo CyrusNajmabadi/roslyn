@@ -20,16 +20,18 @@ internal sealed class NonLocalDocumentDiagnosticSource(
         RequestContext context,
         CancellationToken cancellationToken)
     {
-        // We call GetDiagnosticsForIdsAsync as we want to ensure we get the full set of non-local diagnostics for this
-        // document including those reported as a compilation end diagnostic.  These are not included in document pull
-        // (uses GetDiagnosticsForSpan) due to cost.
-        var service = this.Solution.Services.GetRequiredService<IDiagnosticAnalyzerService>();
-        var diagnostics = await service.GetDiagnosticsForIdsAsync(
-            Document.Project, Document.Id, diagnosticIds: null, _shouldIncludeAnalyzer,
-            includeLocalDocumentDiagnostics: false, cancellationToken).ConfigureAwait(false);
+        return [];
 
-        // TODO(cyrusn): In the future we could consider reporting these, but with a flag on the diagnostic mentioning
-        // that it is suppressed and should be hidden from the task list by default.
-        return diagnostics.WhereAsArray(d => !d.IsSuppressed);
+        //// We call GetDiagnosticsForIdsAsync as we want to ensure we get the full set of non-local diagnostics for this
+        //// document including those reported as a compilation end diagnostic.  These are not included in document pull
+        //// (uses GetDiagnosticsForSpan) due to cost.
+        //var service = this.Solution.Services.GetRequiredService<IDiagnosticAnalyzerService>();
+        //var diagnostics = await service.GetDiagnosticsForIdsAsync(
+        //    Document.Project, Document.Id, diagnosticIds: null, _shouldIncludeAnalyzer,
+        //    includeLocalDocumentDiagnostics: false, cancellationToken).ConfigureAwait(false);
+
+        //// TODO(cyrusn): In the future we could consider reporting these, but with a flag on the diagnostic mentioning
+        //// that it is suppressed and should be hidden from the task list by default.
+        //return diagnostics.WhereAsArray(d => !d.IsSuppressed);
     }
 }

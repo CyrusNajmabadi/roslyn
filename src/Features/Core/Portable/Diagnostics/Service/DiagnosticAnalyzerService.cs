@@ -145,7 +145,7 @@ internal sealed partial class DiagnosticAnalyzerService
     }
 
     public Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForIdsAsync(
-        Project project, DocumentId? documentId, ImmutableHashSet<string>? diagnosticIds, Func<DiagnosticAnalyzer, bool>? shouldIncludeAnalyzer, bool includeLocalDocumentDiagnostics, CancellationToken cancellationToken)
+        Project project, DocumentId? documentId, ImmutableHashSet<string>? diagnosticIds, Func<DiagnosticAnalyzer, bool>? shouldIncludeAnalyzer, CancellationToken cancellationToken)
     {
         var analyzers = GetDiagnosticAnalyzers(project, diagnosticIds, shouldIncludeAnalyzer);
 
@@ -154,7 +154,7 @@ internal sealed partial class DiagnosticAnalyzerService
             // Ensure we compute and return diagnostics for both the normal docs and the additional docs in this
             // project if no specific document id was requested.
             documentId != null ? [documentId] : [.. project.DocumentIds, .. project.AdditionalDocumentIds],
-            includeLocalDocumentDiagnostics,
+            includeLocalDocumentDiagnostics: true,
             includeNonLocalDocumentDiagnostics: true,
             // return diagnostics specific to one project or document
             includeProjectNonLocalResult: documentId == null,

@@ -39,18 +39,13 @@ internal interface IDiagnosticAnalyzerService : IWorkspaceService
     /// <param name="documentId">Optional document to scope the returned diagnostics.</param>
     /// <param name="diagnosticIds">Optional set of diagnostic IDs to scope the returned diagnostics.</param>
     /// <param name="shouldIncludeAnalyzer">Option callback to filter out analyzers to execute for computing diagnostics.</param>
-    /// <param name="includeLocalDocumentDiagnostics">
-    /// Indicates if local document diagnostics must be returned.
-    /// Local diagnostics are the ones that are reported by analyzers on the same file for which the callback was received
-    /// and hence can be computed by analyzing a single file in isolation.
-    /// </param>
     /// <remarks>
     /// Non local document will be returned. Non-local diagnostics are the ones reported by
     /// analyzers either at compilation end callback OR in a different file from which the callback was made. Entire
     /// project must be analyzed to get the complete set of non-local document diagnostics.
     /// </remarks>
     Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForIdsAsync(
-        Project project, DocumentId? documentId, ImmutableHashSet<string>? diagnosticIds, Func<DiagnosticAnalyzer, bool>? shouldIncludeAnalyzer, bool includeLocalDocumentDiagnostics, CancellationToken cancellationToken);
+        Project project, DocumentId? documentId, ImmutableHashSet<string>? diagnosticIds, Func<DiagnosticAnalyzer, bool>? shouldIncludeAnalyzer, CancellationToken cancellationToken);
 
     /// <summary>
     /// Get project diagnostics (diagnostics with no source location) of the given diagnostic ids and/or analyzers from
