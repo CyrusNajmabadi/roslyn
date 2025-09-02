@@ -116,27 +116,14 @@ internal sealed partial class DiagnosticAnalyzerService
                 return true;
             };
 
-            // Create driver that holds onto compilation and associated analyzers
-            return CreateCompilationWithAnalyzers(
-                compilation,
-                filteredHostAnalyzers.Concat(filteredProjectAnalyzers).Distinct(),
-                AnalyzerOptionsUtilities.Combine(
-                    project.State.ProjectAnalyzerOptions,
-                    project.HostAnalyzerOptions),
-                exceptionFilter);
-        }
-
-        static CompilationWithAnalyzers? CreateCompilationWithAnalyzers(
-            Compilation compilation,
-            ImmutableArray<DiagnosticAnalyzer> analyzers,
-            AnalyzerOptions? options,
-            Func<Exception, bool> exceptionFilter)
-        {
-            if (analyzers.Length == 0)
+            var allAnalyzers = filteredHostAnalyzers.Concat(filteredProjectAnalyzers).Distinct();
+            if (allAnalyzers.Length == 0)
                 return null;
 
-            return compilation.WithAnalyzers(analyzers, new CompilationWithAnalyzersOptions(
-                options: options,
+            return compilation.WithAnalyzers(allAnalyzers, new CompilationWithAnalyzersOptions(
+                options: AnalyzerOptionsUtilities.Combine(
+                    project.State.ProjectAnalyzerOptions,
+                    project.HostAnalyzerOptions),
                 onAnalyzerException: null,
                 analyzerExceptionFilter: exceptionFilter,
                 // in IDE, we always set concurrentAnalysis == false otherwise, we can get into thread starvation due to
