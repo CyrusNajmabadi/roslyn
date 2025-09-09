@@ -4,8 +4,11 @@
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeActions;
 
@@ -17,17 +20,19 @@ internal interface ICodeActionRequestPriorityProvider
     CodeActionRequestPriority? Priority { get; }
 
     /// <summary>
-    /// Tracks the given <paramref name="analyzer"/> as a de-prioritized analyzer that should be moved to
+    /// Tracks the given <paramref name="analyzerTypeName"/> as a de-prioritized analyzer that should be moved to
     /// <see cref="CodeActionRequestPriority.Low"/> bucket.
     /// </summary>
-    void AddDeprioritizedAnalyzerWithLowPriority(DiagnosticAnalyzer analyzer);
+    ValueTask AddDeprioritizedAnalyzerWithLowPriorityAsync(
+        string analyzerTypeName, ImmutableArray<string> supportedDiagnosticIds, CancellationToken cancellationToken);
 
-    bool IsDeprioritizedAnalyzerWithLowPriority(DiagnosticAnalyzer analyzer);
+    ValueTask<bool> IsDeprioritizedAnalyzerWithLowPriorityAsync(string analyzerTypeName, CancellationToken cancellationToken);
 
     /// <summary>
     /// Indicates whether any deprioritized analyzer supports one of the passed in diagnostic ids.
     /// </summary>
-    bool HasDeprioritizedAnalyzerSupportingDiagnosticId(ImmutableArray<string> diagnosticIds);
+    ValueTask<bool> HasDeprioritizedAnalyzerSupportingDiagnosticIdAsync(
+        ImmutableArray<string> diagnosticIds, CancellationToken cancellationToken);
 }
 
 internal static class ICodeActionRequestPriorityProviderExtensions
@@ -39,7 +44,10 @@ internal static class ICodeActionRequestPriorityProviderExtensions
     /// optimization for lightbulb diagnostic computation, wherein we can reduce the set of analyzers to be executed
     /// when computing fixes for a specific <see cref="ICodeActionRequestPriorityProvider.Priority"/>.
     /// </summary>
-    public static bool MatchesPriority(this ICodeActionRequestPriorityProvider provider, DiagnosticAnalyzer analyzer)
+    public static async ValueTask<bool> MatchesPriorityAsync(
+        this ICodeActionRequestPriorityProvider provider,
+        DiagnosticAnalyzer analyzer,
+        CancellationToken cancellationToken)
     {
         var priority = provider.Priority;
 
@@ -60,7 +68,8 @@ internal static class ICodeActionRequestPriorityProviderExtensions
         // Check if we are computing diagnostics for 'CodeActionRequestPriority.Low' and
         // this analyzer was de-prioritized to low priority bucket.
         if (priority == CodeActionRequestPriority.Low &&
-            provider.IsDeprioritizedAnalyzerWithLowPriority(analyzer))
+            await provider.IsDeprioritizedAnalyzerWithLowPriorityAsync(
+                analyzer.GetType().FullName!, cancellationToken).ConfigureAwait(false))
         {
             return true;
         }
@@ -79,7 +88,10 @@ internal static class ICodeActionRequestPriorityProviderExtensions
     /// Returns true if the given <paramref name="codeFixProvider"/> should be considered a candidate when computing
     /// fixes for the given <see cref="ICodeActionRequestPriorityProvider.Priority"/>.
     /// </summary>
-    public static bool MatchesPriority(this ICodeActionRequestPriorityProvider provider, CodeFixProvider codeFixProvider)
+    public static async ValueTask<bool> MatchesPriorityAsync(
+        this ICodeActionRequestPriorityProvider provider,
+        CodeFixProvider codeFixProvider,
+        CancellationToken cancellationToken)
     {
         if (provider.Priority == null)
         {
@@ -93,7 +105,7 @@ internal static class ICodeActionRequestPriorityProviderExtensions
         }
 
         if (provider.Priority == CodeActionRequestPriority.Low
-            && provider.HasDeprioritizedAnalyzerSupportingDiagnosticId(codeFixProvider.FixableDiagnosticIds)
+            && await provider.HasDeprioritizedAnalyzerSupportingDiagnosticIdAsync(codeFixProvider.FixableDiagnosticIds, cancellationToken).ConfigureAwait(false)
             && codeFixProvider.RequestPriority > CodeActionRequestPriority.Low)
         {
             // 'Low' priority can be used for two types of code fixers:
@@ -110,31 +122,32 @@ internal static class ICodeActionRequestPriorityProviderExtensions
     }
 }
 
-internal sealed class DefaultCodeActionRequestPriorityProvider(CodeActionRequestPriority? priority = null) : ICodeActionRequestPriorityProvider
+internal sealed class DefaultCodeActionRequestPriorityProvider(CodeActionRequestPriority? priority = null)
+    : ICodeActionRequestPriorityProvider
 {
-    private readonly object _gate = new();
-    private HashSet<DiagnosticAnalyzer>? _lowPriorityAnalyzers;
+    private readonly SemaphoreSlim _gate = new(initialCount: 1);
+    private HashSet<string>? _lowPriorityAnalyzers;
     private HashSet<string>? _lowPriorityAnalyzerSupportedDiagnosticIds;
 
     public CodeActionRequestPriority? Priority { get; } = priority;
 
-    public void AddDeprioritizedAnalyzerWithLowPriority(DiagnosticAnalyzer analyzer)
+    public async ValueTask AddDeprioritizedAnalyzerWithLowPriorityAsync(
+        string analyzerTypeName, ImmutableArray<string> supportedDiagnosticIds, CancellationToken cancellationToken)
     {
-        lock (_gate)
+        using (await _gate.DisposableWaitAsync(cancellationToken).ConfigureAwait(false))
         {
             _lowPriorityAnalyzers ??= [];
             _lowPriorityAnalyzerSupportedDiagnosticIds ??= [];
 
-            _lowPriorityAnalyzers.Add(analyzer);
-
-            foreach (var supportedDiagnostic in analyzer.SupportedDiagnostics)
-                _lowPriorityAnalyzerSupportedDiagnosticIds.Add(supportedDiagnostic.Id);
+            _lowPriorityAnalyzers.Add(analyzerTypeName);
+            _lowPriorityAnalyzerSupportedDiagnosticIds.AddRange(supportedDiagnosticIds);
         }
     }
 
-    public bool HasDeprioritizedAnalyzerSupportingDiagnosticId(ImmutableArray<string> diagnosticIds)
+    public async ValueTask<bool> HasDeprioritizedAnalyzerSupportingDiagnosticIdAsync(
+        ImmutableArray<string> diagnosticIds, CancellationToken cancellationToken)
     {
-        lock (_gate)
+        using (await _gate.DisposableWaitAsync(cancellationToken).ConfigureAwait(false))
         {
             if (_lowPriorityAnalyzerSupportedDiagnosticIds == null)
                 return false;
@@ -149,11 +162,12 @@ internal sealed class DefaultCodeActionRequestPriorityProvider(CodeActionRequest
         }
     }
 
-    public bool IsDeprioritizedAnalyzerWithLowPriority(DiagnosticAnalyzer analyzer)
+    public async ValueTask<bool> IsDeprioritizedAnalyzerWithLowPriorityAsync(
+        string analyzerTypeName, CancellationToken cancellationToken)
     {
-        lock (_gate)
+        using (await _gate.DisposableWaitAsync(cancellationToken).ConfigureAwait(false))
         {
-            return _lowPriorityAnalyzers != null && _lowPriorityAnalyzers.Contains(analyzer);
+            return _lowPriorityAnalyzers != null && _lowPriorityAnalyzers.Contains(analyzerTypeName);
         }
     }
 }

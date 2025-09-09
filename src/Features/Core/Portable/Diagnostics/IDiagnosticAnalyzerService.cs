@@ -87,7 +87,7 @@ internal interface IDiagnosticAnalyzerService : IWorkspaceService
     /// will always be returned for the document in that case.
     /// </summary>
     Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForSpanAsync(
-        TextDocument document, TextSpan? range, Func<string, bool>? shouldIncludeDiagnostic,
+        TextDocument document, TextSpan? range, Func<string, ValueTask<bool>>? shouldIncludeDiagnostic,
         ICodeActionRequestPriorityProvider priorityProvider,
         DiagnosticKind diagnosticKind,
         CancellationToken cancellationToken);

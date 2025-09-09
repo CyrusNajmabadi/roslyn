@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Telemetry;
 using Microsoft.CodeAnalysis.Text;
@@ -40,7 +41,7 @@ internal sealed partial class DiagnosticAnalyzerService
     public async Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForSpanAsync(
         TextDocument document,
         TextSpan? range,
-        Func<string, bool>? shouldIncludeDiagnostic,
+        Func<string, ValueTask<bool>>? shouldIncludeDiagnostic,
         ICodeActionRequestPriorityProvider? priorityProvider,
         DiagnosticKind diagnosticKind,
         CancellationToken cancellationToken)
@@ -77,10 +78,10 @@ internal sealed partial class DiagnosticAnalyzerService
         deprioritizationCandidates.AddRange(await this.GetDeprioritizationCandidatesAsync(
             project, analyzers, cancellationToken).ConfigureAwait(false));
 
-        var (syntaxAnalyzers, semanticSpanAnalyzers, semanticDocumentAnalyzers) = GetAllAnalyzers();
-        syntaxAnalyzers = FilterAnalyzers(syntaxAnalyzers, AnalysisKind.Syntax, range, deprioritizationCandidates);
-        semanticSpanAnalyzers = FilterAnalyzers(semanticSpanAnalyzers, AnalysisKind.Semantic, range, deprioritizationCandidates);
-        semanticDocumentAnalyzers = FilterAnalyzers(semanticDocumentAnalyzers, AnalysisKind.Semantic, span: null, deprioritizationCandidates);
+        var (syntaxAnalyzers, semanticSpanAnalyzers, semanticDocumentAnalyzers) = await GetAllAnalyzersAsync().ConfigureAwait(false);
+        syntaxAnalyzers = await FilterAnalyzersAsync(syntaxAnalyzers, AnalysisKind.Syntax, range, deprioritizationCandidates).ConfigureAwait(false);
+        semanticSpanAnalyzers = await FilterAnalyzersAsync(semanticSpanAnalyzers, AnalysisKind.Semantic, range, deprioritizationCandidates).ConfigureAwait(false);
+        semanticDocumentAnalyzers = await FilterAnalyzersAsync(semanticDocumentAnalyzers, AnalysisKind.Semantic, span: null, deprioritizationCandidates).ConfigureAwait(false);
 
         var allDiagnostics = await this.ComputeDiagnosticsAsync(
             document, range, analyzers, syntaxAnalyzers, semanticSpanAnalyzers, semanticDocumentAnalyzers,
@@ -88,9 +89,10 @@ internal sealed partial class DiagnosticAnalyzerService
             cancellationToken).ConfigureAwait(false);
         return allDiagnostics.WhereAsArray(ShouldInclude);
 
-        (ImmutableArray<DiagnosticAnalyzer> syntaxAnalyzers,
-         ImmutableArray<DiagnosticAnalyzer> semanticSpanAnalyzers,
-         ImmutableArray<DiagnosticAnalyzer> semanticDocumentAnalyzers) GetAllAnalyzers()
+        async ValueTask<(
+            ImmutableArray<DiagnosticAnalyzer> syntaxAnalyzers,
+            ImmutableArray<DiagnosticAnalyzer> semanticSpanAnalyzers,
+            ImmutableArray<DiagnosticAnalyzer> semanticDocumentAnalyzers)> GetAllAnalyzersAsync()
         {
             try
             {
@@ -108,8 +110,11 @@ internal sealed partial class DiagnosticAnalyzerService
 
                 foreach (var analyzer in analyzers)
                 {
-                    if (!ShouldIncludeAnalyzer(analyzer, shouldIncludeDiagnostic, priorityProvider, this))
+                    if (!await ShouldIncludeAnalyzerAsync(
+                            analyzer, shouldIncludeDiagnostic, priorityProvider, this, cancellationToken).ConfigureAwait(false))
+                    {
                         continue;
+                    }
 
                     bool includeSyntax = true, includeSemantic = true;
                     if (diagnosticKind != DiagnosticKind.All)
@@ -167,14 +172,15 @@ internal sealed partial class DiagnosticAnalyzerService
         }
 
         // Local functions
-        static bool ShouldIncludeAnalyzer(
+        static async ValueTask<bool> ShouldIncludeAnalyzerAsync(
             DiagnosticAnalyzer analyzer,
-            Func<string, bool>? shouldIncludeDiagnostic,
+            Func<string, ValueTask<bool>>? shouldIncludeDiagnostic,
             ICodeActionRequestPriorityProvider priorityProvider,
-            DiagnosticAnalyzerService owner)
+            DiagnosticAnalyzerService owner,
+            CancellationToken cancellationToken)
         {
             // Skip executing analyzer if its priority does not match the request priority.
-            if (!priorityProvider.MatchesPriority(analyzer))
+            if (!await priorityProvider.MatchesPriorityAsync(analyzer, cancellationToken).ConfigureAwait(false))
                 return false;
 
             // Special case DocumentDiagnosticAnalyzer to never skip these document analyzers based on
@@ -194,7 +200,7 @@ internal sealed partial class DiagnosticAnalyzerService
             return true;
         }
 
-        ImmutableArray<DiagnosticAnalyzer> FilterAnalyzers(
+        async ValueTask<ImmutableArray<DiagnosticAnalyzer>> FilterAnalyzersAsync(
             ImmutableArray<DiagnosticAnalyzer> analyzers,
             AnalysisKind kind,
             TextSpan? span,
@@ -204,13 +210,16 @@ internal sealed partial class DiagnosticAnalyzerService
 
             foreach (var analyzer in analyzers)
             {
-                Debug.Assert(priorityProvider.MatchesPriority(analyzer));
+                Debug.Assert(await priorityProvider.MatchesPriorityAsync(analyzer, cancellationToken).ConfigureAwait(false));
 
                 // Check if this is an expensive analyzer that needs to be de-prioritized to a lower priority bucket.
                 // If so, we skip this analyzer from execution in the current priority bucket.
                 // We will subsequently execute this analyzer in the lower priority bucket.
-                if (TryDeprioritizeAnalyzer(analyzer, kind, span, deprioritizationCandidates))
+                if (await TryDeprioritizeAnalyzerAsync(
+                        analyzer, kind, span, deprioritizationCandidates).ConfigureAwait(false))
+                {
                     continue;
+                }
 
                 filteredAnalyzers.Add(analyzer);
             }
@@ -218,7 +227,7 @@ internal sealed partial class DiagnosticAnalyzerService
             return filteredAnalyzers.ToImmutableAndClear();
         }
 
-        bool TryDeprioritizeAnalyzer(
+        async ValueTask<bool> TryDeprioritizeAnalyzerAsync(
             DiagnosticAnalyzer analyzer, AnalysisKind kind, TextSpan? span,
             HashSet<DiagnosticAnalyzer> deprioritizationCandidates)
         {
@@ -253,16 +262,31 @@ internal sealed partial class DiagnosticAnalyzerService
             // track this analyzer. This ensures that when the owner of this provider calls us back to execute
             // the low priority bucket, we can still get back to this analyzer and execute it that time.
             if (!this._globalOptions.GetOption(DiagnosticOptionsStorage.LightbulbSkipExecutingDeprioritizedAnalyzers))
-                priorityProvider.AddDeprioritizedAnalyzerWithLowPriority(analyzer);
+            {
+                await priorityProvider.AddDeprioritizedAnalyzerWithLowPriorityAsync(
+                    analyzer.GetType().FullName!,
+                    analyzer.SupportedDiagnostics.SelectAsArray(d => d.Id),
+                    cancellationToken).ConfigureAwait(false);
+            }
 
             return true;
         }
 
-        bool ShouldInclude(DiagnosticData diagnostic)
+        async ValueTask<bool> ShouldIncludeAsync(DiagnosticData diagnostic)
         {
-            return diagnostic.DocumentId == document.Id &&
-                (range == null || range.Value.IntersectsWith(diagnostic.DataLocation.UnmappedFileSpan.GetClampedTextSpan(text)))
-                && (shouldIncludeDiagnostic == null || shouldIncludeDiagnostic(diagnostic.Id));
+            if (diagnostic.DocumentId != document.Id)
+                return false;
+
+            if (range != null && !range.Value.IntersectsWith(diagnostic.DataLocation.UnmappedFileSpan.GetClampedTextSpan(text)))
+                return false;
+
+            if (shouldIncludeDiagnostic != null &&
+                !await shouldIncludeDiagnostic(diagnostic.Id).ConfigureAwait(false))
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 
