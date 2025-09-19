@@ -1844,7 +1844,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     }
 
                     closeBrace = openBrace.IsMissing
-                        ? CreateMissingToken(SyntaxKind.CloseBraceToken, this.CurrentToken.Kind, reportError: true)
+                        ? CreateMissingToken(SyntaxKind.CloseBraceToken, this.CurrentToken.Kind)
                         : this.EatToken(SyntaxKind.CloseBraceToken);
 
                     semicolon = TryEatToken(SyntaxKind.SemicolonToken);
