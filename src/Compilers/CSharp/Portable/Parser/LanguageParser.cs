@@ -1843,15 +1843,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                         }
                     }
 
-                    if (openBrace.IsMissing)
-                    {
-                        closeBrace = SyntaxFactory.MissingToken(SyntaxKind.CloseBraceToken);
-                        closeBrace = WithAdditionalDiagnostics(closeBrace, this.GetExpectedTokenError(SyntaxKind.CloseBraceToken, this.CurrentToken.Kind));
-                    }
-                    else
-                    {
-                        closeBrace = this.EatToken(SyntaxKind.CloseBraceToken);
-                    }
+                    closeBrace = openBrace.IsMissing
+                        ? CreateMissingToken(SyntaxKind.CloseBraceToken, this.CurrentToken.Kind, reportError: true)
+                        : this.EatToken(SyntaxKind.CloseBraceToken);
 
                     semicolon = TryEatToken(SyntaxKind.SemicolonToken);
                 }

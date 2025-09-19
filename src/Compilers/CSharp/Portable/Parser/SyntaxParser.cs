@@ -549,7 +549,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             return AddTrailingSkippedSyntax(replacement, this.EatToken());
         }
 
-        private SyntaxToken CreateMissingToken(SyntaxKind expected, SyntaxKind actual, bool reportError)
+        protected SyntaxToken CreateMissingToken(SyntaxKind expected, SyntaxKind actual, bool reportError)
         {
             // should we eat the current ParseToken's leading trivia?
             var token = SyntaxFactory.MissingToken(expected);
