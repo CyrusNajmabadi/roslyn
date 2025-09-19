@@ -4390,7 +4390,7 @@ class C
             ParseAndValidate(test,
                 // (4,26): error CS1528: Expected ; or = (cannot specify constructor arguments in declaration)
                 //     event System.Action E();
-                Diagnostic(ErrorCode.ERR_BadVarDecl, "(").WithLocation(4, 26),
+                Diagnostic(ErrorCode.ERR_BadVarDecl, "()").WithLocation(4, 26),
                 // (4,26): error CS1003: Syntax error, '[' expected
                 //     event System.Action E();
                 Diagnostic(ErrorCode.ERR_SyntaxError, "(").WithArguments("[").WithLocation(4, 26),
