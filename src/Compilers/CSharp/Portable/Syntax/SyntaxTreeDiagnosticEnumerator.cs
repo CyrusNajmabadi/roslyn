@@ -68,10 +68,10 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             TextSpan computeDiagnosticSpan(SyntaxDiagnosticInfo sdi, GreenNode node)
             {
-                if (isMissingNodeOrToken(node) || isSkippedToken(node))
+                if (isMissingNodeOrToken(node))
                 {
-                    var priorToken = findTokenThatEndsAtCurrentPosition(root, rootStartPosition, currentPosition);
-                    if (priorToken != null)
+                    var (beforeToken, afterToken) = findTokensBeforeAfterCurrentPosition(root, rootStartPosition, currentPosition);
+                    if (beforeToken != null)
                     {
                         // Missing nodes/tokens are handled specially.  They are reported at the start of the token that
                         // follows them (since that is the information the parser has when creating them).  However, that's
@@ -79,7 +79,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                         // To accomplish this, we use the previousNonTriviaNode to find the token before us.  And we see if
                         // it had any end-of-lines in it.  If so, we'll move the back as well
-                        var previousTrailingTrivia = priorToken.GetTrailingTriviaCore();
+                        var previousTrailingTrivia = beforeToken.GetTrailingTriviaCore();
                         var widthToSubtract = determineWidthToSubtract(previousTrailingTrivia);
                         if (widthToSubtract > 0)
                         {
@@ -88,11 +88,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                         }
                     }
 
-                    var currentToken = findTokenThatStartsAtCurrentPosition(root, rootStartPosition, currentPosition);
-                    if (currentToken != null)
+                    if (afterToken != null)
                     {
-                        var currentTokenStart = Math.Min(currentPosition + currentToken.GetLeadingTriviaWidth(), fullTreeLength);
-                        var currentTokenEnd = Math.Min(currentTokenStart + currentToken.Width, fullTreeLength);
+                        var currentTokenStart = Math.Min(currentPosition + afterToken.GetLeadingTriviaWidth(), fullTreeLength);
+                        var currentTokenEnd = Math.Min(currentTokenStart + afterToken.Width, fullTreeLength);
                         return TextSpan.FromBounds(currentTokenStart, currentTokenEnd);
                     }
                 }
@@ -110,89 +109,105 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return TextSpan.FromBounds(spanStart, spanEnd);
             }
 
-            static GreenNode? findTokenThatEndsAtCurrentPosition(GreenNode current, int currentFullStart, int desiredFullEndPosition)
+            static (GreenNode? beforeToken, GreenNode? afterToken) findTokensBeforeAfterCurrentPosition(GreenNode current, int currentFullStart, int desiredPosition)
             {
                 // If we're moved past the token we're lookign for, we won't it here.
-                if (currentFullStart > desiredFullEndPosition)
-                    return null;
+                if (currentFullStart > desiredPosition)
+                    return default;
 
                 if (current.IsToken)
                 {
-                    // We're looking at a token.  Return it if it's the one that ends at the position we're looking for.
-                    return currentFullStart + current.FullWidth == desiredFullEndPosition ? current : null;
+                    if (current.Width > 0)
+                    {
+                        if (currentFullStart == desiredPosition)
+                            return (beforeToken: null, afterToken: current);
+
+                        if (currentFullStart + current.FullWidth == desiredPosition)
+                            return (beforeToken: current, afterToken: null);
+                    }
+
+                    return default;
+                        //// We're looking at a token.  Return it if it's the one that ends at the position we're looking for.
+                        //return currentFullStart + current.FullWidth == desiredFullEndPosition ? current : null;
                 }
 
                 // Otherwise, we're before the token.  Recurse into children, skiping those that end before the position
                 // we're looking, and recursing into those that overlap it.
                 var currentChildFullStart = currentFullStart;
-                for (var i = 0; i < current.SlotCount; i++)
+                GreenNode? beforeNode = null, afterNode = null;
+                for (var i = 0; i < current.SlotCount && (beforeNode is null || afterNode is null); i++)
                 {
                     var child = current.GetSlot(i);
                     if (child is null || child.FullWidth == 0)
                         continue;
 
+                    // If we've moved past the searching point, we're done and can bail out immediately.
+                    if (currentChildFullStart > desiredPosition)
+                        break;
+
+                    // If this child is still before the position we're looking for, skip it.
                     var childFullEnd = currentChildFullStart + child.FullWidth;
-                    if (childFullEnd < desiredFullEndPosition)
+                    if (childFullEnd < desiredPosition)
                     {
                         currentChildFullStart += child.FullWidth;
                         continue;
                     }
-                    else
-                    {
-                        return findTokenThatEndsAtCurrentPosition(child, currentChildFullStart, desiredFullEndPosition);
-                    }
+
+                    var (currentBeforeNode, currentAfterNode) = findTokensBeforeAfterCurrentPosition(child, currentChildFullStart, desiredPosition);
+                    beforeNode ??= currentBeforeNode;
+                    afterNode ??= currentAfterNode;
                 }
 
-                return null;
+                return (beforeNode, afterNode);
             }
 
-            static GreenNode? findTokenThatStartsAtCurrentPosition(GreenNode? current, int currentFullStart, int desiredFullStartPosition)
-            {
-                if (current is null)
-                    return null;
+            //static GreenNode? findTokenThatStartsAtCurrentPosition(GreenNode? current, int currentFullStart, int desiredFullStartPosition)
+            //{
+            //    if (current is null)
+            //        return null;
 
-                // If we're moved past the token we're lookign for, we won't it here.
-                if (currentFullStart > desiredFullStartPosition)
-                    return null;
+            //    // If we're moved past the token we're lookign for, we won't it here.
+            //    if (currentFullStart > desiredFullStartPosition)
+            //        return null;
 
-                if (current.IsToken)
-                {
-                    if (current.Width > 0 && currentFullStart == desiredFullStartPosition)
-                        return current;
+            //    if (current.IsToken)
+            //    {
+            //        if (current.Width > 0 && currentFullStart == desiredFullStartPosition)
+            //            return current;
 
-                    // The token we're looking for might be skipped trailing trivia in this current token.
-                    if (current.ContainsSkippedText && currentFullStart + current.FullWidth > desiredFullStartPosition)
-                    {
-                        var trivia = current.GetTrailingTriviaCore();
-                        return findTokenThatStartsAtCurrentPosition(trivia, currentFullStart + current.Width, desiredFullStartPosition);
-                    }
+            //        // The token we're looking for might be skipped trailing trivia in this current token.
+            //        if (current.ContainsSkippedText && currentFullStart + current.FullWidth > desiredFullStartPosition)
+            //        {
+            //            var trivia = current.GetTrailingTriviaCore();
+            //            return findTokenThatStartsAtCurrentPosition(trivia, currentFullStart + current.Width, desiredFullStartPosition);
+            //        }
 
-                    return null;
-                }
+            //        return null;
+            //    }
 
-                // Otherwise, we're before the token.  Recurse into children, skiping those that end before the position
-                // we're looking, and recursing into those that overlap it.
-                var currentChildFullStart = currentFullStart;
-                for (var i = 0; i < current.SlotCount; i++)
-                {
-                    var child = current.GetSlot(i);
-                    if (child is null || child.FullWidth == 0)
-                        continue;
+            //    // Otherwise, we're before the token.  Recurse into children, skiping those that end before the position
+            //    // we're looking, and recursing into those that overlap it.
+            //    var currentChildFullStart = currentFullStart;
+            //    for (var i = 0; i < current.SlotCount; i++)
+            //    {
+            //        var child = current.GetSlot(i);
+            //        if (child is null || child.FullWidth == 0)
+            //            continue;
 
-                    var childFullEnd = currentChildFullStart + child.FullWidth;
-                    if (childFullEnd < desiredFullStartPosition)
-                    {
-                        currentChildFullStart += child.FullWidth;
-                        continue;
-                    }
-                    else
-                    {
-                        return findTokenThatStartsAtCurrentPosition(child, currentChildFullStart, desiredFullStartPosition);
-                    }
-                }
+            //        var childFullEnd = currentChildFullStart + child.FullWidth;
+            //        if (childFullEnd < desiredFullStartPosition)
+            //        {
+            //            currentChildFullStart += child.FullWidth;
+            //            continue;
+            //        }
+            //        else
+            //        {
+            //            return findTokenThatStartsAtCurrentPosition(child, currentChildFullStart, desiredFullStartPosition);
+            //        }
+            //    }
 
-                return null;
-            }
+            //    return null;
+            //}
 
             int determineWidthToSubtract([NotNullWhen(true)] GreenNode? trivia)
             {
