@@ -933,6 +933,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         internal SyntaxToken AddSkippedSyntax(SyntaxToken target, GreenNode skippedSyntax, bool trailing)
         {
             var builder = new SyntaxListBuilder(4);
+            if (trailing)
+                builder.AddRange(target.GetTrailingTrivia());
 
             // the error in we'll attach to the node
             SyntaxDiagnosticInfo diagnostic = null;
@@ -943,8 +945,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             int currentOffset = 0;
             foreach (var node in skippedSyntax.EnumerateNodes())
             {
-                SyntaxToken token = node as SyntaxToken;
-                if (token != null)
+                if (node is SyntaxToken token)
                 {
                     builder.Add(token.GetLeadingTrivia());
 
@@ -969,40 +970,30 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     }
                     else
                     {
-                        // do not create zero-width structured trivia, GetStructure doesn't work well for them
-                        var existing = (SyntaxDiagnosticInfo)token.GetDiagnostics().FirstOrDefault();
-                        if (existing != null)
-                        {
-                            diagnostic = existing;
-                            diagnosticOffset = currentOffset;
-                        }
+                        // Do not create zero-width structured trivia, GetStructure doesn't work well for them. But do
+                        // keep at least one diagnotic attached to the token and move it to the parent token.
+
+                        tryKeepOneDiagnostic(token);
                     }
+
                     builder.Add(token.GetTrailingTrivia());
 
                     currentOffset += token.FullWidth;
                 }
-                else if (node.ContainsDiagnostics && diagnostic == null)
+                else
                 {
-                    // only propagate the first error to reduce noise:
-                    var existing = (SyntaxDiagnosticInfo)node.GetDiagnostics().FirstOrDefault();
-                    if (existing != null)
-                    {
-                        diagnostic = existing;
-                        diagnosticOffset = currentOffset;
-                    }
+                    tryKeepOneDiagnostic(node);
                 }
             }
 
             int triviaWidth = currentOffset;
-            var trivia = builder.ToListNode();
 
             // total width of everything preceding the added trivia
             int triviaOffset;
             if (trailing)
             {
-                var trailingTrivia = target.GetTrailingTrivia();
                 triviaOffset = target.FullWidth; //added trivia is full width (before addition)
-                target = target.TokenWithTrailingTrivia(SyntaxList.Concat(trailingTrivia, trivia));
+                target = target.TokenWithTrailingTrivia(builder.ToListNode());
             }
             else
             {
@@ -1018,8 +1009,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     }
                 }
 
-                var leadingTrivia = target.GetLeadingTrivia();
-                target = target.TokenWithLeadingTrivia(SyntaxList.Concat(trivia, leadingTrivia));
+                builder.AddRange(target.GetLeadingTrivia());
+
+                target = target.TokenWithLeadingTrivia(builder.ToListNode());
                 triviaOffset = 0; //added trivia is first, so offset is zero
             }
 
@@ -1028,11 +1020,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 int newOffset = triviaOffset + diagnosticOffset + diagnostic.Offset;
 
                 target = WithAdditionalDiagnostics(target,
-                    new SyntaxDiagnosticInfo(newOffset, diagnostic.Width, (ErrorCode)diagnostic.Code, diagnostic.Arguments)
-                );
+                    new SyntaxDiagnosticInfo(
+                        newOffset, diagnostic.Width, (ErrorCode)diagnostic.Code, diagnostic.Arguments));
             }
 
             return target;
+
+            void tryKeepOneDiagnostic(GreenNode nodeOrToken)
+            {
+                if (nodeOrToken.ContainsDiagnostics)
+                {
+                    var existing = (SyntaxDiagnosticInfo)nodeOrToken.GetDiagnostics().FirstOrDefault();
+                    if (existing != null)
+                    {
+                        diagnostic = existing;
+                        diagnosticOffset = currentOffset;
+                    }
+                }
+            }
         }
 
         /// <summary>
