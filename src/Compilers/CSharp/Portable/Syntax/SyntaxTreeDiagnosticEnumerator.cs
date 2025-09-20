@@ -68,7 +68,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             TextSpan computeDiagnosticSpan(SyntaxDiagnosticInfo sdi, GreenNode node)
             {
-                if (isMissingNodeOrToken(node))
+                if (isMissingNodeOrToken(node) || isSkippedToken(node))
                 {
                     var priorToken = findTokenThatEndsAtCurrentPosition(root, rootStartPosition, currentPosition);
                     if (priorToken != null)
