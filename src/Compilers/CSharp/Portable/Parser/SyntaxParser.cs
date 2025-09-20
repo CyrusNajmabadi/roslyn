@@ -947,32 +947,32 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             {
                 if (node is SyntaxToken token)
                 {
-                    builder.Add(token.GetLeadingTrivia());
-
                     if (token.Width > 0)
                     {
-                        // separate trivia from the tokens
-                        SyntaxToken tk = token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null);
-
                         // adjust relative offsets of diagnostics attached to the token:
-                        int leadingWidth = token.GetLeadingTriviaWidth();
-                        if (leadingWidth > 0)
+                        //int leadingWidth = token.GetLeadingTriviaWidth();
+                        //if (leadingWidth > 0)
+                        //{
+                        var tokenDiagnostics = token.GetDiagnostics();
+                        for (int i = 0; i < tokenDiagnostics.Length; i++)
                         {
-                            var tokenDiagnostics = tk.GetDiagnostics();
-                            for (int i = 0; i < tokenDiagnostics.Length; i++)
-                            {
-                                var d = (SyntaxDiagnosticInfo)tokenDiagnostics[i];
-                                tokenDiagnostics[i] = new SyntaxDiagnosticInfo(d.Offset - leadingWidth, d.Width, (ErrorCode)d.Code, d.Arguments);
-                            }
+                            var d = (SyntaxDiagnosticInfo)tokenDiagnostics[i];
+                            var (offset, width) = computeFinalSkippedTokenDiagnosticSpan(builder, d, token.GetLeadingTriviaWidth());
+                            //    tokenDiagnostics[i] = new SyntaxDiagnosticInfo(d.Offset - leadingWidth, d.Width, (ErrorCode)d.Code, d.Arguments);
+                            tokenDiagnostics[i] = new SyntaxDiagnosticInfo(offset, width, (ErrorCode)d.Code, d.Arguments);
                         }
+                        // }
+                        builder.Add(token.GetLeadingTrivia());
 
-                        builder.Add(SyntaxFactory.SkippedTokensTrivia(tk));
+                        // separate trivia from the token, and add just the content of it as one SkippedTokensTrivia.
+                        builder.Add(SyntaxFactory.SkippedTokensTrivia(
+                            token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null)));
                     }
                     else
                     {
                         // Do not create zero-width structured trivia, GetStructure doesn't work well for them. But do
                         // keep at least one diagnotic attached to the token and move it to the parent token.
-
+                        builder.Add(token.GetLeadingTrivia());
                         tryKeepOneDiagnostic(token);
                     }
 
@@ -1028,15 +1028,55 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
             void tryKeepOneDiagnostic(GreenNode nodeOrToken)
             {
-                if (nodeOrToken.ContainsDiagnostics)
+                var existing = (SyntaxDiagnosticInfo)nodeOrToken.GetDiagnostics().FirstOrDefault();
+                if (existing != null)
                 {
-                    var existing = (SyntaxDiagnosticInfo)nodeOrToken.GetDiagnostics().FirstOrDefault();
-                    if (existing != null)
-                    {
-                        diagnostic = existing;
-                        diagnosticOffset = currentOffset;
-                    }
+                    diagnostic = existing;
+                    diagnosticOffset = currentOffset;
                 }
+            }
+
+            static (int offset, int width) computeFinalSkippedTokenDiagnosticSpan(
+                SyntaxListBuilder builder, SyntaxDiagnosticInfo info, int leadingTriviaWidth)
+            {
+                var containsNewLine = false;
+                var additionalWidthToRemove = 0;
+                for (var i = builder.Count - 1; i >= 0; i--)
+                {
+                    var trivia = builder[i];
+
+                    if (trivia.RawKind == (int)SyntaxKind.EndOfLineTrivia)
+                    {
+                        containsNewLine = true;
+                    }
+                    else if (trivia.IsSkippedTokensTrivia)
+                    {
+                        break;
+                    }
+
+                    additionalWidthToRemove += trivia.FullWidth;
+                }
+
+                // If there's no preceding newline, just leave the offset/width alone (except adjusted for the leading
+                // trivia we're disconnecting and moving to the target token).
+                if (!containsNewLine)
+                    return (info.Offset - leadingTriviaWidth, info.Width);
+
+                // If there was a newline in the trivia before the sipped token, move the diagnostic to prior to that
+                // point, and make zero length, to indicate there was a missing token where the skipped token appeared.
+                return (-(leadingTriviaWidth + additionalWidthToRemove), width: 0);
+                //    var initialOffset = info.Offset;
+
+                //// Remove the offset that is normally added because of the leading trivia itself. Because we're moving
+                //// that and adding that to the parent's trivia list we don't want to double count that in the offsets.
+                //var adjustedOffsetAfterRemovingLeadingTrivia = initialOffset - leadingTriviaWidth;
+
+
+                //if (!containsNewLine)
+                //    return (-(leadingTriviaWidth, info.Width);
+
+                //return (
+                //    adjustedOffsetAfterRemovingLeadingTrivia - additionalWidthToRemove, 0);
             }
         }
 
