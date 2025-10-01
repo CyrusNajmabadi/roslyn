@@ -22,7 +22,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
 {
     public static readonly IVirtualCharService Instance = new CSharpVirtualCharService();
 
-    private static readonly ObjectPool<ImmutableSegmentedList<VirtualChar>.Builder> s_pooledBuilders = new(() => ImmutableSegmentedList.CreateBuilder<VirtualChar>());
+    private static readonly ObjectPool<ImmutableSegmentedList<VirtualCharGreen>.Builder> s_pooledBuilders = new(() => ImmutableSegmentedList.CreateBuilder<VirtualCharGreen>());
 
     protected CSharpVirtualCharService()
     {
@@ -131,7 +131,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
         var tokenText = token.Text;
         var offset = token.SpanStart;
 
-        var result = ImmutableSegmentedList.CreateBuilder<VirtualChar>();
+        var result = ImmutableSegmentedList.CreateBuilder<VirtualCharGreen>();
 
         var startIndexInclusive = 0;
         var endIndexExclusive = tokenText.Length;
@@ -156,7 +156,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
         }
 
         for (var index = startIndexInclusive; index < endIndexExclusive;)
-            index += ConvertTextAtIndexToRune(tokenText, index, result, offset);
+            index += ConvertTextAtIndexToRune(tokenText, index, result);
 
         return CreateVirtualCharSequence(tokenText, offset, startIndexInclusive, endIndexExclusive, result);
     }
@@ -199,7 +199,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
         // include the line contents for the line that has the final `    """` on it.
         var lastLineExclusive = tokenIncludeDelimiters ? tokenSourceText.Lines.Count - 1 : tokenSourceText.Lines.Count;
 
-        var result = ImmutableSegmentedList.CreateBuilder<VirtualChar>();
+        var result = ImmutableSegmentedList.CreateBuilder<VirtualCharGreen>();
         for (var lineNumber = startLineInclusive; lineNumber < lastLineExclusive; lineNumber++)
         {
             var currentLine = tokenSourceText.Lines[lineNumber];
@@ -221,7 +221,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
             // Now that we've found the start and end portions of that line, convert all the characters within to
             // virtual chars and return.
             for (var i = lineStart; i < lineEnd;)
-                i += ConvertTextAtIndexToRune(tokenSourceText, i, result, token.SpanStart);
+                i += ConvertTextAtIndexToRune(tokenSourceText, i, result);
         }
 
         return VirtualCharSequence.Create(result.ToImmutable());
@@ -258,7 +258,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
         // again, trying to create Runes from the 16-bit-chars. We do this to simplify complex cases where we may
         // have escapes and non-escapes mixed together.
 
-        using var _ = ArrayBuilder<(char ch, TextSpan span)>.GetInstance(out var charResults);
+        using var _ = ArrayBuilder<(char ch, int width)>.GetInstance(out var charResults);
 
         // First pass, just convert everything in the string (i.e. escapes) to plain 16-bit characters.
         for (var index = startIndexInclusive; index < endIndexExclusive;)
@@ -266,22 +266,22 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
             var ch = tokenText[index];
             if (ch == '\\')
             {
-                if (!TryAddEscape(charResults, tokenText, offset, index))
+                if (!TryAddEscape(charResults, tokenText, index))
                     return default;
 
-                index += charResults.Last().span.Length;
+                index += charResults.Last().width;
             }
             else if (escapeBraces && IsOpenOrCloseBrace(ch))
             {
-                if (!IsLegalBraceEscape(tokenText, index, offset, out var braceSpan))
+                if (!IsLegalBraceEscape(tokenText, index, out var braceWidth))
                     return default;
 
-                charResults.Add((ch, braceSpan));
-                index += charResults.Last().span.Length;
+                charResults.Add((ch, braceWidth));
+                index += braceWidth;
             }
             else
             {
-                charResults.Add((ch, new TextSpan(offset + index, 1)));
+                charResults.Add((ch, width: 1));
                 index++;
             }
         }
@@ -305,7 +305,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
     }
 
     private static VirtualCharSequence CreateVirtualCharSequence(
-        string tokenText, int offset, int startIndexInclusive, int endIndexExclusive, ArrayBuilder<(char ch, TextSpan span)> charResults)
+        string tokenText, int offset, int startIndexInclusive, int endIndexExclusive, ArrayBuilder<(char ch, int width)> charResults)
     {
         // Second pass.  Convert those characters to Runes.
         using var pooledRuneResults = s_pooledBuilders.GetPooledObject();
@@ -324,16 +324,16 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
         }
     }
 
-    private static void ConvertCharactersToRunes(ArrayBuilder<(char ch, TextSpan span)> charResults, ImmutableSegmentedList<VirtualChar>.Builder runeResults)
+    private static void ConvertCharactersToRunes(ArrayBuilder<(char ch, int width)> charResults, ImmutableSegmentedList<VirtualCharGreen>.Builder runeResults)
     {
         for (var i = 0; i < charResults.Count;)
         {
-            var (ch, span) = charResults[i];
+            var (ch, width) = charResults[i];
 
             // First, see if this was a valid single char that can become a Rune.
             if (Rune.TryCreate(ch, out var rune))
             {
-                runeResults.Add(VirtualChar.Create(rune, span));
+                runeResults.Add(VirtualCharGreen.Create(rune, width));
                 i++;
                 continue;
             }
@@ -341,10 +341,10 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
             // Next, see if we got at least a surrogate pair that can be converted into a Rune.
             if (i + 1 < charResults.Count)
             {
-                var (nextCh, nextSpan) = charResults[i + 1];
+                var (nextCh, nextWidth) = charResults[i + 1];
                 if (Rune.TryCreate(ch, nextCh, out rune))
                 {
-                    runeResults.Add(VirtualChar.Create(rune, TextSpan.FromBounds(span.Start, nextSpan.End)));
+                    runeResults.Add(VirtualCharGreen.Create(rune, width: width + nextWidth));
                     i += 2;
                     continue;
                 }
@@ -352,26 +352,26 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
 
             // Had an unpaired surrogate.
             Debug.Assert(char.IsSurrogate(ch));
-            runeResults.Add(VirtualChar.Create(ch, span));
+            runeResults.Add(VirtualCharGreen.Create(ch, width));
             i++;
         }
     }
 
     private static bool TryAddEscape(
-        ArrayBuilder<(char ch, TextSpan span)> result, string tokenText, int offset, int index)
+        ArrayBuilder<(char ch, int width)> result, string tokenText, int index)
     {
         // Copied from Lexer.ScanEscapeSequence.
         Debug.Assert(tokenText[index] == '\\');
 
-        return TryAddSingleCharacterEscape(result, tokenText, offset, index) ||
-               TryAddMultiCharacterEscape(result, tokenText, offset, index);
+        return TryAddSingleCharacterEscape(result, tokenText, index) ||
+               TryAddMultiCharacterEscape(result, tokenText, index);
     }
 
     public override bool TryGetEscapeCharacter(VirtualChar ch, out char escapedChar)
         => ch.TryGetEscapeCharacter(out escapedChar);
 
     private static bool TryAddSingleCharacterEscape(
-        ArrayBuilder<(char ch, TextSpan span)> result, string tokenText, int offset, int index)
+        ArrayBuilder<(char ch, int width)> result, string tokenText, int index)
     {
         // Copied from Lexer.ScanEscapeSequence.
         Debug.Assert(tokenText[index] == '\\');
@@ -400,12 +400,12 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
                 return false;
         }
 
-        result.Add((ch, new TextSpan(offset + index, 2)));
+        result.Add((ch, width: 2));
         return true;
     }
 
     private static bool TryAddMultiCharacterEscape(
-        ArrayBuilder<(char ch, TextSpan span)> result, string tokenText, int offset, int index)
+        ArrayBuilder<(char ch, int width)> result, string tokenText, int index)
     {
         // Copied from Lexer.ScanEscapeSequence.
         Debug.Assert(tokenText[index] == '\\');
@@ -416,7 +416,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
             case 'x':
             case 'u':
             case 'U':
-                return TryAddMultiCharacterEscape(result, tokenText, offset, index, ch);
+                return TryAddMultiCharacterEscape(result, tokenText, index, ch);
             default:
                 Debug.Fail("This should not be reachable as long as the compiler added no diagnostics.");
                 return false;
@@ -424,7 +424,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
     }
 
     private static bool TryAddMultiCharacterEscape(
-        ArrayBuilder<(char ch, TextSpan span)> result, string tokenText, int offset, int index, char character)
+        ArrayBuilder<(char ch, int width)> result, string tokenText, int index, char character)
     {
         var startIndex = index;
         Debug.Assert(tokenText[index] == '\\');
@@ -467,7 +467,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
                 // something like \U0000000A
                 //
                 // Represents a single char value.
-                result.Add(((char)uintChar, new TextSpan(startIndex + offset, 2 + 8)));
+                result.Add(((char)uintChar, width: 2 + 8));
                 return true;
             }
             else
@@ -477,9 +477,8 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
                 var highSurrogate = ((uintChar - 0x00010000) / 0x0400) + 0xD800;
 
                 // Encode this as a surrogate pair.
-                var pos = startIndex + offset;
-                result.Add(((char)highSurrogate, new TextSpan(pos, 0)));
-                result.Add(((char)lowSurrogate, new TextSpan(pos, 2 + 8)));
+                result.Add(((char)highSurrogate, width: 0));
+                result.Add(((char)lowSurrogate, width: 2 + 8));
                 return true;
             }
         }
@@ -507,7 +506,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
             }
 
             character = (char)intChar;
-            result.Add((character, new TextSpan(startIndex + offset, 2 + 4)));
+            result.Add((character, width: 2 + 4));
             return true;
         }
         else
@@ -537,7 +536,7 @@ internal class CSharpVirtualCharService : AbstractVirtualCharService
             }
 
             character = (char)intChar;
-            result.Add((character, TextSpan.FromBounds(startIndex + offset, endIndex + offset)));
+            result.Add((character, width: endIndex - startIndex));
             return true;
         }
     }
