@@ -9,24 +9,18 @@ using Microsoft.CodeAnalysis.Text;
 namespace Microsoft.CodeAnalysis.EmbeddedLanguages.VirtualChars;
 
 /// <summary>
-/// <see cref="VirtualChar"/> provides a uniform view of a language's string token characters regardless if they
-/// were written raw in source, or are the production of a language escape sequence.  For example, in C#, in a
-/// normal <c>""</c> string a <c>Tab</c> character can be written either as the raw tab character (value <c>9</c> in
-/// ASCII),  or as <c>\t</c>.  The format is a single character in the source, while the latter is two characters
-/// (<c>\</c> and <c>t</c>).  <see cref="VirtualChar"/> will represent both, providing the raw <see cref="char"/>
-/// value of <c>9</c> as well as what <see cref="TextSpan"/> in the original <see cref="SourceText"/> they occupied.
-/// </summary>
-/// <remarks>
-/// A core consumer of this system is the Regex parser.  That parser wants to work over an array of characters,
-/// however this array of characters is not the same as the array of characters a user types into a string in C# or
-/// VB. For example In C# someone may write: @"\z".  This should appear to the user the same as if they wrote "\\z"
-/// and the same as "\\\u007a".  However, as these all have wildly different presentations for the user, there needs
-/// to be a way to map back the characters it sees ( '\' and 'z' ) back to the  ranges of characters the user wrote.
-/// </remarks>
-internal readonly record struct VirtualChar : IComparable<VirtualChar>, IComparable<char>
+/// <see cref="VirtualCharGreen"/> provides a uniform view of a language's string token characters regardless if they
+/// were written raw in source, or are the production of a language escape sequence.  For example, in C#, in a normal
+/// <c>""</c> string a <c>Tab</c> character can be written either as the raw tab character (value <c>9</c> in ASCII), or
+/// as <c>\t</c>.  The format is a single character in the source, while the latter is two characters (<c>\</c> and
+/// <c>t</c>).  <see cref="VirtualCharGreen"/> will represent both, providing the raw <see cref="char"/> value of
+/// <c>9</c>, and the width of the span in the original source that they occupied.  Note that the actual position is not
+/// represented in the 'green' node, but is instead tracked by the parent <see cref="VirtualChar"/>.  This allows reuse
+/// of green nodes across a document as it is edited, with realization into the red form only happening when needed.
+internal readonly record struct VirtualCharGreen : IComparable<VirtualCharGreen>, IComparable<char>
 {
     /// <summary>
-    /// The value of this <see cref="VirtualChar"/> as a <see cref="Rune"/> if such a representation is possible.
+    /// The value of this <see cref="VirtualCharGreen"/> as a <see cref="Rune"/> if such a representation is possible.
     /// <see cref="Rune"/>s can represent Unicode codepoints that can appear in a <see cref="string"/> except for
     /// unpaired surrogates.  If an unpaired high or low surrogate character is present, this value will be <see
     /// cref="Rune.ReplacementChar"/>.  The value of this character can be retrieved from
@@ -41,42 +35,44 @@ internal readonly record struct VirtualChar : IComparable<VirtualChar>, ICompara
     public readonly char SurrogateChar;
 
     /// <summary>
-    /// The span of characters in the original <see cref="SourceText"/> that represent this <see
-    /// cref="VirtualChar"/>.
+    /// The width of characters in the original <see cref="SourceText"/> that represent this <see
+    /// cref="VirtualCharGreen"/>.  For example an actual tab-character ('9' in ASCII) will have a width of 1, while the
+    /// sequence <c>\t</c> would have a width of 2.  Generally, widths will be between 1 (normal characters in source
+    /// that represent exactly what their value) and up to potentially 10 (for a <c>\UXXXXXXXX</c> sequence).
     /// </summary>
-    public readonly TextSpan Span;
+    public readonly int Width;
 
     /// <summary>
-    /// Creates a new <see cref="VirtualChar"/> from the provided <paramref name="rune"/>.  This operation cannot
+    /// Creates a new <see cref="VirtualCharGreen"/> from the provided <paramref name="rune"/>.  This operation cannot
     /// fail.
     /// </summary>
-    public static VirtualChar Create(Rune rune, TextSpan span)
-        => new(rune, surrogateChar: default, span);
+    public static VirtualCharGreen Create(Rune rune, int width)
+        => new(rune, surrogateChar: default, width);
 
     /// <summary>
-    /// Creates a new <see cref="VirtualChar"/> from an unpaired high or low surrogate character.  This will throw
+    /// Creates a new <see cref="VirtualCharGreen"/> from an unpaired high or low surrogate character.  This will throw
     /// if <paramref name="surrogateChar"/> is not actually a surrogate character. The resultant <see cref="Rune"/>
     /// value will be <see cref="Rune.ReplacementChar"/>.
     /// </summary>
-    public static VirtualChar Create(char surrogateChar, TextSpan span)
+    public static VirtualCharGreen Create(char surrogateChar, int width)
     {
         if (!char.IsSurrogate(surrogateChar))
             throw new ArgumentException(nameof(surrogateChar));
 
-        return new VirtualChar(rune: Rune.ReplacementChar, surrogateChar, span);
+        return new VirtualCharGreen(rune: Rune.ReplacementChar, surrogateChar, width);
     }
 
-    private VirtualChar(Rune rune, char surrogateChar, TextSpan span)
+    private VirtualCharGreen(Rune rune, char surrogateChar, int width)
     {
         Contract.ThrowIfFalse(surrogateChar == 0 || rune == Rune.ReplacementChar,
             "If surrogateChar is provided then rune must be Rune.ReplacementChar");
 
-        if (span.IsEmpty)
-            throw new ArgumentException("Span should not be empty.", nameof(span));
+        if (width == 0)
+            throw new ArgumentException("Width must be non-zero.", nameof(width));
 
         Rune = rune;
         SurrogateChar = surrogateChar;
-        Span = span;
+        Width = width;
     }
 
     /// <summary>
@@ -103,8 +99,148 @@ internal readonly record struct VirtualChar : IComparable<VirtualChar>, ICompara
 
     #region equality
 
-    public static bool operator ==(VirtualChar ch1, char ch2)
+    public static bool operator ==(VirtualCharGreen ch1, char ch2)
         => ch1.Value == ch2;
+
+    public static bool operator !=(VirtualCharGreen ch1, char ch2)
+        => !(ch1 == ch2);
+
+    #endregion
+
+    #region string operations
+
+    /// <inheritdoc/>
+    public override string ToString()
+        => SurrogateChar != 0 ? SurrogateChar.ToString() : Rune.ToString();
+
+    public void AppendTo(StringBuilder builder)
+    {
+        if (SurrogateChar != 0)
+        {
+            builder.Append(SurrogateChar);
+            return;
+        }
+
+        Span<char> chars = stackalloc char[2];
+
+        var length = Rune.EncodeToUtf16(chars);
+        builder.Append(chars[0]);
+        if (length == 2)
+            builder.Append(chars[1]);
+    }
+
+    #endregion
+
+    #region comparable
+
+    public int CompareTo(VirtualCharGreen other)
+        => this.Value - other.Value;
+
+    public static bool operator <(VirtualCharGreen ch1, VirtualCharGreen ch2)
+        => ch1.Value < ch2.Value;
+
+    public static bool operator <=(VirtualCharGreen ch1, VirtualCharGreen ch2)
+        => ch1.Value <= ch2.Value;
+
+    public static bool operator >(VirtualCharGreen ch1, VirtualCharGreen ch2)
+        => ch1.Value > ch2.Value;
+
+    public static bool operator >=(VirtualCharGreen ch1, VirtualCharGreen ch2)
+        => ch1.Value >= ch2.Value;
+
+    public int CompareTo(char other)
+        => this.Value - other;
+
+    public static bool operator <(VirtualCharGreen ch1, char ch2)
+        => ch1.Value < ch2;
+
+    public static bool operator <=(VirtualCharGreen ch1, char ch2)
+        => ch1.Value <= ch2;
+
+    public static bool operator >(VirtualCharGreen ch1, char ch2)
+        => ch1.Value > ch2;
+
+    public static bool operator >=(VirtualCharGreen ch1, char ch2)
+        => ch1.Value >= ch2;
+
+    #endregion
+}
+
+/// <summary>
+/// <see cref="VirtualChar"/> provides a uniform view of a language's string token characters regardless if they
+/// were written raw in source, or are the production of a language escape sequence.  For example, in C#, in a
+/// normal <c>""</c> string a <c>Tab</c> character can be written either as the raw tab character (value <c>9</c> in
+/// ASCII),  or as <c>\t</c>.  The format is a single character in the source, while the latter is two characters
+/// (<c>\</c> and <c>t</c>).  <see cref="VirtualChar"/> will represent both, providing the raw <see cref="char"/>
+/// value of <c>9</c> as well as what <see cref="TextSpan"/> in the original <see cref="SourceText"/> they occupied.
+/// </summary>
+/// <remarks>
+/// A core consumer of this system is the Regex parser.  That parser wants to work over an array of characters,
+/// however this array of characters is not the same as the array of characters a user types into a string in C# or
+/// VB. For example In C# someone may write: @"\z".  This should appear to the user the same as if they wrote "\\z"
+/// and the same as "\\\u007a".  However, as these all have wildly different presentations for the user, there needs
+/// to be a way to map back the characters it sees ( '\' and 'z' ) back to the  ranges of characters the user wrote.
+/// </remarks>
+internal readonly record struct VirtualChar : IComparable<VirtualChar>, IComparable<char>
+{
+    private readonly VirtualCharGreen _green;
+    private readonly int _position;
+
+    /// <inheritdoc cref="VirtualCharGreen.Rune"/>
+    public Rune Rune => _green.Rune;
+
+    /// <inheritdoc cref="VirtualCharGreen.SurrogateChar"/>
+    public char SurrogateChar => _green.SurrogateChar;
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public TextSpan Span => new(_position, _green.Width);
+
+    /// <summary>
+    /// Creates a new <see cref="VirtualChar"/> from the provided <paramref name="rune"/>.  This operation cannot
+    /// fail.
+    /// </summary>
+    public static VirtualChar Create(Rune rune, TextSpan span)
+        => new(VirtualCharGreen.Create(rune, span.Length), span.Start);
+
+    /// <summary>
+    /// Creates a new <see cref="VirtualChar"/> from an unpaired high or low surrogate character.  This will throw
+    /// if <paramref name="surrogateChar"/> is not actually a surrogate character. The resultant <see cref="Rune"/>
+    /// value will be <see cref="Rune.ReplacementChar"/>.
+    /// </summary>
+    public static VirtualChar Create(char surrogateChar, TextSpan span)
+        => new(VirtualCharGreen.Create(surrogateChar, span.Length), span.Start);
+
+    private VirtualChar(VirtualCharGreen green, int position)
+    {
+        if (position < 0)
+            throw new ArgumentException("Position must be non-negative.", nameof(position));
+
+        _green = green;
+        _position = position;
+    }
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public int Value => _green.Value;
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public bool IsDigit => _green.IsDigit;
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public bool IsLetter => _green.IsLetter;
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public bool IsLetterOrDigit => _green.IsLetterOrDigit;
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public bool IsWhiteSpace => _green.IsWhiteSpace;
+
+    /// <inheritdoc cref="VirtualCharGreen.IsWhiteSpace"/>
+    public int Utf16SequenceLength => _green.Utf16SequenceLength;
+
+    #region equality
+
+    public static bool operator ==(VirtualChar ch1, char ch2)
+        => ch1._green == ch2;
 
     public static bool operator !=(VirtualChar ch1, char ch2)
         => !(ch1 == ch2);
@@ -138,34 +274,34 @@ internal readonly record struct VirtualChar : IComparable<VirtualChar>, ICompara
     #region comparable
 
     public int CompareTo(VirtualChar other)
-        => this.Value - other.Value;
+        => _green.CompareTo(other._green);
 
     public static bool operator <(VirtualChar ch1, VirtualChar ch2)
-        => ch1.Value < ch2.Value;
+        => ch1._green < ch2._green;
 
     public static bool operator <=(VirtualChar ch1, VirtualChar ch2)
-        => ch1.Value <= ch2.Value;
+        => ch1._green <= ch2._green;
 
     public static bool operator >(VirtualChar ch1, VirtualChar ch2)
-        => ch1.Value > ch2.Value;
+        => ch1._green > ch2._green;
 
     public static bool operator >=(VirtualChar ch1, VirtualChar ch2)
-        => ch1.Value >= ch2.Value;
+        => ch1._green >= ch2._green;
 
     public int CompareTo(char other)
-        => this.Value - other;
+        => this._green.CompareTo(other);
 
     public static bool operator <(VirtualChar ch1, char ch2)
-        => ch1.Value < ch2;
+        => ch1._green < ch2;
 
     public static bool operator <=(VirtualChar ch1, char ch2)
-        => ch1.Value <= ch2;
+        => ch1._green <= ch2;
 
     public static bool operator >(VirtualChar ch1, char ch2)
-        => ch1.Value > ch2;
+        => ch1._green > ch2;
 
     public static bool operator >=(VirtualChar ch1, char ch2)
-        => ch1.Value >= ch2;
+        => ch1._green >= ch2;
 
     #endregion
 }
