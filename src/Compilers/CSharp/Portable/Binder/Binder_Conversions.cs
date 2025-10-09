@@ -819,8 +819,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 _ = GetSpecialTypeMember(SpecialMember.System_Nullable_T__ctor, diagnostics, syntax: node.Syntax);
             }
 
-            var converter = new CollectionExpressionConverter(
-                node, targetType, conversion, diagnostics);
+            var converter = new CollectionExpressionConverter(this, node, targetType, conversion, diagnostics);
             return converter.Do();
         }
 
@@ -867,7 +866,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _diagnostics.Add(ErrorCode.ERR_CollectionRefLikeElementType, _node.Syntax);
                 }
 
-                var result = tryConvertCollectionExpression(collectionTypeKind, elementType, constructor);
+                var result = TryConvertCollectionExpression(collectionTypeKind, elementType, constructor);
                 if (result is null)
                     return _binder.BindCollectionExpressionForErrorRecovery(_node, _targetType, inConversion: true, _diagnostics);
 
@@ -877,7 +876,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return result;
             }
 
-            private BoundCollectionExpression? tryConvertCollectionExpression(
+            private BoundCollectionExpression? TryConvertCollectionExpression(
                 CollectionExpressionTypeKind collectionTypeKind,
                 TypeSymbol elementType,
                 MethodSymbol? constructor)
@@ -897,7 +896,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 // Specialized handling for ienumerable-based normal collections.  These defer to the behavior we had
                 // since C# 3.0 where we will determine which .Add methods to call on an element by element basis.
                 if (collectionTypeKind == CollectionExpressionTypeKind.ImplementsIEnumerable)
-                    return TryConvertCollectionExpressionImplementsIEnumerableType(elementType, constructor);
+                    return TryConvertCollectionExpressionImplementsIEnumerableType(constructor);
 
                 if (collectionTypeKind is CollectionExpressionTypeKind.ArrayInterface ||
                     hasSpreadElements)
@@ -916,22 +915,19 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 var elements = BindElements(elementType);
 
-                switch (collectionTypeKind)
+                return collectionTypeKind switch
                 {
-                    case CollectionExpressionTypeKind.Array:
-                    case CollectionExpressionTypeKind.Span:
-                    case CollectionExpressionTypeKind.ReadOnlySpan:
-                        return TryConvertCollectionExpressionArrayOrSpanType(collectionTypeKind, elementType, elements);
+                    CollectionExpressionTypeKind.Array or CollectionExpressionTypeKind.Span or CollectionExpressionTypeKind.ReadOnlySpan
+                        => TryConvertCollectionExpressionArrayOrSpanType(collectionTypeKind, elements),
 
-                    case CollectionExpressionTypeKind.ArrayInterface:
-                        return TryConvertCollectionExpressionArrayInterfaceType(elementType, elements);
+                    CollectionExpressionTypeKind.ArrayInterface
+                        => TryConvertCollectionExpressionArrayInterfaceType(elements),
 
-                    case CollectionExpressionTypeKind.CollectionBuilder:
-                        return TryConvertCollectionExpressionBuilderType(elementType, elements);
+                    CollectionExpressionTypeKind.CollectionBuilder
+                        => TryConvertCollectionExpressionBuilderType(elements),
 
-                    default:
-                        throw ExceptionUtilities.UnexpectedValue(collectionTypeKind);
-                }
+                    _ => throw ExceptionUtilities.UnexpectedValue(collectionTypeKind),
+                };
             }
 
             private ImmutableArray<BoundNode> BindElements(TypeSymbol elementType)
@@ -969,7 +965,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return builder.ToImmutableAndFree();
             }
 
-            private BoundNode BindSpreadElement(
+            private readonly BoundNode BindSpreadElement(
                 BoundCollectionExpressionSpreadElement element, TypeSymbol elementType, Conversion elementConversion)
             {
                 var enumeratorInfo = element.EnumeratorInfoOpt;
@@ -998,7 +994,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             private BoundCollectionExpression? TryConvertCollectionExpressionImplementsIEnumerableType(
-                TypeSymbol elementType,
                 MethodSymbol? constructor)
             {
                 var syntax = _node.Syntax;
@@ -1077,7 +1072,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             private BoundCollectionExpression? TryConvertCollectionExpressionArrayOrSpanType(
                 CollectionExpressionTypeKind collectionTypeKind,
-                TypeSymbol elementType,
                 ImmutableArray<BoundNode> elements)
             {
                 var syntax = _node.Syntax;
@@ -1116,9 +1110,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _targetType);
             }
 
-            private BoundCollectionExpression? tryConvertCollectionExpressionArrayInterfaceType(
-                TypeSymbol elementType,
-                ImmutableArray<BoundNode> elements)
+            private BoundCollectionExpression? TryConvertCollectionExpressionArrayInterfaceType(ImmutableArray<BoundNode> elements)
             {
                 var syntax = _node.Syntax;
 
@@ -1139,20 +1131,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _targetType);
             }
 
-            private BoundCollectionExpression? tryConvertCollectionExpressionBuilderType(
-                TypeSymbol elementType,
-                ImmutableArray<BoundNode> elements,
-                BindingDiagnosticBag diagnostics)
+            private BoundCollectionExpression? TryConvertCollectionExpressionBuilderType(ImmutableArray<BoundNode> elements)
             {
                 var syntax = _node.Syntax;
 
                 var (collectionCreation, collectionBuilderMethod, collectionBuilderElementsPlaceholder) = BindCollectionBuilderInfo();
                 if (collectionCreation is null || collectionBuilderMethod is null || collectionBuilderElementsPlaceholder is null)
                     return null;
-
-                var lastParameterType = collectionBuilderMethod.Parameters.Last().Type;
-                Debug.Assert(lastParameterType.IsReadOnlySpan());
-                elementType = ((NamedTypeSymbol)lastParameterType).TypeArgumentsWithAnnotationsNoUseSiteDiagnostics[0].Type;
 
                 return new BoundCollectionExpression(
                     syntax,
@@ -1328,12 +1313,12 @@ namespace Microsoft.CodeAnalysis.CSharp
                 if (_targetType is NamedTypeSymbol namedType)
                 {
                     var binder = new ParamsCollectionTypeInProgressBinder(namedType, _binder, constructor);
-                    collectionCreation = binder.BindClassCreationExpression(syntax, namedType.Name, syntax, namedType, analyzedArguments, diagnostics);
+                    collectionCreation = binder.BindClassCreationExpression(syntax, namedType.Name, syntax, namedType, analyzedArguments, _diagnostics);
                     collectionCreation.WasCompilerGenerated = true;
                 }
                 else if (_targetType is TypeParameterSymbol typeParameter)
                 {
-                    collectionCreation = BindTypeParameterCreationExpression(syntax, typeParameter, analyzedArguments, initializerOpt: null, typeSyntax: syntax, wasTargetTyped: true, diagnostics);
+                    collectionCreation = _binder.BindTypeParameterCreationExpression(syntax, typeParameter, analyzedArguments, initializerOpt: null, typeSyntax: syntax, wasTargetTyped: true, _diagnostics);
                     collectionCreation.WasCompilerGenerated = true;
                 }
                 else
@@ -1401,7 +1386,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     withElement.Arguments, withElement.ArgumentRefKindsOpt, withElement.ArgumentNamesOpt);
 
                 // Now perform overload resolution given only those two constructors and no others.
-                if (TryPerformOverloadResolutionWithConstructorSubset(
+                if (_binder.TryPerformOverloadResolutionWithConstructorSubset(
                         constructedListType,
                         ref candidateConstructors,
                         candidateConstructors,
@@ -1414,12 +1399,12 @@ namespace Microsoft.CodeAnalysis.CSharp
                         ref useSiteInfo,
                         isParamsModifierValidation: false))
                 {
-                    return BindClassCreationExpressionContinued(
-                        withSyntax, withSyntax, constructedListType, analyzedArguments, initializerSyntaxOpt: null, initializerTypeOpt: null, wasTargetTyped: false, memberResolutionResult, candidateConstructors, useSiteInfo, diagnostics);
+                    return _binder.BindClassCreationExpressionContinued(
+                        withSyntax, withSyntax, constructedListType, analyzedArguments, initializerSyntaxOpt: null, initializerTypeOpt: null, wasTargetTyped: false, memberResolutionResult, candidateConstructors, useSiteInfo, _diagnostics);
                 }
 
-                return CreateBadClassCreationExpression(
-                    withSyntax, withSyntax, constructedListType, analyzedArguments, initializerSyntaxOpt: null, initializerTypeOpt: null, memberResolutionResult, candidateConstructors, useSiteInfo, diagnostics);
+                return _binder.CreateBadClassCreationExpression(
+                    withSyntax, withSyntax, constructedListType, analyzedArguments, initializerSyntaxOpt: null, initializerTypeOpt: null, memberResolutionResult, candidateConstructors, useSiteInfo, _diagnostics);
             }
         }
 
@@ -1586,7 +1571,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             Debug.Assert(!collectionBuilderMethod.GetIsNewExtensionMember());
         }
-
 
         internal bool HasCollectionExpressionApplicableConstructor(
             bool hasWithElement,
