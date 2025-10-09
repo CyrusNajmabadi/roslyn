@@ -37,7 +37,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 return base.IsParamsArrayOrCollection;
             }
-            init
+            set
             {
                 base.IsParamsArrayOrCollection = value;
             }
