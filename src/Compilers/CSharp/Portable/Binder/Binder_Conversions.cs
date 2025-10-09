@@ -823,7 +823,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return converter.Do();
         }
 
-        private struct CollectionExpressionConverter
+        private readonly struct CollectionExpressionConverter
         {
             private readonly Binder _binder;
             private readonly BoundUnconvertedCollectionExpression _node;
@@ -845,7 +845,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 _diagnostics = diagnostics;
             }
 
-            public BoundCollectionExpression Do()
+            public readonly BoundCollectionExpression Do()
             {
                 var collectionTypeKind = _conversion.GetCollectionExpressionTypeKind(
                 out var elementType, out MethodSymbol? constructor, out bool isExpanded);
@@ -876,7 +876,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return result;
             }
 
-            private BoundCollectionExpression? TryConvertCollectionExpression(
+            private readonly BoundCollectionExpression? TryConvertCollectionExpression(
                 CollectionExpressionTypeKind collectionTypeKind,
                 TypeSymbol elementType,
                 MethodSymbol? constructor)
