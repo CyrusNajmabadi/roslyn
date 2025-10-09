@@ -930,7 +930,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 };
             }
 
-            private ImmutableArray<BoundNode> BindElements(TypeSymbol elementType)
+            private readonly ImmutableArray<BoundNode> BindElements(TypeSymbol elementType)
             {
                 var elements = _node.Elements;
                 var builder = ArrayBuilder<BoundNode>.GetInstance(elements.Length);
@@ -944,20 +944,19 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     var element = elements[i];
                     var elementConversion = elementConversions[i];
-                    var convertedElement = element is BoundCollectionExpressionSpreadElement spreadElement ?
-                        BindSpreadElement(
+                    builder.Add(element is BoundCollectionExpressionSpreadElement spreadElement
+                        ? BindSpreadElement(
                             spreadElement,
                             elementType,
-                            elementConversion) :
-                        _binder.CreateConversion(
+                            elementConversion)
+                        : _binder.CreateConversion(
                             element.Syntax,
                             (BoundExpression)element,
                             elementConversion,
                             isCast: false,
                             conversionGroupOpt: null,
                             destination: elementType,
-                            _diagnostics);
-                    builder.Add(convertedElement!);
+                            _diagnostics));
                 }
 
                 _conversion.MarkUnderlyingConversionsChecked();
@@ -965,7 +964,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return builder.ToImmutableAndFree();
             }
 
-            private readonly BoundNode BindSpreadElement(
+            private readonly BoundCollectionExpressionSpreadElement BindSpreadElement(
                 BoundCollectionExpressionSpreadElement element, TypeSymbol elementType, Conversion elementConversion)
             {
                 var enumeratorInfo = element.EnumeratorInfoOpt;
@@ -993,7 +992,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     lengthOrCount: element.LengthOrCount);
             }
 
-            private BoundCollectionExpression? TryConvertCollectionExpressionImplementsIEnumerableType(
+            private readonly BoundCollectionExpression? TryConvertCollectionExpressionImplementsIEnumerableType(
                 MethodSymbol? constructor)
             {
                 var syntax = _node.Syntax;
@@ -1070,7 +1069,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _targetType);
             }
 
-            private BoundCollectionExpression? TryConvertCollectionExpressionArrayOrSpanType(
+            private readonly BoundCollectionExpression? TryConvertCollectionExpressionArrayOrSpanType(
                 CollectionExpressionTypeKind collectionTypeKind,
                 ImmutableArray<BoundNode> elements)
             {
@@ -1110,7 +1109,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _targetType);
             }
 
-            private BoundCollectionExpression? TryConvertCollectionExpressionArrayInterfaceType(ImmutableArray<BoundNode> elements)
+            private readonly BoundCollectionExpression? TryConvertCollectionExpressionArrayInterfaceType(ImmutableArray<BoundNode> elements)
             {
                 var syntax = _node.Syntax;
 
@@ -1131,7 +1130,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _targetType);
             }
 
-            private BoundCollectionExpression? TryConvertCollectionExpressionBuilderType(ImmutableArray<BoundNode> elements)
+            private readonly BoundCollectionExpression? TryConvertCollectionExpressionBuilderType(ImmutableArray<BoundNode> elements)
             {
                 var syntax = _node.Syntax;
 
@@ -1153,7 +1152,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     _targetType);
             }
 
-            private (BoundExpression? collectionCreate, MethodSymbol? collectionBuilderMethod, BoundValuePlaceholder? elementsPlaceholder) BindCollectionBuilderInfo()
+            private readonly (BoundExpression? collectionCreate, MethodSymbol? collectionBuilderMethod, BoundValuePlaceholder? elementsPlaceholder) BindCollectionBuilderInfo()
             {
                 var namedType = (NamedTypeSymbol)_targetType;
 
@@ -1275,7 +1274,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return (collectionCreation, collectionBuilderMethod, collectionBuilderElementsPlaceholder);
             }
 
-            private bool HasCollectionInitializerTypeInProgress(SyntaxNode syntax, TypeSymbol targetType)
+            private readonly bool HasCollectionInitializerTypeInProgress(SyntaxNode syntax, TypeSymbol targetType)
             {
                 Binder? current = _binder;
                 while (current?.Flags.Includes(BinderFlags.CollectionInitializerAddMethod) == true)
@@ -1293,7 +1292,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return false;
             }
 
-            private BoundExpression BindCollectionConstructorConstruction(
+            private readonly BoundExpression BindCollectionConstructorConstruction(
                 SyntaxNode syntax,
                 MethodSymbol? constructor)
             {
@@ -1329,7 +1328,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return collectionCreation;
             }
 
-            private BoundExpression? BindCollectionArrayInterfaceConstruction()
+            private readonly BoundExpression? BindCollectionArrayInterfaceConstruction()
             {
                 var withElement = _node.WithElement;
                 if (withElement is null)
