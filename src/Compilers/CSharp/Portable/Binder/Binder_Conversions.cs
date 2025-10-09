@@ -7,7 +7,6 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Xml.Linq;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -858,9 +857,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                 BindingDiagnosticBag diagnostics)
             {
                 var syntax = node.Syntax;
+                var hasSpreadElements = node.HasSpreadElements(out _, out _);
+
                 if (LocalRewriter.IsAllocatingRefStructCollectionExpression(node, collectionTypeKind, elementType, @this.Compilation))
                 {
-                    diagnostics.Add(node.HasSpreadElements(out _, out _)
+                    diagnostics.Add(hasSpreadElements
                         ? ErrorCode.WRN_CollectionExpressionRefStructSpreadMayAllocate
                         : ErrorCode.WRN_CollectionExpressionRefStructMayAllocate,
                         syntax, targetType);
@@ -870,6 +871,18 @@ namespace Microsoft.CodeAnalysis.CSharp
                 // since C# 3.0 where we will determine which .Add methods to call on an element by element basis.
                 if (collectionTypeKind == CollectionExpressionTypeKind.ImplementsIEnumerable)
                     return tryConvertCollectionExpressionImplementsIEnumerableType(@this, node, targetType, elementType, constructor, diagnostics);
+
+                if (collectionTypeKind is CollectionExpressionTypeKind.ArrayInterface ||
+                    hasSpreadElements)
+                {
+                    // Verify the existence of the List<T> members that may be used in lowering, even
+                    // though not all will be used for any particular collection expression. Checking all
+                    // gives a consistent behavior, regardless of collection expression elements.
+                    _ = @this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctor, diagnostics, syntax: syntax);
+                    _ = @this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctorInt32, diagnostics, syntax: syntax);
+                    _ = @this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__Add, diagnostics, syntax: syntax);
+                    _ = @this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ToArray, diagnostics, syntax: syntax);
+                }
 
                 // From this point out, all the remaining collection types end up converting all their elements
                 // to their actual element type and passing those along.  
@@ -1096,12 +1109,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 var syntax = node.Syntax;
 
-                BoundExpression? collectionCreation = null;
-                if (node.WithElement != null)
-                {
-                    collectionCreation = @this.BindCollectionArrayInterfaceConstruction(
-                        targetType, list_T__ctor, list_T__ctorInt32, node.WithElement, diagnostics);
-                }
+                var collectionCreation = @this.BindCollectionArrayInterfaceConstruction(targetType, node.WithElement, diagnostics);
 
                 return new BoundCollectionExpression(
                     syntax,
@@ -1280,19 +1288,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        static void ensureListTMemembers(
-            Binder @this, BindingDiagnosticBag diagnostics)
-        {
-            // Verify the existence of the List<T> members that may be used in lowering, even
-            // though not all will be used for any particular collection expression. Checking all
-            // gives a consistent behavior, regardless of collection expression elements.
-            list_T__ctor = (MethodSymbol?)@this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctor, diagnostics, syntax: syntax);
-            list_T__ctorInt32 = (MethodSymbol?)@this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctorInt32, diagnostics, syntax: syntax);
-            _ = @this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__Add, diagnostics, syntax: syntax);
-            _ = @this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ToArray, diagnostics, syntax: syntax);
-
-        }
-
         private bool HasCollectionInitializerTypeInProgress(SyntaxNode syntax, TypeSymbol targetType)
         {
             Binder? current = this;
@@ -1418,11 +1413,12 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private BoundExpression? BindCollectionArrayInterfaceConstruction(
             TypeSymbol targetType,
-            MethodSymbol? list_T__ctor,
-            MethodSymbol? list_T__ctorInt32,
-            BoundUnconvertedWithElement withElement,
+            BoundUnconvertedWithElement? withElement,
             BindingDiagnosticBag diagnostics)
         {
+            if (withElement is null)
+                return null;
+
             Debug.Assert(targetType.IsArrayInterface(out _));
 
             var withSyntax = withElement.Syntax;
@@ -1460,6 +1456,10 @@ namespace Microsoft.CodeAnalysis.CSharp
             var constructedListType =
                 this.GetWellKnownType(WellKnownType.System_Collections_Generic_List_T, ref useSiteInfo)
                     .Construct([typeArgument]);
+
+            // Don't need to report diagnostics here.  Our caller will have already done this.
+            var list_T__ctor = (MethodSymbol?)this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctor, BindingDiagnosticBag.Discarded);
+            var list_T__ctorInt32 = (MethodSymbol?)this.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctorInt32, BindingDiagnosticBag.Discarded);
 
             var candidateConstructorsBuilder = ArrayBuilder<MethodSymbol>.GetInstance();
             candidateConstructorsBuilder.AddIfNotNull(list_T__ctor?.AsMember(constructedListType));
