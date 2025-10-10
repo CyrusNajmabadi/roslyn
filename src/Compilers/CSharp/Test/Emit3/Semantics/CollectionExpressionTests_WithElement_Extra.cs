@@ -3679,7 +3679,10 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
         comp.VerifyEmitDiagnostics(
             // (12,68): error CS9405: No overload for method 'Create' takes 1 'with(...)' element arguments
             //     static IMyCollection<T?> F<T>(ReadOnlySpan<T> items, T arg) => [with(arg), ..items];
-            Diagnostic(ErrorCode.ERR_BadCollectionArgumentsArgCount, "[with(arg), ..items]").WithArguments("Create", "1").WithLocation(12, 68));
+            Diagnostic(ErrorCode.ERR_BadCollectionArgumentsArgCount, "[with(arg), ..items]").WithArguments("Create", "1").WithLocation(12, 68),
+            // (12,74): warning CS8620: Argument of type 'T' cannot be used for parameter 'items' of type 'ReadOnlySpan<T?>' in 'MyCollection<T?> MyCollectionBuilder.Create<T?>(ReadOnlySpan<T?> items)' due to differences in the nullability of reference types.
+            //     static IMyCollection<T?> F<T>(ReadOnlySpan<T> items, T arg) => [with(arg), ..items];
+            Diagnostic(ErrorCode.WRN_NullabilityMismatchInArgument, "arg").WithArguments("T", "System.ReadOnlySpan<T?>", "items", "MyCollection<T?> MyCollectionBuilder.Create<T?>(ReadOnlySpan<T?> items)").WithLocation(12, 74));
     }
 
     [Fact]
