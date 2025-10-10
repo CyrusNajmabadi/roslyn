@@ -27,6 +27,7 @@ using static Microsoft.CodeAnalysis.WorkspaceEventMap;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
 
 [Export(typeof(MiscellaneousFilesWorkspace))]
+[Export(typeof(IOpenTextBufferEventListener))]
 internal sealed partial class MiscellaneousFilesWorkspace : Workspace, IOpenTextBufferEventListener
 {
     private readonly IThreadingContext _threadingContext;
@@ -66,8 +67,6 @@ internal sealed partial class MiscellaneousFilesWorkspace : Workspace, IOpenText
         _fileTrackingMetadataAsSourceService = fileTrackingMetadataAsSourceService;
 
         _metadataReferences = new(() => [.. CreateMetadataReferences()]);
-
-        _openTextBufferProvider.AddListener(this);
     }
 
     void IOpenTextBufferEventListener.OnOpenDocument(string moniker, ITextBuffer textBuffer, IVsHierarchy? _) => TrackOpenedDocument(moniker, textBuffer);

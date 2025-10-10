@@ -41,7 +41,7 @@ internal sealed class OpenTextBufferProvider : IVsRunningDocTableEvents3, IDispo
     private readonly IVsEditorAdaptersFactoryService _editorAdaptersFactoryService;
     private readonly Lazy<IVsRunningDocumentTable4> _runningDocumentTable;
 
-    private ImmutableArray<IOpenTextBufferEventListener> _listeners = [];
+    private ImmutableArray<Lazy<IOpenTextBufferEventListener>> _listeners;
 
     /// <summary>
     /// The map from monikers to open text buffers; because we can only fetch the text buffer on the UI thread, all updates to this must be done from the UI thread.
@@ -56,10 +56,12 @@ internal sealed class OpenTextBufferProvider : IVsRunningDocTableEvents3, IDispo
         IThreadingContext threadingContext,
         IVsEditorAdaptersFactoryService editorAdaptersFactoryService,
         [Import(typeof(SVsServiceProvider))] IServiceProvider serviceProvider,
+        [ImportMany] IEnumerable<Lazy<IOpenTextBufferEventListener>> listeners,
         IAsynchronousOperationListenerProvider listenerProvider)
     {
         _threadingContext = threadingContext;
         _editorAdaptersFactoryService = editorAdaptersFactoryService;
+        _listeners = [.. listeners];
 
         _runningDocumentTable = new(() =>
         {
@@ -87,7 +89,7 @@ internal sealed class OpenTextBufferProvider : IVsRunningDocTableEvents3, IDispo
         {
             try
             {
-                action(listener);
+                action(listener.Value);
             }
             catch (Exception e) when (FatalError.ReportAndCatch(e, ErrorSeverity.Critical))
             {
@@ -120,8 +122,8 @@ internal sealed class OpenTextBufferProvider : IVsRunningDocTableEvents3, IDispo
         }
     }
 
-    public void AddListener(IOpenTextBufferEventListener listener) => ImmutableInterlocked.Update(ref _listeners, static (array, listener) => array.Add(listener), listener);
-    public void RemoveListener(IOpenTextBufferEventListener listener) => ImmutableInterlocked.Update(ref _listeners, static (array, listener) => array.Remove(listener), listener);
+    public void AddListener(IOpenTextBufferEventListener listener)
+        => ImmutableInterlocked.Update(ref _listeners, static (array, listener) => array.Add(new(() => listener)), listener);
 
     public int OnAfterFirstDocumentLock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
         => VSConstants.E_NOTIMPL;

@@ -8,8 +8,11 @@ using Microsoft.VisualStudio.Text;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
 
 /// <summary>
-/// Defines the methods that get called by the <see cref="OpenTextBufferProvider"/>
-/// for getting notified about running document table events.
+/// Defines the methods that get called by the <see cref="OpenTextBufferProvider"/> for getting notified about running
+/// document table events. Instances of this can be register themselves dynamically using <see
+/// cref="OpenTextBufferProvider"/> using <see cref="OpenTextBufferProvider.AddListener"/>.  However, MEF exporting can
+/// also be used here.  If a type exports this interface as a MEF component, it will be automatically instantiated when
+/// needed when <see cref="OpenTextBufferProvider"/> wants to send out notifications.
 /// </summary>
 internal interface IOpenTextBufferEventListener
 {
