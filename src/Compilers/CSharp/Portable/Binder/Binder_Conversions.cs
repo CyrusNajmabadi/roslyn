@@ -1166,7 +1166,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                 foreach (var builderMethod in collectionBuilderMethods)
                 {
                     var projection = new SynthesizedCollectionBuilderProjectedMethodSymbol(builderMethod);
+
+                    // See documentation on SynthesizedCollectionBuilderProjectedMethodSymbol for why Arity must be 0
+                    // for the projection method.  Similarly, in GetCollectionBuilderMethods we filter out any methods
+                    // that would result in a projection with a last 'params' parameter.
                     Debug.Assert(projection.Arity == 0);
+                    Debug.Assert(projection.ParameterCount == 0 || !projection.Parameters.Last().IsParams);
+
                     projectionMethods.Add(projection);
                 }
 
@@ -1198,7 +1204,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     resultKind: LookupResultKind.Viable).MakeCompilerGenerated();
 
                 var projectionInvocationExpression = _binder.BindInvocationExpression(
-                    syntax, _node.Syntax, methodName, methodGroup,
+                    syntax, syntax, methodName, methodGroup,
                     analyzedArguments, _diagnostics, acceptOnlyMethods: true);
 
                 BoundExpression? collectionCreation;
@@ -1206,26 +1212,36 @@ namespace Microsoft.CodeAnalysis.CSharp
                 BoundValuePlaceholder? collectionBuilderElementsPlaceholder;
 
                 if (projectionInvocationExpression is not BoundCall projectionCall ||
-                    projectionCall.Expanded ||
                     projectionCall.Method is not SynthesizedCollectionBuilderProjectedMethodSymbol { UnderlyingMethod: var underlyingMethod })
                 {
-                    // PROTOTYPE: give error when in expanded form.  This means we had something like `Foo(params int[]
-                    // x, ReadOnlySpan<int> y)` which is already extremely strange.
+                    // PROTOTYPE: consider giving error if the projection bound in 'Expanded' form.  This means we had
+                    // something like.
+                    //
+                    //      Goo(params int[] x, ReadOnlySpan<int> y)
+                    //
+                    // Which is already extremely strange as having a params argument that is not last would need
+                    // special crafting to create (likely in metadata only).
+                    //
+                    // We could also consider removing this from the set of candidate methods when building them.
                     collectionCreation = null;
                     collectionBuilderMethod = null;
                     collectionBuilderElementsPlaceholder = null;
                 }
                 else
                 {
+                    // We should have already filtered out any methods that would result in an 'Expanded' last params
+                    // parameter in GetCollectionBuilderMethods. 
+                    Debug.Assert(!projectionCall.Expanded);
+
                     // Now that we've settled on the actual collection builder method to call, do a final round of
                     // checks on it in case there are reasons it will have a problem.
                     collectionBuilderMethod = underlyingMethod;
-                    _binder.CheckCollectionBuilderMethod(syntax, collectionBuilderMethod, _diagnostics, forParams: false);
+                    _binder.CheckCollectionBuilderMethod(syntax, collectionBuilderMethod, _diagnostics);
 
-                    // Take our successful call to the projection method and rewrite it to call the actual call to the
-                    // real collection builder.  Because we don't know how the actual elements will be converted to the
-                    // final ReadOnlySpan (that happens in LocalRewriter.VisitCollectionBuilderCollectionExpression), we
-                    // create a placeholder to stand in for them.
+                    // Take our successful call to the projection method and rewrite it to call the original collection
+                    // builder method it was projected from. Because we don't know how the actual elements will be
+                    // converted to the final ReadOnlySpan (that happens in LocalRewriter
+                    // VisitCollectionBuilderCollectionExpression), we create a placeholder to stand in for them.
                     //
                     // In other words, given `[with(a, b, c), x, y, z]` wew will first have figured out how to call
                     // CollectionBuilder.ProjectedCreate(a, b, c).  From that, we will then want to actually call
@@ -1266,9 +1282,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                         resultKind: LookupResultKind.Viable,
                         type: collectionBuilderMethod.ReturnType).MakeCompilerGenerated();
 
-                    // Wrap in a conversion if necessary.  Note that GetAndValidateCollectionBuilderMethods guarantees
-                    // that either return and target type are identical, or that a valid implicit conversion exists
-                    // between them.
+                    // Wrap in a conversion if necessary.  Note that GetCollectionBuilderMethods guarantees that either
+                    // return and target type are identical, or that a valid implicit conversion exists between them.
                     collectionCreation = _binder.CreateConversion(builderCall, _targetType, _diagnostics);
                 }
 
@@ -1411,11 +1426,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        /// <param name="forParams">Determines if this is finding collection builder methods for the <c>params
-        /// SomeCollectionType</c> case, or for the general <c>SomeCollection c = [...]</c> case.  The former differs
-        /// from the latter in that the collection builder method itself can only contain a single <see
-        /// cref="ReadOnlySpan{T}"/> parameter, while the latter can be any method that <em>ends</em> with a <see
-        /// cref="ReadOnlySpan{T}"/> parameter, but otherwise follows the collection builder method pattern.</param>
+        /// <param name="forParams">Specifies whether this is finding collection builder methods for the <c>params
+        /// SomeCollectionType</c> case, or for the general <c>SomeCollection c = [...]</c> case.  
+        /// For the <c>params</c> case, the collection builder method itself can only contain a single <see cref="ReadOnlySpan{T}"/> parameter.
+        /// In the general case, any method that <em>ends</em> with a <see cref="ReadOnlySpan{T}"/> parameter,
+        /// but otherwise follows the collection builder method pattern.</param>
         /// <remarks>
         /// This method does not validate the collection builder methods it returns (for example, checking for obsolete
         /// errors and the like).  The caller should use <see cref="CheckCollectionBuilderMethod"/> to do so. Once they
@@ -1455,7 +1470,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 string? methodName,
                 ref CompoundUseSiteInfo<AssemblySymbol> useSiteInfo)
             {
-
                 if (!SourceNamedTypeSymbol.IsValidCollectionBuilderType(builderType))
                 {
                     return [];
@@ -1496,8 +1510,19 @@ namespace Microsoft.CodeAnalysis.CSharp
                         continue;
                     }
 
+                    // Last parameter must be some ReadOnlySpan<T>
                     if (method.Parameters is not [.., { RefKind: RefKind.None, Type: NamedTypeSymbol parameterType }]
                         || !readOnlySpanType.Equals(parameterType.OriginalDefinition, TypeCompareKind.AllIgnoreOptions))
+                    {
+                        continue;
+                    }
+
+                    // Filter out methods that have a params parameter in the non-last position.  Note: it is not legal
+                    // to make a method with such a parameter in C# or VB.  However, it could be possible to read in
+                    // such a method from metadata.  By filtering these out, we can sidestep thorny issues that would
+                    // arise when trying to call the synthesized projected version of this method with the
+                    // ReadOnlySpan<T> parameter removed.
+                    if (method.Parameters is [.., { IsParams: true }, _])
                     {
                         continue;
                     }
@@ -1537,7 +1562,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     result.Add(method);
 
-                    // Can early-exist in the params case at this point as there can only be one such creation method with
+                    // Can early-exit in the params case at this point as there can only be one such creation method with
                     // this signature.
                     if (forParams)
                         break;
@@ -1550,27 +1575,21 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal void CheckCollectionBuilderMethod(
             SyntaxNode syntax,
             MethodSymbol collectionBuilderMethod,
-            BindingDiagnosticBag diagnostics,
-            bool forParams)
+            BindingDiagnosticBag diagnostics)
         {
             ReportUseSite(collectionBuilderMethod, diagnostics, syntax.Location);
 
             var parameterType = (NamedTypeSymbol)collectionBuilderMethod.Parameters.Last().Type;
             Debug.Assert(parameterType.OriginalDefinition.Equals(Compilation.GetWellKnownType(WellKnownType.System_ReadOnlySpan_T), TypeCompareKind.AllIgnoreOptions));
 
-            collectionBuilderMethod.CheckConstraints(
-                new ConstraintsHelper.CheckConstraintsArgs(Compilation, Conversions, syntax.Location, diagnostics));
+            // Do not include nullability constraint checking.  That will be done in the nullable-walker when it checks
+            // the actual call to the collection builder method.
+            collectionBuilderMethod.CheckConstraints(new ConstraintsHelper.CheckConstraintsArgs(
+                Compilation, Conversions, includeNullability: false, syntax.Location, diagnostics));
 
             ReportDiagnosticsIfObsolete(diagnostics, collectionBuilderMethod.ContainingType, syntax, hasBaseReceiver: false);
-
-            // The normal method resolution done by the call to BindInvocationExpression in ConvertCollectionExpression
-            // will already report these issues. So we only need to do this extra checking when we're in the params
-            // checking case.
-            if (forParams)
-            {
-                ReportDiagnosticsIfObsolete(diagnostics, collectionBuilderMethod, syntax, hasBaseReceiver: false);
-                ReportDiagnosticsIfUnmanagedCallersOnly(diagnostics, collectionBuilderMethod, syntax, isDelegateConversion: false);
-            }
+            ReportDiagnosticsIfObsolete(diagnostics, collectionBuilderMethod, syntax, hasBaseReceiver: false);
+            ReportDiagnosticsIfUnmanagedCallersOnly(diagnostics, collectionBuilderMethod, syntax, isDelegateConversion: false);
 
             Debug.Assert(!collectionBuilderMethod.GetIsNewExtensionMember());
         }
@@ -1615,7 +1634,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return true;
                 }
 
-                // From the specification: https://github.com/dotnet/csharplang/blob/main/proposals/collection-expression-arguments.md#conversions
+                // From the specification:
+                // https://github.com/dotnet/csharplang/blob/90f1d8b0e9ba8a140f73aef376833969cce8bf9e/proposals/collection-expression-arguments.md?plain=1#L175
                 //
                 // A struct or class type that implements System.Collections.IEnumerable where:
                 //

@@ -2,16 +2,14 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Immutable;
-using System.Linq;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols;
 
 /// <summary>
-/// See
-/// https://github.com/dotnet/csharplang/blob/main/proposals/collection-expression-arguments.md#collectionbuilderattribute-methods.
+/// See https://github.com/dotnet/csharplang/blob/90f1d8b0e9ba8a140f73aef376833969cce8bf9e/proposals/collection-expression-arguments.md?plain=1#L225
 /// For collection builders: For each create method for the target type, we define a projection method with an identical
 /// signature to the create method but without the last parameter.  This is the signature of the method a `with(...)`
 /// element will be matched against when using a collection builder type for a collection expression.
@@ -47,6 +45,21 @@ internal sealed class SynthesizedCollectionBuilderProjectedMethodSymbol(
     public override ImmutableArray<CustomModifier> RefCustomModifiers => this.UnderlyingMethod.RefCustomModifiers;
     public override TypeWithAnnotations ReturnTypeWithAnnotations => this.UnderlyingMethod.ReturnTypeWithAnnotations;
 
+    /// <summary>
+    /// The projection method itself is intentionally not obsolete.  We don't want to report obsoletion errors when
+    /// using it in some speculative binding for overload resolution.  Instead, we will then report the error on the
+    /// original <see cref="UnderlyingMethod"/> this points at directly in <see
+    /// cref="Binder.CheckCollectionBuilderMethod"/>.
+    /// </summary>
+    internal override ObsoleteAttributeData? ObsoleteAttributeData => null;
+
+    /// <summary>
+    /// Similarly to <see cref="ObsoleteAttributeData"/>, we do not want to report unmanaged callers only on this
+    /// method.  Instead, we will then report the error on the original <see cref="UnderlyingMethod"/> this points at
+    /// directly in <see cref="Binder.CheckCollectionBuilderMethod"/>.
+    /// </summary>
+    internal override UnmanagedCallersOnlyAttributeData? GetUnmanagedCallersOnlyAttributeData(bool forceComplete) => null;
+
     // Note: it is very intentional that we return empty arrays for Type arguments/parameters.  Consider a
     // hypothetical signature like:
     //
@@ -72,18 +85,18 @@ internal sealed class SynthesizedCollectionBuilderProjectedMethodSymbol(
         {
             if (_lazyParameters.IsDefault)
             {
-                var parameters = this.UnderlyingMethod.Parameters
-                    .Take(this.ParameterCount)
-                    .SelectAsArray(
-                        static (p, @this) => (ParameterSymbol)new SynthesizedCollectionBuilderProjectedParameterSymbol(@this, p), this);
-                ImmutableInterlocked.InterlockedInitialize(ref _lazyParameters, parameters);
+                // Grab all but the last parameter from the underlying method.
+                var parameters = this.UnderlyingMethod.Parameters;
+                var parameterCount = parameters.Length - 1;
+                var builder = ArrayBuilder<ParameterSymbol>.GetInstance(parameterCount);
+                for (int i = 0; i < parameterCount; i++)
+                    builder.Add(new SynthesizedCollectionBuilderProjectedParameterSymbol(this, parameters[i]));
+
+                ImmutableInterlocked.InterlockedInitialize(ref _lazyParameters, builder.ToImmutableAndFree());
             }
             return _lazyParameters;
         }
     }
-
-    internal override UnmanagedCallersOnlyAttributeData? GetUnmanagedCallersOnlyAttributeData(bool forceComplete)
-        => this.UnderlyingMethod.GetUnmanagedCallersOnlyAttributeData(forceComplete);
 
     internal override int TryGetOverloadResolutionPriority()
         => this.UnderlyingMethod.TryGetOverloadResolutionPriority();
