@@ -1123,8 +1123,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     collectionBuilderMethod: null,
                     collectionBuilderElementsPlaceholder: null,
                     wasTargetTyped: true,
-                    // Since a with-element is not legal here, we can just treat these as if they don't have one at all.
-                    hasWithElement: false,
+                    hasWithElement: _node.WithElement != null,
                     _node,
                     elements,
                     _targetType);
@@ -1214,15 +1213,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 if (projectionInvocationExpression is not BoundCall projectionCall ||
                     projectionCall.Method is not SynthesizedCollectionBuilderProjectedMethodSymbol { UnderlyingMethod: var underlyingMethod })
                 {
-                    // PROTOTYPE: consider giving error if the projection bound in 'Expanded' form.  This means we had
-                    // something like.
-                    //
-                    //      Goo(params int[] x, ReadOnlySpan<int> y)
-                    //
-                    // Which is already extremely strange as having a params argument that is not last would need
-                    // special crafting to create (likely in metadata only).
-                    //
-                    // We could also consider removing this from the set of candidate methods when building them.
                     collectionCreation = null;
                     collectionBuilderMethod = null;
                     collectionBuilderElementsPlaceholder = null;
