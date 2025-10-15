@@ -2249,26 +2249,41 @@ namespace Microsoft.CodeAnalysis.CSharp
             bool inConversion,
             BindingDiagnosticBag diagnostics)
         {
-            var syntax = node.Syntax;
-            var builder = ArrayBuilder<BoundNode>.GetInstance(node.Elements.Length);
+            var withArguments = node.WithElement?.Arguments ?? [];
+
+            var withArgumentsBuilder = ArrayBuilder<BoundExpression>.GetInstance(withArguments.Length);
+            foreach (var argument in withArguments)
+                withArgumentsBuilder.Add(BindToNaturalType(argument, diagnostics, reportNoTargetType: !targetType.IsErrorType()));
+
+            var naturalWithArguments = withArgumentsBuilder.ToImmutableAndFree();
+            var collectionCreation = naturalWithArguments.Length > 0
+                ? new BoundBadExpression(node.WithElement!.Syntax, LookupResultKind.Empty, symbols: [], naturalWithArguments, CreateErrorType())
+                : null;
+
+            var elementsBuilder = ArrayBuilder<BoundNode>.GetInstance(node.Elements.Length);
+
             foreach (var element in node.Elements)
             {
                 var result = element is BoundExpression expression ?
                     BindToNaturalType(expression, diagnostics, reportNoTargetType: !targetType.IsErrorType()) :
                     element;
-                builder.Add(result);
+                elementsBuilder.Add(result);
             }
+
             return new BoundCollectionExpression(
-                syntax,
+                node.Syntax,
                 collectionTypeKind: CollectionExpressionTypeKind.None,
                 placeholder: null,
-                collectionCreation: null,
+                collectionCreation,
                 collectionBuilderMethod: null,
                 collectionBuilderElementsPlaceholder: null,
                 wasTargetTyped: inConversion,
-                hasWithElement: node.WithElement != null,
+                // Regardless of whether there was a 'with' element, we are in an error recovery scenario, and we've
+                // moved all with arguments to the front of the elements list.  So treat this as not having a 'with'
+                // element.
+                hasWithElement: false,
                 node,
-                elements: builder.ToImmutableAndFree(),
+                elements: elementsBuilder.ToImmutableAndFree(),
                 targetType,
                 hasErrors: true)
             { WasCompilerGenerated = node.IsParamsArrayOrCollection, IsParamsArrayOrCollection = node.IsParamsArrayOrCollection };

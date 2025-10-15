@@ -11,8 +11,9 @@ using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Semantics;
+namespace Microsoft.CodeAnalysis.CSharp.UnitTests;
 
+[CompilerTrait(CompilerFeature.CollectionExpressions)]
 public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
 {
     private static string? IncludeExpectedOutput(string expectedOutput) => ExecutionConditionUtil.IsMonoOrCoreClr ? expectedOutput : null;
@@ -1364,6 +1365,9 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
             // (7,18): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             //         Identity([with(default), default, 3]);
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(default), default, 3]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(7, 18),
+            // (7,24): error CS8716: There is no target type for the default literal.
+            //         Identity([with(default), default, 3]);
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(7, 24),
             // (7,34): error CS8716: There is no target type for the default literal.
             //         Identity([with(default), default, 3]);
             Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(7, 34));
@@ -1502,7 +1506,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                     static MyCollection<T> NonEmptyArgs<T>(T t) => [with(t), t];
                 }
                 """;
-        // Added execution output verification.
+
         var verifier = CompileAndVerify(
             [sourceA, sourceB, s_collectionExtensions],
             targetFramework: TargetFramework.Net80,
@@ -1935,9 +1939,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 }
                 """;
         var comp = CreateCompilation([sourceA, sourceB], targetFramework: TargetFramework.Net80);
-        // https://github.com/dotnet/roslyn/issues/77866: [with(x)] and [with(x), y] should
-        // result in errors since x should not be included in the params argument. Should
-        // be fixed when the last parameter of the builder method is the items parameter.
+
         comp.VerifyEmitDiagnostics(
             // (15,14): error CS9405: No overload for method 'Create' takes 1 'with(...)' element arguments
             //         c = [with(x)];
@@ -2713,7 +2715,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(y: 6, x: 7), 8];
                 c.Report();
                 """;
-        // Added execution output verification.
+
         var verifier = CompileAndVerify(
             [sourceA, sourceB, s_collectionExtensions],
             targetFramework: TargetFramework.Net80,
@@ -2831,7 +2833,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(ref r)];
                 c.Report();
                 """;
-        // Added execution output verification.
+
         var verifier = CompileAndVerify(
             [sourceA, sourceB1, s_collectionExtensions],
             targetFramework: TargetFramework.Net80,
@@ -2997,10 +2999,10 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(in ro)];
                 c.Report();
                 """;
-        var comp = CreateCompilation(
+        CompileAndVerify(
             [sourceA, sourceB1, s_collectionExtensions],
-            targetFramework: TargetFramework.Net80);
-        comp.VerifyEmitDiagnostics(
+            targetFramework: TargetFramework.Net80,
+            expectedOutput: IncludeExpectedOutput("[0], [1], [2], [3], [4], "), verify: Verification.FailsPEVerify).VerifyDiagnostics(
             // (6,11): warning CS9193: Argument 1 should be a variable because it is passed to a 'ref readonly' parameter
             // c = [with(0)];
             Diagnostic(ErrorCode.WRN_RefReadonlyNotVariable, "0").WithArguments("1").WithLocation(6, 11),
@@ -3017,7 +3019,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(ref ro)];
                 c = [with(out x)];
                 """;
-        comp = CreateCompilation([sourceA, sourceB2], targetFramework: TargetFramework.Net80);
+        var comp = CreateCompilation([sourceA, sourceB2], targetFramework: TargetFramework.Net80);
         comp.VerifyEmitDiagnostics(
             // (6,15): error CS1510: A ref or out value must be an assignable variable
             // c = [with(ref ro)];
@@ -3154,8 +3156,9 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(in ro)];
                 c.Report();
                 """;
-        var comp = CreateCompilation([sourceA, sourceB1, s_collectionExtensions], targetFramework: TargetFramework.Net80);
-        comp.VerifyEmitDiagnostics(
+        CompileAndVerify(
+            [sourceA, sourceB1, s_collectionExtensions], targetFramework: TargetFramework.Net80,
+            expectedOutput: IncludeExpectedOutput("[0], [1], [2], [3], [4], [5], "), verify: Verification.FailsPEVerify).VerifyDiagnostics(
             // (11,15): warning CS9191: The 'ref' modifier for argument 1 corresponding to 'in' parameter is equivalent to 'in'. Consider using 'in' instead.
             // c = [with(ref x)];
             Diagnostic(ErrorCode.WRN_BadArgRef, "x").WithArguments("1").WithLocation(11, 15));
@@ -3167,7 +3170,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 ref readonly int ro = ref x;
                 c = [with(ref ro)];
                 """;
-        comp = CreateCompilation([sourceA, sourceB2], targetFramework: TargetFramework.Net80);
+        var comp = CreateCompilation([sourceA, sourceB2], targetFramework: TargetFramework.Net80);
         comp.VerifyEmitDiagnostics(
             // (5,15): error CS1510: A ref or out value must be an assignable variable
             // c = [with(ref ro)];
@@ -3278,7 +3281,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(out r), 3];
                 c.Report();
                 """;
-        // Added execution output verification.
+
         var verifier = CompileAndVerify(
             [sourceA, sourceB1, s_collectionExtensions],
             targetFramework: TargetFramework.Net80,
@@ -3417,7 +3420,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                 c = [with(out x, y), 3];
                 c.Report();
                 """;
-        // Added execution output verification.
+
         var verifier = CompileAndVerify(
             [sourceA, sourceB, s_collectionExtensions],
             targetFramework: TargetFramework.Net80,
@@ -3462,24 +3465,45 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
             // (2,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(items: default)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(items: default)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(2, 5),
+            // (2,18): error CS8716: There is no target type for the default literal.
+            // c = [with(items: default)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(2, 18),
             // (3,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(items: default, 1)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(items: default, 1)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(3, 5),
+            // (3,18): error CS8716: There is no target type for the default literal.
+            // c = [with(items: default, 1)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(3, 18),
             // (4,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(items: default, arg: 2)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(items: default, arg: 2)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(4, 5),
+            // (4,18): error CS8716: There is no target type for the default literal.
+            // c = [with(items: default, arg: 2)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(4, 18),
             // (5,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(3, items: default)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(3, items: default)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(5, 5),
+            // (5,21): error CS8716: There is no target type for the default literal.
+            // c = [with(3, items: default)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(5, 21),
             // (6,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(arg: 4, items: default)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(arg: 4, items: default)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(6, 5),
+            // (6,26): error CS8716: There is no target type for the default literal.
+            // c = [with(arg: 4, items: default)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(6, 26),
             // (7,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(default, 5)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(default, 5)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(7, 5),
+            // (7,11): error CS8716: There is no target type for the default literal.
+            // c = [with(default, 5)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(7, 11),
             // (8,5): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             // c = [with(default, arg: 6)];
-            Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(default, arg: 6)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(8, 5));
+            Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(default, arg: 6)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(8, 5),
+            // (8,11): error CS8716: There is no target type for the default literal.
+            // c = [with(default, arg: 6)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(8, 11));
     }
 
     [Fact]
@@ -3800,6 +3824,9 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
             // (8,13): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             //         c = [with(default)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(default)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(8, 13),
+            // (8,19): error CS8716: There is no target type for the default literal.
+            //         c = [with(default)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(8, 19),
             // (9,13): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             //         c = F(1, 2);
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "F(1, 2)").WithArguments("Create", "T", "MyCollection<T>").WithLocation(9, 13),
@@ -3937,6 +3964,9 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
             // (8,13): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             //         c = [with(default)];
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "[with(default)]").WithArguments("Create", "T", "MyCollection<T>").WithLocation(8, 13),
+            // (8,19): error CS8716: There is no target type for the default literal.
+            //         c = [with(default)];
+            Diagnostic(ErrorCode.ERR_DefaultLiteralNoTargetType, "default").WithLocation(8, 19),
             // (9,13): error CS9187: Could not find an accessible 'Create' method with the expected signature: a static method with a single parameter of type 'ReadOnlySpan<T>' and return type 'MyCollection<T>'.
             //         c = F(1, 2);
             Diagnostic(ErrorCode.ERR_CollectionBuilderAttributeMethodNotFound, "F(1, 2)").WithArguments("Create", "T", "MyCollection<T>").WithLocation(9, 13),
@@ -5311,8 +5341,7 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
                     }
                 }
                 """;
-        // https://github.com/dotnet/roslyn/issues/77866: 1, ..., 2, ..., should be evaluated before 3, ..., 4, ... .
-        // Should be fixed when the last parameter of the builder method is the items parameter.
+
         var comp = CreateCompilation(
             [sourceA, sourceB, sourceC],
             targetFramework: TargetFramework.Net80);
@@ -7290,6 +7319,81 @@ public sealed class CollectionExpressionTests_WithElement_Extra : CSharpTestBase
             // (8,34): error CS9400: 'with(...)' element must be the first element
             //         HashSet<string> s = ["", with(e = Create<T>())];
             Diagnostic(ErrorCode.ERR_CollectionArgumentsMustBeFirst, "with").WithLocation(8, 34));
+    }
+
+    [Fact]
+    public void NullableAnalysis_03()
+    {
+        var source = """
+            #nullable enable
+            using System.Collections.Generic;
+            class Program
+            {
+                static IEqualityComparer<T> Create<T>()
+                {
+                    IEqualityComparer<T>? e = null;
+                    HashSet<string> s = [e.ToString(), with(e = Create<T>())];
+                    return e;
+                }
+            }
+            """;
+        var comp = CreateCompilation(source);
+        comp.VerifyEmitDiagnostics(
+            // (8,30): warning CS8602: Dereference of a possibly null reference.
+            //         HashSet<string> s = [e.ToString(), with(e = Create<T>())];
+            Diagnostic(ErrorCode.WRN_NullReferenceReceiver, "e").WithLocation(8, 30),
+            // (8,44): error CS9400: 'with(...)' element must be the first element
+            //         HashSet<string> s = [e.ToString(), with(e = Create<T>())];
+            Diagnostic(ErrorCode.ERR_CollectionArgumentsMustBeFirst, "with").WithLocation(8, 44));
+    }
+
+    [Fact]
+    public void NullableAnalysis_04()
+    {
+        var source = """
+            #nullable enable
+            using System.Collections.Generic;
+            class Program
+            {
+                static IEqualityComparer<T> Create<T>()
+                {
+                    IEqualityComparer<T>? e = Create<T>();
+                    HashSet<string> s = [(e = null).ToString(), with((IEqualityComparer<string>)(object)e.ToString())];
+                    return e;
+                }
+            }
+            """;
+        var comp = CreateCompilation(source);
+        comp.VerifyEmitDiagnostics(
+            // (8,31): warning CS8602: Dereference of a possibly null reference.
+            //         HashSet<string> s = [(e = null).ToString(), with((IEqualityComparer<string>)(object)e.ToString())];
+            Diagnostic(ErrorCode.WRN_NullReferenceReceiver, "e = null").WithLocation(8, 31),
+            // (8,53): error CS9400: 'with(...)' element must be the first element
+            //         HashSet<string> s = [(e = null).ToString(), with((IEqualityComparer<string>)(object)e.ToString())];
+            Diagnostic(ErrorCode.ERR_CollectionArgumentsMustBeFirst, "with").WithLocation(8, 53));
+    }
+
+    [Fact]
+    public void NullableAnalysis_05()
+    {
+        string source = """
+                #nullable enable
+                using System.Collections.Generic;
+                class Program
+                {
+                    static IEqualityComparer<string> Create()
+                    {
+                        IEqualityComparer<string>? e = Create();
+                        HashSet<string> s = [with((e = null)), e.ToString()];
+                        return e;
+                    }
+                }
+                """;
+        var comp = CreateCompilation(source);
+        comp.VerifyEmitDiagnostics(
+            // (8,48): warning CS8602: Dereference of a possibly null reference.
+            //         HashSet<string> s = [with((e = null)), e.ToString()];
+            Diagnostic(ErrorCode.WRN_NullReferenceReceiver, "e").WithLocation(8, 48));
     }
 
     [Fact]
