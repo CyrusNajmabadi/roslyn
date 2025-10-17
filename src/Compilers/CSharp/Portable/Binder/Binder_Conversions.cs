@@ -1383,7 +1383,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 var list_T__ctor = (MethodSymbol?)_binder.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctor, BindingDiagnosticBag.Discarded, syntax: _node.Syntax);
                 var list_T__ctorInt32 = (MethodSymbol?)_binder.GetWellKnownTypeMember(WellKnownMember.System_Collections_Generic_List_T__ctorInt32, BindingDiagnosticBag.Discarded, syntax: _node.Syntax);
 
-                var candidateConstructorsBuilder = ArrayBuilder<MethodSymbol>.GetInstance();
+                var candidateConstructorsBuilder = ArrayBuilder<MethodSymbol>.GetInstance(capacity: 2);
                 candidateConstructorsBuilder.AddIfNotNull(list_T__ctor?.AsMember(constructedListType));
                 candidateConstructorsBuilder.AddIfNotNull(list_T__ctorInt32?.AsMember(constructedListType));
                 var candidateConstructors = candidateConstructorsBuilder.ToImmutableAndFree();
