@@ -680,7 +680,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     // below.  Otherwise, finish this single line constructor we're on.
                     if (!allowNewline && SyntaxFacts.IsNewLine(ch))
                     {
-                        if (kind is InterpolatedStringKind.SingleLineRaw)
+                        if (!_isInterpolatedString && kind is InterpolatedStringKind.SingleLineRaw)
                             _lexer.ScanEndOfLine();
                         return;
                     }
