@@ -106,10 +106,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             {
                 var currentChar = TextWindow.PeekChar();
 
-                // See if we reached the end of the line or file before hitting the end. Errors about this will be
+                // See if we reached the end of the line or file before hitting the end. In the case of an errant
+                // new-line consume it as well to aid with the error location placement. Errors about this will be
                 // reported by the parser.
-                if (SyntaxFacts.IsNewLine(currentChar) || IsAtEndOfText(currentChar))
+                if (IsAtEndOfText(currentChar))
                     return;
+
+                if (SyntaxFacts.IsNewLine(currentChar))
+                {
+                    ScanEndOfLine();
+                    return;
+                }
 
                 if (currentChar != '"')
                 {

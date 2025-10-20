@@ -78,12 +78,16 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     return textToken.GetValueText();
 
                 // Preserve what the lexer used to do here.  In the presence of any diagnostics, the text of the raw
-                // string minus the starting quotes is used as the value.
+                // starting from after the quote, but not including the final newlines is the value of the raw string.
                 var startIndex = 0;
                 while (startIndex < originalText.Length && originalText[startIndex] is '"')
                     startIndex++;
 
-                return originalText[startIndex..];
+                var endIndex = originalText.Length;
+                while (endIndex > startIndex && SyntaxFacts.IsNewLine(originalText[endIndex - 1]))
+                    endIndex--;
+
+                return originalText[startIndex..endIndex];
             }
         }
 

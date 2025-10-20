@@ -570,15 +570,18 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
                 if (kind is InterpolatedStringKind.SingleLineRaw)
                 {
-                    if (_lexer.TextWindow.PeekChar() != '"')
+                    var ch = _lexer.TextWindow.PeekChar();
+                    if (ch != '"')
                     {
                         // Didn't find a closing quote.  We hit the end of a line (in the normal case) or the end of the
                         // file in the normal/verbatim case.
-                        Debug.Assert(IsAtEnd(kind));
+                        Debug.Assert(IsAtEnd(kind) || SyntaxFacts.IsNewLine(_lexer.TextWindow.PeekChar(-1)));
+                        var width =
+                            _lexer.TextWindow.PeekChar(-1) == '\n' && _lexer.TextWindow.PeekChar(-2) == '\r' ? 2 :
+                            SyntaxFacts.IsNewLine(_lexer.TextWindow.PeekChar(-1)) ? 1 : 0;
 
                         TrySetError(_lexer.MakeError(
-                            _lexer.TextWindow.Position,
-                            width: SyntaxFacts.IsNewLine(_lexer.TextWindow.PeekChar()) ? 1 : 0, ErrorCode.ERR_UnterminatedRawString));
+                            _lexer.TextWindow.Position - width, width, ErrorCode.ERR_UnterminatedRawString));
                     }
                     else
                     {
@@ -662,12 +665,23 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 if (CheckForIllegalEmptyMultiLineRawStringLiteral(kind, startingQuoteCount))
                     return;
 
+                var allowNewline = kind is InterpolatedStringKind.Verbatim or InterpolatedStringKind.MultiLineRaw;
                 while (true)
                 {
-                    if (IsAtEnd(kind))
+                    var ch = _lexer.TextWindow.PeekChar();
+                    if (_lexer.IsAtEndOfText(ch))
                     {
                         // error: end of line/file before end of string pop out. Error will be reported in
                         // ScanInterpolatedStringLiteralEnd
+                        return;
+                    }
+
+                    // If this is a verbatim or multi-line raw string, we allow newlines in the content, and continue
+                    // below.  Otherwise, finish this single line constructor we're on.
+                    if (!allowNewline && SyntaxFacts.IsNewLine(ch))
+                    {
+                        if (kind is InterpolatedStringKind.SingleLineRaw)
+                            _lexer.ScanEndOfLine();
                         return;
                     }
 
@@ -695,10 +709,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                             if (kind == InterpolatedStringKind.Normal)
                             {
                                 var escapeStart = _lexer.TextWindow.Position;
-                                char ch = _lexer.ScanEscapeSequence(surrogateCharacter: out _);
-                                if (ch is '{' or '}')
+                                char escapedChar = _lexer.ScanEscapeSequence(surrogateCharacter: out _);
+                                if (escapedChar is '{' or '}')
                                 {
-                                    TrySetError(_lexer.MakeError(escapeStart, _lexer.TextWindow.Position - escapeStart, ErrorCode.ERR_EscapedCurly, ch));
+                                    TrySetError(_lexer.MakeError(escapeStart, _lexer.TextWindow.Position - escapeStart, ErrorCode.ERR_EscapedCurly, escapedChar));
                                 }
                             }
                             else
