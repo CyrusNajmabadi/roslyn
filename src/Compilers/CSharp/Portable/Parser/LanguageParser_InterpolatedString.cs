@@ -17,7 +17,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         {
             var originalToken = this.EatToken();
 
-            var expressionKind = SyntaxFacts.GetLiteralExpression(originalToken.Kind);
+            var originalTokenKind = originalToken.Kind;
+            var expressionKind = SyntaxFacts.GetLiteralExpression(originalTokenKind);
             Debug.Assert(expressionKind != SyntaxKind.None);
 
             // We want to share as much code as possible with raw-interpolated-strings.  Especially the code for dealing
@@ -78,14 +79,18 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     return textToken.GetValueText();
 
                 // Preserve what the lexer used to do here.  In the presence of any diagnostics, the text of the raw
-                // starting from after the quote, but not including the final newlines is the value of the raw string.
+                // starting from after the quote, but not including the final newlines (for single line raw literals) is
+                // the value of the raw string.
                 var startIndex = 0;
                 while (startIndex < originalText.Length && originalText[startIndex] is '"')
                     startIndex++;
 
                 var endIndex = originalText.Length;
-                while (endIndex > startIndex && SyntaxFacts.IsNewLine(originalText[endIndex - 1]))
-                    endIndex--;
+                if (originalTokenKind is SyntaxKind.SingleLineRawStringLiteralToken)
+                {
+                    while (endIndex > startIndex && SyntaxFacts.IsNewLine(originalText[endIndex - 1]))
+                        endIndex--;
+                }
 
                 return originalText[startIndex..endIndex];
             }
