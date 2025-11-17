@@ -20,9 +20,8 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Structure;
 public sealed class BlockStructureServiceTests
 {
     [Fact]
-    public async Task TestSimpleLambda()
-    {
-        var code =
+    public Task TestSimpleLambda()
+        => TestAsync(
             """
             using System.Linq;
             class C
@@ -35,19 +34,12 @@ public sealed class BlockStructureServiceTests
                     });
                 }
             }
-            """;
-
-        using var workspace = TestWorkspace.CreateCSharp(code);
-        var spans = await GetSpansFromWorkspaceAsync(workspace);
-
-        // ensure all 4 outlining region tags were found (usings, class, method, lambda)
-        Assert.Equal(4, spans.Length);
-    }
+            """,
+            expectedSpanCount: 4);
 
     [Fact]
-    public async Task TestParenthesizedLambda()
-    {
-        var code =
+    public Task TestParenthesizedLambda()
+        => TestAsync(
             """
             using System.Linq;
             class C
@@ -60,19 +52,12 @@ public sealed class BlockStructureServiceTests
                     });
                 }
             }
-            """;
-
-        using var workspace = TestWorkspace.CreateCSharp(code);
-        var spans = await GetSpansFromWorkspaceAsync(workspace);
-
-        // ensure all 4 outlining region tags were found (usings, class, method, lambda)
-        Assert.Equal(4, spans.Length);
-    }
+            """,
+            expectedSpanCount: 4);
 
     [Fact]
-    public async Task TestAnonymousDelegate()
-    {
-        var code =
+    public Task TestAnonymousDelegate()
+        => TestAsync(
             """
             using System.Linq;
             class C
@@ -85,32 +70,19 @@ public sealed class BlockStructureServiceTests
                     });
                 }
             }
-            """;
-
-        using var workspace = TestWorkspace.CreateCSharp(code);
-        var spans = await GetSpansFromWorkspaceAsync(workspace);
-
-        // ensure all 4 outlining region tags were found (usings, class, method, anonymous delegate)
-        Assert.Equal(4, spans.Length);
-    }
+            """,
+            expectedSpanCount: 4);
 
     [Fact]
-    public async Task TestTwoInvocationExpressionsThreeLines()
-    {
-        // The inner argument list should be collapsible, but the outer one shouldn't.
-        var code = """
+    public Task TestTwoInvocationExpressionsThreeLines()
+        => TestAsync(
+            """
             var x = MyMethod1(MyMethod2(
                 "",
                 "");
-            """;
-
-        using var workspace = TestWorkspace.CreateCSharp(code);
-        var spans = await GetSpansFromWorkspaceAsync(workspace);
-
-        Assert.Equal(1, spans.Length);
-
-        Assert.Equal(27, spans[0].TextSpan.Start);
-    }
+            """,
+            expectedSpanCount: 1,
+            expectedSpanStart: 27);
 
     private static async Task<ImmutableArray<BlockSpan>> GetSpansFromWorkspaceAsync(
         TestWorkspace workspace)
@@ -122,5 +94,20 @@ public sealed class BlockStructureServiceTests
 
         var structure = await outliningService.GetBlockStructureAsync(document, options, CancellationToken.None);
         return structure.Spans;
+    }
+
+    private static async Task TestAsync(
+        string code,
+        int expectedSpanCount,
+        int? expectedSpanStart = null)
+    {
+        using var workspace = TestWorkspace.CreateCSharp(code);
+        var spans = await GetSpansFromWorkspaceAsync(workspace);
+
+        Assert.Equal(expectedSpanCount, spans.Length);
+        if (expectedSpanStart.HasValue)
+        {
+            Assert.Equal(expectedSpanStart.Value, spans[0].TextSpan.Start);
+        }
     }
 }

@@ -26,81 +26,74 @@ public sealed class DiagnosticDataTests
         => VerifyTextSpanAsync("", 10, 10, 20, 20, new TextSpan(0, 0));
 
     [Fact]
-    public async Task DiagnosticData_GetText1()
-    {
-        var code = """
+    public Task DiagnosticData_GetText1()
+        => VerifyTextSpanAsync("""
 
 
-            """;
-
-        await VerifyTextSpanAsync(code, 30, 30, 40, 40, new TextSpan(code.Length, 0));
-    }
-
-    [Fact]
-    public async Task DiagnosticData_GetText2()
-    {
-        var code = """
+            """, 30, 30, 40, 40, new TextSpan("""
 
 
-            """;
-
-        await VerifyTextSpanAsync(code, 0, 30, 40, 40, new TextSpan(code.Length, 0));
-    }
+            """.Length, 0));
 
     [Fact]
-    public async Task DiagnosticData_GetText3()
-    {
-        var code = """
+    public Task DiagnosticData_GetText2()
+        => VerifyTextSpanAsync("""
 
 
-            """;
-
-        await VerifyTextSpanAsync(code, 0, 30, 0, 40, new TextSpan(code.Length, 0));
-    }
-
-    [Fact]
-    public async Task DiagnosticData_GetText4()
-    {
-        var code = """
+            """, 0, 30, 40, 40, new TextSpan("""
 
 
-            """;
-
-        await VerifyTextSpanAsync(code, 1, 30, 1, 40, new TextSpan(code.Length, 0));
-    }
+            """.Length, 0));
 
     [Fact]
-    public async Task DiagnosticData_GetText5()
-    {
-        var code = """
+    public Task DiagnosticData_GetText3()
+        => VerifyTextSpanAsync("""
 
 
-            """;
-
-        await VerifyTextSpanAsync(code, 1, 30, 1, 40, new TextSpan(code.Length, 0));
-    }
-
-    [Fact]
-    public async Task DiagnosticData_GetText6()
-    {
-        var code = """
+            """, 0, 30, 0, 40, new TextSpan("""
 
 
-            """;
-
-        await VerifyTextSpanAsync(code, 1, 30, 2, 40, new TextSpan(code.Length, 0));
-    }
+            """.Length, 0));
 
     [Fact]
-    public async Task DiagnosticData_GetText7()
-    {
-        var code = """
+    public Task DiagnosticData_GetText4()
+        => VerifyTextSpanAsync("""
 
 
-            """;
+            """, 1, 30, 1, 40, new TextSpan("""
 
-        await VerifyTextSpanAsync(code, 1, 0, 1, 2, new TextSpan(code.Length, 0));
-    }
+
+            """.Length, 0));
+
+    [Fact]
+    public Task DiagnosticData_GetText5()
+        => VerifyTextSpanAsync("""
+
+
+            """, 1, 30, 1, 40, new TextSpan("""
+
+
+            """.Length, 0));
+
+    [Fact]
+    public Task DiagnosticData_GetText6()
+        => VerifyTextSpanAsync("""
+
+
+            """, 1, 30, 2, 40, new TextSpan("""
+
+
+            """.Length, 0));
+
+    [Fact]
+    public Task DiagnosticData_GetText7()
+        => VerifyTextSpanAsync("""
+
+
+            """, 1, 0, 1, 2, new TextSpan("""
+
+
+            """.Length, 0));
 
     [Fact]
     public Task DiagnosticData_GetText8()
