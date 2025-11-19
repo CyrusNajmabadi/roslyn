@@ -286,17 +286,15 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
             CancellationToken cancellationToken)
         {
             // Note: this method is called in some blocking scenarios.  Specifically, when the outlining manager blocks
-            // on outlining tags.  As such, we use ConfigureAwait(true) and NoThrowAwaitable(captureContext: true) to
-            // ensure we're always coming back to the calling context as much as possible.  In the blocking case, this
-            // is good, so we don't have unnecessary thread switches.  In the non-blocking threadpool case, this is also
-            // fine as CA(true) will just keep us on the threadpool.
+            // on outlining tags.  As such, we use ConfigureAwait(calledFromJtfRun) and NoThrowAwaitable(captureContext:
+            // calledFromJtfRun) to ensure we're always coming back to the calling context if we started from JTF.  This 
+            // also helps in the non-blocking case as we want to ensure that even after we do work on the UI thread that
+            // we come back to the BG to unblock it asap.
 
             // Enqueue work to a queue that will all tagger main thread work together in the near future. This let's
-            // us avoid hammering the dispatcher queue with lots of work that causes contention.  Additionally, use
-            // a no-throw awaitable so that in the common case where we cancel before, we don't throw an exception
-            // that can exacerbate cross process debugging scenarios.
+            // us avoid hammering the dispatcher queue with lots of work that causes contention.
             var valueOpt = await _dataSource.MainThreadManager.PerformWorkOnMainThreadAsync(
-                GetTaggerUIData, cancellationToken).ConfigureAwait(true);
+                GetTaggerUIData, cancellationToken).ConfigureAwait(calledFromJtfRun);
 
             if (valueOpt is null)
             {
@@ -352,17 +350,17 @@ internal partial class AbstractAsynchronousTaggerProvider<TTag>
                 var (oldTagTrees, newTagTrees, context) = await CompareAndSwapTagTreesAsync(
                     static async (oldTagTrees, args, cancellationToken) =>
                     {
-                        var (@this, oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition) = args;
+                        var (@this, oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition, calledFromJtfRun) = args;
 
                         // Create a context to store pass the information along and collect the results.
                         var context = new TaggerContext<TTag>(
                             oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition, oldTagTrees);
-                        await @this.ProduceTagsAsync(context, cancellationToken).ConfigureAwait(true);
+                        await @this.ProduceTagsAsync(context, cancellationToken).ConfigureAwait(calledFromJtfRun);
 
                         return (@this.ComputeNewTagTrees(oldTagTrees, context), context);
                     },
-                    (this, oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition),
-                    cancellationToken).ConfigureAwait(true);
+                    (this, oldState, frozenPartialSemantics, spansToTag, snapshotSpansToTag, caretPosition, calledFromJtfRun),
+                    cancellationToken).ConfigureAwait(calledFromJtfRun);
 
                 // We may get back null if we were canceled.  Immediately bail out in that case.
                 if (newTagTrees is null)
