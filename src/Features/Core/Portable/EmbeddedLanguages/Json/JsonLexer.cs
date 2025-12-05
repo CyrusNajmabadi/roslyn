@@ -18,28 +18,29 @@ using JsonToken = EmbeddedSyntaxToken<JsonKind>;
 using JsonTrivia = EmbeddedSyntaxTrivia<JsonKind>;
 
 [NonCopyable]
-internal struct JsonLexer
+internal struct JsonLexer<TVirtualCharSequence, TVirtualCharSequenceIntrospector>
+    where TVirtualCharSequenceIntrospector : struct, IVirtualCharSequenceIntrospector<TVirtualCharSequence>
 {
-    public readonly VirtualCharSequence Text;
+    public readonly TVirtualCharSequence Text;
     public int Position;
 
-    public JsonLexer(VirtualCharSequence text) : this()
+    public JsonLexer(TVirtualCharSequence text) : this()
     {
         Text = text;
     }
 
-    public readonly VirtualChar CurrentChar => Text[Position];
+    public readonly VirtualChar CurrentChar => default(TVirtualCharSequenceIntrospector).GetAt(Text, Position);
 
-    public readonly VirtualCharSequence GetCharsToCurrentPosition(int start)
+    public readonly TVirtualCharSequence GetCharsToCurrentPosition(int start)
         => GetSubSequence(start, Position);
 
-    public readonly VirtualCharSequence GetSubSequence(int start, int end)
-        => Text[start..end];
+    public readonly TVirtualCharSequence GetSubSequence(int start, int end)
+        => default(TVirtualCharSequenceIntrospector).Slice(Text, start..end);
 
     public JsonToken ScanNextToken()
     {
         var leadingTrivia = ScanTrivia(leading: true);
-        if (Position == Text.Length)
+        if (Position == default(TVirtualCharSequenceIntrospector).GetLength(Text))
         {
             return CreateToken(
                 JsonKind.EndOfFile, leadingTrivia,
@@ -59,7 +60,7 @@ internal struct JsonLexer
 
     private (VirtualCharSequence, JsonKind, EmbeddedDiagnostic? diagnostic) ScanNextTokenWorker()
     {
-        Debug.Assert(Position < Text.Length);
+        Debug.Assert(Position < default(TVirtualCharSequenceIntrospector).GetLength(Text));
         return this.CurrentChar.Value switch
         {
             '{' => ScanSingleCharToken(JsonKind.OpenBraceToken),
@@ -81,14 +82,14 @@ internal struct JsonLexer
         };
     }
 
-    private (VirtualCharSequence, JsonKind, EmbeddedDiagnostic?) ScanString()
+    private (TVirtualCharSequence, JsonKind, EmbeddedDiagnostic?) ScanString()
     {
         var start = Position;
         var openChar = this.CurrentChar;
         Position++;
 
         EmbeddedDiagnostic? diagnostic = null;
-        while (Position < Text.Length)
+        while (Position < default(TVirtualCharSequenceIntrospector).GetLength(Text))
         {
             var currentCh = this.CurrentChar;
 
@@ -121,7 +122,7 @@ internal struct JsonLexer
     /// </summary>
     private EmbeddedDiagnostic? AdvanceToEndOfEscape(int stringStart, int escapeStart)
     {
-        if (this.Position == Text.Length)
+        if (this.Position == default(TVirtualCharSequenceIntrospector).GetLength(Text))
         {
             var chars = GetCharsToCurrentPosition(stringStart);
             return new EmbeddedDiagnostic(FeaturesResources.Unterminated_string, GetSpan(chars));
@@ -141,7 +142,7 @@ internal struct JsonLexer
     private EmbeddedDiagnostic? ScanUnicodeChars(int escapeStart, int unicodeCharStart)
     {
         var invalid = false;
-        for (var i = 0; this.Position < Text.Length && i < 4; i++)
+        for (var i = 0; this.Position < default(TVirtualCharSequenceIntrospector).GetLength(Text) && i < 4; i++)
         {
             var ch = this.CurrentChar;
             Position++;
@@ -163,11 +164,11 @@ internal struct JsonLexer
                       (>= 'A' and <= 'F') or
                       (>= 'a' and <= 'f');
 
-    private (VirtualCharSequence, JsonKind, EmbeddedDiagnostic?) ScanText()
+    private (TVirtualCharSequence, JsonKind, EmbeddedDiagnostic?) ScanText()
     {
         var start = Position;
 
-        while (Position < Text.Length && !IsNotPartOfText(this.CurrentChar))
+        while (Position < default(TVirtualCharSequenceIntrospector).GetLength(Text) && !IsNotPartOfText(this.CurrentChar))
             Position++;
 
         return (GetCharsToCurrentPosition(start), JsonKind.TextToken, null);
@@ -184,7 +185,7 @@ internal struct JsonLexer
             };
     }
 
-    private (VirtualCharSequence, JsonKind, EmbeddedDiagnostic?) ScanSingleCharToken(JsonKind kind)
+    private (TVirtualCharSequence, JsonKind, EmbeddedDiagnostic?) ScanSingleCharToken(JsonKind kind)
     {
         var chars = this.Text[Position..(Position + 1)];
         Position++;
@@ -195,7 +196,7 @@ internal struct JsonLexer
     {
         using var _ = ArrayBuilder<JsonTrivia>.GetInstance(out var result);
 
-        while (Position < Text.Length)
+        while (Position < default(TVirtualCharSequenceIntrospector).GetLength(Text))
         {
             var comment = ScanComment();
             if (comment != null)
@@ -278,7 +279,7 @@ internal struct JsonLexer
         var start = Position;
         Position += 2;
 
-        while (Position < Text.Length && this.CurrentChar.Value is not '\r' and not '\n')
+        while (Position < default(TVirtualCharSequenceIntrospector).GetLength(Text) && this.CurrentChar.Value is not '\r' and not '\n')
             Position++;
 
         var chars = GetCharsToCurrentPosition(start);
@@ -299,7 +300,7 @@ internal struct JsonLexer
         var start = Position;
         Position += 2;
 
-        while (Position < Text.Length && !IsAt("*/"))
+        while (Position < default(TVirtualCharSequenceIntrospector).GetLength(Text) && !IsAt("*/"))
             Position++;
 
         if (IsAt("*/"))
@@ -308,7 +309,7 @@ internal struct JsonLexer
             return CreateTrivia(JsonKind.MultiLineCommentTrivia, GetCharsToCurrentPosition(start));
         }
 
-        Debug.Assert(Position == Text.Length);
+        Debug.Assert(Position == default(TVirtualCharSequenceIntrospector).GetLength(Text));
         return CreateTrivia(JsonKind.MultiLineCommentTrivia, GetCharsToCurrentPosition(start),
             new EmbeddedDiagnostic(FeaturesResources.Unterminated_comment, GetTextSpan(start, Position)));
     }
@@ -323,7 +324,7 @@ internal struct JsonLexer
     {
         for (var i = 0; i < val.Length; i++)
         {
-            if (position + i >= Text.Length || Text[position + i] != val[i])
+            if (position + i >= default(TVirtualCharSequenceIntrospector).GetLength(Text) || Text[position + i] != val[i])
                 return false;
         }
 
@@ -333,7 +334,7 @@ internal struct JsonLexer
     private JsonTrivia? ScanWhitespace()
     {
         var start = Position;
-        while (Position < Text.Length && char.IsWhiteSpace(this.CurrentChar))
+        while (Position < default(TVirtualCharSequenceIntrospector).GetLength(Text) && char.IsWhiteSpace(this.CurrentChar))
             Position++;
 
         if (Position > start)

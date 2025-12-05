@@ -12,8 +12,12 @@ internal static class EmbeddedSyntaxHelpers
     public static TextSpan GetSpan<TSyntaxKind>(EmbeddedSyntaxToken<TSyntaxKind> token1, EmbeddedSyntaxToken<TSyntaxKind> token2) where TSyntaxKind : struct
         => GetSpan(token1.VirtualChars[0], token2.VirtualChars[^1]);
 
-    public static TextSpan GetSpan(VirtualCharSequence virtualChars)
-        => GetSpan(virtualChars[0], virtualChars[^1]);
+    public static TextSpan GetSpan<TVirtualCharSequence, TVirtualCharSequenceIntrospector>(TVirtualCharSequence virtualChars)
+        where TVirtualCharSequenceIntrospector : struct, IVirtualCharSequenceIntrospector<TVirtualCharSequence>
+    {
+        var introspector = default(TVirtualCharSequenceIntrospector);
+        return GetSpan(introspector.GetAt(virtualChars, 0), introspector.GetAt(virtualChars, introspector.GetLength(virtualChars) - 1));
+    }
 
     public static TextSpan GetSpan(VirtualChar firstChar, VirtualChar lastChar)
         => TextSpan.FromBounds(firstChar.Span.Start, lastChar.Span.End);
