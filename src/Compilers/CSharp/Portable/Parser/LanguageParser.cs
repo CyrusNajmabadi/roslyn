@@ -12588,6 +12588,7 @@ done:
             //  ( x , ... ) =>     or       ( ref x , ...) =>
             var index = 1;
 
+            var hasParameterModifier = false;
             while (true)
             {
                 var token = this.PeekToken(index++);
@@ -12596,14 +12597,30 @@ done:
                 // this *will* grab explicitly typed lambdas like `(A b) =>`.  However, that's ok.  The only caller of
                 // this is ScanParenthesizedLambda, which just wants to know if it's on some form of lambda.
                 if (this.IsTrueIdentifier(token) ||
-                    token.Kind is SyntaxKind.CommaToken ||
-                    IsParameterModifierIncludingScoped(token))
+                    token.Kind is SyntaxKind.CommaToken)
                 {
                     continue;
                 }
 
-                return token.Kind == SyntaxKind.CloseParenToken &&
-                       this.PeekToken(index).Kind == SyntaxKind.EqualsGreaterThanToken;
+                if (IsParameterModifierIncludingScoped(token))
+                {
+                    hasParameterModifier = hasParameterModifier || IsParameterModifierExcludingScoped(token);
+                    continue;
+                }
+
+                if (token.Kind != SyntaxKind.CloseParenToken)
+                    return false;
+
+                var nextToken = this.PeekToken(index);
+                if (nextToken.Kind == SyntaxKind.EqualsGreaterThanToken)
+                    return true;
+
+                // if we have something like `(ref int x) =` then it's more likely that this was meant to be a
+                // parenthesized lambda, but the `>` hasn't completed yet.
+                if (nextToken.Kind == SyntaxKind.EqualsToken && hasParameterModifier)
+                    return true;
+
+                return false;
             }
         }
 
@@ -12628,6 +12645,7 @@ done:
             // method F rather than a lambda expression with return type F.
             // Instead, we need to scan to `=>`.
 
+            var hasParameterModifier = false;
             while (true)
             {
                 // Advance past the open paren or comma.
@@ -12639,6 +12657,19 @@ done:
                 {
                     SyntaxListBuilder modifiers = _pool.Allocate();
                     ParseParameterModifiers(modifiers, isFunctionPointerParameter: false, isLambdaParameter: true);
+
+                    if (!hasParameterModifier)
+                    {
+                        for (int i = 0, n = modifiers.Count; i < n; i++)
+                        {
+                            if (IsParameterModifierExcludingScoped((SyntaxToken)modifiers[i]))
+                            {
+                                hasParameterModifier = true;
+                                break;
+                            }
+                        }
+                    }
+
                     _pool.Free(modifiers);
                 }
 
@@ -12675,7 +12706,16 @@ done:
                         continue;
 
                     case SyntaxKind.CloseParenToken:
-                        return this.PeekToken(1).Kind == SyntaxKind.EqualsGreaterThanToken;
+                        var nextToken = this.PeekToken(1);
+                        if (nextToken.Kind == SyntaxKind.EqualsGreaterThanToken)
+                            return true;
+
+                        // if we have something like `(ref int x) =` then it's more likely that this was meant to be a
+                        // parenthesized lambda, but the `>` hasn't completed yet.
+                        if (nextToken.Kind == SyntaxKind.EqualsToken && hasParameterModifier)
+                            return true;
+
+                        return false;
 
                     default:
                         return false;
@@ -13701,7 +13741,9 @@ done:
                 if (this.CurrentToken.Kind == SyntaxKind.OpenParenToken)
                 {
                     var paramList = this.ParseLambdaParameterList();
-                    var arrow = this.EatToken(SyntaxKind.EqualsGreaterThanToken);
+                    var arrow = this.CurrentToken.Kind == SyntaxKind.EqualsToken
+                        ? this.EatTokenAsKind(SyntaxKind.EqualsGreaterThanToken)
+                        : this.EatToken(SyntaxKind.EqualsGreaterThanToken);
                     var (block, expression) = ParseLambdaBody();
 
                     return _syntaxFactory.ParenthesizedLambdaExpression(
