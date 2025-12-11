@@ -722,24 +722,27 @@ namespace A.B {
              );
 
             comp.VerifyDiagnostics(
-                // (1,1): error CS8059: Feature 'top-level statements' is not available in C# 6. Please use language version 9.0 or greater.
+                // (1,20): error CS1026: ) expected
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
-                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}").WithArguments("top-level statements", "9.0").WithLocation(1, 1),
-                // (1,1): error CS8059: Feature 'extern local functions' is not available in C# 6. Please use language version 9.0 or greater.
+                Diagnostic(ErrorCode.ERR_CloseParenExpected, "*").WithLocation(1, 20),
+                // (1,20): error CS1002: ; expected
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
-                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "extern").WithArguments("extern local functions", "9.0").WithLocation(1, 1),
-                // (1,14): error CS8059: Feature 'local functions' is not available in C# 6. Please use language version 7.0 or greater.
-                // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
-                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "Alias").WithArguments("local functions", "7.0").WithLocation(1, 14),
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "*").WithLocation(1, 20),
                 // (1,21): error CS1040: Preprocessor directives must appear as the first non-whitespace character on a line
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
                 Diagnostic(ErrorCode.ERR_BadDirectivePlacement, "#").WithLocation(1, 21),
-                // (1,61): error CS1026: ) expected
+                // (1,61): error CS1733: Expected expression
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
-                Diagnostic(ErrorCode.ERR_CloseParenExpected, "").WithLocation(1, 61),
+                Diagnostic(ErrorCode.ERR_ExpressionExpected, "").WithLocation(1, 61),
                 // (1,61): error CS1002: ; expected
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
                 Diagnostic(ErrorCode.ERR_SemicolonExpected, "").WithLocation(1, 61),
+                // (1,1): error CS8059: Feature 'top-level statements' is not available in C# 6. Please use language version 9.0 or greater.
+                // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "extern alias Alias(").WithArguments("top-level statements", "9.0").WithLocation(1, 1),
+                // (1,14): error CS8059: Feature 'local functions' is not available in C# 6. Please use language version 7.0 or greater.
+                // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "Alias").WithArguments("local functions", "7.0").WithLocation(1, 14),
                 // (1,14): error CS8112: Local function 'Alias()' must declare a body because it is not marked 'static extern'.
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
                 Diagnostic(ErrorCode.ERR_LocalFunctionMissingBody, "Alias").WithArguments("Alias()").WithLocation(1, 14),
@@ -749,10 +752,12 @@ namespace A.B {
                 // (1,14): warning CS0626: Method, operator, or accessor 'Alias()' is marked external and has no attributes on it. Consider adding a DllImport attribute to specify the external implementation.
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
                 Diagnostic(ErrorCode.WRN_ExternMethodNoImplementation, "Alias").WithArguments("Alias()").WithLocation(1, 14),
+                // (1,1): error CS8059: Feature 'extern local functions' is not available in C# 6. Please use language version 9.0 or greater.
+                // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion6, "extern").WithArguments("extern local functions", "9.0").WithLocation(1, 1),
                 // (1,14): warning CS8321: The local function 'Alias' is declared but never used
                 // extern alias Alias(*#$@^%*&); class D : Alias(*#$@^%*&).C {}
-                Diagnostic(ErrorCode.WRN_UnreferencedLocalFunction, "Alias").WithArguments("Alias").WithLocation(1, 14)
-                );
+                Diagnostic(ErrorCode.WRN_UnreferencedLocalFunction, "Alias").WithArguments("Alias").WithLocation(1, 14));
         }
 
         [Fact]

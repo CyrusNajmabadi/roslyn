@@ -2775,10 +2775,9 @@ scoped ref var b;
 ref scoped var c;
 ";
             UsingTree(source, TestOptions.Regular.WithLanguageVersion(langVersion),
-                // (2,16): error CS1003: Syntax error, ',' expected
+                // (2,16): error CS1002: ; expected
                 // ref scoped var c;
-                Diagnostic(ErrorCode.ERR_SyntaxError, "c").WithArguments(",").WithLocation(2, 16)
-                );
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "c").WithLocation(2, 16));
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -3069,6 +3068,24 @@ scoped scoped var b;
                                 N(SyntaxKind.IdentifierToken, "scoped");
                             }
                         }
+                        M(SyntaxKind.SemicolonToken);
+                    }
+                }
+                N(SyntaxKind.GlobalStatement);
+                {
+                    N(SyntaxKind.LocalDeclarationStatement);
+                    {
+                        N(SyntaxKind.VariableDeclaration);
+                        {
+                            N(SyntaxKind.PredefinedType);
+                            {
+                                N(SyntaxKind.IntKeyword);
+                            }
+                            N(SyntaxKind.VariableDeclarator);
+                            {
+                                N(SyntaxKind.IdentifierToken, "a");
+                            }
+                        }
                         N(SyntaxKind.SemicolonToken);
                     }
                 }
@@ -3090,6 +3107,17 @@ scoped scoped var b;
                             {
                                 N(SyntaxKind.IdentifierToken, "var");
                             }
+                        }
+                        M(SyntaxKind.SemicolonToken);
+                    }
+                }
+                N(SyntaxKind.GlobalStatement);
+                {
+                    N(SyntaxKind.ExpressionStatement);
+                    {
+                        N(SyntaxKind.IdentifierName);
+                        {
+                            N(SyntaxKind.IdentifierToken, "b");
                         }
                         N(SyntaxKind.SemicolonToken);
                     }
@@ -3191,13 +3219,12 @@ scoped scoped var b;
 scoped scoped ref R z = ref x;
 ";
             UsingTree(source, TestOptions.RegularPreview,
-                // (1,17): error CS1003: Syntax error, ',' expected
+                // (1,17): error CS1002: ; expected
                 // scoped scoped R x = default;
-                Diagnostic(ErrorCode.ERR_SyntaxError, "x").WithArguments(",").WithLocation(1, 17),
-                // (2,15): error CS1003: Syntax error, ',' expected
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "x").WithLocation(1, 17),
+                // (2,15): error CS1002: ; expected
                 // scoped scoped ref R z = ref x;
-                Diagnostic(ErrorCode.ERR_SyntaxError, "ref").WithArguments(",").WithLocation(2, 15)
-                );
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "ref").WithLocation(2, 15));
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -3776,43 +3803,6 @@ scoped ref readonly R x = M;
                                 N(SyntaxKind.IdentifierToken, "M");
                             }
                         }
-                        M(SyntaxKind.SemicolonToken);
-                    }
-                }
-                N(SyntaxKind.GlobalStatement);
-                {
-                    N(SyntaxKind.LocalDeclarationStatement);
-                    {
-                        N(SyntaxKind.VariableDeclaration);
-                        {
-                            N(SyntaxKind.IdentifierName);
-                            {
-                                N(SyntaxKind.IdentifierToken, "c");
-                            }
-                            M(SyntaxKind.VariableDeclarator);
-                            {
-                                M(SyntaxKind.IdentifierToken);
-                            }
-                        }
-                        M(SyntaxKind.SemicolonToken);
-                    }
-                }
-                N(SyntaxKind.GlobalStatement);
-                {
-                    N(SyntaxKind.ExpressionStatement);
-                    {
-                        N(SyntaxKind.SimpleAssignmentExpression);
-                        {
-                            M(SyntaxKind.IdentifierName);
-                            {
-                                M(SyntaxKind.IdentifierToken);
-                            }
-                            N(SyntaxKind.EqualsToken);
-                            N(SyntaxKind.IdentifierName);
-                            {
-                                N(SyntaxKind.IdentifierToken, "M");
-                            }
-                        }
                         N(SyntaxKind.SemicolonToken);
                     }
                 }
@@ -3884,43 +3874,6 @@ scoped ref readonly R x = M;
                                     }
                                 }
                                 N(SyntaxKind.CloseParenToken);
-                            }
-                            N(SyntaxKind.EqualsToken);
-                            N(SyntaxKind.IdentifierName);
-                            {
-                                N(SyntaxKind.IdentifierToken, "M");
-                            }
-                        }
-                        M(SyntaxKind.SemicolonToken);
-                    }
-                }
-                N(SyntaxKind.GlobalStatement);
-                {
-                    N(SyntaxKind.LocalDeclarationStatement);
-                    {
-                        N(SyntaxKind.VariableDeclaration);
-                        {
-                            N(SyntaxKind.IdentifierName);
-                            {
-                                N(SyntaxKind.IdentifierToken, "c");
-                            }
-                            M(SyntaxKind.VariableDeclarator);
-                            {
-                                M(SyntaxKind.IdentifierToken);
-                            }
-                        }
-                        M(SyntaxKind.SemicolonToken);
-                    }
-                }
-                N(SyntaxKind.GlobalStatement);
-                {
-                    N(SyntaxKind.ExpressionStatement);
-                    {
-                        N(SyntaxKind.SimpleAssignmentExpression);
-                        {
-                            M(SyntaxKind.IdentifierName);
-                            {
-                                M(SyntaxKind.IdentifierToken);
                             }
                             N(SyntaxKind.EqualsToken);
                             N(SyntaxKind.IdentifierName);

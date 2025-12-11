@@ -8704,6 +8704,14 @@ class A : B : C
                         M(SyntaxKind.SemicolonToken);
                     }
                 }
+                N(SyntaxKind.GlobalStatement);
+                {
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
                 N(SyntaxKind.EndOfFileToken);
             }
             EOF();

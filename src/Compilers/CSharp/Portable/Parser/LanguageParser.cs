@@ -13875,13 +13875,11 @@ done:
 
         private bool IsPossibleLambdaParameter()
         {
+            if (IsParameterModifierIncludingScoped(this.CurrentToken))
+                return true;
+
             switch (this.CurrentToken.Kind)
             {
-                case SyntaxKind.ParamsKeyword:
-                case SyntaxKind.ReadOnlyKeyword:
-                case SyntaxKind.RefKeyword:
-                case SyntaxKind.OutKeyword:
-                case SyntaxKind.InKeyword:
                 case SyntaxKind.OpenParenToken:   // tuple
                 case SyntaxKind.OpenBracketToken: // attribute
                     return true;

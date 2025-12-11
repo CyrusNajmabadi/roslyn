@@ -7942,9 +7942,12 @@ class Program
                 var lam = void (this int x = 1) => throw null;
                 """;
             CreateCompilation(source).VerifyDiagnostics(
-                // (1,17): error CS1041: Identifier expected; 'this' is a keyword
+                // (1,17): error CS0027: Keyword 'this' is not available in the current context
                 // var lam = void (this int x = 1) => throw null;
-                Diagnostic(ErrorCode.ERR_IdentifierExpectedKW, "this").WithArguments("", "this").WithLocation(1, 17));
+                Diagnostic(ErrorCode.ERR_ThisInBadContext, "this").WithLocation(1, 17),
+                // (1,17): error CS1743: Cannot specify a default value for the 'this' parameter
+                // var lam = void (this int x = 1) => throw null;
+                Diagnostic(ErrorCode.ERR_DefaultValueForExtensionParameter, "this").WithLocation(1, 17));
         }
 
         [Fact]
@@ -8525,9 +8528,9 @@ class Program
                 var lam = (this params int[] xs) => xs.Length;
                 """;
             CreateCompilation(source).VerifyDiagnostics(
-                // (1,12): error CS1041: Identifier expected; 'this' is a keyword
+                // (1,12): error CS0027: Keyword 'this' is not available in the current context
                 // var lam = (this params int[] xs) => xs.Length;
-                Diagnostic(ErrorCode.ERR_IdentifierExpectedKW, "this").WithArguments("", "this").WithLocation(1, 12));
+                Diagnostic(ErrorCode.ERR_ThisInBadContext, "this").WithLocation(1, 12));
         }
 
         [Fact]
