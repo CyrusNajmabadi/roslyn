@@ -3718,35 +3718,7 @@ scoped ref readonly R x = M;
             UsingTree(source, TestOptions.Regular.WithLanguageVersion(langVersion),
                 // (2,6): error CS1073: Unexpected token 'scoped'
                 // (ref scoped int b, var c) = M;
-<<<<<<< HEAD
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "ref scoped").WithArguments("ref").WithLocation(2, 2),
-                // (2,13): error CS1026: ) expected
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_CloseParenExpected, "int").WithLocation(2, 13),
-                // (2,13): error CS1002: ; expected
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "int").WithLocation(2, 13),
-                // (2,20): error CS1044: Cannot use more than one type in a for, using, fixed, or declaration statement
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_MultiTypeInDeclaration, "var").WithLocation(2, 20),
-                // (2,24): error CS1002: ; expected
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "c").WithLocation(2, 24),
-                // (2,25): error CS1001: Identifier expected
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_IdentifierExpected, ")").WithLocation(2, 25),
-                // (2,25): error CS1003: Syntax error, ',' expected
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SyntaxError, ")").WithArguments(",").WithLocation(2, 25),
-                // (2,27): error CS1002: ; expected
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "=").WithLocation(2, 27),
-                // (2,27): error CS1525: Invalid expression term '='
-                // (ref scoped int b, var c) = M;
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "=").WithArguments("=").WithLocation(2, 27));
-=======
                 Diagnostic(ErrorCode.ERR_UnexpectedToken, "scoped").WithArguments("scoped").WithLocation(2, 6));
->>>>>>> declExprParsing
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -3861,35 +3833,7 @@ scoped ref readonly R x = M;
             UsingTree(source, TestOptions.Regular.WithLanguageVersion(langVersion),
                 // (2,6): error CS1073: Unexpected token 'scoped'
                 // (ref scoped a b, var c) = M;
-<<<<<<< HEAD
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "ref scoped").WithArguments("ref").WithLocation(2, 2),
-                // (2,13): error CS1026: ) expected
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_CloseParenExpected, "a").WithLocation(2, 13),
-                // (2,13): error CS1002: ; expected
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "a").WithLocation(2, 13),
-                // (2,18): error CS1044: Cannot use more than one type in a for, using, fixed, or declaration statement
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_MultiTypeInDeclaration, "var").WithLocation(2, 18),
-                // (2,22): error CS1002: ; expected
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "c").WithLocation(2, 22),
-                // (2,23): error CS1001: Identifier expected
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_IdentifierExpected, ")").WithLocation(2, 23),
-                // (2,23): error CS1003: Syntax error, ',' expected
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SyntaxError, ")").WithArguments(",").WithLocation(2, 23),
-                // (2,25): error CS1002: ; expected
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "=").WithLocation(2, 25),
-                // (2,25): error CS1525: Invalid expression term '='
-                // (ref scoped a b, var c) = M;
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "=").WithArguments("=").WithLocation(2, 25));
-=======
                 Diagnostic(ErrorCode.ERR_UnexpectedToken, "scoped").WithArguments("scoped").WithLocation(2, 6));
->>>>>>> declExprParsing
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -4076,41 +4020,7 @@ scoped ref readonly R x = M;
             UsingTree(source, TestOptions.Regular.WithLanguageVersion(langVersion),
                 // (2,15): error CS1073: Unexpected token 'scoped'
                 // (ref readonly scoped int c, var d) = M;
-<<<<<<< HEAD
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "ref ").WithArguments("ref").WithLocation(2, 2),
-                // (2,6): error CS1525: Invalid expression term 'readonly'
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "readonly").WithArguments("readonly").WithLocation(2, 6),
-                // (2,6): error CS1026: ) expected
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_CloseParenExpected, "readonly").WithLocation(2, 6),
-                // (2,6): error CS1002: ; expected
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "readonly").WithLocation(2, 6),
-                // (2,6): error CS0106: The modifier 'readonly' is not valid for this item
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_BadMemberFlag, "readonly").WithArguments("readonly").WithLocation(2, 6),
-                // (2,29): error CS1044: Cannot use more than one type in a for, using, fixed, or declaration statement
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_MultiTypeInDeclaration, "var").WithLocation(2, 29),
-                // (2,33): error CS1002: ; expected
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "d").WithLocation(2, 33),
-                // (2,34): error CS1001: Identifier expected
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_IdentifierExpected, ")").WithLocation(2, 34),
-                // (2,34): error CS1003: Syntax error, ',' expected
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SyntaxError, ")").WithArguments(",").WithLocation(2, 34),
-                // (2,36): error CS1002: ; expected
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "=").WithLocation(2, 36),
-                // (2,36): error CS1525: Invalid expression term '='
-                // (ref readonly scoped int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "=").WithArguments("=").WithLocation(2, 36));
-=======
                 Diagnostic(ErrorCode.ERR_UnexpectedToken, "scoped").WithArguments("scoped").WithLocation(2, 15));
->>>>>>> declExprParsing
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -4192,35 +4102,7 @@ scoped ref readonly R x = M;
                 Diagnostic(ErrorCode.ERR_UnexpectedToken, "scoped").WithArguments("scoped").WithLocation(2, 6),
                 // (2,13): error CS1073: Unexpected token 'readonly'
                 // (ref scoped readonly int c, var d) = M;
-<<<<<<< HEAD
-                Diagnostic(ErrorCode.ERR_CloseParenExpected, "readonly").WithLocation(2, 13),
-                // (2,13): error CS1002: ; expected
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "readonly").WithLocation(2, 13),
-                // (2,13): error CS0106: The modifier 'readonly' is not valid for this item
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_BadMemberFlag, "readonly").WithArguments("readonly").WithLocation(2, 13),
-                // (2,29): error CS1044: Cannot use more than one type in a for, using, fixed, or declaration statement
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_MultiTypeInDeclaration, "var").WithLocation(2, 29),
-                // (2,33): error CS1002: ; expected
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "d").WithLocation(2, 33),
-                // (2,34): error CS1001: Identifier expected
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_IdentifierExpected, ")").WithLocation(2, 34),
-                // (2,34): error CS1003: Syntax error, ',' expected
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SyntaxError, ")").WithArguments(",").WithLocation(2, 34),
-                // (2,36): error CS1002: ; expected
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "=").WithLocation(2, 36),
-                // (2,36): error CS1525: Invalid expression term '='
-                // (ref scoped readonly int c, var d) = M;
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "=").WithArguments("=").WithLocation(2, 36));
-=======
                 Diagnostic(ErrorCode.ERR_UnexpectedToken, "readonly").WithArguments("readonly").WithLocation(2, 13));
->>>>>>> declExprParsing
 
             N(SyntaxKind.CompilationUnit);
             {
