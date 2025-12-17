@@ -130,7 +130,7 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
 
             // Only want to fixup `=> Task.FromResult(...)` and `ValueTask GooAsync() => new(...)` and the like to
             // `async => ...`.  We want to leave alone `Task GooAsync() => BarAsync()`
-            if (!IsTaskFromExpressionWrapper(expression, out _) ||
+            if (!IsTaskFromExpressionWrapper(expression, out _) &&
                 !TryRewriteSpecializedTask(expression, out _))
             {
                 return false;
