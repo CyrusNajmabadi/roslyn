@@ -280,7 +280,7 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
         return body;
     }
 
-    private static bool TryUnwrap(SyntaxNode body, ReturnStatementSyntax returnStatement, out ReturnStatementSyntax? result)
+    private static bool TryUnwrap(bool returnsValue, SyntaxNode body, ReturnStatementSyntax returnStatement, out ReturnStatementSyntax? result)
     {
         if (returnStatement.Expression != null)
         {
@@ -307,6 +307,13 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
 
                 return true;
             }
+
+            if (returnExpression is LiteralExpressionSyntax(kind: SyntaxKind.DefaultLiteralExpression) &&
+                !returnsValue)
+            {
+                result = null;
+                return true;
+            }
         }
 
         result = null;
@@ -322,7 +329,7 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
             if (child is not ReturnStatementSyntax { Expression: { } returnExpression } returnStatement)
                 continue;
 
-            if (TryUnwrap(body, returnStatement, out var unwrapped))
+            if (TryUnwrap(returnsValue, body, returnStatement, out var unwrapped))
             {
                 if (unwrapped is null)
                 {
