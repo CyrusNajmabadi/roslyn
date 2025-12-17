@@ -288,7 +288,8 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
                 continue;
             }
 
-            if (returnExpression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "CompletedTask" })
+            if (returnExpression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "CompletedTask" } &&
+                !returnStatement.Parent.IsEmbeddedStatementOwner())
             {
                 bodyEditor.RemoveNode(returnStatement);
                 continue;
