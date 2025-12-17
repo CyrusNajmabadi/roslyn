@@ -130,8 +130,11 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
 
             // Only want to fixup `=> Task.FromResult(...)` and `ValueTask GooAsync() => new(...)` and the like to
             // `async => ...`.  We want to leave alone `Task GooAsync() => BarAsync()`
-            if (!IsTaskFromExpressionWrapper(expression, out _))
+            if (!IsTaskFromExpressionWrapper(expression, out _) ||
+                !TryRewriteSpecializedTask(expression, out _))
+            {
                 return false;
+            }
         }
 
         var method = GetMethodSymbol(semanticModel, container, cancellationToken);
@@ -142,6 +145,38 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
             return false;
 
         return true;
+    }
+
+    private static bool TryRewriteSpecializedTask(ExpressionSyntax expression, [NotNullWhen(true)] out ExpressionSyntax? result)
+    {
+        result = RewriteSpecializedTaskWorker();
+        if (result is null)
+            return false;
+
+        result = result.WithTriviaFrom(expression);
+        return true;
+
+        ExpressionSyntax? RewriteSpecializedTaskWorker()
+        {
+            if (expression is InvocationExpressionSyntax { ArgumentList.Arguments: [] } invocationExpression)
+                expression = invocationExpression.Expression;
+
+            if (expression is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "SpecializedTasks" } } memberAccess)
+            {
+                var name = memberAccess.Name;
+                return name.Identifier.ValueText switch
+                {
+                    "True" => SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression),
+                    "False" => SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression),
+                    "Null" => SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression),
+                    "EmptyReadOnlyList" or "EmptyList" or "EmptyImmutableArray" or "EmptyEnumerable" => SyntaxFactory.CollectionExpression(),
+                    "Default" when name is GenericNameSyntax { TypeArgumentList.Arguments: [var typeArg] } => SyntaxFactory.DefaultExpression(typeArg),
+                    _ => null,
+                };
+            }
+
+            return null;
+        }
     }
 
     private static bool IsTaskFromExpressionWrapper(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
