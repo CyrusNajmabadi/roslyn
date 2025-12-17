@@ -221,14 +221,8 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
     {
         if (body is ExpressionSyntax expression)
         {
-            if (expression is BaseObjectCreationExpressionSyntax { ArgumentList.Arguments: [var argument1] })
-            {
-                return argument1.Expression;
-            }
-            else if (expression is InvocationExpressionSyntax { ArgumentList.Arguments: [var argument2] })
-            {
-                return argument2.Expression;
-            }
+            if (IsTaskFromExpressionWrapper(expression, out var argument))
+                return argument.Expression.WithTriviaFrom(expression);
         }
         else
         {
