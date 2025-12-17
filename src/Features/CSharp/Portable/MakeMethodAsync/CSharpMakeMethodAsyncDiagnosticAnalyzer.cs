@@ -288,10 +288,18 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
                 continue;
             }
 
-            if (returnExpression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "CompletedTask" } &&
-                !returnStatement.Parent.IsEmbeddedStatementOwner())
+            if (returnExpression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "CompletedTask" })
             {
-                bodyEditor.RemoveNode(returnStatement);
+                if (body is BlockSyntax block &&
+                    returnStatement == block.Statements.Last())
+                {
+                    bodyEditor.RemoveNode(returnStatement);
+                }
+                else
+                {
+                    bodyEditor.ReplaceNode(returnStatement, SyntaxFactory.ReturnStatement().WithTriviaFrom(returnStatement));
+                }
+
                 continue;
             }
 
