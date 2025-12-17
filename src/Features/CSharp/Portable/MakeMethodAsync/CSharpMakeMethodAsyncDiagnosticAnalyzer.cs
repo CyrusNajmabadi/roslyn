@@ -308,10 +308,17 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
                 return true;
             }
 
-            if (returnExpression is LiteralExpressionSyntax(kind: SyntaxKind.DefaultLiteralExpression) &&
-                !returnsValue)
+            if (returnExpression is LiteralExpressionSyntax(kind: SyntaxKind.DefaultLiteralExpression))
             {
-                result = null;
+                if (!returnsValue)
+                {
+                    result = null;
+                }
+                else
+                {
+                    result = returnStatement;
+                }
+
                 return true;
             }
         }
