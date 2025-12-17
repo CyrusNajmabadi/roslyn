@@ -30,6 +30,8 @@ namespace Microsoft.CodeAnalysis.CSharp.MakeMethodAsync;
 internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
     : SyntaxEditorBasedCodeRefactoringProvider
 {
+    protected override CodeActionCleanup Cleanup => CodeActionCleanup.SyntaxOnly;
+
     protected override ImmutableArray<RefactorAllScope> SupportedRefactorAllScopes => DefaultRefactorAllScopes;
 
     private static bool IsPotentialAsyncContainer(SyntaxNode node)
