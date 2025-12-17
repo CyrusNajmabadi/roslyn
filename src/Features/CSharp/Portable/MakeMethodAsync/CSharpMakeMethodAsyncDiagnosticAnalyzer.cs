@@ -179,35 +179,35 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
         }
     }
 
-    private static bool IsTaskFromExpressionWrapper(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
+    private static bool IsTaskFromExpressionWrapper(ExpressionSyntax expression, [NotNullWhen(true)] out ExpressionSyntax? result)
     {
-        return IsTaskConstruction(expression, out argument) ||
-               IsFromResultInvocation(expression, out argument);
+        return IsTaskConstruction(expression, out result) ||
+               IsFromResultInvocation(expression, out result);
     }
 
-    private static bool IsTaskConstruction(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
+    private static bool IsTaskConstruction(ExpressionSyntax expression, [NotNullWhen(true)] out ExpressionSyntax? result)
     {
-        if (expression is BaseObjectCreationExpressionSyntax { ArgumentList.Arguments: [var arg] })
+        if (expression is BaseObjectCreationExpressionSyntax { ArgumentList.Arguments: [var argument] })
         {
-            argument = arg;
+            result = argument.Expression;
             return true;
         }
 
-        argument = null;
+        result = null;
         return false;
     }
 
-    private static bool IsFromResultInvocation(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
+    private static bool IsFromResultInvocation(ExpressionSyntax expression, [NotNullWhen(true)] out ExpressionSyntax? result)
     {
-        if (expression is InvocationExpressionSyntax { ArgumentList.Arguments: [var arg] } invocation &&
+        if (expression is InvocationExpressionSyntax { ArgumentList.Arguments: [var argument] } invocation &&
            invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
            memberAccess.Name.Identifier.ValueText == "FromResult")
         {
-            argument = arg;
+            result = argument.Expression;
             return true;
         }
 
-        argument = null;
+        result = null;
         return false;
     }
 
@@ -259,8 +259,11 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
     {
         if (body is ExpressionSyntax expression)
         {
-            if (IsTaskFromExpressionWrapper(expression, out var argument))
-                return argument.Expression.WithTriviaFrom(expression);
+            if (IsTaskFromExpressionWrapper(expression, out var unwrapped) ||
+                TryRewriteSpecializedTask(expression, out unwrapped))
+            {
+                return unwrapped.WithTriviaFrom(expression);
+            }
         }
         else
         {
@@ -278,9 +281,10 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
             if (child is not ReturnStatementSyntax { Expression: { } returnExpression } returnStatement)
                 continue;
 
-            if (IsTaskFromExpressionWrapper(returnExpression, out var argument))
+            if (IsTaskFromExpressionWrapper(returnExpression, out var unwrapped) ||
+                TryRewriteSpecializedTask(returnExpression, out unwrapped))
             {
-                bodyEditor.ReplaceNode(returnExpression, argument.Expression.WithTriviaFrom(returnExpression));
+                bodyEditor.ReplaceNode(returnExpression, unwrapped.WithTriviaFrom(returnExpression));
                 continue;
             }
 
