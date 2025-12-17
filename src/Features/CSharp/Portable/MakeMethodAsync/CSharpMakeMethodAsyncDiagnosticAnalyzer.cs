@@ -2,66 +2,277 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#pragma warning disable VSTHRD200 // Use "Async" suffix for async methods
+
+using System;
+using System.Collections.Immutable;
+using System.Composition;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.CodeStyle;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.MakeMethodAsync;
 
-internal sealed class CSharpMakeMethodAsyncDiagnosticAnalyzer()
-    : AbstractBuiltInCodeStyleDiagnosticAnalyzer(
-        "MA0001", EnforceOnBuild.WhenExplicitlyEnabled, (IOption2?)null, "New make async")
+[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(CSharpMakeMethodAsyncCodeRefactoringProvider)), Shared]
+[method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+[method: ImportingConstructor]
+internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
+    : SyntaxEditorBasedCodeRefactoringProvider
 {
-    public override DiagnosticAnalyzerCategory GetAnalyzerCategory()
-        => DiagnosticAnalyzerCategory.SemanticDocumentAnalysis;
+    protected override ImmutableArray<RefactorAllScope> SupportedRefactorAllScopes => DefaultRefactorAllScopes;
 
-    protected override void InitializeWorker(AnalysisContext context)
-    {
-        context.RegisterCompilationStartAction(context =>
+    private static bool IsPotentialAsyncContainer(SyntaxNode node)
+        => node is MethodDeclarationSyntax or LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
+
+    private static bool HasAsyncModifier(SyntaxNode node)
+        => GetModifiers(node).Any(SyntaxKind.AsyncKeyword);
+
+    private static SyntaxTokenList GetModifiers(SyntaxNode node)
+        => node switch
         {
-            var taskTypes = new KnownTaskTypes(context.Compilation);
+            MethodDeclarationSyntax methodDeclaration => methodDeclaration.Modifiers,
+            LocalFunctionStatementSyntax localFunction => localFunction.Modifiers,
+            AnonymousFunctionExpressionSyntax anonymousFunction => anonymousFunction.Modifiers,
+            _ => throw ExceptionUtilities.Unreachable(),
+        };
 
-            context.RegisterSyntaxNodeAction(AnalyzeMethodDeclaration, SyntaxKind.MethodDeclaration);
-            context.RegisterSyntaxNodeAction(context => AnalyzeAnonymousFunction(context, taskTypes), SyntaxKind.AnonymousMethodExpression, SyntaxKind.SimpleLambdaExpression, SyntaxKind.ParenthesizedLambdaExpression);
+    private static SyntaxNode? GetBody(SyntaxNode node)
+        => node switch
+        {
+            MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body ?? (SyntaxNode?)methodDeclaration.ExpressionBody?.Expression,
+            LocalFunctionStatementSyntax localFunction => localFunction.Body ?? (SyntaxNode?)localFunction.ExpressionBody?.Expression,
+            AnonymousFunctionExpressionSyntax anonymousFunction => anonymousFunction.Body ?? anonymousFunction.ExpressionBody,
+            _ => throw ExceptionUtilities.Unreachable(),
+        };
 
-        });
+    private static IMethodSymbol? GetMethodSymbol(SemanticModel semanticModel, SyntaxNode node, CancellationToken cancellationToken)
+    {
+        return node switch
+        {
+            MethodDeclarationSyntax methodDeclaration => semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken),
+            LocalFunctionStatementSyntax localFunction => semanticModel.GetDeclaredSymbol(localFunction, cancellationToken),
+            AnonymousFunctionExpressionSyntax anonymousFunction => (IMethodSymbol?)semanticModel.GetSymbolInfo(anonymousFunction, cancellationToken).Symbol,
+            _ => null,
+        };
     }
 
-    private void AnalyzeMethodDeclaration(SyntaxNodeAnalysisContext context)
+    public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
     {
-        var methodDeclaration = (MethodDeclarationSyntax)context.Node;
-        var returnType = methodDeclaration.ReturnType;
-        var rightMostName = returnType.GetRightmostName();
-        if (rightMostName is null)
+        var (document, span, cancellationToken) = context;
+        var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var taskTypes = new KnownTaskTypes(semanticModel.Compilation);
+
+        var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var token = root.FindToken(span.Start);
+
+        var container = token.GetRequiredParent().FirstAncestorOrSelf<SyntaxNode>(
+            n => n is MethodDeclarationSyntax or LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax);
+        if (container is null)
             return;
 
-        var identifier = rightMostName.Identifier;
-        if (identifier.ValueText is not nameof(Task) and not nameof(ValueTask))
+        if (!ShouldMakeAsync(semanticModel, taskTypes, container, cancellationToken))
             return;
 
-        if (methodDeclaration.Modifiers.Any(SyntaxKind.AsyncKeyword))
-            return;
-
-        context.ReportDiagnostic(Diagnostic.Create(this.Descriptor, methodDeclaration.GetLocation()));
+        context.RegisterRefactoring(CodeAction.Create(
+            "New make async",
+            cancellationToken => RefactorAllAsync(document, new([container.Span]), null, cancellationToken)));
     }
 
-    private void AnalyzeAnonymousFunction(SyntaxNodeAnalysisContext context, KnownTaskTypes taskTypes)
+    private static bool ShouldMakeAsync(
+        SemanticModel semanticModel, KnownTaskTypes taskTypes, SyntaxNode container, CancellationToken cancellationToken)
     {
-        var cancellationToken = context.CancellationToken;
-        var node = (AnonymousFunctionExpressionSyntax)context.Node;
-        if (node.Modifiers.Any(SyntaxKind.AsyncKeyword))
-            return;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (context.SemanticModel.GetSymbolInfo(node, cancellationToken).Symbol is not IMethodSymbol lambdaMethod)
-            return;
+        if (HasAsyncModifier(container))
+            return false;
 
-        if (!taskTypes.IsTaskLike(lambdaMethod.ReturnType))
-            return;
+        var body = GetBody(container);
+        if (body is null)
+            return false;
 
-        context.ReportDiagnostic(Diagnostic.Create(this.Descriptor, node.GetLocation()));
+        if (container is MethodDeclarationSyntax methodDeclaration)
+        {
+            var returnType = methodDeclaration.ReturnType;
+            var rightMostName = returnType.GetRightmostName();
+            if (rightMostName is null)
+                return false;
+
+            var identifier = rightMostName.Identifier;
+            if (identifier.ValueText is not nameof(Task) and not nameof(ValueTask))
+                return false;
+        }
+        else if (container is LocalFunctionStatementSyntax localFunction)
+        {
+            var returnType = localFunction.ReturnType;
+            var rightMostName = returnType.GetRightmostName();
+            if (rightMostName is null)
+                return false;
+
+            var identifier = rightMostName.Identifier;
+            if (identifier.ValueText is not nameof(Task) and not nameof(ValueTask))
+                return false;
+        }
+
+        if (body is ExpressionSyntax expression)
+        {
+            if (expression is ThrowExpressionSyntax)
+                return false;
+
+            // Only want to fixup `=> Task.FromResult(...)` and `ValueTask GooAsync() => new(...)` and the like to
+            // `async => ...`.  We want to leave alone `Task GooAsync() => BarAsync()`
+            if (!IsTaskFromExpressionWrapper(expression, out _))
+                return false;
+        }
+
+        var method = GetMethodSymbol(semanticModel, container, cancellationToken);
+        if (method is null)
+            return false;
+
+        if (!taskTypes.IsTaskLike(method.ReturnType))
+            return false;
+
+        return true;
+    }
+
+    private static bool IsTaskFromExpressionWrapper(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
+    {
+        return IsTaskConstruction(expression, out argument) ||
+               IsFromResultInvocation(expression, out argument);
+    }
+
+    private static bool IsTaskConstruction(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
+    {
+        if (expression is BaseObjectCreationExpressionSyntax { ArgumentList.Arguments: [var arg] })
+        {
+            argument = arg;
+            return true;
+        }
+
+        argument = null;
+        return false;
+    }
+
+    private static bool IsFromResultInvocation(ExpressionSyntax expression, [NotNullWhen(true)] out ArgumentSyntax? argument)
+    {
+        if (expression is InvocationExpressionSyntax { ArgumentList.Arguments: [var arg] } invocation &&
+           invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+           memberAccess.Name.Identifier.ValueText == "FromResult")
+        {
+            argument = arg;
+            return true;
+        }
+
+        argument = null;
+        return false;
+    }
+
+    protected override async Task RefactorAllAsync(
+        Document document,
+        ImmutableArray<TextSpan> refactorAllSpans,
+        SyntaxEditor editor,
+        string? equivalenceKey,
+        CancellationToken cancellationToken)
+    {
+        var semanticModel = await document.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+
+        var intervalTree = new TextSpanMutableIntervalTree(refactorAllSpans);
+        var taskTypes = new KnownTaskTypes(semanticModel.Compilation);
+
+        foreach (var node in root.DescendantNodes().Where(IsPotentialAsyncContainer).OrderByDescending(n => n.SpanStart))
+        {
+            if (!ShouldMakeAsync(semanticModel, taskTypes, node, cancellationToken))
+                continue;
+
+            var methodSymbol = GetMethodSymbol(semanticModel, node, cancellationToken);
+            if (methodSymbol is null)
+                continue;
+
+            editor.ReplaceNode(
+                node,
+                (currentNode, generator) => MakeAsync(generator, methodSymbol, currentNode));
+        }
+    }
+
+    private static SyntaxNode MakeAsync(
+        SyntaxGenerator generator, IMethodSymbol methodSymbol, SyntaxNode currentNode)
+    {
+        var returnsValue = methodSymbol.ReturnType.GetTypeArguments().Length > 0;
+
+        currentNode = generator.WithModifiers(currentNode, generator.GetModifiers(currentNode).WithAsync(true));
+        var body = GetBody(currentNode);
+        if (body != null)
+            currentNode = currentNode.ReplaceNode(body, RewriteBody(generator, body, returnsValue));
+
+        return currentNode;
+    }
+
+    private static SyntaxNode RewriteBody(SyntaxGenerator generator, SyntaxNode body, bool returnsValue)
+    {
+        if (body is ExpressionSyntax expression)
+        {
+            if (expression is BaseObjectCreationExpressionSyntax { ArgumentList.Arguments: [var argument1] })
+            {
+                return argument1.Expression;
+            }
+            else if (expression is InvocationExpressionSyntax { ArgumentList.Arguments: [var argument2] })
+            {
+                return argument2.Expression;
+            }
+        }
+        else
+        {
+            return RewriteBlock(generator, body, returnsValue);
+        }
+
+        return body;
+    }
+
+    private static SyntaxNode RewriteBlock(SyntaxGenerator generator, SyntaxNode body, bool returnsValue)
+    {
+        var bodyEditor = new SyntaxEditor(body, generator);
+        foreach (var child in body.DescendantNodesAndSelf(n => !IsPotentialAsyncContainer(n)).OrderByDescending(n => n.SpanStart))
+        {
+            if (child is not ReturnStatementSyntax { Expression: { } returnExpression } returnStatement)
+                continue;
+
+            if (IsTaskFromExpressionWrapper(returnExpression, out var argument))
+            {
+                bodyEditor.ReplaceNode(returnExpression, argument.WithTriviaFrom(returnExpression));
+                continue;
+            }
+
+            var awaited = generator.AwaitExpression(
+                generator.InvocationExpression(
+                    generator.MemberAccessExpression(
+                        returnExpression.WithoutTrivia(),
+                        "ConfigureAwait"),
+                    generator.Argument(generator.FalseLiteralExpression()))).WithTriviaFrom(returnExpression);
+
+            // return FooAsync();
+            if (returnsValue)
+            {
+                bodyEditor.ReplaceNode(returnExpression, awaited);
+            }
+            else
+            {
+                bodyEditor.ReplaceNode(
+                    returnStatement,
+                    SyntaxFactory.ExpressionStatement(
+                        (ExpressionSyntax)awaited, returnStatement.SemicolonToken).WithLeadingTrivia(returnStatement.GetLeadingTrivia()));
+            }
+        }
+
+        return bodyEditor.GetChangedRoot();
     }
 }
