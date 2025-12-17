@@ -15,6 +15,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.CSharp.UseExpressionBody;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Shared.Collections;
@@ -247,15 +248,21 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
     {
         var returnsValue = methodSymbol.ReturnType.GetTypeArguments().Length > 0;
 
-        currentNode = generator.WithModifiers(currentNode, generator.GetModifiers(currentNode).WithAsync(true));
         var body = GetBody(currentNode);
         if (body != null)
-            currentNode = currentNode.ReplaceNode(body, RewriteBody(generator, body, returnsValue));
+        {
+            var rewritten = RewriteBody(generator, body, returnsValue);
+            if (rewritten != null)
+            {
+                currentNode = currentNode.ReplaceNode(body, rewritten);
+                currentNode = generator.WithModifiers(currentNode, generator.GetModifiers(currentNode).WithAsync(true));
+            }
+        }
 
         return currentNode;
     }
 
-    private static SyntaxNode RewriteBody(SyntaxGenerator generator, SyntaxNode body, bool returnsValue)
+    private static SyntaxNode? RewriteBody(SyntaxGenerator generator, SyntaxNode? body, bool returnsValue)
     {
         if (body is ExpressionSyntax expression)
         {
@@ -265,7 +272,7 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
                 return unwrapped.WithTriviaFrom(expression);
             }
         }
-        else
+        else if (body is BlockSyntax)
         {
             return RewriteBlock(generator, body, returnsValue);
         }
@@ -273,19 +280,17 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
         return body;
     }
 
-    private static SyntaxNode RewriteBlock(SyntaxGenerator generator, SyntaxNode body, bool returnsValue)
+    private static bool TryUnwrap(SyntaxNode body, ReturnStatementSyntax returnStatement, out ReturnStatementSyntax? result)
     {
-        var bodyEditor = new SyntaxEditor(body, generator);
-        foreach (var child in body.DescendantNodesAndSelf(n => !IsPotentialAsyncContainer(n)).OrderByDescending(n => n.SpanStart))
+        if (returnStatement.Expression != null)
         {
-            if (child is not ReturnStatementSyntax { Expression: { } returnExpression } returnStatement)
-                continue;
+            var returnExpression = returnStatement.Expression;
 
             if (IsTaskFromExpressionWrapper(returnExpression, out var unwrapped) ||
                 TryRewriteSpecializedTask(returnExpression, out unwrapped))
             {
-                bodyEditor.ReplaceNode(returnExpression, unwrapped.WithTriviaFrom(returnExpression));
-                continue;
+                result = returnStatement.ReplaceNode(returnExpression, unwrapped.WithTriviaFrom(returnExpression));
+                return true;
             }
 
             if (returnExpression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "CompletedTask" })
@@ -293,13 +298,42 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
                 if (body is BlockSyntax block &&
                     returnStatement == block.Statements.Last())
                 {
+                    result = null;
+                }
+                else
+                {
+                    result = SyntaxFactory.ReturnStatement().WithTriviaFrom(returnStatement);
+                }
+
+                return true;
+            }
+        }
+
+        result = null;
+        return false;
+    }
+
+    private static SyntaxNode? RewriteBlock(SyntaxGenerator generator, SyntaxNode body, bool returnsValue)
+    {
+        var bodyEditor = new SyntaxEditor(body, generator);
+        var unwrappedCode = false;
+        foreach (var child in body.DescendantNodesAndSelf(n => !IsPotentialAsyncContainer(n)).OrderByDescending(n => n.SpanStart))
+        {
+            if (child is not ReturnStatementSyntax { Expression: { } returnExpression } returnStatement)
+                continue;
+
+            if (TryUnwrap(body, returnStatement, out var unwrapped))
+            {
+                if (unwrapped is null)
+                {
                     bodyEditor.RemoveNode(returnStatement);
                 }
                 else
                 {
-                    bodyEditor.ReplaceNode(returnStatement, SyntaxFactory.ReturnStatement().WithTriviaFrom(returnStatement));
+                    bodyEditor.ReplaceNode(returnStatement, unwrapped);
                 }
 
+                unwrappedCode = true;
                 continue;
             }
 
@@ -324,6 +358,6 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
             }
         }
 
-        return bodyEditor.GetChangedRoot();
+        return unwrappedCode ? bodyEditor.GetChangedRoot() : null;
     }
 }
