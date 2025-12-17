@@ -312,7 +312,15 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
             {
                 if (!returnsValue)
                 {
-                    result = null;
+                    if (body is BlockSyntax block &&
+                        returnStatement == block.Statements.Last())
+                    {
+                        result = null;
+                    }
+                    else
+                    {
+                        result = SyntaxFactory.ReturnStatement().WithTriviaFrom(returnStatement);
+                    }
                 }
                 else
                 {
