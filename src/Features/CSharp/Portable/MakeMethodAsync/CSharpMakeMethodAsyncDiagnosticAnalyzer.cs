@@ -288,6 +288,12 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
                 continue;
             }
 
+            if (returnExpression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "CompletedTask" })
+            {
+                bodyEditor.RemoveNode(returnStatement);
+                continue;
+            }
+
             var awaited = generator.AwaitExpression(
                 generator.InvocationExpression(
                     generator.MemberAccessExpression(
