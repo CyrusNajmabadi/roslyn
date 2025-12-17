@@ -226,6 +226,9 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
 
         foreach (var node in root.DescendantNodes().Where(IsPotentialAsyncContainer).OrderByDescending(n => n.SpanStart))
         {
+            if (!intervalTree.HasIntervalThatOverlapsWith(node.Span))
+                continue;
+
             if (!ShouldMakeAsync(semanticModel, taskTypes, node, cancellationToken))
                 continue;
 
@@ -277,7 +280,7 @@ internal sealed class CSharpMakeMethodAsyncCodeRefactoringProvider()
 
             if (IsTaskFromExpressionWrapper(returnExpression, out var argument))
             {
-                bodyEditor.ReplaceNode(returnExpression, argument.WithTriviaFrom(returnExpression));
+                bodyEditor.ReplaceNode(returnExpression, argument.Expression.WithTriviaFrom(returnExpression));
                 continue;
             }
 
