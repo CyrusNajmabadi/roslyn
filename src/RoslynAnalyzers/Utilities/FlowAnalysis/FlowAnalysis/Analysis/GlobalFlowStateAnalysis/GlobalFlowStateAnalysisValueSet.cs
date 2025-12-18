@@ -18,11 +18,11 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
     internal sealed class GlobalFlowStateAnalysisValueSet : CacheBasedEquatable<GlobalFlowStateAnalysisValueSet>
     {
         public static readonly GlobalFlowStateAnalysisValueSet Unset = new(
-            ImmutableHashSet<IAbstractAnalysisValue>.Empty, ImmutableHashSet<GlobalFlowStateAnalysisValueSet>.Empty, 0, GlobalFlowStateAnalysisValueSetKind.Unset);
+            [], [], 0, GlobalFlowStateAnalysisValueSetKind.Unset);
         public static readonly GlobalFlowStateAnalysisValueSet Empty = new(
-            ImmutableHashSet<IAbstractAnalysisValue>.Empty, ImmutableHashSet<GlobalFlowStateAnalysisValueSet>.Empty, 0, GlobalFlowStateAnalysisValueSetKind.Empty);
+            [], [], 0, GlobalFlowStateAnalysisValueSetKind.Empty);
         public static readonly GlobalFlowStateAnalysisValueSet Unknown = new(
-            ImmutableHashSet<IAbstractAnalysisValue>.Empty, ImmutableHashSet<GlobalFlowStateAnalysisValueSet>.Empty, 0, GlobalFlowStateAnalysisValueSetKind.Unknown);
+            [], [], 0, GlobalFlowStateAnalysisValueSetKind.Unknown);
 
         private GlobalFlowStateAnalysisValueSet(
             ImmutableHashSet<IAbstractAnalysisValue> analysisValues,
@@ -53,7 +53,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
         }
 
         public static GlobalFlowStateAnalysisValueSet Create(IAbstractAnalysisValue analysisValue)
-            => new([analysisValue], ImmutableHashSet<GlobalFlowStateAnalysisValueSet>.Empty, height: 0, GlobalFlowStateAnalysisValueSetKind.Known);
+            => new([analysisValue], [], height: 0, GlobalFlowStateAnalysisValueSetKind.Known);
 
         public ImmutableHashSet<IAbstractAnalysisValue> AnalysisValues { get; }
         public ImmutableHashSet<GlobalFlowStateAnalysisValueSet> Parents { get; }
@@ -137,7 +137,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
                     height = 1;
                 }
 
-                return GlobalFlowStateAnalysisValueSet.Create(ImmutableHashSet<IAbstractAnalysisValue>.Empty, parentsBuilder.ToImmutable(), height);
+                return GlobalFlowStateAnalysisValueSet.Create([], parentsBuilder.ToImmutable(), height);
             }
 
             static GlobalFlowStateAnalysisValueSet GetNegateValueFromParents(ImmutableHashSet<GlobalFlowStateAnalysisValueSet> parents)

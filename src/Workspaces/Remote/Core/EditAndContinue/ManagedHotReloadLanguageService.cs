@@ -40,7 +40,7 @@ internal sealed partial class ManagedHotReloadLanguageService(
     }
 
     private static readonly ActiveStatementSpanProvider s_emptyActiveStatementProvider =
-        async (_, _, _) => ImmutableArray<ActiveStatementSpan>.Empty;
+        async (_, _, _) => [];
 
     private readonly ManagedHotReloadServiceProxy _debuggerService = new(serviceBrokerProvider.ServiceBroker);
     private readonly SolutionSnapshotProviderProxy _solutionSnapshotProvider = new(serviceBrokerProvider.ServiceBroker);

@@ -56,7 +56,7 @@ internal sealed class InlayHintHandler : ILspServiceDocumentRequestHandler<Inlay
         var resultId = inlayHintCache.UpdateCache(new InlayHintCache.InlayHintCacheEntry(hints));
 
         if (hints.Length == 0)
-            return Array.Empty<LSP.InlayHint>();
+            return [];
 
         var text = await document.GetValueTextAsync(cancellationToken).ConfigureAwait(false);
         var syntaxVersion = await document.GetSyntaxVersionAsync(cancellationToken).ConfigureAwait(false);

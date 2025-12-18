@@ -310,7 +310,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
 
         private static bool TryGetEditorConfigOptionForSkippedNamespaces(AnalyzerOptions analyzerOptions, SyntaxTree tree, out ImmutableArray<string> skippedNamespaces)
         {
-            skippedNamespaces = ImmutableArray<string>.Empty;
+            skippedNamespaces = [];
             if (!TryGetEditorConfigOption(analyzerOptions, tree, NamespaceToIgnoreInTrackingEditorConfigOptionName, out var namespacesString) || string.IsNullOrWhiteSpace(namespacesString))
             {
                 return false;

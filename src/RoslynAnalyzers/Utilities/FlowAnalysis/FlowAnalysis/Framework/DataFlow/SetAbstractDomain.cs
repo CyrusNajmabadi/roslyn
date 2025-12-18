@@ -14,7 +14,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
 
         public static SetAbstractDomain<T> Default { get; } = new SetAbstractDomain<T>();
 
-        public override ImmutableHashSet<T> Bottom => ImmutableHashSet<T>.Empty;
+        public override ImmutableHashSet<T> Bottom => [];
 
         public override int Compare(ImmutableHashSet<T> oldValue, ImmutableHashSet<T> newValue, bool assertMonotonicity)
         {

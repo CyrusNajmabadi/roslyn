@@ -2224,7 +2224,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers.UnitTests
                 """, $"""
                 C
                 C.C() -> void
-                """, $@"", System.Array.Empty<DiagnosticResult>());
+                """, $@"", []);
 
         [Fact]
         public Task TestAddAndRemoveMembers_CSharp_FixAsync()

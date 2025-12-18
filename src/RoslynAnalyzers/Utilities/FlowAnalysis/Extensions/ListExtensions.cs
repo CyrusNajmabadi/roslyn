@@ -40,7 +40,7 @@ namespace Analyzer.Utilities.Extensions
 
             if (builder is null)
             {
-                return ImmutableArray<T>.Empty;
+                return [];
             }
 
             list.RemoveRange(list.Count - builder.Count, builder.Count);

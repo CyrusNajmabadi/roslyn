@@ -19,7 +19,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics;
 internal readonly struct SkippedHostAnalyzersInfo
 {
     public static readonly SkippedHostAnalyzersInfo Empty = new(
-        [],
+        ImmutableHashSet<DiagnosticAnalyzer>.Empty,
         ImmutableDictionary<DiagnosticAnalyzer, ImmutableArray<string>>.Empty);
 
     /// <summary>

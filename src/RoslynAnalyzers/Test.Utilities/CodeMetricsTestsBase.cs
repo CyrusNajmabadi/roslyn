@@ -80,7 +80,7 @@ namespace Test.Utilities.CodeMetrics
             }
             else
             {
-                Assert.Collection(diagnostics, Array.Empty<Action<Diagnostic>>());
+                Assert.Collection(diagnostics, []);
             }
 
             var actualMetricsText = GetMetricsDataString(compilation).Trim();

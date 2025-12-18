@@ -26,7 +26,7 @@ namespace Analyzer.Utilities.Extensions
             DiagnosticDescriptor rule,
             ImmutableDictionary<string, string?>? properties,
             params object[] args)
-            => node.CreateDiagnostic(rule, additionalLocations: ImmutableArray<Location>.Empty, properties, args);
+            => node.CreateDiagnostic(rule, additionalLocations: [], properties, args);
 
         public static Diagnostic CreateDiagnostic(
             this SyntaxNode node,
@@ -107,7 +107,7 @@ namespace Analyzer.Utilities.Extensions
             DiagnosticDescriptor rule,
             ImmutableDictionary<string, string?>? properties,
             params object[] args)
-            => location.CreateDiagnostic(rule, ImmutableArray<Location>.Empty, properties, args);
+            => location.CreateDiagnostic(rule, [], properties, args);
 
         public static Diagnostic CreateDiagnostic(
             this Location location,

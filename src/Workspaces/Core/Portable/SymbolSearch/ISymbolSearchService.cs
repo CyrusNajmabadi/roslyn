@@ -156,11 +156,11 @@ internal sealed class ReferenceAssemblyResult(
 internal sealed class DefaultSymbolSearchService() : ISymbolSearchService
 {
     public async ValueTask<ImmutableArray<PackageResult>> FindPackagesAsync(string source, TypeQuery typeQuery, NamespaceQuery namespaceQuery, CancellationToken cancellationToken)
-        => ImmutableArray<PackageResult>.Empty;
+        => [];
 
     public async ValueTask<ImmutableArray<PackageWithAssemblyResult>> FindPackagesWithAssemblyAsync(string source, string assemblyName, CancellationToken cancellationToken)
-        => ImmutableArray<PackageWithAssemblyResult>.Empty;
+        => [];
 
     public async ValueTask<ImmutableArray<ReferenceAssemblyResult>> FindReferenceAssembliesAsync(TypeQuery typeQuery, NamespaceQuery namespaceQuery, CancellationToken cancellationToken)
-        => ImmutableArray<ReferenceAssemblyResult>.Empty;
+        => [];
 }

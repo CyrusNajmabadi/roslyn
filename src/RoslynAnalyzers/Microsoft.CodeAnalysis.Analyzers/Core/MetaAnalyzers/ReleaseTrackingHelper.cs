@@ -338,7 +338,7 @@ namespace Microsoft.CodeAnalysis.ReleaseTracking
         public ImmutableHashSet<Version> Versions { get; }
 
         private ReleaseTrackingData()
-            : this(ImmutableSortedDictionary<string, ReleaseTrackingDataForRule>.Empty, ImmutableHashSet<Version>.Empty)
+            : this(ImmutableSortedDictionary<string, ReleaseTrackingDataForRule>.Empty, [])
         {
         }
 

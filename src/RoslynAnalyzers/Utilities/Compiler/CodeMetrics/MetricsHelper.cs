@@ -107,7 +107,7 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
                 {
                     if (remaining.IsEmpty)
                     {
-                        next = ReadOnlySpan<char>.Empty;
+                        next = [];
                         return false;
                     }
 
@@ -117,7 +117,7 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
                         if (index < 0)
                         {
                             next = remaining;
-                            remaining = ReadOnlySpan<char>.Empty;
+                            remaining = [];
                             return false;
                         }
 
@@ -139,7 +139,7 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
                         if (index < 0)
                         {
                             next = remaining;
-                            remaining = ReadOnlySpan<char>.Empty;
+                            remaining = [];
                             return false;
                         }
 
@@ -412,7 +412,7 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
             {
                 SymbolKind.Method => ((IMethodSymbol)member).Parameters,
                 SymbolKind.Property => ((IPropertySymbol)member).Parameters,
-                _ => ImmutableArray<IParameterSymbol>.Empty,
+                _ => [],
             };
         }
     }

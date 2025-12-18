@@ -69,7 +69,7 @@ namespace Analyzer.Utilities
 
             _disposeOwnershipTransferLikelyTypes = IDisposable != null ?
                 GetDisposeOwnershipTransferLikelyTypes(compilation) :
-                ImmutableHashSet<INamedTypeSymbol>.Empty;
+                [];
         }
 
         private static ImmutableHashSet<INamedTypeSymbol> GetDisposeOwnershipTransferLikelyTypes(Compilation compilation)
@@ -190,7 +190,7 @@ namespace Analyzer.Utilities
 
             if (!namedType.IsDisposable(IDisposable, IAsyncDisposable, ConfiguredAsyncDisposable))
             {
-                disposableFields = ImmutableHashSet<IFieldSymbol>.Empty;
+                disposableFields = [];
             }
             else
             {

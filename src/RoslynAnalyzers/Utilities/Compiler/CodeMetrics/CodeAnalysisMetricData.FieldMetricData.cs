@@ -20,7 +20,7 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
                 int cyclomaticComplexity,
                 int? depthOfInheritance)
                 : base(symbol, maintainabilityIndex, computationalComplexityMetrics, coupledNamedTypes,
-                      linesOfCode, cyclomaticComplexity, depthOfInheritance, children: ImmutableArray<CodeAnalysisMetricData>.Empty)
+                      linesOfCode, cyclomaticComplexity, depthOfInheritance, children: [])
             {
             }
 

@@ -36,7 +36,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.CopyAnalysis
         }
 
         private CopyAbstractValue(CopyAbstractValueKind kind)
-            : this(ImmutableHashSet<AnalysisEntity>.Empty, kind)
+            : this([], kind)
         {
             Debug.Assert(!kind.IsKnown());
         }

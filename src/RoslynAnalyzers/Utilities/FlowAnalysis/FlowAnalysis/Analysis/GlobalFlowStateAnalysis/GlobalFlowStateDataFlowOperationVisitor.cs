@@ -61,7 +61,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
 
             return AnalysisEntity.Create(
                 owningSymbol,
-                ImmutableArray<AbstractIndex>.Empty,
+                [],
                 owningSymbol.GetMemberOrLocalOrParameterType()!,
                 instanceLocation: PointsToAbstractValue.Unknown,
                 parent: null,

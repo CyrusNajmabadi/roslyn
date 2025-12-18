@@ -42,7 +42,7 @@ namespace Analyzer.Utilities
         {
             if (itemOptionValue == null)
             {
-                return ImmutableArray<string>.Empty;
+                return [];
             }
 
             return ProduceTrimmedArray(itemOptionValue).ToImmutableArray();

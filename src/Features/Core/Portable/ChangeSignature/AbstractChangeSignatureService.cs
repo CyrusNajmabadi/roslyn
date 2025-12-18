@@ -97,7 +97,7 @@ internal abstract class AbstractChangeSignatureService : ILanguageService
 
         return context is ChangeSignatureAnalysisSucceededContext changeSignatureAnalyzedSucceedContext
             ? [new ChangeSignatureCodeAction(this, changeSignatureAnalyzedSucceedContext)]
-            : ImmutableArray<ChangeSignatureCodeAction>.Empty;
+            : [];
     }
 
     internal async Task<ChangeSignatureAnalyzedContext> GetChangeSignatureContextAsync(

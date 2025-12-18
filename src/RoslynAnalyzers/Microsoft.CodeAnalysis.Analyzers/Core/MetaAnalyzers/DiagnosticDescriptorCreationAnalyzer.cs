@@ -1081,7 +1081,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
                     Diagnostic diagnostic = argument.CreateDiagnostic(ProvideCustomTagsInDescriptorRule);
                     operationAnalysisContext.ReportDiagnostic(diagnostic);
 
-                    customTags = ImmutableArray<string>.Empty;
+                    customTags = [];
                 }
                 else if (arrayCreation.Initializer is IArrayInitializerOperation arrayInitializer &&
                     arrayInitializer.ElementValues.All(element => element.ConstantValue.HasValue && element.ConstantValue.Value is string))

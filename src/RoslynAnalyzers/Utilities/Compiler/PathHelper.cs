@@ -15,7 +15,7 @@ namespace Analyzer.Utilities
         public static ReadOnlySpan<char> GetFileName(string? path)
         {
             if (RoslynString.IsNullOrEmpty(path))
-                return ReadOnlySpan<char>.Empty;
+                return [];
 
             var lastSeparator = path.LastIndexOfAny(DirectorySeparatorCharacters);
             if (lastSeparator < 0)

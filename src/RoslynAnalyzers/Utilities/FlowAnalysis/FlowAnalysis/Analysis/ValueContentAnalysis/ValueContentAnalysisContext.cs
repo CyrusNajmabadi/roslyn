@@ -42,7 +42,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis
                   pointsToAnalysisResult, valueContentAnalysisResult: null, tryGetOrComputeAnalysisResult, parentControlFlowGraph,
                   interproceduralAnalysisData, interproceduralAnalysisPredicate)
         {
-            AdditionalSupportedValueTypes = additionalSupportedValueTypes.IsDefault ? ImmutableArray<INamedTypeSymbol>.Empty : additionalSupportedValueTypes;
+            AdditionalSupportedValueTypes = additionalSupportedValueTypes.IsDefault ? [] : additionalSupportedValueTypes;
             GetValueForAdditionalSupportedValueTypeOperation = getValueForAdditionalSupportedValueTypeOperation;
         }
 

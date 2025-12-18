@@ -105,7 +105,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
 
         private PropertySetAbstractValue()
         {
-            this.KnownPropertyAbstractValues = ImmutableArray<PropertySetAbstractValueKind>.Empty;
+            this.KnownPropertyAbstractValues = [];
         }
 
         /// <summary>

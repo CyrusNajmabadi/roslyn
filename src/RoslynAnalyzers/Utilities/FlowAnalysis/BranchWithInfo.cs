@@ -27,9 +27,9 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis
 
         internal BranchWithInfo(BasicBlock destination)
             : this(destination,
-                  enteringRegions: ImmutableArray<ControlFlowRegion>.Empty,
-                  leavingRegions: ImmutableArray<ControlFlowRegion>.Empty,
-                  finallyRegions: ImmutableArray<ControlFlowRegion>.Empty,
+                  enteringRegions: [],
+                  leavingRegions: [],
+                  finallyRegions: [],
                   kind: ControlFlowBranchSemantics.Regular,
                   branchValue: null,
                   controlFlowConditionKind: ControlFlowConditionKind.None,
@@ -76,9 +76,9 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis
         {
             return new BranchWithInfo(
                 destination,
-                enteringRegions: ImmutableArray<ControlFlowRegion>.Empty,
-                leavingRegions: ImmutableArray<ControlFlowRegion>.Empty,
-                finallyRegions: ImmutableArray<ControlFlowRegion>.Empty,
+                enteringRegions: [],
+                leavingRegions: [],
+                finallyRegions: [],
                 kind: Kind,
                 branchValue: BranchValue,
                 controlFlowConditionKind: ControlFlowConditionKind,

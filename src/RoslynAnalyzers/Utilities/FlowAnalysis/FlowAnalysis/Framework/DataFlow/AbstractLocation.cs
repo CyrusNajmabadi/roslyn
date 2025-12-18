@@ -37,7 +37,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             Debug.Assert(isSpecialSingleton ^ (locationType != null));
 
             Creation = creation;
-            CreationCallStack = creationCallStack ?? ImmutableStack<IOperation>.Empty;
+            CreationCallStack = creationCallStack ?? [];
             AnalysisEntity = analysisEntity;
             Symbol = symbol;
             CaptureId = captureId;
@@ -160,7 +160,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
 
                     IObjectCreationOperation objectCreation => objectCreation.Arguments,
 
-                    _ => ImmutableArray<IArgumentOperation>.Empty,
+                    _ => [],
                 };
 
                 foreach (var argument in arguments)

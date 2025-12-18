@@ -64,7 +64,7 @@ internal sealed class CSharpCopilotCodeAnalysisService : AbstractCopilotCodeAnal
         if (AnalysisService is not null)
             return await AnalysisService.AnalyzeDocumentAsync(document, span, promptTitle, cancellationToken).ConfigureAwait(false);
 
-        return ImmutableArray<Diagnostic>.Empty;
+        return [];
     }
 
     protected override async Task<ImmutableArray<string>> GetAvailablePromptTitlesCoreAsync(Document document, CancellationToken cancellationToken)
@@ -72,7 +72,7 @@ internal sealed class CSharpCopilotCodeAnalysisService : AbstractCopilotCodeAnal
         if (AnalysisService is not null)
             return await AnalysisService.GetAvailablePromptTitlesAsync(document, cancellationToken).ConfigureAwait(false);
 
-        return ImmutableArray<string>.Empty;
+        return [];
     }
 
     protected override async Task<ImmutableArray<Diagnostic>> GetCachedDiagnosticsCoreAsync(Document document, string promptTitle, CancellationToken cancellationToken)
@@ -80,7 +80,7 @@ internal sealed class CSharpCopilotCodeAnalysisService : AbstractCopilotCodeAnal
         if (AnalysisService is not null)
             return await AnalysisService.GetCachedDiagnosticsAsync(document, promptTitle, cancellationToken).ConfigureAwait(false);
 
-        return ImmutableArray<Diagnostic>.Empty;
+        return [];
     }
 
     protected override async Task<bool> IsAvailableCoreAsync(CancellationToken cancellationToken)

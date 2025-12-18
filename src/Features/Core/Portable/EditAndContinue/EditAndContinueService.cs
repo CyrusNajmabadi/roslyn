@@ -255,7 +255,7 @@ internal sealed class EditAndContinueService : IEditAndContinueService
         var debuggingSession = TryGetDebuggingSession(sessionId);
         if (debuggingSession == null)
         {
-            return ImmutableArray<ActiveStatementSpan>.Empty;
+            return [];
         }
 
         return await debuggingSession.GetAdjustedActiveStatementSpansAsync(mappedDocument, activeStatementSpanProvider, cancellationToken).ConfigureAwait(false);

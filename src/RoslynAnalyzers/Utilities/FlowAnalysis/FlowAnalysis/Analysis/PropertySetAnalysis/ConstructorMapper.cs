@@ -56,7 +56,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
         public ConstructorMapper(ValueContentAbstractValueCallback mapFromValueContentAbstractValueCallback)
         {
             this.MapFromValueContentAbstractValue = mapFromValueContentAbstractValueCallback ?? throw new ArgumentNullException(nameof(mapFromValueContentAbstractValueCallback));
-            this.PropertyAbstractValues = ImmutableArray<PropertySetAbstractValueKind>.Empty;
+            this.PropertyAbstractValues = [];
         }
 
         /// <summary>
@@ -66,7 +66,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
         public ConstructorMapper(PointsToAbstractValueCallback mapFromPointsToAbstractValueCallback)
         {
             this.MapFromPointsToAbstractValue = mapFromPointsToAbstractValueCallback ?? throw new ArgumentNullException(nameof(mapFromPointsToAbstractValueCallback));
-            this.PropertyAbstractValues = ImmutableArray<PropertySetAbstractValueKind>.Empty;
+            this.PropertyAbstractValues = [];
         }
 
         /// <summary>

@@ -65,7 +65,7 @@ public partial class ProjectDependencyGraph
     ///    has been calculated, forks of this PDG will calculate their new reverse references in a non-lazy fashion.
     /// </remarks>
     internal static readonly ProjectDependencyGraph Empty = new(
-        [],
+        ImmutableHashSet<ProjectId>.Empty,
         ImmutableDictionary<ProjectId, ImmutableHashSet<ProjectId>>.Empty,
         reverseReferencesMap: null,
         ImmutableDictionary<ProjectId, ImmutableHashSet<ProjectId>>.Empty,

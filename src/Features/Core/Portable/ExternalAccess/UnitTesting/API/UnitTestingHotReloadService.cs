@@ -20,7 +20,7 @@ internal sealed class UnitTestingHotReloadService(HostWorkspaceServices services
         private readonly ImmutableArray<string> _capabilities = capabilities;
 
         public async ValueTask<ImmutableArray<ManagedActiveStatementDebugInfo>> GetActiveStatementsAsync(CancellationToken cancellationToken)
-            => ImmutableArray<ManagedActiveStatementDebugInfo>.Empty;
+            => [];
 
         public async ValueTask<ManagedHotReloadAvailability> GetAvailabilityAsync(Guid module, CancellationToken cancellationToken)
             => new ManagedHotReloadAvailability(ManagedHotReloadAvailabilityStatus.Available);
@@ -49,7 +49,7 @@ internal sealed class UnitTestingHotReloadService(HostWorkspaceServices services
     }
 
     private static readonly ActiveStatementSpanProvider s_solutionActiveStatementSpanProvider =
-        async (_, _, _) => ImmutableArray<ActiveStatementSpan>.Empty;
+        async (_, _, _) => [];
 
     private readonly IEditAndContinueService _encService = services.GetRequiredService<IEditAndContinueWorkspaceService>().Service;
     private DebuggingSessionId _sessionId;

@@ -21,7 +21,7 @@ namespace Analyzer.Utilities.UnitTests.Options
         public void WhenNoSymbolNames_ReturnsEmpty()
         {
             // Arrange & act
-            var options = SymbolNamesWithValueOption<Unit>.Create(ImmutableArray<string>.Empty, GetCompilation(), null, static name => new SymbolNamesWithValueOption<Unit>.NameParts(name, Unit.Default));
+            var options = SymbolNamesWithValueOption<Unit>.Create([], GetCompilation(), null, static name => new SymbolNamesWithValueOption<Unit>.NameParts(name, Unit.Default));
 
             // Assert
             Assert.Equal(SymbolNamesWithValueOption<Unit>.Empty, options);

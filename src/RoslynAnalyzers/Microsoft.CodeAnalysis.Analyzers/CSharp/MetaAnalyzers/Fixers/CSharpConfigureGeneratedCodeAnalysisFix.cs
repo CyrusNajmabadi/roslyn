@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Analyzers.MetaAnalyzers.Fixers
                 }
             }
 
-            return Enumerable.Empty<SyntaxNode>();
+            return [];
         }
     }
 }

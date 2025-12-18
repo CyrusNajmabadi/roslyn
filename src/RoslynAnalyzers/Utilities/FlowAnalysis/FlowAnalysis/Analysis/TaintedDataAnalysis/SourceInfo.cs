@@ -66,7 +66,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 throw new ArgumentException("Can't specify constantArrayLengthMatcher unless taintConstantArray is true");
             }
 
-            DependencyFullTypeNames = dependencyFullTypeNames ?? ImmutableArray<string>.Empty;
+            DependencyFullTypeNames = dependencyFullTypeNames ?? [];
         }
 
         /// <summary>

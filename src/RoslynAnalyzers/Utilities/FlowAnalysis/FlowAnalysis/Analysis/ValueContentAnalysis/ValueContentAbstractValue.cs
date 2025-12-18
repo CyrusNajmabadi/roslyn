@@ -23,10 +23,10 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis
         // Ensure we bound the number of value content literals and avoid infinite analysis iterations.
         private const int LiteralsBound = 10;
 
-        public static ValueContentAbstractValue UndefinedState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.Undefined);
-        public static ValueContentAbstractValue InvalidState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.Invalid);
-        public static ValueContentAbstractValue MayBeContainsNonLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.Maybe);
-        public static ValueContentAbstractValue DoesNotContainLiteralOrNonLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.No);
+        public static ValueContentAbstractValue UndefinedState { get; } = new ValueContentAbstractValue([], ValueContainsNonLiteralState.Undefined);
+        public static ValueContentAbstractValue InvalidState { get; } = new ValueContentAbstractValue([], ValueContainsNonLiteralState.Invalid);
+        public static ValueContentAbstractValue MayBeContainsNonLiteralState { get; } = new ValueContentAbstractValue([], ValueContainsNonLiteralState.Maybe);
+        public static ValueContentAbstractValue DoesNotContainLiteralOrNonLiteralState { get; } = new ValueContentAbstractValue([], ValueContainsNonLiteralState.No);
         public static ValueContentAbstractValue ContainsNullLiteralState { get; } = new ValueContentAbstractValue([(object?)null], ValueContainsNonLiteralState.No);
         public static ValueContentAbstractValue ContainsEmptyStringLiteralState { get; } = new ValueContentAbstractValue([string.Empty], ValueContainsNonLiteralState.No);
         public static ValueContentAbstractValue ContainsZeroIntergralLiteralState { get; } = new ValueContentAbstractValue([0], ValueContainsNonLiteralState.No);

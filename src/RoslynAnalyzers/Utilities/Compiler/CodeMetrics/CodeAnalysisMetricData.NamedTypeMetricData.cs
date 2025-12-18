@@ -123,7 +123,7 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
                         indexThreshold -= 4;
                     }
 
-                    return builder?.ToImmutable() ?? ImmutableHashSet<IFieldSymbol>.Empty;
+                    return builder?.ToImmutable() ?? [];
                 }
             }
 

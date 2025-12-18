@@ -59,7 +59,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
             PropertySetAnalysisParameters propertySetAnalysisParameters,
             params (int Line, int Column, string? Method, HazardousUsageEvaluationResult Result)[] expectedResults)
         {
-            expectedResults ??= Array.Empty<(int Line, int Column, string? MethodName, HazardousUsageEvaluationResult Result)>();
+            expectedResults ??= [];
 
             Project project = CreateProject([source, TestTypeToTrackSource]);
             Compilation? compilation = project.GetCompilationAsync().Result;
@@ -83,13 +83,13 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
                     cfg,
                     compilation,
                     symbol,
-                    new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
+                    new AnalyzerOptions([]),
                     propertySetAnalysisParameters.TypesToTrack,
                     propertySetAnalysisParameters.ConstructorMapper,
                     propertySetAnalysisParameters.PropertyMapperCollection,
                     propertySetAnalysisParameters.HazardousUsageEvaluatorCollection,
                     InterproceduralAnalysisConfiguration.Create(
-                        new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
+                        new AnalyzerOptions([]),
                         dummy,
                         cfg,
                         compilation,

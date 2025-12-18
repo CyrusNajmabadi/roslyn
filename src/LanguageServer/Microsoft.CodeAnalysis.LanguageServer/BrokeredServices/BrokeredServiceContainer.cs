@@ -16,7 +16,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.BrokeredServices;
 internal sealed class BrokeredServiceContainer : GlobalBrokeredServiceContainer
 {
     public BrokeredServiceContainer(TraceSource traceSource)
-        : base(ImmutableDictionary<ServiceMoniker, ServiceRegistration>.Empty, isClientOfExclusiveServer: false, joinableTaskFactory: null, traceSource)
+        : base([], isClientOfExclusiveServer: false, joinableTaskFactory: null, traceSource)
     {
     }
 

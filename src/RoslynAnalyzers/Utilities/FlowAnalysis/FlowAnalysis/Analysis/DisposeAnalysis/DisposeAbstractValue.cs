@@ -21,7 +21,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.DisposeAnalysis
         public static readonly DisposeAbstractValue Unknown = new(DisposeAbstractValueKind.Unknown);
 
         private DisposeAbstractValue(DisposeAbstractValueKind kind)
-            : this(ImmutableHashSet<IOperation>.Empty, kind)
+            : this([], kind)
         {
             Debug.Assert(kind != DisposeAbstractValueKind.Disposed);
         }

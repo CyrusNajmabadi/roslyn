@@ -21,8 +21,8 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
     /// <remarks>This metric is based off of the Halstead metric.</remarks>
     internal sealed class ComputationalComplexityMetrics
     {
-        internal static readonly ComputationalComplexityMetrics Default = new(0, 0, 0, 0, 0, ImmutableHashSet<OperationKind>.Empty,
-            ImmutableHashSet<BinaryOperatorKind>.Empty, ImmutableHashSet<UnaryOperatorKind>.Empty, ImmutableHashSet<CaseKind>.Empty, ImmutableHashSet<ISymbol>.Empty, ImmutableHashSet<object>.Empty);
+        internal static readonly ComputationalComplexityMetrics Default = new(0, 0, 0, 0, 0, [],
+            [], [], [], [], []);
         private static readonly object s_nullConstantPlaceholder = new();
         private readonly long _symbolUsageCounts;
         private readonly long _constantUsageCounts;
@@ -286,12 +286,12 @@ namespace Microsoft.CodeAnalysis.CodeMetrics
                 symbolUsageCounts,
                 constantUsageCounts,
                 hasSymbolInitializer,
-                distinctOperatorKindsBuilder != null ? distinctOperatorKindsBuilder.ToImmutable() : ImmutableHashSet<OperationKind>.Empty,
-                distinctBinaryOperatorKindsBuilder != null ? distinctBinaryOperatorKindsBuilder.ToImmutable() : ImmutableHashSet<BinaryOperatorKind>.Empty,
-                distinctUnaryOperatorKindsBuilder != null ? distinctUnaryOperatorKindsBuilder.ToImmutable() : ImmutableHashSet<UnaryOperatorKind>.Empty,
-                distinctCaseKindsBuilder != null ? distinctCaseKindsBuilder.ToImmutable() : ImmutableHashSet<CaseKind>.Empty,
-                distinctReferencedSymbolsBuilder != null ? distinctReferencedSymbolsBuilder.ToImmutable() : ImmutableHashSet<ISymbol>.Empty,
-                distinctReferencedConstantsBuilder != null ? distinctReferencedConstantsBuilder.ToImmutable() : ImmutableHashSet<object>.Empty);
+                distinctOperatorKindsBuilder != null ? distinctOperatorKindsBuilder.ToImmutable() : [],
+                distinctBinaryOperatorKindsBuilder != null ? distinctBinaryOperatorKindsBuilder.ToImmutable() : [],
+                distinctUnaryOperatorKindsBuilder != null ? distinctUnaryOperatorKindsBuilder.ToImmutable() : [],
+                distinctCaseKindsBuilder != null ? distinctCaseKindsBuilder.ToImmutable() : [],
+                distinctReferencedSymbolsBuilder != null ? distinctReferencedSymbolsBuilder.ToImmutable() : [],
+                distinctReferencedConstantsBuilder != null ? distinctReferencedConstantsBuilder.ToImmutable() : []);
 
             static int getExecutableLinesOfCode(IOperation operation, ref bool hasSymbolInitializer)
             {

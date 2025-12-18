@@ -62,7 +62,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
         /// <param name="NullableLineNumber">Number for the max line where #nullable enable was found (-1 otherwise)</param>
         private sealed record ApiData(ImmutableArray<ApiLine> ApiList, ImmutableArray<RemovedApiLine> RemovedApiList, int NullableLineNumber)
         {
-            public static readonly ApiData Empty = new(ImmutableArray<ApiLine>.Empty, ImmutableArray<RemovedApiLine>.Empty, NullableLineNumber: -1);
+            public static readonly ApiData Empty = new([], [], NullableLineNumber: -1);
         }
 
         private sealed class Impl
@@ -859,7 +859,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
                     return skippedNamespaces;
                 }
 
-                return ImmutableArray<string>.Empty;
+                return [];
             }
 
             private bool IsTrackedApiCore(ISymbol symbol, CancellationToken cancellationToken)

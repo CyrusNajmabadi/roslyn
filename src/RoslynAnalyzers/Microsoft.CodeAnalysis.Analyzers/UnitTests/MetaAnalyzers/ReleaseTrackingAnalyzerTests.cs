@@ -485,7 +485,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
                     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(descriptor1);
                     public override void Initialize(AnalysisContext context) { }
                 }
-                """, @"", @"", $@"{DefaultUnshippedHeader}{entry}", additionalExpectedDiagnosticsInInput: ImmutableArray<DiagnosticResult>.Empty,
+                """, @"", @"", $@"{DefaultUnshippedHeader}{entry}", additionalExpectedDiagnosticsInInput: [],
                 additionalExpectedDiagnosticsInResult: [GetAdditionalFileResultAt(5, 1,
                         ReleaseTrackingHelper.UnshippedFileName,
                         DiagnosticDescriptorCreationAnalyzer.InvalidUndetectedEntryInAnalyzerReleasesFileRule,
@@ -1026,7 +1026,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
 
         private async Task VerifyCSharpAdditionalFileFixAsync(string source, string shippedText, string oldUnshippedText, string newUnshippedText)
         {
-            await VerifyAdditionalFileFixAsync(LanguageNames.CSharp, source, shippedText, oldUnshippedText, newUnshippedText, ImmutableArray<DiagnosticResult>.Empty, ImmutableArray<DiagnosticResult>.Empty);
+            await VerifyAdditionalFileFixAsync(LanguageNames.CSharp, source, shippedText, oldUnshippedText, newUnshippedText, [], []);
         }
 
         private async Task VerifyCSharpAdditionalFileFixAsync(string source, string shippedText, string oldUnshippedText, string newUnshippedText,

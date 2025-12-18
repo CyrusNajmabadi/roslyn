@@ -34,7 +34,7 @@ internal static class CopilotUtilities
     public static ImmutableArray<TextSpan> GetTextSpansFromTextChanges(IEnumerable<TextChange>? changes)
     {
         if (changes is null)
-            return ImmutableArray<TextSpan>.Empty;
+            return [];
 
         var totalDelta = 0;
 

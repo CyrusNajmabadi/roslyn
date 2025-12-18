@@ -25,7 +25,7 @@ namespace GenerateDocumentationAndConfigFiles
         {
             if (analyzerFileReference == null)
             {
-                return ImmutableArray<CodeFixProvider>.Empty;
+                return [];
             }
 
             ImmutableArray<CodeFixProvider>.Builder? builder = null;
@@ -64,7 +64,7 @@ namespace GenerateDocumentationAndConfigFiles
                 Console.WriteLine($"Error processing analyzer file reference: {analyzerFileReference.FullPath}\r\n{ex.Message}\r\n{ex}");
             }
 
-            return builder != null ? builder.ToImmutable() : ImmutableArray<CodeFixProvider>.Empty;
+            return builder != null ? builder.ToImmutable() : [];
         }
 
         /// <summary>

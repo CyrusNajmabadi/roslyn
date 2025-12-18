@@ -142,7 +142,7 @@ internal abstract partial class AbstractSuppressionCodeFixProvider : IConfigurat
         TextDocument textDocument, TextSpan span, IEnumerable<Diagnostic> diagnostics, CancellationToken cancellationToken)
     {
         if (textDocument is not Document document)
-            return ImmutableArray<CodeFix>.Empty;
+            return [];
 
         return await GetSuppressionsAsync(document, span, diagnostics, skipSuppressMessage: false, skipUnsuppress: false, cancellationToken: cancellationToken).ConfigureAwait(false);
     }

@@ -29,7 +29,7 @@ internal abstract class AbstractAggregatingLog<TAggregator, TValue> : ITelemetry
     private readonly FunctionId _functionId;
     private readonly object _flushLock;
 
-    private ImmutableDictionary<string, (TAggregator aggregator, TelemetryEvent TelemetryEvent, object Lock)> _aggregations = ImmutableDictionary<string, (TAggregator, TelemetryEvent, object)>.Empty;
+    private ImmutableDictionary<string, (TAggregator aggregator, TelemetryEvent TelemetryEvent, object Lock)> _aggregations = ImmutableDictionary<string, (TAggregator aggregator, TelemetryEvent TelemetryEvent, object Lock)>.Empty;
 
     /// <summary>
     /// Creates a new aggregating telemetry log
@@ -123,7 +123,7 @@ internal abstract class AbstractAggregatingLog<TAggregator, TValue> : ITelemetry
                 }
             }
 
-            _aggregations = ImmutableDictionary<string, (TAggregator, TelemetryEvent, object)>.Empty;
+            _aggregations = ImmutableDictionary<string, (TAggregator aggregator, TelemetryEvent TelemetryEvent, object Lock)>.Empty;
         }
     }
 }

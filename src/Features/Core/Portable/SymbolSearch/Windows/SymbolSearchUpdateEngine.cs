@@ -121,7 +121,7 @@ internal sealed partial class SymbolSearchUpdateEngine : ISymbolSearchUpdateEngi
     {
         // Check if we don't have a database to search.  
         if (!_sourceToDatabase.TryGetValue(source, out var databaseWrapper))
-            return ImmutableArray<TResult>.Empty;
+            return [];
 
         var database = databaseWrapper.Database;
 
@@ -129,7 +129,7 @@ internal sealed partial class SymbolSearchUpdateEngine : ISymbolSearchUpdateEngi
 
         // never find anything named 'var'.
         if (searchName == "var")
-            return ImmutableArray<TResult>.Empty;
+            return [];
 
         var query = new MemberQuery(searchName, isFullSuffix: true, isFullNamespace: false);
         var symbols = new PartialArray<Symbol>(100);
@@ -179,7 +179,7 @@ internal sealed partial class SymbolSearchUpdateEngine : ISymbolSearchUpdateEngi
         if (!_sourceToDatabase.TryGetValue(source, out var databaseWrapper))
         {
             // Don't have a database to search.  
-            return ImmutableArray<PackageWithAssemblyResult>.Empty;
+            return [];
         }
 
         using var _ = ArrayBuilder<PackageWithAssemblyResult>.GetInstance(out var result);

@@ -708,7 +708,7 @@ namespace Text.Analyzers.UnitTests
         }
 
         private Task VerifyCSharpAsync(string source, params DiagnosticResult[] expected)
-            => VerifyCSharpAsync(source, Array.Empty<(string Path, string Text)>(), expected);
+            => VerifyCSharpAsync(source, [], expected);
 
         private Task VerifyCSharpAsync(string source, (string Path, string Text) additionalText, params DiagnosticResult[] expected)
             => VerifyCSharpAsync(source, [additionalText], expected);
@@ -747,7 +747,7 @@ namespace Text.Analyzers.UnitTests
                 """);
 
             static string CreateXml(IEnumerable<string>? words) =>
-                string.Join(Environment.NewLine, words?.Select(x => $"<Word>{x}</Word>") ?? Enumerable.Empty<string>());
+                string.Join(Environment.NewLine, words?.Select(x => $"<Word>{x}</Word>") ?? []);
         }
 
         private static (string Path, string Text) CreateDicDictionary(IEnumerable<string> recognizedWords)

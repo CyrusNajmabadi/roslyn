@@ -38,7 +38,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
             Debug.Assert(locations.Count <= LocationThreshold);
 
             Locations = locations;
-            LValueCapturedOperations = ImmutableHashSet<IOperation>.Empty;
+            LValueCapturedOperations = [];
             Kind = PointsToAbstractValueKind.KnownLocations;
             NullState = nullState;
         }
@@ -48,7 +48,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
             Debug.Assert(!lValueCapturedOperations.IsEmpty);
 
             LValueCapturedOperations = lValueCapturedOperations;
-            Locations = ImmutableHashSet<AbstractLocation>.Empty;
+            Locations = [];
             Kind = PointsToAbstractValueKind.KnownLValueCaptures;
             NullState = NullAbstractValue.NotNull;
         }
@@ -58,8 +58,8 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
             Debug.Assert(kind != PointsToAbstractValueKind.KnownLocations);
             Debug.Assert(kind != PointsToAbstractValueKind.KnownLValueCaptures);
 
-            Locations = ImmutableHashSet<AbstractLocation>.Empty;
-            LValueCapturedOperations = ImmutableHashSet<IOperation>.Empty;
+            Locations = [];
+            LValueCapturedOperations = [];
             Kind = kind;
             NullState = nullState;
         }

@@ -95,7 +95,7 @@ namespace Text.Analyzers
                 }
             }
 
-            return new CodeAnalysisDictionary(recognizedWords, Enumerable.Empty<string>());
+            return new CodeAnalysisDictionary(recognizedWords, []);
         }
 
         private static IEnumerable<string> GetSectionWords(XDocument document, string section, string property)

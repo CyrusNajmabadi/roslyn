@@ -43,7 +43,7 @@ namespace Analyzer.Utilities.Extensions
                 return builder.ToImmutable();
             }
 
-            return ImmutableArray<int>.Empty;
+            return [];
         }
     }
 }

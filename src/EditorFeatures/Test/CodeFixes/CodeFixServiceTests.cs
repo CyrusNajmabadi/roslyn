@@ -557,13 +557,13 @@ public sealed class CodeFixServiceTests
             public override async Task<ImmutableArray<Diagnostic>> AnalyzeSyntaxAsync(TextDocument document, SyntaxTree? tree, CancellationToken cancellationToken)
             {
                 ReceivedCallback = true;
-                return ImmutableArray<Diagnostic>.Empty;
+                return [];
             }
 
             public override async Task<ImmutableArray<Diagnostic>> AnalyzeSemanticsAsync(TextDocument document, SyntaxTree? tree, CancellationToken cancellationToken)
             {
                 ReceivedCallback = true;
-                return ImmutableArray<Diagnostic>.Empty;
+                return [];
             }
         }
 

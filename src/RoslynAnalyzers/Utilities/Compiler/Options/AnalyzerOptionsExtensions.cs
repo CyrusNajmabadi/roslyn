@@ -550,7 +550,7 @@ namespace Analyzer.Utilities
             // So, we default to first syntax tree.
             if (compilation.SyntaxTrees.FirstOrDefault() is not { } tree)
             {
-                return ImmutableArray<string>.Empty;
+                return [];
             }
 
             var propertyOptionName = MSBuildItemOptionNamesHelpers.GetPropertyNameForItemOptionName(itemOptionName);

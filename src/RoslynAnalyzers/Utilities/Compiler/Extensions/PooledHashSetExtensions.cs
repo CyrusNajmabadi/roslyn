@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.PooledObjects
             ImmutableHashSet<T> result;
             if (Count == 0)
             {
-                result = ImmutableHashSet<T>.Empty;
+                result = [];
             }
             else
             {
@@ -42,6 +42,6 @@ namespace Microsoft.CodeAnalysis.PooledObjects
         }
 
         public ImmutableHashSet<T> ToImmutable()
-            => Count == 0 ? ImmutableHashSet<T>.Empty : this.ToImmutableHashSet(Comparer);
+            => Count == 0 ? [] : this.ToImmutableHashSet(Comparer);
     }
 }

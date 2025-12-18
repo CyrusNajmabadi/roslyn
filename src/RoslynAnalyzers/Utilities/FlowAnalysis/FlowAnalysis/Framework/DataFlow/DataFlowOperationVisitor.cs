@@ -1128,7 +1128,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         {
             if (operation == null || DataFlowAnalysisContext.PointsToAnalysisResult == null)
             {
-                return ImmutableHashSet<AbstractLocation>.Empty;
+                return [];
             }
             else
             {
@@ -1141,7 +1141,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             Debug.Assert(parameterEntity.Symbol?.Kind == SymbolKind.Parameter);
             if (parameterEntity == null || DataFlowAnalysisContext.PointsToAnalysisResult == null)
             {
-                return ImmutableHashSet<AbstractLocation>.Empty;
+                return [];
             }
             else
             {
@@ -2230,7 +2230,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             }
 
             // Bail out if we are already analyzing the current context.
-            var currentMethodsBeingAnalyzed = DataFlowAnalysisContext.InterproceduralAnalysisData?.MethodsBeingAnalyzed ?? ImmutableHashSet<TAnalysisContext>.Empty;
+            var currentMethodsBeingAnalyzed = DataFlowAnalysisContext.InterproceduralAnalysisData?.MethodsBeingAnalyzed ?? [];
             var newMethodsBeingAnalyzed = currentMethodsBeingAnalyzed.Add(DataFlowAnalysisContext);
             if (currentMethodsBeingAnalyzed.Count == newMethodsBeingAnalyzed.Count)
             {
@@ -2735,7 +2735,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         {
             var invocationInstance = (AnalysisEntityFactory.ThisOrMeInstance, ThisOrMePointsToAbstractValue);
             var thisOrMeInstance = invocationInstance;
-            var currentMethodsBeingAnalyzed = DataFlowAnalysisContext.InterproceduralAnalysisData?.MethodsBeingAnalyzed ?? ImmutableHashSet<TAnalysisContext>.Empty;
+            var currentMethodsBeingAnalyzed = DataFlowAnalysisContext.InterproceduralAnalysisData?.MethodsBeingAnalyzed ?? [];
             var newMethodsBeingAnalyzed = currentMethodsBeingAnalyzed.Add(DataFlowAnalysisContext);
 
             return new InterproceduralAnalysisData<TAnalysisData, TAnalysisContext, TAbstractAnalysisValue>(

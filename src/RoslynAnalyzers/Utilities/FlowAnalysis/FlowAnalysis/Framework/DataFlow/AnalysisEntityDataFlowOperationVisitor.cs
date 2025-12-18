@@ -400,7 +400,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             // child entities for reference type entities.
             if (!HasCompletePointsToAnalysisResult && analysisEntity.Type.IsReferenceType)
             {
-                return ImmutableHashSet<AnalysisEntity>.Empty;
+                return [];
             }
 
             return GetChildAnalysisEntities(analysisEntity.InstanceLocation, entity => IsChildAnalysisEntity(entity, analysisEntity));
@@ -435,7 +435,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             // We are interested only in dependent child/member infos, not the root info.
             if (instanceLocation == null || instanceLocation.Kind == PointsToAbstractValueKind.Unknown)
             {
-                return ImmutableHashSet<AnalysisEntity>.Empty;
+                return [];
             }
 
             predicate ??= entity => IsChildAnalysisEntity(entity, instanceLocation);

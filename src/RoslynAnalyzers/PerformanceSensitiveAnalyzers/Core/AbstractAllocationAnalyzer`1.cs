@@ -14,7 +14,7 @@ namespace Microsoft.CodeAnalysis.PerformanceSensitiveAnalyzers
     {
         protected abstract ImmutableArray<TLanguageKindEnum> Expressions { get; }
 
-        protected sealed override ImmutableArray<OperationKind> Operations => ImmutableArray<OperationKind>.Empty;
+        protected sealed override ImmutableArray<OperationKind> Operations => [];
 
         protected abstract void AnalyzeNode(SyntaxNodeAnalysisContext context, in PerformanceSensitiveInfo info);
 

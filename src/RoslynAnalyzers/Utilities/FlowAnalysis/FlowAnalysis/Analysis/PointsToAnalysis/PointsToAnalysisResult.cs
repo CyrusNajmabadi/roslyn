@@ -52,7 +52,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
                 return escapedLocations;
             }
 
-            return ImmutableHashSet<AbstractLocation>.Empty;
+            return [];
         }
 
         internal bool IsTrackedEntity(AnalysisEntity analysisEntity)

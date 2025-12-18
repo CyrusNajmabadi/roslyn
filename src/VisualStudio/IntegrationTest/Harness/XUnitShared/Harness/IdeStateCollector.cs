@@ -13,7 +13,7 @@ namespace Xunit.Harness
 
     public static class IdeStateCollector
     {
-        private static ImmutableList<KeyValuePair<string, Func<string>>> _customIdeStateCollectors = ImmutableList<KeyValuePair<string, Func<string>>>.Empty;
+        private static ImmutableList<KeyValuePair<string, Func<string>>> _customIdeStateCollectors = [];
 
         public static void RegisterCustomState(string title, Func<string> callback)
         {

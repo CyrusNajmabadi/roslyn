@@ -73,20 +73,20 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         }
 
         private AnalysisEntity(IInstanceReferenceOperation instanceReferenceOperation, PointsToAbstractValue location)
-            : this(symbol: null, indices: ImmutableArray<AbstractIndex>.Empty, instanceReferenceOperationSyntax: instanceReferenceOperation.Syntax,
+            : this(symbol: null, indices: [], instanceReferenceOperationSyntax: instanceReferenceOperation.Syntax,
                   captureId: null, location: location, type: instanceReferenceOperation.Type!, parent: null, entityForInstanceLocation: null, isThisOrMeInstance: false)
         {
             Debug.Assert(instanceReferenceOperation != null);
         }
 
         private AnalysisEntity(InterproceduralCaptureId captureId, ITypeSymbol capturedType, PointsToAbstractValue location)
-            : this(symbol: null, indices: ImmutableArray<AbstractIndex>.Empty, instanceReferenceOperationSyntax: null,
+            : this(symbol: null, indices: [], instanceReferenceOperationSyntax: null,
                   captureId: captureId, location: location, type: capturedType, parent: null, entityForInstanceLocation: null, isThisOrMeInstance: false)
         {
         }
 
         private AnalysisEntity(INamedTypeSymbol namedType, PointsToAbstractValue location, bool isThisOrMeInstance)
-            : this(symbol: namedType, indices: ImmutableArray<AbstractIndex>.Empty, instanceReferenceOperationSyntax: null,
+            : this(symbol: namedType, indices: [], instanceReferenceOperationSyntax: null,
                   captureId: null, location: location, type: namedType, parent: null, entityForInstanceLocation: null, isThisOrMeInstance: isThisOrMeInstance)
         {
         }

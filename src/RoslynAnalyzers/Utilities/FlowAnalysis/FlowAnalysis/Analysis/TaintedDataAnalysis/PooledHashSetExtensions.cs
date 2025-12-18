@@ -47,7 +47,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 isInterface,
                 isAnyStringParameterInConstructorASink,
                 sinkProperties: sinkProperties?.ToImmutableHashSet(StringComparer.Ordinal)
-                        ?? ImmutableHashSet<string>.Empty,
+                        ?? [],
                 sinkMethodParameters:
                     sinkMethodParameters
                             ?.Select(o => new KeyValuePair<string, ImmutableHashSet<string>>(o.Method, o.Parameters.ToImmutableHashSet()))
@@ -64,18 +64,18 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             SourceInfo metadata = new SourceInfo(
                 fullTypeName,
                 isInterface: false,
-                taintedProperties: ImmutableHashSet<string>.Empty,
-                transferProperties: ImmutableHashSet<string>.Empty,
+                taintedProperties: [],
+                transferProperties: [],
                 taintedArguments:
                     taintedArguments.ToImmutableHashSet(),
                 taintedMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<string>)>.Empty,
+                    [],
                 taintedMethodsNeedsPointsToAnalysis:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(PointsToCheck, string)>)>.Empty,
+                    [],
                 taintedMethodsNeedsValueContentAnalysis:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(ValueContentCheck, string)>)>.Empty,
+                    [],
                 transferMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    [],
                 taintConstantArray: false,
                 constantArrayLengthMatcher: null);
             builder.Add(metadata);
@@ -91,18 +91,18 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 fullTypeName,
                 dependencyFullTypeNames: dependencyFullTypeNames,
                 isInterface: false,
-                taintedProperties: ImmutableHashSet<string>.Empty,
-                transferProperties: ImmutableHashSet<string>.Empty,
+                taintedProperties: [],
+                transferProperties: [],
                 taintedArguments:
                     taintedArguments.ToImmutableHashSet(),
                 taintedMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<string>)>.Empty,
+                    [],
                 taintedMethodsNeedsPointsToAnalysis:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(PointsToCheck, string)>)>.Empty,
+                    [],
                 taintedMethodsNeedsValueContentAnalysis:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(ValueContentCheck, string)>)>.Empty,
+                    [],
                 transferMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    [],
                 taintConstantArray: false,
                 constantArrayLengthMatcher: null);
             builder.Add(metadata);
@@ -120,10 +120,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 fullTypeName,
                 isInterface: isInterface,
                 taintedProperties: taintedProperties?.ToImmutableHashSet(StringComparer.Ordinal)
-                    ?? ImmutableHashSet<string>.Empty,
-                transferProperties: ImmutableHashSet<string>.Empty,
+                    ?? [],
+                transferProperties: [],
                 taintedArguments:
-                    ImmutableHashSet<ParameterMatcher>.Empty,
+                    [],
                 taintedMethods:
                     taintedMethods
                         ?.Select<string, (MethodMatcher, ImmutableHashSet<string>)>(o =>
@@ -132,13 +132,13 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                                 ImmutableHashSet<string>.Empty.Add(TaintedTargetValue.Return)
                             ))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<string>)>.Empty,
+                    ?? [],
                 taintedMethodsNeedsPointsToAnalysis:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(PointsToCheck, string)>)>.Empty,
+                    [],
                 taintedMethodsNeedsValueContentAnalysis:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(ValueContentCheck, string)>)>.Empty,
+                    [],
                 transferMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    [],
                 taintConstantArray: false,
                 constantArrayLengthMatcher: null);
             builder.Add(metadata);
@@ -170,31 +170,31 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 fullTypeName,
                 isInterface: isInterface,
                 taintedProperties: taintedProperties?.ToImmutableHashSet(StringComparer.Ordinal)
-                    ?? ImmutableHashSet<string>.Empty,
+                    ?? [],
                 transferProperties: transferProperties?.ToImmutableHashSet(StringComparer.Ordinal)
-                    ?? ImmutableHashSet<string>.Empty,
+                    ?? [],
                 taintedArguments:
-                    ImmutableHashSet<ParameterMatcher>.Empty,
+                    [],
                 taintedMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<string>)>.Empty,
+                    [],
                 taintedMethodsNeedsPointsToAnalysis:
                     taintedMethodsNeedsPointsToAnalysis?.Select(o =>
                             (
                                 o.methodMatcher,
                                 o.pointsToChecksAndTargets?.ToImmutableHashSet()
-                                    ?? ImmutableHashSet<(PointsToCheck, string)>.Empty
+                                    ?? []
                             ))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(PointsToCheck, string)>)>.Empty,
+                    ?? [],
                 taintedMethodsNeedsValueContentAnalysis:
                     taintedMethodsNeedsValueContentAnalysis?.Select(o =>
                             (
                                 o.methodMatcher,
                                 o.valueContentChecksAndTargets?.ToImmutableHashSet()
-                                    ?? ImmutableHashSet<(ValueContentCheck, string)>.Empty
+                                    ?? []
                             ))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(ValueContentCheck, string)>)>.Empty,
+                    ?? [],
                 transferMethods:
                     transferMethods
                         ?.Select(o =>
@@ -202,9 +202,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                                 o.methodMatcher,
                                 o.valueContentChecksAndTargets
                                     ?.ToImmutableHashSet()
-                                ?? ImmutableHashSet<(string, string)>.Empty))
+                                ?? []))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    ?? [],
                 taintConstantArray: taintConstantArray,
                 constantArrayLengthMatcher: constantArrayLengthMatcher);
             builder.Add(metadata);
@@ -227,12 +227,12 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 fullTypeName,
                 isInterface: isInterface,
                 taintedProperties: taintedProperties?.ToImmutableHashSet(StringComparer.Ordinal)
-                    ?? ImmutableHashSet<string>.Empty,
-                transferProperties: ImmutableHashSet<string>.Empty,
+                    ?? [],
+                transferProperties: [],
                 taintedArguments:
-                    ImmutableHashSet<ParameterMatcher>.Empty,
+                    [],
                 taintedMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<string>)>.Empty,
+                    [],
                 taintedMethodsNeedsPointsToAnalysis:
                     taintedMethodsNeedsPointsToAnalysis?.Select(o =>
                             (
@@ -240,10 +240,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                                 o.pointsToChecks
                                     ?.Select(s => (s, TaintedTargetValue.Return))
                                     ?.ToImmutableHashSet()
-                                ?? ImmutableHashSet<(PointsToCheck, string)>.Empty
+                                ?? []
                             ))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(PointsToCheck, string)>)>.Empty,
+                    ?? [],
                 taintedMethodsNeedsValueContentAnalysis:
                     taintedMethodsNeedsValueContentAnalysis?.Select(o =>
                             (
@@ -251,12 +251,12 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                                 o.valueContentChecks
                                     ?.Select(s => (s, TaintedTargetValue.Return))
                                     ?.ToImmutableHashSet()
-                                ?? ImmutableHashSet<(ValueContentCheck, string)>.Empty
+                                ?? []
                             ))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(ValueContentCheck, string)>)>.Empty,
+                    ?? [],
                 transferMethods:
-                    ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    [],
                 taintConstantArray: taintConstantArray,
                 constantArrayLengthMatcher: constantArrayLengthMatcher);
             builder.Add(metadata);
@@ -280,11 +280,11 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                         ?.Select<string, (MethodMatcher, ImmutableHashSet<(string, string)>)>(o =>
                             (
                                 (methodName, arguments) => methodName == o,
-                                ImmutableHashSet<(string, string)>.Empty))
+                                []))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    ?? [],
                 sanitizingInstanceMethods: sanitizingInstanceMethods?.ToImmutableHashSet(StringComparer.Ordinal)
-                    ?? ImmutableHashSet<string>.Empty);
+                    ?? []);
             builder.Add(info);
         }
 
@@ -307,11 +307,11 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                                 o.methodMatcher,
                                 o.taintedArgumentToSanized
                                     ?.ToImmutableHashSet()
-                                ?? ImmutableHashSet<(string, string)>.Empty))
+                                ?? []))
                         ?.ToImmutableHashSet()
-                    ?? ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)>.Empty,
+                    ?? [],
                 sanitizingInstanceMethods: sanitizingInstanceMethods?.ToImmutableHashSet(StringComparer.Ordinal)
-                    ?? ImmutableHashSet<string>.Empty);
+                    ?? []);
             builder.Add(info);
         }
     }

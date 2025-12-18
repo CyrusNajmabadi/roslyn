@@ -17,7 +17,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
     [DebuggerDisplay("{Kind} ({SourceOrigins.Count} source origins)")]
     internal sealed class TaintedDataAbstractValue : CacheBasedEquatable<TaintedDataAbstractValue>
     {
-        public static readonly TaintedDataAbstractValue NotTainted = new(TaintedDataAbstractValueKind.NotTainted, ImmutableHashSet<SymbolAccess>.Empty);
+        public static readonly TaintedDataAbstractValue NotTainted = new(TaintedDataAbstractValueKind.NotTainted, []);
 
         private TaintedDataAbstractValue(TaintedDataAbstractValueKind kind, ImmutableHashSet<SymbolAccess> sourceOrigins)
         {

@@ -79,7 +79,7 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
             SyntaxKind.Interpolation,
         ];
 
-        private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
+        private static readonly object[] EmptyMessageArgs = [];
 
         protected override void AnalyzeNode(SyntaxNodeAnalysisContext context, in PerformanceSensitiveInfo info)
         {

@@ -24,7 +24,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             HandlingCatchRegion = GetHandlerRegion(block, exceptionType);
             ContainingFinallyRegion = block.GetContainingRegionOfKind(ControlFlowRegionKind.Finally);
             ExceptionType = exceptionType ?? throw new ArgumentNullException(nameof(exceptionType));
-            InterproceduralCallStack = interproceduralCallStack ?? ImmutableStack<IOperation>.Empty;
+            InterproceduralCallStack = interproceduralCallStack ?? [];
             IsDefaultExceptionForExceptionsPathAnalysis = isDefaultExceptionForExceptionsPathAnalysis;
         }
 

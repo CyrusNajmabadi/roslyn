@@ -68,7 +68,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         /// <summary>
         /// Qualified names of the optional dependency types.
         /// </summary>
-        public ImmutableArray<string> DependencyFullTypeNames => ImmutableArray<string>.Empty;
+        public ImmutableArray<string> DependencyFullTypeNames => [];
 
         public override int GetHashCode()
         {

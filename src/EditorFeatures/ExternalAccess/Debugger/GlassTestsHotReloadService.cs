@@ -15,7 +15,7 @@ namespace Microsoft.CodeAnalysis.ExternalAccess.Debugger;
 internal sealed class GlassTestsHotReloadService
 {
     private static readonly ActiveStatementSpanProvider s_noActiveStatementSpanProvider =
-       async (_, _, _) => ImmutableArray<ActiveStatementSpan>.Empty;
+       async (_, _, _) => [];
 
     private readonly IManagedHotReloadService _debuggerService;
 

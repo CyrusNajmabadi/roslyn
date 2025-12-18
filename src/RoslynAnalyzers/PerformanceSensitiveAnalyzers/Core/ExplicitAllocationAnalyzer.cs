@@ -60,7 +60,7 @@ namespace Microsoft.CodeAnalysis.PerformanceSensitiveAnalyzers
             DiagnosticSeverity.Info,
             isEnabledByDefault: true);
 
-        private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
+        private static readonly object[] EmptyMessageArgs = [];
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [ArrayCreationRule, ObjectCreationRule, AnonymousObjectCreationRule, LetCauseRule];
 

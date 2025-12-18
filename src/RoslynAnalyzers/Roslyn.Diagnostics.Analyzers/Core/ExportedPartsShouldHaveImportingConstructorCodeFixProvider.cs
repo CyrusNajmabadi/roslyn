@@ -108,11 +108,11 @@ namespace Roslyn.Diagnostics.Analyzers
 
             var importingConstructor = generator.ConstructorDeclaration(
                 containingTypeName: generator.GetName(declaration),
-                parameters: Enumerable.Empty<SyntaxNode>(),
+                parameters: [],
                 Accessibility.Public,
                 DeclarationModifiers.None,
                 baseConstructorArguments: null,
-                statements: Enumerable.Empty<SyntaxNode>());
+                statements: []);
             importingConstructor = generator.AddAttributes(importingConstructor, generator.Attribute(generator.TypeExpression(importingConstructorAttributeSymbol).WithAddImportsAnnotation()));
 
             var index = 0;

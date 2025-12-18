@@ -17,7 +17,7 @@ namespace Xunit.Harness
     public static class DataCollectionService
     {
         private static readonly ConditionalWeakTable<Exception, StrongBox<bool>> LoggedExceptions = new();
-        private static ImmutableList<CustomLoggerData> _customInProcessLoggers = ImmutableList<CustomLoggerData>.Empty;
+        private static ImmutableList<CustomLoggerData> _customInProcessLoggers = [];
         private static bool _firstChanceExceptionHandlerInstalled;
 
         [ThreadStatic]

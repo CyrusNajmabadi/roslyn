@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
 
         protected override ImmutableArray<SyntaxKind> Expressions { get; } = [SyntaxKind.ForEachStatement, SyntaxKind.InvocationExpression];
 
-        private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
+        private static readonly object[] EmptyMessageArgs = [];
 
         protected override void AnalyzeNode(SyntaxNodeAnalysisContext context, in PerformanceSensitiveInfo info)
         {

@@ -103,7 +103,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 return builder.ToImmutableAndFree();
             }
 
-            return ImmutableArray<AbstractIndex>.Empty;
+            return [];
         }
 
         private static AbstractIndex CreateAbstractIndex(IOperation operation)
@@ -131,7 +131,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
 
             analysisEntity = null;
             ISymbol? symbol = null;
-            ImmutableArray<AbstractIndex> indices = ImmutableArray<AbstractIndex>.Empty;
+            ImmutableArray<AbstractIndex> indices = [];
             IOperation? instance = null;
             ITypeSymbol? type = operation.Type;
             switch (operation)
@@ -301,7 +301,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                         symbol = propertyReference.Property;
                         indices = !propertyReference.Arguments.IsEmpty ?
                             CreateAbstractIndices(propertyReference.Arguments.SelectAsArray(a => a.Value)) :
-                            ImmutableArray<AbstractIndex>.Empty;
+                            [];
                     }
 
                     break;
@@ -365,7 +365,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 }
                 else
                 {
-                    parentEntity = AnalysisEntity.Create(underlyingValueTupleType, ImmutableArray<AbstractIndex>.Empty,
+                    parentEntity = AnalysisEntity.Create(underlyingValueTupleType, [],
                         underlyingValueTupleType, instanceLocation, parent: null, entityForInstanceLocation: null);
                 }
 
@@ -381,7 +381,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                         return false;
                     }
 
-                    builder.Add(AnalysisEntity.Create(mappedValueTupleField, indices: ImmutableArray<AbstractIndex>.Empty,
+                    builder.Add(AnalysisEntity.Create(mappedValueTupleField, indices: [],
                         type: mappedValueTupleField.Type, instanceLocation, parentEntity, entityForInstanceLocation));
                 }
 
@@ -537,7 +537,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                         }
                         else
                         {
-                            interproceduralCallStackForSymbolDeclaration = ImmutableStack<IOperation>.Empty;
+                            interproceduralCallStackForSymbolDeclaration = [];
                         }
 
                         var location = AbstractLocation.CreateSymbolLocation(symbol, interproceduralCallStackForSymbolDeclaration);

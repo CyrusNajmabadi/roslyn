@@ -19,7 +19,7 @@ internal sealed class HotReloadService(SolutionServices services, Func<ValueTask
     private sealed class DebuggerService(Func<ValueTask<ImmutableArray<string>>> capabilitiesProvider) : IManagedHotReloadService
     {
         public async ValueTask<ImmutableArray<ManagedActiveStatementDebugInfo>> GetActiveStatementsAsync(CancellationToken cancellationToken)
-            => ImmutableArray<ManagedActiveStatementDebugInfo>.Empty;
+            => [];
 
         public async ValueTask<ManagedHotReloadAvailability> GetAvailabilityAsync(Guid module, CancellationToken cancellationToken)
             => new ManagedHotReloadAvailability(ManagedHotReloadAvailabilityStatus.Available);
@@ -129,7 +129,7 @@ internal sealed class HotReloadService(SolutionServices services, Func<ValueTask
     }
 
     private static readonly ActiveStatementSpanProvider s_solutionActiveStatementSpanProvider =
-        async (_, _, _) => ImmutableArray<ActiveStatementSpan>.Empty;
+        async (_, _, _) => [];
 
     private readonly IEditAndContinueService _encService = services.GetRequiredService<IEditAndContinueWorkspaceService>().Service;
 

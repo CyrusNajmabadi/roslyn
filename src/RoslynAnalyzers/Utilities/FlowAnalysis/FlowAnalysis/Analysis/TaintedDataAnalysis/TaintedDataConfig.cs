@@ -198,7 +198,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             else
             {
                 Debug.Fail($"SinkKind {sinkKind} entry missing from {typeof(T).Name} map");
-                return new TaintedDataSymbolMap<T>(this.WellKnownTypeProvider, Enumerable.Empty<T>());
+                return new TaintedDataSymbolMap<T>(this.WellKnownTypeProvider, []);
             }
         }
 
@@ -249,7 +249,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 default:
                     Debug.Fail($"Unhandled SinkKind {sinkKind}");
-                    return ImmutableHashSet<SourceInfo>.Empty;
+                    return [];
             }
 
             return ImmutableInterlocked.GetOrAdd(ref s_sinkKindToSourceInfo, sinkKind, sourceInfo);
@@ -305,7 +305,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 default:
                     Debug.Fail($"Unhandled SinkKind {sinkKind}");
-                    return ImmutableHashSet<SanitizerInfo>.Empty;
+                    return [];
             }
 
             return ImmutableInterlocked.GetOrAdd(ref s_sinkKindToSanitizerInfo, sinkKind, sanitizerInfo);
@@ -360,7 +360,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 default:
                     Debug.Fail($"Unhandled SinkKind {sinkKind}");
-                    return ImmutableHashSet<SinkInfo>.Empty;
+                    return [];
             }
         }
     }

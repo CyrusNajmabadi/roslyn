@@ -40,15 +40,15 @@ namespace System.Collections.Immutable
         {
             if (set1.IsEmpty || set2.IsEmpty)
             {
-                return ImmutableHashSet<T>.Empty;
+                return [];
             }
             else if (set1.Count == 1)
             {
-                return set2.Contains(set1.First()) ? set1 : ImmutableHashSet<T>.Empty;
+                return set2.Contains(set1.First()) ? set1 : [];
             }
             else if (set2.Count == 1)
             {
-                return set1.Contains(set2.First()) ? set2 : ImmutableHashSet<T>.Empty;
+                return set1.Contains(set2.First()) ? set2 : [];
             }
 
             using var _ = PooledHashSet<T>.GetInstance(out var builder);
