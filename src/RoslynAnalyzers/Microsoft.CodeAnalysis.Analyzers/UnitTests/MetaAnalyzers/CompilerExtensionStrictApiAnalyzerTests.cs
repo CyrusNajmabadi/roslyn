@@ -47,8 +47,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task CSharpFeatureDefinedWithCommonReference(CompilerFeature feature, SupportedLanguage supportedLanguage)
             => new VerifyCS.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.CSharp, feature, supportedLanguage),
             }.RunAsync();
 
@@ -65,8 +64,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
 
             await new VerifyCS.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity(matchingPackage, CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity(matchingPackage, CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.CSharp, feature, supportedLanguage),
             }.RunAsync();
         }
@@ -77,8 +75,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         {
             var test = new VerifyCS.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.CSharp, feature, supportedLanguage),
             };
 
@@ -114,8 +111,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
 
             await new VerifyCS.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity(mismatchedPackage, CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity(mismatchedPackage, CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.CSharp, feature, supportedLanguage),
                 ExpectedDiagnostics =
                 {
@@ -129,8 +125,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task VisualBasicFeatureDefinedWithCommonReference(CompilerFeature feature, SupportedLanguage supportedLanguage)
             => new VerifyVB.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.VisualBasic, feature, supportedLanguage),
             }.RunAsync();
 
@@ -147,8 +142,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
 
             await new VerifyVB.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity(matchingPackage, CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity(matchingPackage, CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.VisualBasic, feature, supportedLanguage),
             }.RunAsync();
         }
@@ -159,8 +153,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         {
             var test = new VerifyVB.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.VisualBasic, feature, supportedLanguage),
             };
 
@@ -196,8 +189,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
 
             await new VerifyVB.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages(ImmutableArray.Create(
-                    new PackageIdentity(mismatchedPackage, CompilerReferenceVersion))),
+                ReferenceAssemblies = ReferenceAssemblies.NetStandard.NetStandard20.AddPackages([new PackageIdentity(mismatchedPackage, CompilerReferenceVersion)]),
                 TestCode = DefineFeature(ImplementationLanguage.VisualBasic, feature, supportedLanguage),
                 ExpectedDiagnostics =
                 {

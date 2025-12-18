@@ -59,11 +59,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         {
             return new TaintedDataAbstractValue(
                 TaintedDataAbstractValueKind.Tainted,
-                ImmutableHashSet.Create<SymbolAccess>(
-                    new SymbolAccess(
+                [new SymbolAccess(
                         taintedSymbol,
                         accessingSyntax,
-                        accessingMethod)));
+                        accessingMethod)]);
         }
 
         /// <summary>

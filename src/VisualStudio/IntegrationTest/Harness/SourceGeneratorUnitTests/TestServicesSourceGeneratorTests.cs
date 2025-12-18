@@ -182,9 +182,7 @@ namespace System.Diagnostics.CodeAnalysis
                 TestState =
                 {
                     ReferenceAssemblies = ReferenceAssemblies.NetFramework.Net472.Default
-                        .AddPackages(ImmutableArray.Create(
-                            new PackageIdentity("Microsoft.VisualStudio.SDK", "17.0.31902.203"),
-                            new PackageIdentity("xunit", "2.4.1"))),
+                        .AddPackages([new PackageIdentity("Microsoft.VisualStudio.SDK", "17.0.31902.203"), new PackageIdentity("xunit", "2.4.1")]),
                     AdditionalReferences =
                     {
                         ExtensibilityTestingLibrary,

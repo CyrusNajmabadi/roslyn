@@ -25,7 +25,7 @@ namespace Roslyn.Diagnostics.Analyzers
         internal static readonly SuppressionDescriptor Rule =
             new(Id, SuppressedDiagnosticId, CreateLocalizableResourceString(nameof(RelaxTestNamingSuppressorJustification)));
 
-        public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = ImmutableArray.Create(Rule);
+        public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = [Rule];
 
         public override void ReportSuppressions(SuppressionAnalysisContext context)
         {

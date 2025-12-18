@@ -991,7 +991,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                     var assumeMethods = ContractNamedType.GetMembers("Assume");
                     var assertMethods = ContractNamedType.GetMembers("Assert");
                     var validationMethods = requiresMethods.Concat(assumeMethods).Concat(assertMethods).OfType<IMethodSymbol>().Where(m => m.IsStatic && m.ReturnsVoid && !m.Parameters.IsEmpty && (m.Parameters[0].Type.SpecialType == SpecialType.System_Boolean));
-                    _lazyContractCheckMethods = ImmutableHashSet.CreateRange(validationMethods);
+                    _lazyContractCheckMethods = [.. validationMethods];
                 }
 
                 return _lazyContractCheckMethods.Contains(method);
@@ -2448,7 +2448,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                     argumentValuesMap,
                     GetCapturedVariablesMap(cfg, invokedMethod, isLambdaOrLocalFunction),
                     _addressSharedEntitiesProvider.GetAddressedSharedEntityMap(),
-                    ImmutableStack.CreateRange(_interproceduralCallStack),
+                    [.. _interproceduralCallStack],
                     newMethodsBeingAnalyzed,
                     getCachedAbstractValueFromCaller: GetCachedAbstractValue,
                     getInterproceduralControlFlowGraph: GetInterproceduralControlFlowGraph,
@@ -2745,7 +2745,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 argumentValuesMap: ImmutableDictionary<IParameterSymbol, ArgumentInfo<TAbstractAnalysisValue>>.Empty,
                 GetCapturedVariablesMap(cfg, invokedMethod, isLambdaOrLocalFunction: true),
                 addressSharedEntities: ImmutableDictionary<AnalysisEntity, CopyAbstractValue>.Empty,
-                ImmutableStack.CreateRange(_interproceduralCallStack),
+                [.. _interproceduralCallStack],
                 newMethodsBeingAnalyzed,
                 getCachedAbstractValueFromCaller: _ => ValueDomain.UnknownOrMayBeValue,
                 getInterproceduralControlFlowGraph: GetInterproceduralControlFlowGraph,
@@ -2904,7 +2904,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                     var abstractIndex = AbstractIndex.Create(index);
                     IOperation elementInitializer = operation.ElementValues[index];
                     TAbstractAnalysisValue initializerValue = Visit(elementInitializer, argument);
-                    SetAbstractValueForArrayElementInitializer(arrayCreation, ImmutableArray.Create(abstractIndex), elementType, elementInitializer, initializerValue);
+                    SetAbstractValueForArrayElementInitializer(arrayCreation, [abstractIndex], elementType, elementInitializer, initializerValue);
                 }
             }
             else

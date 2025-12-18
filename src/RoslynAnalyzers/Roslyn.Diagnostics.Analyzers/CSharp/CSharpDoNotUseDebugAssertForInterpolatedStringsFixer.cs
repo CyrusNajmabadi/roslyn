@@ -24,7 +24,7 @@ namespace Roslyn.Diagnostics.CSharp.Analyzers
     [method: Obsolete("This exported object must be obtained through the MEF export provider.", error: true)]
     public sealed class CSharpDoNotUseDebugAssertForInterpolatedStringsFixer() : CodeFixProvider
     {
-        public override ImmutableArray<string> FixableDiagnosticIds { get; } = ImmutableArray.Create(RoslynDiagnosticIds.DoNotUseInterpolatedStringsWithDebugAssertRuleId);
+        public override ImmutableArray<string> FixableDiagnosticIds { get; } = [RoslynDiagnosticIds.DoNotUseInterpolatedStringsWithDebugAssertRuleId];
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {

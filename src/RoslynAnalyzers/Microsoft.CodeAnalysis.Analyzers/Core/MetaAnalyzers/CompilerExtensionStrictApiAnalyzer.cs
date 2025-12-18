@@ -57,10 +57,12 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             helpLinkUri: HelpLinkUri,
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
+        [
             DoNotDeclareCompilerFeatureInAssemblyWithWorkspacesReferenceStrictRule,
             DoNotDeclareCSharpCompilerFeatureInAssemblyWithVisualBasicReferenceStrictRule,
-            DoNotDeclareVisualBasicCompilerFeatureInAssemblyWithCSharpReferenceStrictRule);
+            DoNotDeclareVisualBasicCompilerFeatureInAssemblyWithCSharpReferenceStrictRule,
+        ];
 
         internal static bool IsStrictAnalysisEnabled(AnalyzerOptions options)
         {

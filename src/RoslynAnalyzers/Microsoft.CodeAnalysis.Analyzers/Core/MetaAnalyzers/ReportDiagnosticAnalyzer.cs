@@ -35,7 +35,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             description: CreateLocalizableResourceString(nameof(InvalidReportDiagnosticDescription)),
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(InvalidReportDiagnosticRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [InvalidReportDiagnosticRule];
 
         [SuppressMessage("AnalyzerPerformance", "RS1012:Start action has no registered actions.", Justification = "Method returns an analyzer that is registered by the caller.")]
         protected override DiagnosticAnalyzerSymbolAnalyzer? GetDiagnosticAnalyzerSymbolAnalyzer(CompilationStartAnalysisContext compilationContext, INamedTypeSymbol diagnosticAnalyzer, INamedTypeSymbol diagnosticAnalyzerAttribute)
@@ -102,8 +102,17 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
                 return null;
             }
 
-            ImmutableHashSet<INamedTypeSymbol> contextTypes = ImmutableHashSet.Create(compilationEndAnalysisContext, codeBlockAnalysisContext,
-                operationBlockAnalysisContext, operationAnalysisContext, semanticModelAnalysisContext, symbolAnalysisContext, syntaxNodeAnalysisContext, syntaxTreeAnalysisContext);
+            ImmutableHashSet<INamedTypeSymbol> contextTypes =
+            [
+                compilationEndAnalysisContext,
+                codeBlockAnalysisContext,
+                operationBlockAnalysisContext,
+                operationAnalysisContext,
+                semanticModelAnalysisContext,
+                symbolAnalysisContext,
+                syntaxNodeAnalysisContext,
+                syntaxTreeAnalysisContext,
+            ];
 
             return GetAnalyzer(contextTypes, diagnosticType, diagnosticDescriptorType, diagnosticAnalyzer, diagnosticAnalyzerAttribute);
         }

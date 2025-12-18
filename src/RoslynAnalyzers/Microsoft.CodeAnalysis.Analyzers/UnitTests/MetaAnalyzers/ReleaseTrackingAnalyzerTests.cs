@@ -486,12 +486,11 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
                     public override void Initialize(AnalysisContext context) { }
                 }
                 """, @"", @"", $@"{DefaultUnshippedHeader}{entry}", additionalExpectedDiagnosticsInInput: ImmutableArray<DiagnosticResult>.Empty,
-                additionalExpectedDiagnosticsInResult: ImmutableArray.Create(
-                    GetAdditionalFileResultAt(5, 1,
+                additionalExpectedDiagnosticsInResult: [GetAdditionalFileResultAt(5, 1,
                         ReleaseTrackingHelper.UnshippedFileName,
                         DiagnosticDescriptorCreationAnalyzer.InvalidUndetectedEntryInAnalyzerReleasesFileRule,
                         ReleaseTrackingHelper.UnshippedFileName,
-                        entry)));
+                        entry)]);
         }
 
         [Fact]

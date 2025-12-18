@@ -28,7 +28,7 @@ namespace Microsoft.CodeAnalysis.Analyzers
             isEnabledByDefault: true,
             description: CreateLocalizableResourceString(nameof(ImplementationIsObsoleteDescription)));
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(Rule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];
 
         public override void Initialize(AnalysisContext context)
         {

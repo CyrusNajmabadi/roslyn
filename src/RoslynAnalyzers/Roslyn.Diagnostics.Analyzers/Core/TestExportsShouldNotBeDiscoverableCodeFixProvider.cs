@@ -27,7 +27,7 @@ namespace Roslyn.Diagnostics.Analyzers
     [method: Obsolete("This exported object must be obtained through the MEF export provider.", error: true)]
     public class TestExportsShouldNotBeDiscoverableCodeFixProvider() : CodeFixProvider
     {
-        public override ImmutableArray<string> FixableDiagnosticIds { get; } = ImmutableArray.Create(TestExportsShouldNotBeDiscoverable.Rule.Id);
+        public override ImmutableArray<string> FixableDiagnosticIds { get; } = [TestExportsShouldNotBeDiscoverable.Rule.Id];
 
         public override FixAllProvider GetFixAllProvider()
             => WellKnownFixAllProviders.BatchFixer;

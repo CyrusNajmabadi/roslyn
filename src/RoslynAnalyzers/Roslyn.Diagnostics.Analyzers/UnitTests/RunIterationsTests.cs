@@ -19,7 +19,7 @@ namespace Roslyn.Diagnostics.Analyzers.UnitTests
     {
         private static readonly ReferenceAssemblies xunitWithCombinatorial =
             AdditionalMetadataReferences.DefaultWithXUnit.AddPackages(
-                ImmutableArray.Create(new PackageIdentity("Xunit.Combinatorial", "1.4.1")));
+                [new PackageIdentity("Xunit.Combinatorial", "1.4.1")]);
 
         [Theory]
         [InlineData("Fact")]

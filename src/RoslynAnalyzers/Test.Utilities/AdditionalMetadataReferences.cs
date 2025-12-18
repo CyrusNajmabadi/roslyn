@@ -21,8 +21,8 @@ namespace Test.Utilities
                     new PackageIdentity("Microsoft.VisualBasic", "10.3.0")));
 
         public static ReferenceAssemblies DefaultNetFramework { get; } = ReferenceAssemblies.Default
-            .AddAssemblies(ImmutableArray.Create("System.Xml.Data"))
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.CodeAnalysis", "3.0.0")));
+            .AddAssemblies(["System.Xml.Data"])
+            .AddPackages([new PackageIdentity("Microsoft.CodeAnalysis", "3.0.0")]);
 
         public static ReferenceAssemblies Default { get; } =
 #if NETCOREAPP
@@ -32,60 +32,64 @@ namespace Test.Utilities
 #endif
 
         public static ReferenceAssemblies DefaultWithoutRoslynSymbols { get; } = ReferenceAssemblies.Default
-            .AddAssemblies(ImmutableArray.Create("System.Xml.Data"))
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", "3.0.0")));
+            .AddAssemblies(["System.Xml.Data"])
+            .AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", "3.0.0")]);
 
         public static ReferenceAssemblies DefaultWithSystemWeb { get; } = ReferenceAssemblies.NetFramework.Net472.Default
-            .AddAssemblies(ImmutableArray.Create("System.Web", "System.Web.Extensions"));
+            .AddAssemblies(["System.Web", "System.Web.Extensions"]);
 
         public static ReferenceAssemblies DefaultForTaintedDataAnalysis { get; } = ReferenceAssemblies.NetFramework.Net472.Default
-            .AddAssemblies(ImmutableArray.Create("PresentationFramework", "System.Web", "System.Web.Extensions", "System.Xaml"))
-            .AddPackages(ImmutableArray.Create(
+            .AddAssemblies(["PresentationFramework", "System.Web", "System.Web.Extensions", "System.Xaml"])
+            .AddPackages(
+            [
                 new PackageIdentity("System.DirectoryServices", "6.0.1"),
                 new PackageIdentity("AntiXSS", "4.3.0"),
                 new PackageIdentity("Microsoft.AspNetCore.Mvc", "2.2.0"),
-                new PackageIdentity("Microsoft.EntityFrameworkCore.Relational", "2.0.3")));
+                new PackageIdentity("Microsoft.EntityFrameworkCore.Relational", "2.0.3"),
+            ]);
 
         public static ReferenceAssemblies DefaultWithSerialization { get; } = ReferenceAssemblies.NetFramework.Net472.Default
-            .AddAssemblies(ImmutableArray.Create("System.Runtime.Serialization"));
+            .AddAssemblies(["System.Runtime.Serialization"]);
 
         public static ReferenceAssemblies DefaultWithAzureStorage { get; } = ReferenceAssemblies.Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("WindowsAzure.Storage", "9.0.0")));
+            .AddPackages([new PackageIdentity("WindowsAzure.Storage", "9.0.0")]);
 
         public static ReferenceAssemblies DefaultWithNewtonsoftJson10 { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Newtonsoft.Json", "10.0.1")));
+            .AddPackages([new PackageIdentity("Newtonsoft.Json", "10.0.1")]);
 
         public static ReferenceAssemblies DefaultWithNewtonsoftJson12 { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Newtonsoft.Json", "12.0.1")));
+            .AddPackages([new PackageIdentity("Newtonsoft.Json", "12.0.1")]);
 
         public static ReferenceAssemblies DefaultWithMELogging { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.Extensions.Logging", "5.0.0")));
+            .AddPackages([new PackageIdentity("Microsoft.Extensions.Logging", "5.0.0")]);
 
         public static ReferenceAssemblies DefaultWithWilson { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.IdentityModel.Tokens", "6.12.0")));
+            .AddPackages([new PackageIdentity("Microsoft.IdentityModel.Tokens", "6.12.0")]);
 
         public static ReferenceAssemblies DefaultWithWinForms { get; } = ReferenceAssemblies.NetFramework.Net472.WindowsForms;
 
         public static ReferenceAssemblies DefaultWithWinHttpHandler { get; } = ReferenceAssemblies.NetStandard.NetStandard20
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("System.Net.Http.WinHttpHandler", "4.7.0")));
+            .AddPackages([new PackageIdentity("System.Net.Http.WinHttpHandler", "4.7.0")]);
 
         public static ReferenceAssemblies DefaultWithAspNetCoreMvc { get; } = Default
-            .AddPackages(ImmutableArray.Create(
+            .AddPackages(
+            [
                 new PackageIdentity("Microsoft.AspNetCore", "1.1.7"),
                 new PackageIdentity("Microsoft.AspNetCore.Mvc", "1.1.8"),
-                new PackageIdentity("Microsoft.AspNetCore.Http", "1.1.2")));
+                new PackageIdentity("Microsoft.AspNetCore.Http", "1.1.2"),
+            ]);
 
         public static ReferenceAssemblies DefaultWithNUnit { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("NUnit", "3.12.0")));
+            .AddPackages([new PackageIdentity("NUnit", "3.12.0")]);
 
         public static ReferenceAssemblies DefaultWithXUnit { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("xunit", "2.4.1")));
+            .AddPackages([new PackageIdentity("xunit", "2.4.1")]);
 
         public static ReferenceAssemblies DefaultWithMSTest { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("MSTest.TestFramework", "2.1.0")));
+            .AddPackages([new PackageIdentity("MSTest.TestFramework", "2.1.0")]);
 
         public static ReferenceAssemblies DefaultWithAsyncInterfaces { get; } = Default
-            .AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.Bcl.AsyncInterfaces", "1.1.0")));
+            .AddPackages([new PackageIdentity("Microsoft.Bcl.AsyncInterfaces", "1.1.0")]);
 
         public static MetadataReference SystemCollectionsImmutableReference { get; } = MetadataReference.CreateFromFile(typeof(ImmutableHashSet<>).Assembly.Location);
         public static MetadataReference SystemComponentModelCompositionReference { get; } = MetadataReference.CreateFromFile(typeof(System.ComponentModel.Composition.ExportAttribute).Assembly.Location);

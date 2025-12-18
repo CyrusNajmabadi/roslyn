@@ -43,7 +43,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
                     else
                     {
                         this.OneDimensionalPool[i] = new PropertySetAbstractValue(
-                            ImmutableArray.Create<PropertySetAbstractValueKind>((PropertySetAbstractValueKind)i));
+                            [(PropertySetAbstractValueKind)i]);
                     }
                 }
 
@@ -62,9 +62,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.PropertySetAnalysis
                         else
                         {
                             this.TwoDimensionalPool[i, j] = new PropertySetAbstractValue(
-                                ImmutableArray.Create<PropertySetAbstractValueKind>(
-                                    (PropertySetAbstractValueKind)i,
-                                    (PropertySetAbstractValueKind)j));
+                                [(PropertySetAbstractValueKind)i, (PropertySetAbstractValueKind)j]);
                         }
                     }
                 }

@@ -106,7 +106,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
                 // Create a new value set with value1 and value2 as parent sets.
                 return GlobalFlowStateAnalysisValueSet.Create(
                     ImmutableHashSet<IAbstractAnalysisValue>.Empty,
-                    ImmutableHashSet.Create(value1, value2),
+                    [value1, value2],
                     height: Math.Max(value1.Height, value2.Height) + 1);
             }
 

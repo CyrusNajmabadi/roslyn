@@ -25,7 +25,7 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers.CodeFixes
         private readonly string _title = CodeFixesResources.AvoidAllocationByUsingArrayEmpty;
 
         public sealed override ImmutableArray<string> FixableDiagnosticIds { get; } =
-            ImmutableArray.Create(ExplicitAllocationAnalyzer.ObjectCreationRuleId, ExplicitAllocationAnalyzer.ArrayCreationRuleId);
+            [ExplicitAllocationAnalyzer.ObjectCreationRuleId, ExplicitAllocationAnalyzer.ArrayCreationRuleId];
 
         public sealed override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
@@ -228,9 +228,11 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers.CodeFixes
                 _readonlySequenceSpecialTypes.Any(readonlySequence => namedType.ConstructedFrom.SpecialType == readonlySequence);
         }
 
-        private static readonly ImmutableArray<SpecialType> _readonlySequenceSpecialTypes = ImmutableArray.Create(
+        private static readonly ImmutableArray<SpecialType> _readonlySequenceSpecialTypes =
+        [
             SpecialType.System_Collections_Generic_IEnumerable_T,
             SpecialType.System_Collections_Generic_IReadOnlyList_T,
-            SpecialType.System_Collections_Generic_IReadOnlyCollection_T);
+            SpecialType.System_Collections_Generic_IReadOnlyCollection_T,
+        ];
     }
 }

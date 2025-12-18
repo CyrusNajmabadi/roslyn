@@ -25,8 +25,7 @@ internal abstract partial class AbstractAddImportFeatureService<TSimpleNameSynta
         protected override async Task<ImmutableArray<CodeActionOperation>> ComputeOperationsAsync(
             IProgress<CodeAnalysisProgress> progress, CancellationToken cancellationToken)
         {
-            return ImmutableArray.Create<CodeActionOperation>(
-                new InstallWithPackageManagerCodeActionOperation(_installerService, _packageName));
+            return [new InstallWithPackageManagerCodeActionOperation(_installerService, _packageName)];
         }
 
         private sealed class InstallWithPackageManagerCodeActionOperation(

@@ -36,9 +36,9 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(ParamsParameterRule, ValueTypeNonOverridenCallRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [ParamsParameterRule, ValueTypeNonOverridenCallRule];
 
-        protected override ImmutableArray<SyntaxKind> Expressions { get; } = ImmutableArray.Create(SyntaxKind.InvocationExpression);
+        protected override ImmutableArray<SyntaxKind> Expressions { get; } = [SyntaxKind.InvocationExpression];
 
         protected override void AnalyzeNode(SyntaxNodeAnalysisContext context, in PerformanceSensitiveInfo info)
         {

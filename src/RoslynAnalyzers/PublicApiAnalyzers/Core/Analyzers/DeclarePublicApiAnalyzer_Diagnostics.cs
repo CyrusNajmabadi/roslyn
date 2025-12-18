@@ -277,7 +277,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-            ImmutableArray.Create(
+            [
                 DeclareNewPublicApiRule,
                 DeclareNewInternalApiRule,
                 AnnotatePublicApiRule,
@@ -300,6 +300,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
                 OverloadWithOptionalParametersShouldHaveMostParametersInternal,
                 ShouldAnnotatePublicApiFilesRule,
                 ShouldAnnotateInternalApiFilesRule,
-                RemovedApiIsNotActuallyRemovedRule);
+                RemovedApiIsNotActuallyRemovedRule,
+            ];
     }
 }

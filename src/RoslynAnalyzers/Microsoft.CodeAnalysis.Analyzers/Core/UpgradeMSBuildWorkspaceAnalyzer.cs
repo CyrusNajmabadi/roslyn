@@ -33,7 +33,7 @@ namespace Microsoft.CodeAnalysis
             helpLinkUri: "https://go.microsoft.com/fwlink/?linkid=874285",
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(UpgradeMSBuildWorkspaceDiagnosticRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [UpgradeMSBuildWorkspaceDiagnosticRule];
 
         public override void Initialize(AnalysisContext context)
         {

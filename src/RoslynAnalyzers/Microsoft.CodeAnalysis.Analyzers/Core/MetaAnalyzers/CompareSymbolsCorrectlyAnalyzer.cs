@@ -76,7 +76,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
         private static readonly ImmutableDictionary<string, string?> s_CollectionRuleProperties =
             ImmutableDictionary.CreateRange([new KeyValuePair<string, string?>(RulePropertyName, CollectionRuleName)]);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(s_equalityRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [s_equalityRule];
 
         public override void Initialize(AnalysisContext context)
         {

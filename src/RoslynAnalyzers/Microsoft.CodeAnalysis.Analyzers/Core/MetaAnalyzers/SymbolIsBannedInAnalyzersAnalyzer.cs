@@ -43,7 +43,11 @@ namespace Microsoft.CodeAnalysis.Analyzers
     public abstract class SymbolIsBannedInAnalyzersAnalyzer<TSyntaxKind> : SymbolIsBannedAnalyzerBase<TSyntaxKind>
         where TSyntaxKind : struct
     {
-        public sealed override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(SymbolIsBannedInAnalyzersAnalyzer.SymbolIsBannedRule, SymbolIsBannedInAnalyzersAnalyzer.NoSettingSpecifiedSymbolIsBannedRule);
+        public sealed override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        [
+            SymbolIsBannedInAnalyzersAnalyzer.SymbolIsBannedRule,
+            SymbolIsBannedInAnalyzersAnalyzer.NoSettingSpecifiedSymbolIsBannedRule,
+        ];
 
         protected sealed override DiagnosticDescriptor SymbolIsBannedRule => SymbolIsBannedInAnalyzersAnalyzer.SymbolIsBannedRule;
 

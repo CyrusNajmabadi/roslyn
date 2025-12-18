@@ -55,9 +55,16 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
             DiagnosticSeverity.Info,
             isEnabledByDefault: true);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(ValueTypeToReferenceTypeConversionRule, DelegateOnStructInstanceRule, MethodGroupAllocationRule, ReadonlyMethodGroupAllocationRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
+        [
+            ValueTypeToReferenceTypeConversionRule,
+            DelegateOnStructInstanceRule,
+            MethodGroupAllocationRule,
+            ReadonlyMethodGroupAllocationRule,
+        ];
 
-        protected override ImmutableArray<SyntaxKind> Expressions { get; } = ImmutableArray.Create(
+        protected override ImmutableArray<SyntaxKind> Expressions { get; } =
+        [
             SyntaxKind.SimpleAssignmentExpression,
             SyntaxKind.ReturnStatement,
             SyntaxKind.YieldReturnStatement,
@@ -69,7 +76,8 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
             SyntaxKind.EqualsValueClause,
             SyntaxKind.Argument,
             SyntaxKind.ArrowExpressionClause,
-            SyntaxKind.Interpolation);
+            SyntaxKind.Interpolation,
+        ];
 
         private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
 

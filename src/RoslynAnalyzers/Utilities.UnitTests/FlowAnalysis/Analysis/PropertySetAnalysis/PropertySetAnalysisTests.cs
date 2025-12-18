@@ -219,8 +219,7 @@ public class OtherClass
             new(
                 "TestTypeToTrack",
                 new ConstructorMapper(     // Only one constructor, which leaves its AString property as null (not hazardous).
-                    ImmutableArray.Create<PropertySetAbstractValueKind>(
-                        PropertySetAbstractValueKind.Unflagged)),
+                    [PropertySetAbstractValueKind.Unflagged]),
                 new PropertyMapperCollection(
                     new PropertyMapper(    // Definitely null => unflagged, definitely non-null => flagged, otherwise => maybe.
                         "AString",
@@ -500,8 +499,7 @@ class TestClass
             new(
                 "TestTypeToTrack",
                 new ConstructorMapper(     // Only one constructor, which leaves its AnEnum property as Value0 (hazardous).
-                    ImmutableArray.Create<PropertySetAbstractValueKind>(
-                        PropertySetAbstractValueKind.Flagged)),
+                    [PropertySetAbstractValueKind.Flagged]),
                 new PropertyMapperCollection(
                     new PropertyMapper(
                         "AnEnum",
@@ -629,9 +627,7 @@ class TestClass
             new(
                 "TestTypeToTrack",
                 new ConstructorMapper(
-                    ImmutableArray.Create<PropertySetAbstractValueKind>(   // Order is the same as the PropertyMappers below.
-                        PropertySetAbstractValueKind.Unflagged,      // AString
-                        PropertySetAbstractValueKind.Unflagged)),    // AnEnum
+                    [PropertySetAbstractValueKind.Unflagged, PropertySetAbstractValueKind.Unflagged]),    // AnEnum
             new PropertyMapperCollection(
                 new PropertyMapper(
                     "AString",
@@ -985,8 +981,7 @@ class TestClass
             new(
                 "TestTypeToTrack",
                 new ConstructorMapper(     // Only one constructor, which leaves its AString property as null (not hazardous).
-                    ImmutableArray.Create<PropertySetAbstractValueKind>(
-                        PropertySetAbstractValueKind.Unflagged)),
+                    [PropertySetAbstractValueKind.Unflagged]),
                 new PropertyMapperCollection(
                     new PropertyMapper(    // Definitely null => unflagged, definitely non-null => flagged, otherwise => maybe.
                         "AString",
@@ -1081,8 +1076,7 @@ class TestClass
             new(
                 "TestTypeToTrack",
                 new ConstructorMapper(     // Only one constructor, which leaves its AString property as null (not hazardous).
-                    ImmutableArray.Create<PropertySetAbstractValueKind>(
-                        PropertySetAbstractValueKind.Unflagged)),
+                    [PropertySetAbstractValueKind.Unflagged]),
                 new PropertyMapperCollection(
                     new PropertyMapper(    // Definitely null => unflagged, definitely non-null => flagged, otherwise => maybe.
                         "AString",
@@ -1226,7 +1220,7 @@ class TestClass
             ProjectId projectId = ProjectId.CreateNewId(debugName: TestProjectName);
 
             var defaultReferences = ReferenceAssemblies.NetFramework.Net48.Default;
-            defaultReferences = defaultReferences.AddPackages(ImmutableArray.Create(new PackageIdentity("System.DirectoryServices", "6.0.1")));
+            defaultReferences = defaultReferences.AddPackages([new PackageIdentity("System.DirectoryServices", "6.0.1")]);
             var references = Task.Run(() => defaultReferences.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)).GetAwaiter().GetResult();
 
 #pragma warning disable CA2000 // Dispose objects before losing scope - Current solution/project takes the dispose ownership of the created AdhocWorkspace

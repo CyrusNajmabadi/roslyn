@@ -104,14 +104,16 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             description: s_localizableDescriptionStatefulAnalyzerRegisterActionsDescription,
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
+        [
             MissingSymbolKindArgumentRule,
             MissingSyntaxKindArgumentRule,
             MissingOperationKindArgumentRule,
             UnsupportedSymbolKindArgumentRule,
             InvalidSyntaxKindTypeArgumentRule,
             StartActionWithNoRegisteredActionsRule,
-            StartActionWithOnlyEndActionRule);
+            StartActionWithOnlyEndActionRule,
+        ];
 
         protected override DiagnosticAnalyzerSymbolAnalyzer? GetDiagnosticAnalyzerSymbolAnalyzer(CompilationStartAnalysisContext compilationContext, INamedTypeSymbol diagnosticAnalyzer, INamedTypeSymbol diagnosticAnalyzerAttribute)
         {
@@ -176,14 +178,15 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             private readonly INamedTypeSymbol _symbolKind;
 
             private static readonly ImmutableHashSet<string> s_supportedSymbolKinds =
-                ImmutableHashSet.Create(
+                [
                     nameof(SymbolKind.Event),
                     nameof(SymbolKind.Field),
                     nameof(SymbolKind.Method),
                     nameof(SymbolKind.NamedType),
                     nameof(SymbolKind.Namespace),
                     nameof(SymbolKind.Parameter),
-                    nameof(SymbolKind.Property));
+                    nameof(SymbolKind.Property),
+                ];
 
 #pragma warning disable CA1815 // Override equals and operator equals on value types
             private struct NodeAndSymbol

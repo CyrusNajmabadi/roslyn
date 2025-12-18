@@ -34,11 +34,13 @@ namespace Analyzer.Utilities
             ];
         private static readonly BoundedCacheWithFactory<Compilation, DisposeAnalysisHelper> s_DisposeHelperCache = new();
 
-        private static readonly ImmutableHashSet<OperationKind> s_DisposableCreationKinds = ImmutableHashSet.Create(
+        private static readonly ImmutableHashSet<OperationKind> s_DisposableCreationKinds =
+        [
             OperationKind.ObjectCreation,
             OperationKind.TypeParameterObjectCreation,
             OperationKind.DynamicObjectCreation,
-            OperationKind.Invocation);
+            OperationKind.Invocation,
+        ];
 
         private readonly WellKnownTypeProvider _wellKnownTypeProvider;
         private readonly ImmutableHashSet<INamedTypeSymbol> _disposeOwnershipTransferLikelyTypes;

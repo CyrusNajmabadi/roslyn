@@ -259,7 +259,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests
         public Task UseBannedApi_ISourceGenerator()
             => new VerifyCS.Test
             {
-                ReferenceAssemblies = AdditionalMetadataReferences.Default.WithPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.CodeAnalysis.Common", "4.5.0"))),
+                ReferenceAssemblies = AdditionalMetadataReferences.Default.WithPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", "4.5.0")]),
                 TestCode = """
                     using Microsoft.CodeAnalysis;
                     

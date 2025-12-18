@@ -25,8 +25,8 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
         public static PointsToAbstractValue Unknown { get; } = new PointsToAbstractValue(PointsToAbstractValueKind.Unknown, NullAbstractValue.MaybeNull);
         public static PointsToAbstractValue UnknownNull { get; } = new PointsToAbstractValue(PointsToAbstractValueKind.UnknownNull, NullAbstractValue.Null);
         public static PointsToAbstractValue UnknownNotNull { get; } = new PointsToAbstractValue(PointsToAbstractValueKind.UnknownNotNull, NullAbstractValue.NotNull);
-        public static PointsToAbstractValue NoLocation { get; } = new PointsToAbstractValue(ImmutableHashSet.Create(AbstractLocation.NoLocation), NullAbstractValue.NotNull);
-        public static PointsToAbstractValue NullLocation { get; } = new PointsToAbstractValue(ImmutableHashSet.Create(AbstractLocation.Null), NullAbstractValue.Null);
+        public static PointsToAbstractValue NoLocation { get; } = new PointsToAbstractValue([AbstractLocation.NoLocation], NullAbstractValue.NotNull);
+        public static PointsToAbstractValue NullLocation { get; } = new PointsToAbstractValue([AbstractLocation.Null], NullAbstractValue.Null);
 
         private PointsToAbstractValue(ImmutableHashSet<AbstractLocation> locations, NullAbstractValue nullState)
         {
@@ -69,12 +69,12 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
             Debug.Assert(!location.IsNull, "Use 'PointsToAbstractValue.NullLocation' singleton");
             Debug.Assert(!location.IsNoLocation, "Use 'PointsToAbstractValue.NoLocation' singleton");
 
-            return new PointsToAbstractValue(ImmutableHashSet.Create(location), mayBeNull ? NullAbstractValue.MaybeNull : NullAbstractValue.NotNull);
+            return new PointsToAbstractValue([location], mayBeNull ? NullAbstractValue.MaybeNull : NullAbstractValue.NotNull);
         }
 
         internal static PointsToAbstractValue Create(IOperation lValueCapturedOperation)
         {
-            return new PointsToAbstractValue(ImmutableHashSet.Create(lValueCapturedOperation));
+            return new PointsToAbstractValue([lValueCapturedOperation]);
         }
 
         internal static PointsToAbstractValue Create(ImmutableHashSet<AbstractLocation> locations, NullAbstractValue nullState)

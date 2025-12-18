@@ -23,7 +23,7 @@ namespace Roslyn.Diagnostics.CSharp.Analyzers
     [method: Obsolete("This exported object must be obtained through the MEF export provider.", error: true)]
     public sealed class CSharpAvoidOptSuffixForNullableEnableCodeCodeFixProvider() : CodeFixProvider
     {
-        public override ImmutableArray<string> FixableDiagnosticIds { get; } = ImmutableArray.Create(CSharpAvoidOptSuffixForNullableEnableCode.Rule.Id);
+        public override ImmutableArray<string> FixableDiagnosticIds { get; } = [CSharpAvoidOptSuffixForNullableEnableCode.Rule.Id];
 
         public override FixAllProvider GetFixAllProvider()
             => WellKnownFixAllProviders.BatchFixer;

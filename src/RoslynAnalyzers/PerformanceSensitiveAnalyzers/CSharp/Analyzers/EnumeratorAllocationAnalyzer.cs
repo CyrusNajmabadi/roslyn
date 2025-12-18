@@ -28,9 +28,9 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(ReferenceTypeEnumeratorRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [ReferenceTypeEnumeratorRule];
 
-        protected override ImmutableArray<SyntaxKind> Expressions { get; } = ImmutableArray.Create(SyntaxKind.ForEachStatement, SyntaxKind.InvocationExpression);
+        protected override ImmutableArray<SyntaxKind> Expressions { get; } = [SyntaxKind.ForEachStatement, SyntaxKind.InvocationExpression];
 
         private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
 

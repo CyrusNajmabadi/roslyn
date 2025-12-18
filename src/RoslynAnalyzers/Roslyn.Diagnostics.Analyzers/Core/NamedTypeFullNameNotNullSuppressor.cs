@@ -32,7 +32,7 @@ namespace Roslyn.Diagnostics.Analyzers
         internal static readonly SuppressionDescriptor CS8603Rule = new(Id, CS8603, s_localizableJustification);
         internal static readonly SuppressionDescriptor CS8604Rule = new(Id, CS8604, s_localizableJustification);
 
-        public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = ImmutableArray.Create(CS8600Rule, CS8603Rule, CS8604Rule);
+        public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = [CS8600Rule, CS8603Rule, CS8604Rule];
 
         public override void ReportSuppressions(SuppressionAnalysisContext context)
         {

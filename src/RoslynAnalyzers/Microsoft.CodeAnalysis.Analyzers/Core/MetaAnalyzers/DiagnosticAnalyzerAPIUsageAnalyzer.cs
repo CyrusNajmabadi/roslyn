@@ -30,10 +30,12 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
         private static readonly LocalizableString s_localizableDescription = CreateLocalizableResourceString(nameof(DoNotUseTypesFromAssemblyRuleDescription), nameof(AnalysisContext), DiagnosticWellKnownNames.RegisterCompilationStartActionName);
         private const string CodeActionMetadataName = "Microsoft.CodeAnalysis.CodeActions.CodeAction";
         private const string HelpLinkUri = "https://github.com/dotnet/roslyn/blob/main/docs/roslyn-analyzers/rules/RS1022.md";
-        private static readonly ImmutableArray<string> s_WorkspaceAssemblyNames = ImmutableArray.Create(
+        private static readonly ImmutableArray<string> s_WorkspaceAssemblyNames =
+        [
             "Microsoft.CodeAnalysis.Workspaces",
             "Microsoft.CodeAnalysis.CSharp.Workspaces",
-            "Microsoft.CodeAnalysis.VisualBasic.Workspaces");
+            "Microsoft.CodeAnalysis.VisualBasic.Workspaces",
+        ];
 
         public static readonly DiagnosticDescriptor DoNotUseTypesFromAssemblyDirectRule = new(
             DiagnosticIds.DoNotUseTypesFromAssemblyRuleId,
@@ -58,7 +60,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             customTags: WellKnownDiagnosticTagsExtensions.CompilationEndAndTelemetry);
 
         protected abstract bool IsNamedTypeDeclarationBlock(SyntaxNode syntax);
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(DoNotUseTypesFromAssemblyDirectRule, DoNotUseTypesFromAssemblyIndirectRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [DoNotUseTypesFromAssemblyDirectRule, DoNotUseTypesFromAssemblyIndirectRule];
 
         public override void Initialize(AnalysisContext context)
         {

@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.Analyzers
             description: CreateLocalizableResourceString(nameof(DoNotIgnoreReturnValueOnImmutableObjectMethodInvocationDescription)),
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(DoNotIgnoreReturnValueDiagnosticRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [DoNotIgnoreReturnValueDiagnosticRule];
 
         private const string SolutionFullName = @"Microsoft.CodeAnalysis.Solution";
         private const string ProjectFullName = @"Microsoft.CodeAnalysis.Project";
@@ -39,11 +39,7 @@ namespace Microsoft.CodeAnalysis.Analyzers
         private const string SyntaxNodeFullName = @"Microsoft.CodeAnalysis.SyntaxNode";
         private const string CompilationFullName = @"Microsoft.CodeAnalysis.Compilation";
 
-        private static readonly ImmutableArray<string> s_immutableMethodNames = ImmutableArray.Create(
-            "Add",
-            "Remove",
-            "Replace",
-            "With");
+        private static readonly ImmutableArray<string> s_immutableMethodNames = ["Add", "Remove", "Replace", "With"];
 
         public override void Initialize(AnalysisContext context)
         {

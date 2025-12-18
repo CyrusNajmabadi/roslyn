@@ -22,8 +22,7 @@ internal sealed class InstallWithPackageManagerCodeAction(
     protected override async Task<ImmutableArray<CodeActionOperation>> ComputeOperationsAsync(
         IProgress<CodeAnalysisProgress> progress, CancellationToken cancellationToken)
     {
-        return ImmutableArray.Create<CodeActionOperation>(
-            new InstallWithPackageManagerCodeActionOperation(this));
+        return [new InstallWithPackageManagerCodeActionOperation(this)];
     }
 
     private sealed class InstallWithPackageManagerCodeActionOperation(

@@ -42,7 +42,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.CopyAnalysis
         }
 
         internal CopyAbstractValue(AnalysisEntity analysisEntity)
-            : this(ImmutableHashSet.Create(analysisEntity),
+            : this([analysisEntity],
                    kind: analysisEntity.Type.IsReferenceType ? CopyAbstractValueKind.KnownReferenceCopy : CopyAbstractValueKind.KnownValueCopy)
         {
         }

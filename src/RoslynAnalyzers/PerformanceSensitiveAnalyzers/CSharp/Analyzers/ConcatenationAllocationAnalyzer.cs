@@ -39,9 +39,9 @@ namespace Microsoft.CodeAnalysis.CSharp.PerformanceSensitiveAnalyzers
             isEnabledByDefault: true,
             helpLinkUri: "http://msdn.microsoft.com/en-us/library/yz2be5wk.aspx");
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(StringConcatenationAllocationRule, ValueTypeToReferenceTypeInAStringConcatenationRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [StringConcatenationAllocationRule, ValueTypeToReferenceTypeInAStringConcatenationRule];
 
-        protected override ImmutableArray<SyntaxKind> Expressions { get; } = ImmutableArray.Create(SyntaxKind.AddExpression, SyntaxKind.AddAssignmentExpression);
+        protected override ImmutableArray<SyntaxKind> Expressions { get; } = [SyntaxKind.AddExpression, SyntaxKind.AddAssignmentExpression];
 
         private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
 

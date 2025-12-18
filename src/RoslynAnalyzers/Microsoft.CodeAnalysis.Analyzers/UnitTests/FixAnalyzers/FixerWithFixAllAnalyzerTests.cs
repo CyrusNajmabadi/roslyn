@@ -364,7 +364,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.FixAnalyzers
         public Task CSharp_CodeActionCreateNestedActions_NoDiagnosticsAsync()
             => new VerifyCS.Test
             {
-                ReferenceAssemblies = ReferenceAssemblies.Default.AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.CodeAnalysis", "3.3.0"))),
+                ReferenceAssemblies = ReferenceAssemblies.Default.AddPackages([new PackageIdentity("Microsoft.CodeAnalysis", "3.3.0")]),
                 TestCode = """
 
                 using System;

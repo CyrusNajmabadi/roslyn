@@ -53,7 +53,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
         }
 
         public static GlobalFlowStateAnalysisValueSet Create(IAbstractAnalysisValue analysisValue)
-            => new(ImmutableHashSet.Create(analysisValue), ImmutableHashSet<GlobalFlowStateAnalysisValueSet>.Empty, height: 0, GlobalFlowStateAnalysisValueSetKind.Known);
+            => new([analysisValue], ImmutableHashSet<GlobalFlowStateAnalysisValueSet>.Empty, height: 0, GlobalFlowStateAnalysisValueSetKind.Known);
 
         public ImmutableHashSet<IAbstractAnalysisValue> AnalysisValues { get; }
         public ImmutableHashSet<GlobalFlowStateAnalysisValueSet> Parents { get; }
@@ -67,7 +67,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
             var newHeight = Height + newRoot.Height + 1;
             if (Parents.IsEmpty)
             {
-                return GlobalFlowStateAnalysisValueSet.Create(AnalysisValues, ImmutableHashSet.Create(newRoot), newHeight);
+                return GlobalFlowStateAnalysisValueSet.Create(AnalysisValues, [newRoot], newHeight);
             }
 
             using var _ = PooledHashSet<GlobalFlowStateAnalysisValueSet>.GetInstance(out var parentsBuilder);

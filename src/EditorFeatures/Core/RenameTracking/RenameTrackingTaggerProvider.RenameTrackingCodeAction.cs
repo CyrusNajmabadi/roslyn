@@ -63,7 +63,7 @@ internal sealed partial class RenameTrackingTaggerProvider
                 return [];
 
             var committerOperation = new RenameTrackingCommitterOperation(_renameTrackingCommitter, _threadingContext);
-            return ImmutableArray.Create<CodeActionOperation>(committerOperation);
+            return [committerOperation];
         }
 
         protected override async Task<IEnumerable<CodeActionOperation>> ComputePreviewOperationsAsync(CancellationToken cancellationToken)

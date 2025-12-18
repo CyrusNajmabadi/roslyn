@@ -33,8 +33,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             helpLinkUri: HelpLinkUri,
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
-            DoNotDeclareCompilerFeatureInAssemblyWithUnsupportedTargetFrameworkStrictRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [DoNotDeclareCompilerFeatureInAssemblyWithUnsupportedTargetFrameworkStrictRule];
 
         public override void Initialize(AnalysisContext context)
         {

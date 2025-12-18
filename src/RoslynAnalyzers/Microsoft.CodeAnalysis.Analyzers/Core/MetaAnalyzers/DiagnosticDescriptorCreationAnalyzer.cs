@@ -174,7 +174,8 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             description: CreateLocalizableResourceString(nameof(AddCompilationEndCustomTagDescription)),
             customTags: WellKnownDiagnosticTagsExtensions.Telemetry);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
+        [
             UseLocalizableStringsInDescriptorRule,
             ProvideHelpUriInDescriptorRule,
             DiagnosticIdMustBeAConstantRule,
@@ -199,7 +200,8 @@ namespace Microsoft.CodeAnalysis.Analyzers.MetaAnalyzers
             DefineDiagnosticTitleCorrectlyRule,
             DefineDiagnosticMessageCorrectlyRule,
             DefineDiagnosticDescriptionCorrectlyRule,
-            AddCompilationEndCustomTagRule);
+            AddCompilationEndCustomTagRule,
+        ];
 
         public override void Initialize(AnalysisContext context)
         {

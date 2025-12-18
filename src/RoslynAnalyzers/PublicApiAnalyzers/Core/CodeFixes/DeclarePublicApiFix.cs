@@ -26,7 +26,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
     [method: Obsolete("This exported object must be obtained through the MEF export provider.", error: true)]
     public sealed class DeclarePublicApiFix() : CodeFixProvider
     {
-        public sealed override ImmutableArray<string> FixableDiagnosticIds { get; } = ImmutableArray.Create(DiagnosticIds.DeclarePublicApiRuleId, DiagnosticIds.DeclareInternalApiRuleId);
+        public sealed override ImmutableArray<string> FixableDiagnosticIds { get; } = [DiagnosticIds.DeclarePublicApiRuleId, DiagnosticIds.DeclareInternalApiRuleId];
 
         public sealed override FixAllProvider GetFixAllProvider()
         {

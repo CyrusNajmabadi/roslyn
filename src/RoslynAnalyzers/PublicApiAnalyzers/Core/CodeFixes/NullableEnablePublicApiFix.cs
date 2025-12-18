@@ -24,7 +24,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
     public sealed class NullableEnablePublicApiFix() : CodeFixProvider
     {
         public sealed override ImmutableArray<string> FixableDiagnosticIds { get; } =
-            ImmutableArray.Create(DiagnosticIds.ShouldAnnotatePublicApiFilesRuleId, DiagnosticIds.ShouldAnnotateInternalApiFilesRuleId);
+            [DiagnosticIds.ShouldAnnotatePublicApiFilesRuleId, DiagnosticIds.ShouldAnnotateInternalApiFilesRuleId];
 
         public sealed override FixAllProvider GetFixAllProvider()
             => new PublicSurfaceAreaFixAllProvider();

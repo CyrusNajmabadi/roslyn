@@ -18,13 +18,15 @@ namespace Roslyn.Diagnostics.CSharp.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class CSharpSymbolDeclaredEventAnalyzer : SymbolDeclaredEventAnalyzer<SyntaxKind>
     {
-        private static readonly ImmutableHashSet<string> s_symbolTypesWithExpectedSymbolDeclaredEvent = ImmutableHashSet.Create(
+        private static readonly ImmutableHashSet<string> s_symbolTypesWithExpectedSymbolDeclaredEvent =
+        [
             "SourceNamespaceSymbol",
             "SourceNamedTypeSymbol",
             "SourceEventSymbol",
             "SourceFieldSymbol",
             "SourceMethodSymbol",
-            "SourcePropertySymbol");
+            "SourcePropertySymbol",
+        ];
 
         protected override CompilationAnalyzer? GetCompilationAnalyzer(Compilation compilation, INamedTypeSymbol symbolType)
         {

@@ -68,7 +68,7 @@ namespace Microsoft.CodeAnalysis.PublicApiAnalyzers
         private sealed class Impl
         {
             private static readonly ImmutableArray<MethodKind> s_ignorableMethodKinds
-                = ImmutableArray.Create(MethodKind.EventAdd, MethodKind.EventRemove);
+                = [MethodKind.EventAdd, MethodKind.EventRemove];
 
             private static readonly SymbolDisplayFormat s_namespaceFormat = new(
                 globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,

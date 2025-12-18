@@ -97,6 +97,6 @@ internal abstract class AbstractObjectCreationCompletionProvider<TSyntaxContext>
 
         // In the case of array creation, we don't offer a preselected/hard-selected item because
         // the user may want an implicitly-typed array creation
-        return ImmutableArray.Create(new SymbolAndSelectionInfo(Symbol: type, Preselect: !isArray));
+        return [new SymbolAndSelectionInfo(Symbol: type, Preselect: !isArray)];
     }
 }

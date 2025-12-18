@@ -62,18 +62,16 @@ namespace Microsoft.CodeAnalysis.PerformanceSensitiveAnalyzers
 
         private static readonly object[] EmptyMessageArgs = Array.Empty<object>();
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
-            ArrayCreationRule,
-            ObjectCreationRule,
-            AnonymousObjectCreationRule,
-            LetCauseRule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [ArrayCreationRule, ObjectCreationRule, AnonymousObjectCreationRule, LetCauseRule];
 
-        protected override ImmutableArray<OperationKind> Operations { get; } = ImmutableArray.Create(
+        protected override ImmutableArray<OperationKind> Operations { get; } =
+        [
             OperationKind.ArrayCreation,
             OperationKind.ObjectCreation,
             OperationKind.AnonymousObjectCreation,
             OperationKind.DelegateCreation,
-            OperationKind.TypeParameterObjectCreation);
+            OperationKind.TypeParameterObjectCreation,
+        ];
 
         protected override void AnalyzeNode(OperationAnalysisContext context, in PerformanceSensitiveInfo info)
         {

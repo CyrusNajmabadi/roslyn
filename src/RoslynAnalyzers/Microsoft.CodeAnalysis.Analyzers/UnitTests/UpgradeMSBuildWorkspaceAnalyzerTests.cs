@@ -17,12 +17,14 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests
 {
     public class UpgradeMSBuildWorkspaceAnalyzerTests
     {
-        private static readonly ReferenceAssemblies s_withDesktopWorkspaces = ReferenceAssemblies.NetFramework.Net46.Default.AddPackages(ImmutableArray.Create(new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", "2.9.0")));
+        private static readonly ReferenceAssemblies s_withDesktopWorkspaces = ReferenceAssemblies.NetFramework.Net46.Default.AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.Common", "2.9.0")]);
 
-        private static readonly ReferenceAssemblies s_withMSBuildWorkspaces = ReferenceAssemblies.NetFramework.Net461.Default.AddPackages(ImmutableArray.Create(
+        private static readonly ReferenceAssemblies s_withMSBuildWorkspaces = ReferenceAssemblies.NetFramework.Net461.Default.AddPackages(
+        [
             new PackageIdentity("Microsoft.CodeAnalysis.Workspaces.MSBuild", "2.9.0"),
             new PackageIdentity("Microsoft.CodeAnalysis.CSharp.Workspaces", "2.9.0"),
-            new PackageIdentity("Microsoft.Build.Locator", "1.0.18")));
+            new PackageIdentity("Microsoft.Build.Locator", "1.0.18"),
+        ]);
 
         private static Task VerifyCSharpAsync(string source, ReferenceAssemblies referenceAssemblies)
             => new VerifyCS.Test()

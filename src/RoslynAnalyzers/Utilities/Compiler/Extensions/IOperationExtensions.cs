@@ -84,7 +84,7 @@ namespace Analyzer.Utilities.Extensions
         {
             if (!operation.IsImplicit)
             {
-                return ImmutableArray.Create(operation);
+                return [operation];
             }
 
             var builder = ImmutableArray.CreateBuilder<IOperation>();
@@ -379,7 +379,7 @@ namespace Analyzer.Utilities.Extensions
         }
 
         private static readonly ImmutableArray<OperationKind> s_LambdaAndLocalFunctionKinds =
-            ImmutableArray.Create(OperationKind.AnonymousFunction, OperationKind.LocalFunction);
+            [OperationKind.AnonymousFunction, OperationKind.LocalFunction];
 
         public static bool IsWithinLambdaOrLocalFunction(this IOperation operation, [NotNullWhen(true)] out IOperation? containingLambdaOrLocalFunctionOperation)
         {

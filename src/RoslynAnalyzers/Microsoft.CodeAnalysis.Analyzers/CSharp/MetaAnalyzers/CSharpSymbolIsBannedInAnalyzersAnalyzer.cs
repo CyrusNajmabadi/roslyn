@@ -16,7 +16,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Analyzers
     {
         protected override SyntaxKind XmlCrefSyntaxKind => SyntaxKind.XmlCrefAttribute;
 
-        protected override ImmutableArray<SyntaxKind> BaseTypeSyntaxKinds => ImmutableArray.Create(SyntaxKind.BaseList);
+        protected override ImmutableArray<SyntaxKind> BaseTypeSyntaxKinds => [SyntaxKind.BaseList];
 
         protected override SymbolDisplayFormat SymbolDisplayFormat => SymbolDisplayFormat.CSharpShortErrorMessageFormat;
 

@@ -66,8 +66,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task CSharpAnalyzerDefinedWithSupportedFramework(SupportedTargetFramework supportedFramework)
             => new VerifyCS.Test
             {
-                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(supportedFramework).AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(supportedFramework)))),
+                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(supportedFramework).AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(supportedFramework))]),
                 TestState =
                 {
                     Sources =
@@ -83,8 +82,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task CSharpFeatureDefinedWithSupportedFramework(CompilerFeature feature)
             => new VerifyCS.Test
             {
-                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(SupportedTargetFramework.NetStandard2_0).AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(SupportedTargetFramework.NetStandard2_0)))),
+                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(SupportedTargetFramework.NetStandard2_0).AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(SupportedTargetFramework.NetStandard2_0))]),
                 TestState =
                 {
                     Sources =
@@ -100,8 +98,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task CSharpFeatureDefinedWithUnsupportedFramework(CompilerFeature feature, UnsupportedTargetFramework framework)
             => new VerifyCS.Test
             {
-                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(framework).AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(framework)))),
+                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(framework).AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(framework))]),
                 TestState =
                 {
                     Sources =
@@ -121,8 +118,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task VisualBasicAnalyzerDefinedWithSupportedFramework(SupportedTargetFramework supportedFramework)
             => new VerifyVB.Test
             {
-                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(supportedFramework).AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(supportedFramework)))),
+                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(supportedFramework).AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(supportedFramework))]),
                 TestState =
                 {
                     Sources =
@@ -138,8 +134,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task VisualBasicFeatureDefinedWithSupportedFramework(CompilerFeature feature)
             => new VerifyVB.Test
             {
-                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(SupportedTargetFramework.NetStandard2_0).AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(SupportedTargetFramework.NetStandard2_0)))),
+                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(SupportedTargetFramework.NetStandard2_0).AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(SupportedTargetFramework.NetStandard2_0))]),
                 TestState =
                 {
                     Sources =
@@ -155,8 +150,7 @@ namespace Microsoft.CodeAnalysis.Analyzers.UnitTests.MetaAnalyzers
         public Task VisualBasicFeatureDefinedWithUnsupportedFramework(CompilerFeature feature, UnsupportedTargetFramework framework)
             => new VerifyVB.Test
             {
-                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(framework).AddPackages(ImmutableArray.Create(
-                    new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(framework)))),
+                ReferenceAssemblies = GetReferenceAssembliesForTargetFramework(framework).AddPackages([new PackageIdentity("Microsoft.CodeAnalysis.Common", GetCodeAnalysisPackageVersion(framework))]),
                 TestState =
                 {
                     Sources =

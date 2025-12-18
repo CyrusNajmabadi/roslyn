@@ -13,11 +13,7 @@ namespace Microsoft.CodeAnalysis.CSharp.BannedApiAnalyzers
     public sealed class CSharpRestrictedInternalsVisibleToAnalyzer : RestrictedInternalsVisibleToAnalyzer<NameSyntax, SyntaxKind>
     {
         protected override ImmutableArray<SyntaxKind> NameSyntaxKinds =>
-            ImmutableArray.Create(
-                SyntaxKind.IdentifierName,
-                SyntaxKind.GenericName,
-                SyntaxKind.QualifiedName,
-                SyntaxKind.AliasQualifiedName);
+            [SyntaxKind.IdentifierName, SyntaxKind.GenericName, SyntaxKind.QualifiedName, SyntaxKind.AliasQualifiedName];
 
         protected override bool IsInTypeOnlyContext(NameSyntax node)
             => SyntaxFacts.IsInTypeOnlyContext(node);

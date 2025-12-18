@@ -27,12 +27,12 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis
         public static ValueContentAbstractValue InvalidState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.Invalid);
         public static ValueContentAbstractValue MayBeContainsNonLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.Maybe);
         public static ValueContentAbstractValue DoesNotContainLiteralOrNonLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet<object?>.Empty, ValueContainsNonLiteralState.No);
-        public static ValueContentAbstractValue ContainsNullLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet.Create((object?)null), ValueContainsNonLiteralState.No);
-        public static ValueContentAbstractValue ContainsEmptyStringLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet.Create<object?>(string.Empty), ValueContainsNonLiteralState.No);
-        public static ValueContentAbstractValue ContainsZeroIntergralLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet.Create<object?>(0), ValueContainsNonLiteralState.No);
-        public static ValueContentAbstractValue ContainsOneIntergralLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet.Create<object?>(1), ValueContainsNonLiteralState.No);
-        private static ValueContentAbstractValue ContainsTrueLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet.Create<object?>(true), ValueContainsNonLiteralState.No);
-        private static ValueContentAbstractValue ContainsFalseLiteralState { get; } = new ValueContentAbstractValue(ImmutableHashSet.Create<object?>(false), ValueContainsNonLiteralState.No);
+        public static ValueContentAbstractValue ContainsNullLiteralState { get; } = new ValueContentAbstractValue([(object?)null], ValueContainsNonLiteralState.No);
+        public static ValueContentAbstractValue ContainsEmptyStringLiteralState { get; } = new ValueContentAbstractValue([string.Empty], ValueContainsNonLiteralState.No);
+        public static ValueContentAbstractValue ContainsZeroIntergralLiteralState { get; } = new ValueContentAbstractValue([0], ValueContainsNonLiteralState.No);
+        public static ValueContentAbstractValue ContainsOneIntergralLiteralState { get; } = new ValueContentAbstractValue([1], ValueContainsNonLiteralState.No);
+        private static ValueContentAbstractValue ContainsTrueLiteralState { get; } = new ValueContentAbstractValue([true], ValueContainsNonLiteralState.No);
+        private static ValueContentAbstractValue ContainsFalseLiteralState { get; } = new ValueContentAbstractValue([false], ValueContainsNonLiteralState.No);
 
         private ValueContentAbstractValue(ImmutableHashSet<object?> literalValues, ValueContainsNonLiteralState nonLiteralState)
         {
@@ -74,7 +74,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis
                     return ((bool)literal) ? ContainsTrueLiteralState : ContainsFalseLiteralState;
             }
 
-            return new ValueContentAbstractValue(ImmutableHashSet.Create<object?>(literal), ValueContainsNonLiteralState.No);
+            return new ValueContentAbstractValue([literal], ValueContainsNonLiteralState.No);
         }
 
         private static ValueContentAbstractValue Create(ImmutableHashSet<object?> literalValues, ValueContainsNonLiteralState nonLiteralState)
