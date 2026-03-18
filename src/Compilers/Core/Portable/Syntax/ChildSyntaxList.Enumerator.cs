@@ -1,4 +1,4 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -94,7 +94,13 @@ namespace Microsoft.CodeAnalysis
                 // for absent items in list slots) is skipped because it cannot satisfy any filter
                 // (e.g. ContainsAnnotations).
                 bool passesGreenFilter()
-                    => _greenFilter == null || (GetGreenChildAt(_node!, _childIndex, ref _slotData) is { } greenChild && _greenFilter(greenChild));
+                {
+                    if (_greenFilter is null)
+                        return true;
+                        
+                    var greenChild = GetGreenChildAt(_node!, _childIndex, ref _slotData);
+                    return greenChild is not null && _greenFilter(greenChild);
+                }
             }
 
             internal SyntaxNode? TryMoveNextAndGetCurrentAsNode()
