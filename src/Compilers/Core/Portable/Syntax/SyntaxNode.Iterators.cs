@@ -1,4 +1,4 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -51,9 +51,6 @@ namespace Microsoft.CodeAnalysis
                 // special case for zero-width tokens (OverlapsWith never returns true for these)
                 || (childSpan.Length == 0 && span.IntersectsWith(childSpan));
         }
-
-        private bool ShouldYieldSelf(bool includeSelf, in TextSpan span, Func<GreenNode, bool>? greenFilter)
-            => includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan);
 
         private struct ChildSyntaxListEnumeratorStack : IDisposable
         {
@@ -456,6 +453,9 @@ namespace Microsoft.CodeAnalysis
                 }
             }
         }
+
+        private bool ShouldYieldSelf(bool includeSelf, in TextSpan span, Func<GreenNode, bool>? greenFilter)
+            => includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan);
 
         private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensOnly(
             TextSpan span,
