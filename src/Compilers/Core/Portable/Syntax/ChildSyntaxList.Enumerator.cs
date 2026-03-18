@@ -19,6 +19,7 @@ namespace Microsoft.CodeAnalysis
             private int _count;
             private int _childIndex;
             private SlotData _slotData;
+            private Func<GreenNode, bool>? _greenFilter;
 
             internal Enumerator(SyntaxNode node, int count)
             {
@@ -26,16 +27,18 @@ namespace Microsoft.CodeAnalysis
                 _count = count;
                 _childIndex = -1;
                 _slotData = new SlotData(node);
+                _greenFilter = null;
             }
 
             // PERF: Initialize an Enumerator directly from a SyntaxNode without going
             // via ChildNodesAndTokens. This saves constructing an intermediate ChildSyntaxList
-            internal void InitializeFrom(SyntaxNode node)
+            internal void InitializeFrom(SyntaxNode node, Func<GreenNode, bool>? greenFilter = null)
             {
                 _node = node;
                 _count = CountNodes(node.Green);
                 _childIndex = -1;
                 _slotData = new SlotData(node);
+                _greenFilter = greenFilter;
             }
 
             /// <summary>Advances the enumerator to the next element of the <see cref="ChildSyntaxList" />.</summary>
@@ -73,28 +76,15 @@ namespace Microsoft.CodeAnalysis
 
             internal bool TryMoveNextAndGetCurrent(out SyntaxNodeOrToken current)
             {
-                if (!MoveNext())
-                {
-                    current = default;
-                    return false;
-                }
-
-                current = ItemInternal(_node, _childIndex, ref _slotData);
-                return true;
-            }
-
-            /// <summary>
-            /// Advances to the next child whose green node passes <paramref name="greenFilter"/>, returning
-            /// the realized red <see cref="SyntaxNodeOrToken"/>. Children whose green nodes do not pass the
-            /// filter are skipped without creating red nodes.
-            /// </summary>
-            internal bool TryMoveNextAndGetCurrent(Func<GreenNode, bool> greenFilter, out SyntaxNodeOrToken current)
-            {
                 Debug.Assert(_node != null);
                 while (MoveNext())
                 {
+                    // When no green filter is present, return every child unconditionally.  When a
+                    // green filter is active, check the child's green node first.  A null green child
+                    // (possible for absent items in list slots) is skipped because it cannot satisfy
+                    // any filter (e.g. ContainsAnnotations).
                     var greenChild = GetGreenChildAt(_node, _childIndex, ref _slotData);
-                    if (greenChild != null && greenFilter(greenChild))
+                    if (_greenFilter == null || (greenChild != null && _greenFilter(greenChild)))
                     {
                         current = ItemInternal(_node, _childIndex, ref _slotData);
                         return true;
