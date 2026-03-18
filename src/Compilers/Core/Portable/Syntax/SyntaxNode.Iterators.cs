@@ -56,25 +56,33 @@ namespace Microsoft.CodeAnalysis
         {
             private static readonly ObjectPool<ChildSyntaxList.Enumerator[]> s_stackPool = new ObjectPool<ChildSyntaxList.Enumerator[]>(() => new ChildSyntaxList.Enumerator[16]);
 
+            /// <summary>
+            /// Optional green-node predicate checked before creating a red node for a child.
+            /// Allows skipping entire subtrees without allocating red nodes.  <see langword="null"/>
+            /// is equivalent to a predicate that always returns <see langword="true"/>.
+            /// </summary>
+            private readonly Func<GreenNode, bool>? _greenFilter;
+
+            /// <summary>
+            /// Optional red-node predicate checked before descending into a node's children.
+            /// Only invoked when the green filter check passes.  <see langword="null"/> is
+            /// equivalent to a predicate that always returns <see langword="true"/>.
+            /// </summary>
+            private readonly Func<SyntaxNode, bool>? _descendIntoChildren;
+
             private ChildSyntaxList.Enumerator[]? _stack;
             private int _stackPtr;
-            private readonly Func<SyntaxNode, bool>? _descendIntoChildren;
-            private readonly Func<GreenNode, bool>? _greenFilter;
 
             public ChildSyntaxListEnumeratorStack(
                 SyntaxNode startingNode,
                 Func<SyntaxNode, bool>? descendIntoChildren,
                 Func<GreenNode, bool>? greenFilter)
             {
-                Debug.Assert(descendIntoChildren == null || greenFilter == null);
-                _descendIntoChildren = descendIntoChildren;
                 _greenFilter = greenFilter;
+                _descendIntoChildren = descendIntoChildren;
 
-                var shouldDescend = greenFilter != null
-                    ? greenFilter(startingNode.Green)
-                    : descendIntoChildren == null || descendIntoChildren(startingNode);
-
-                if (shouldDescend)
+                if (greenFilter?.Invoke(startingNode.Green) is not false
+                    && descendIntoChildren?.Invoke(startingNode) is not false)
                 {
                     _stack = s_stackPool.Allocate();
                     _stackPtr = 0;
@@ -122,10 +130,10 @@ namespace Microsoft.CodeAnalysis
 
             public bool PushChildren(SyntaxNode node)
             {
-                if (_descendIntoChildren != null && !_descendIntoChildren(node))
+                if (_greenFilter?.Invoke(node.Green) is false)
                     return false;
 
-                if (_greenFilter != null && !_greenFilter(node.Green))
+                if (_descendIntoChildren?.Invoke(node) is false)
                     return false;
 
                 Debug.Assert(_stack is object);
@@ -231,7 +239,6 @@ namespace Microsoft.CodeAnalysis
                 Func<SyntaxNode, bool>? descendIntoChildren,
                 Func<GreenNode, bool>? greenFilter)
             {
-                Debug.Assert(descendIntoChildren == null || greenFilter == null);
                 _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, descendIntoChildren, greenFilter);
                 _triviaStack = new TriviaListEnumeratorStack();
                 if (_nodeStack.IsNotEmpty)
@@ -327,7 +334,6 @@ namespace Microsoft.CodeAnalysis
                 Func<SyntaxNode, bool>? descendIntoChildren,
                 Func<GreenNode, bool>? greenFilter)
             {
-                Debug.Assert(descendIntoChildren == null || greenFilter == null);
                 _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, descendIntoChildren, greenFilter);
                 _triviaStack = new TriviaListEnumeratorStack();
                 if (_nodeStack.IsNotEmpty)
@@ -454,7 +460,7 @@ namespace Microsoft.CodeAnalysis
             Func<GreenNode, bool>? greenFilter,
             bool includeSelf)
         {
-            if (includeSelf && (greenFilter == null || greenFilter(this.Green)) && IsInSpan(in span, this.FullSpan))
+            if (includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan))
             {
                 yield return this;
             }
@@ -487,7 +493,7 @@ namespace Microsoft.CodeAnalysis
             Func<GreenNode, bool>? greenFilter,
             bool includeSelf)
         {
-            if (includeSelf && (greenFilter == null || greenFilter(this.Green)) && IsInSpan(in span, this.FullSpan))
+            if (includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan))
             {
                 yield return this;
             }

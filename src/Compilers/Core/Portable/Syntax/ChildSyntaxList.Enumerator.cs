@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis
 
             // PERF: Initialize an Enumerator directly from a SyntaxNode without going
             // via ChildNodesAndTokens. This saves constructing an intermediate ChildSyntaxList
-            internal void InitializeFrom(SyntaxNode node, Func<GreenNode, bool>? greenFilter = null)
+            internal void InitializeFrom(SyntaxNode node, Func<GreenNode, bool>? greenFilter)
             {
                 _node = node;
                 _count = CountNodes(node.Green);
@@ -79,12 +79,7 @@ namespace Microsoft.CodeAnalysis
                 Debug.Assert(_node != null);
                 while (MoveNext())
                 {
-                    // When no green filter is present, return every child unconditionally.  When a
-                    // green filter is active, check the child's green node first.  A null green child
-                    // (possible for absent items in list slots) is skipped because it cannot satisfy
-                    // any filter (e.g. ContainsAnnotations).
-                    var greenChild = GetGreenChildAt(_node, _childIndex, ref _slotData);
-                    if (_greenFilter == null || (greenChild != null && _greenFilter(greenChild)))
+                    if (passesGreenFilter())
                     {
                         current = ItemInternal(_node, _childIndex, ref _slotData);
                         return true;
@@ -93,6 +88,13 @@ namespace Microsoft.CodeAnalysis
 
                 current = default;
                 return false;
+
+                // When no green filter is present, every child passes unconditionally.  When a green
+                // filter is active, check the child's green node first.  A null green child (possible
+                // for absent items in list slots) is skipped because it cannot satisfy any filter
+                // (e.g. ContainsAnnotations).
+                bool passesGreenFilter()
+                    => _greenFilter == null || (GetGreenChildAt(_node!, _childIndex, ref _slotData) is { } greenChild && _greenFilter(greenChild));
             }
 
             internal SyntaxNode? TryMoveNextAndGetCurrentAsNode()
