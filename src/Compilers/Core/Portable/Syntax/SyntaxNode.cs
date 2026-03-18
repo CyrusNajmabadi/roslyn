@@ -1257,9 +1257,9 @@ recurse:
         /// filtered at the green node level. Children whose green nodes do not pass <paramref name="greenFilter"/>
         /// are skipped entirely (not yielded and not descended into), avoiding red node creation for those subtrees.
         /// </summary>
-        internal IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensAndSelf(Func<GreenNode, bool> greenFilter, bool descendIntoTrivia = false)
+        internal IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensAndSelf(Func<GreenNode, bool> greenFilter, bool descendIntoTrivia)
         {
-            return DescendantNodesAndTokensImpl(this.FullSpan, greenFilter, descendIntoTrivia, includeSelf: true);
+            return DescendantNodesAndTokensImpl(this.FullSpan, descendIntoChildren: null, greenFilter, descendIntoTrivia, includeSelf: true);
         }
 
         /// <summary>

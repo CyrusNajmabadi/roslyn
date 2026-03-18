@@ -17,22 +17,25 @@ namespace Microsoft.CodeAnalysis
         private IEnumerable<SyntaxNode> DescendantNodesImpl(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren, bool descendIntoTrivia, bool includeSelf)
         {
             return descendIntoTrivia
-                ? DescendantNodesAndTokensImpl(span, descendIntoChildren, true, includeSelf).Where(e => e.IsNode).Select(e => e.AsNode()!)
+                ? DescendantNodesAndTokensImpl(span, descendIntoChildren, descendIntoTrivia: true, includeSelf).Where(e => e.IsNode).Select(e => e.AsNode()!)
                 : DescendantNodesOnly(span, descendIntoChildren, includeSelf);
         }
 
         private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensImpl(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren, bool descendIntoTrivia, bool includeSelf)
         {
-            return descendIntoTrivia
-                ? DescendantNodesAndTokensIntoTrivia(span, descendIntoChildren, includeSelf)
-                : DescendantNodesAndTokensOnly(span, descendIntoChildren, includeSelf);
+            return DescendantNodesAndTokensImpl(span, descendIntoChildren, greenFilter: null, descendIntoTrivia, includeSelf);
         }
 
-        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensImpl(TextSpan span, Func<GreenNode, bool> greenFilter, bool descendIntoTrivia, bool includeSelf)
+        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensImpl(
+            TextSpan span,
+            Func<SyntaxNode, bool>? descendIntoChildren,
+            Func<GreenNode, bool>? greenFilter,
+            bool descendIntoTrivia,
+            bool includeSelf)
         {
             return descendIntoTrivia
-                ? DescendantNodesAndTokensIntoTrivia(span, greenFilter, includeSelf)
-                : DescendantNodesAndTokensOnly(span, greenFilter, includeSelf);
+                ? DescendantNodesAndTokensIntoTrivia(span, descendIntoChildren, greenFilter, includeSelf)
+                : DescendantNodesAndTokensOnly(span, descendIntoChildren, greenFilter, includeSelf);
         }
 
         private IEnumerable<SyntaxTrivia> DescendantTriviaImpl(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
@@ -55,14 +58,16 @@ namespace Microsoft.CodeAnalysis
 
             private ChildSyntaxList.Enumerator[]? _stack;
             private int _stackPtr;
+            private readonly Func<SyntaxNode, bool>? _descendIntoChildren;
             private readonly Func<GreenNode, bool>? _greenFilter;
 
             public ChildSyntaxListEnumeratorStack(
                 SyntaxNode startingNode,
-                Func<SyntaxNode, bool>? descendIntoChildren = null,
-                Func<GreenNode, bool>? greenFilter = null)
+                Func<SyntaxNode, bool>? descendIntoChildren,
+                Func<GreenNode, bool>? greenFilter)
             {
                 Debug.Assert(descendIntoChildren == null || greenFilter == null);
+                _descendIntoChildren = descendIntoChildren;
                 _greenFilter = greenFilter;
 
                 var shouldDescend = greenFilter != null
@@ -117,6 +122,9 @@ namespace Microsoft.CodeAnalysis
 
             public bool PushChildren(SyntaxNode node)
             {
+                if (_descendIntoChildren != null && !_descendIntoChildren(node))
+                    return false;
+
                 if (_greenFilter != null && !_greenFilter(node.Green))
                     return false;
 
@@ -131,12 +139,12 @@ namespace Microsoft.CodeAnalysis
                 return true;
             }
 
-            public void PushChildren(
-                SyntaxNode node,
-                Func<SyntaxNode, bool>? descendIntoChildren)
+            public void PushChildren(SyntaxNode node, Func<SyntaxNode, bool>? descendIntoChildren)
             {
                 if (descendIntoChildren == null || descendIntoChildren(node))
+                {
                     PushChildren(node);
+                }
             }
 
             public void Dispose()
@@ -220,12 +228,11 @@ namespace Microsoft.CodeAnalysis
 
             public TwoEnumeratorListStack(
                 SyntaxNode startingNode,
-                Func<SyntaxNode, bool>? descendIntoChildren = null,
-                Func<GreenNode, bool>? greenFilter = null)
+                Func<SyntaxNode, bool>? descendIntoChildren,
+                Func<GreenNode, bool>? greenFilter)
             {
                 Debug.Assert(descendIntoChildren == null || greenFilter == null);
-                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode,
-                    descendIntoChildren: descendIntoChildren, greenFilter: greenFilter);
+                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, descendIntoChildren, greenFilter);
                 _triviaStack = new TriviaListEnumeratorStack();
                 if (_nodeStack.IsNotEmpty)
                 {
@@ -270,13 +277,8 @@ namespace Microsoft.CodeAnalysis
                 return false;
             }
 
-            public void PushChildren(
-                SyntaxNode node,
-                Func<SyntaxNode, bool>? descendIntoChildren = null)
+            public void PushChildren(SyntaxNode node)
             {
-                if (descendIntoChildren != null && !descendIntoChildren(node))
-                    return;
-
                 if (_nodeStack.PushChildren(node))
                 {
                     Debug.Assert(_discriminatorStack is object);
@@ -322,12 +324,11 @@ namespace Microsoft.CodeAnalysis
 
             public ThreeEnumeratorListStack(
                 SyntaxNode startingNode,
-                Func<SyntaxNode, bool>? descendIntoChildren = null,
-                Func<GreenNode, bool>? greenFilter = null)
+                Func<SyntaxNode, bool>? descendIntoChildren,
+                Func<GreenNode, bool>? greenFilter)
             {
                 Debug.Assert(descendIntoChildren == null || greenFilter == null);
-                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode,
-                    descendIntoChildren: descendIntoChildren, greenFilter: greenFilter);
+                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, descendIntoChildren, greenFilter);
                 _triviaStack = new TriviaListEnumeratorStack();
                 if (_nodeStack.IsNotEmpty)
                 {
@@ -382,13 +383,8 @@ namespace Microsoft.CodeAnalysis
                 return _tokenStack.Pop();
             }
 
-            public void PushChildren(
-                SyntaxNode node,
-                Func<SyntaxNode, bool>? descendIntoChildren = null)
+            public void PushChildren(SyntaxNode node)
             {
-                if (descendIntoChildren != null && !descendIntoChildren(node))
-                    return;
-
                 if (_nodeStack.PushChildren(node))
                 {
                     Debug.Assert(_discriminatorStack is object);
@@ -434,7 +430,7 @@ namespace Microsoft.CodeAnalysis
                 yield return this;
             }
 
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren: descendIntoChildren))
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren, greenFilter: null))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -444,7 +440,7 @@ namespace Microsoft.CodeAnalysis
                         // PERF: Push before yield return so that "nodeValue" is 'dead' after the yield
                         // and therefore doesn't need to be stored in the iterator state machine. This
                         // saves a field.
-                        stack.PushChildren(nodeValue, descendIntoChildren: descendIntoChildren);
+                        stack.PushChildren(nodeValue);
 
                         yield return nodeValue;
                     }
@@ -452,43 +448,18 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensOnly(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren, bool includeSelf)
+        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensOnly(
+            TextSpan span,
+            Func<SyntaxNode, bool>? descendIntoChildren,
+            Func<GreenNode, bool>? greenFilter,
+            bool includeSelf)
         {
-            if (includeSelf && IsInSpan(in span, this.FullSpan))
+            if (includeSelf && (greenFilter == null || greenFilter(this.Green)) && IsInSpan(in span, this.FullSpan))
             {
                 yield return this;
             }
 
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren: descendIntoChildren))
-            {
-                while (stack.IsNotEmpty)
-                {
-                    SyntaxNodeOrToken value;
-                    if (stack.TryGetNextInSpan(in span, out value))
-                    {
-                        // PERF: Push before yield return so that "value" is 'dead' after the yield
-                        // and therefore doesn't need to be stored in the iterator state machine. This
-                        // saves a field.
-                        var nodeValue = value.AsNode();
-                        if (nodeValue != null)
-                        {
-                            stack.PushChildren(nodeValue, descendIntoChildren: descendIntoChildren);
-                        }
-
-                        yield return value;
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensOnly(TextSpan span, Func<GreenNode, bool> greenFilter, bool includeSelf)
-        {
-            if (includeSelf && greenFilter(this.Green) && IsInSpan(in span, this.FullSpan))
-            {
-                yield return this;
-            }
-
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, greenFilter: greenFilter))
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren, greenFilter))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -510,14 +481,18 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensIntoTrivia(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren, bool includeSelf)
+        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensIntoTrivia(
+            TextSpan span,
+            Func<SyntaxNode, bool>? descendIntoChildren,
+            Func<GreenNode, bool>? greenFilter,
+            bool includeSelf)
         {
-            if (includeSelf && IsInSpan(in span, this.FullSpan))
+            if (includeSelf && (greenFilter == null || greenFilter(this.Green)) && IsInSpan(in span, this.FullSpan))
             {
                 yield return this;
             }
 
-            using (var stack = new ThreeEnumeratorListStack(this, descendIntoChildren: descendIntoChildren))
+            using (var stack = new ThreeEnumeratorListStack(this, descendIntoChildren, greenFilter))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -533,7 +508,7 @@ namespace Microsoft.CodeAnalysis
                                 if (value.IsNode)
                                 {
                                     // parent nodes come before children (prefix document order)
-                                    stack.PushChildren(value.AsNode()!, descendIntoChildren: descendIntoChildren);
+                                    stack.PushChildren(value.AsNode()!);
                                 }
                                 else if (value.IsToken)
                                 {
@@ -583,75 +558,6 @@ namespace Microsoft.CodeAnalysis
                                     // PERF: Push before yield return so that "structureNode" is 'dead' after the yield
                                     // and therefore doesn't need to be stored in the iterator state machine. This
                                     // saves a field.
-                                    stack.PushChildren(structureNode, descendIntoChildren: descendIntoChildren);
-
-                                    yield return structureNode;
-                                }
-                            }
-                            break;
-
-                        case ThreeEnumeratorListStack.Which.Token:
-                            yield return stack.PopToken();
-                            break;
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensIntoTrivia(TextSpan span, Func<GreenNode, bool> greenFilter, bool includeSelf)
-        {
-            if (includeSelf && greenFilter(this.Green) && IsInSpan(in span, this.FullSpan))
-            {
-                yield return this;
-            }
-
-            using (var stack = new ThreeEnumeratorListStack(this, greenFilter: greenFilter))
-            {
-                while (stack.IsNotEmpty)
-                {
-                    switch (stack.PeekNext())
-                    {
-                        case ThreeEnumeratorListStack.Which.Node:
-                            SyntaxNodeOrToken value;
-                            if (stack.TryGetNextInSpan(in span, out value))
-                            {
-                                if (value.IsNode)
-                                {
-                                    stack.PushChildren(value.AsNode()!);
-                                }
-                                else if (value.IsToken)
-                                {
-                                    var token = value.AsToken();
-
-                                    if (token.HasStructuredTrivia)
-                                    {
-                                        if (token.HasTrailingTrivia)
-                                        {
-                                            stack.PushTrailingTrivia(in token);
-                                        }
-
-                                        stack.PushToken(in value);
-
-                                        if (token.HasLeadingTrivia)
-                                        {
-                                            stack.PushLeadingTrivia(in token);
-                                        }
-
-                                        break;
-                                    }
-                                }
-
-                                yield return value;
-                            }
-
-                            break;
-
-                        case ThreeEnumeratorListStack.Which.Trivia:
-                            SyntaxTrivia trivia;
-                            if (stack.TryGetNext(out trivia))
-                            {
-                                if (trivia.TryGetStructure(out var structureNode) && IsInSpan(in span, trivia.FullSpan))
-                                {
                                     stack.PushChildren(structureNode);
 
                                     yield return structureNode;
@@ -669,7 +575,7 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxTrivia> DescendantTriviaOnly(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren)
         {
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren: descendIntoChildren))
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren, greenFilter: null))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -678,7 +584,7 @@ namespace Microsoft.CodeAnalysis
                     {
                         if (value.AsNode(out var nodeValue))
                         {
-                            stack.PushChildren(nodeValue, descendIntoChildren: descendIntoChildren);
+                            stack.PushChildren(nodeValue);
                         }
                         else if (value.IsToken)
                         {
@@ -707,7 +613,7 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxTrivia> DescendantTriviaIntoTrivia(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren)
         {
-            using (var stack = new TwoEnumeratorListStack(this, descendIntoChildren: descendIntoChildren))
+            using (var stack = new TwoEnumeratorListStack(this, descendIntoChildren, greenFilter: null))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -719,7 +625,7 @@ namespace Microsoft.CodeAnalysis
                             {
                                 if (value.AsNode(out var nodeValue))
                                 {
-                                    stack.PushChildren(nodeValue, descendIntoChildren: descendIntoChildren);
+                                    stack.PushChildren(nodeValue);
                                 }
                                 else if (value.IsToken)
                                 {
@@ -749,7 +655,7 @@ namespace Microsoft.CodeAnalysis
                                 // saves a field.
                                 if (trivia.TryGetStructure(out var structureNode))
                                 {
-                                    stack.PushChildren(structureNode, descendIntoChildren: descendIntoChildren);
+                                    stack.PushChildren(structureNode);
                                 }
 
                                 if (IsInSpan(in span, trivia.FullSpan))
