@@ -180,7 +180,7 @@ namespace Microsoft.CodeAnalysis
         /// For list slots, returns the individual item's green node within the list.
         /// Updates slotData for efficient subsequent lookups.
         /// </summary>
-        internal static GreenNode? GetGreenChildAt(SyntaxNode node, int index, ref SlotData slotData)
+        private static GreenNode? GetGreenChildAt(SyntaxNode node, int index, ref SlotData slotData)
         {
             var greenSlot = FindGreenSlotContainingIndex(node, index, ref slotData, out var idx, out _, out _);
             return greenSlot.IsList ? greenSlot.GetSlot(idx) : greenSlot;

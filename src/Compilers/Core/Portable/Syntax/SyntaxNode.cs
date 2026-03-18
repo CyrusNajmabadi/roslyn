@@ -1259,7 +1259,7 @@ recurse:
         /// </summary>
         internal IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensAndSelf(Func<GreenNode, bool> greenFilter, bool descendIntoTrivia)
         {
-            return DescendantNodesAndTokensImpl(this.FullSpan, descendIntoChildren: null, greenFilter, descendIntoTrivia, includeSelf: true);
+            return DescendantNodesAndTokensImpl(this.FullSpan, greenFilter, descendIntoChildren: null, descendIntoTrivia, includeSelf: true);
         }
 
         /// <summary>

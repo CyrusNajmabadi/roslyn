@@ -23,19 +23,19 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensImpl(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren, bool descendIntoTrivia, bool includeSelf)
         {
-            return DescendantNodesAndTokensImpl(span, descendIntoChildren, greenFilter: null, descendIntoTrivia, includeSelf);
+            return DescendantNodesAndTokensImpl(span, greenFilter: null, descendIntoChildren, descendIntoTrivia, includeSelf);
         }
 
         private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensImpl(
             TextSpan span,
-            Func<SyntaxNode, bool>? descendIntoChildren,
             Func<GreenNode, bool>? greenFilter,
+            Func<SyntaxNode, bool>? descendIntoChildren,
             bool descendIntoTrivia,
             bool includeSelf)
         {
             return descendIntoTrivia
-                ? DescendantNodesAndTokensIntoTrivia(span, descendIntoChildren, greenFilter, includeSelf)
-                : DescendantNodesAndTokensOnly(span, descendIntoChildren, greenFilter, includeSelf);
+                ? DescendantNodesAndTokensIntoTrivia(span, greenFilter, descendIntoChildren, includeSelf)
+                : DescendantNodesAndTokensOnly(span, greenFilter, descendIntoChildren, includeSelf);
         }
 
         private IEnumerable<SyntaxTrivia> DescendantTriviaImpl(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
@@ -51,6 +51,9 @@ namespace Microsoft.CodeAnalysis
                 // special case for zero-width tokens (OverlapsWith never returns true for these)
                 || (childSpan.Length == 0 && span.IntersectsWith(childSpan));
         }
+
+        private bool ShouldYieldSelf(bool includeSelf, in TextSpan span, Func<GreenNode, bool>? greenFilter)
+            => includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan);
 
         private struct ChildSyntaxListEnumeratorStack : IDisposable
         {
@@ -75,14 +78,13 @@ namespace Microsoft.CodeAnalysis
 
             public ChildSyntaxListEnumeratorStack(
                 SyntaxNode startingNode,
-                Func<SyntaxNode, bool>? descendIntoChildren,
-                Func<GreenNode, bool>? greenFilter)
+                Func<GreenNode, bool>? greenFilter,
+                Func<SyntaxNode, bool>? descendIntoChildren)
             {
                 _greenFilter = greenFilter;
                 _descendIntoChildren = descendIntoChildren;
 
-                if (greenFilter?.Invoke(startingNode.Green) is not false
-                    && descendIntoChildren?.Invoke(startingNode) is not false)
+                if (ShouldDescendIntoChildren(startingNode))
                 {
                     _stack = s_stackPool.Allocate();
                     _stackPtr = 0;
@@ -128,12 +130,13 @@ namespace Microsoft.CodeAnalysis
                 return null;
             }
 
+            private bool ShouldDescendIntoChildren(SyntaxNode node)
+                => _greenFilter?.Invoke(node.Green) is not false
+                    && _descendIntoChildren?.Invoke(node) is not false;
+
             public bool PushChildren(SyntaxNode node)
             {
-                if (_greenFilter?.Invoke(node.Green) is false)
-                    return false;
-
-                if (_descendIntoChildren?.Invoke(node) is false)
+                if (!ShouldDescendIntoChildren(node))
                     return false;
 
                 Debug.Assert(_stack is object);
@@ -236,10 +239,10 @@ namespace Microsoft.CodeAnalysis
 
             public TwoEnumeratorListStack(
                 SyntaxNode startingNode,
-                Func<SyntaxNode, bool>? descendIntoChildren,
-                Func<GreenNode, bool>? greenFilter)
+                Func<GreenNode, bool>? greenFilter,
+                Func<SyntaxNode, bool>? descendIntoChildren)
             {
-                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, descendIntoChildren, greenFilter);
+                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, greenFilter, descendIntoChildren);
                 _triviaStack = new TriviaListEnumeratorStack();
                 if (_nodeStack.IsNotEmpty)
                 {
@@ -331,10 +334,10 @@ namespace Microsoft.CodeAnalysis
 
             public ThreeEnumeratorListStack(
                 SyntaxNode startingNode,
-                Func<SyntaxNode, bool>? descendIntoChildren,
-                Func<GreenNode, bool>? greenFilter)
+                Func<GreenNode, bool>? greenFilter,
+                Func<SyntaxNode, bool>? descendIntoChildren)
             {
-                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, descendIntoChildren, greenFilter);
+                _nodeStack = new ChildSyntaxListEnumeratorStack(startingNode, greenFilter, descendIntoChildren);
                 _triviaStack = new TriviaListEnumeratorStack();
                 if (_nodeStack.IsNotEmpty)
                 {
@@ -436,7 +439,7 @@ namespace Microsoft.CodeAnalysis
                 yield return this;
             }
 
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren, greenFilter: null))
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, greenFilter: null, descendIntoChildren))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -456,16 +459,16 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensOnly(
             TextSpan span,
-            Func<SyntaxNode, bool>? descendIntoChildren,
             Func<GreenNode, bool>? greenFilter,
+            Func<SyntaxNode, bool>? descendIntoChildren,
             bool includeSelf)
         {
-            if (includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan))
+            if (ShouldYieldSelf(includeSelf, in span, greenFilter))
             {
                 yield return this;
             }
 
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren, greenFilter))
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, greenFilter, descendIntoChildren))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -489,16 +492,16 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensIntoTrivia(
             TextSpan span,
-            Func<SyntaxNode, bool>? descendIntoChildren,
             Func<GreenNode, bool>? greenFilter,
+            Func<SyntaxNode, bool>? descendIntoChildren,
             bool includeSelf)
         {
-            if (includeSelf && greenFilter?.Invoke(this.Green) is not false && IsInSpan(in span, this.FullSpan))
+            if (ShouldYieldSelf(includeSelf, in span, greenFilter))
             {
                 yield return this;
             }
 
-            using (var stack = new ThreeEnumeratorListStack(this, descendIntoChildren, greenFilter))
+            using (var stack = new ThreeEnumeratorListStack(this, greenFilter, descendIntoChildren))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -581,7 +584,7 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxTrivia> DescendantTriviaOnly(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren)
         {
-            using (var stack = new ChildSyntaxListEnumeratorStack(this, descendIntoChildren, greenFilter: null))
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, greenFilter: null, descendIntoChildren))
             {
                 while (stack.IsNotEmpty)
                 {
@@ -619,7 +622,7 @@ namespace Microsoft.CodeAnalysis
 
         private IEnumerable<SyntaxTrivia> DescendantTriviaIntoTrivia(TextSpan span, Func<SyntaxNode, bool>? descendIntoChildren)
         {
-            using (var stack = new TwoEnumeratorListStack(this, descendIntoChildren, greenFilter: null))
+            using (var stack = new TwoEnumeratorListStack(this, greenFilter: null, descendIntoChildren))
             {
                 while (stack.IsNotEmpty)
                 {
