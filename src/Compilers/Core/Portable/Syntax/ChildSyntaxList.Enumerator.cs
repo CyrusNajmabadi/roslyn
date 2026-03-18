@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -81,6 +81,28 @@ namespace Microsoft.CodeAnalysis
 
                 current = ItemInternal(_node, _childIndex, ref _slotData);
                 return true;
+            }
+
+            /// <summary>
+            /// Advances to the next child whose green node passes <paramref name="greenFilter"/>, returning
+            /// the realized red <see cref="SyntaxNodeOrToken"/>. Children whose green nodes do not pass the
+            /// filter are skipped without creating red nodes.
+            /// </summary>
+            internal bool TryMoveNextAndGetCurrent(Func<GreenNode, bool> greenFilter, out SyntaxNodeOrToken current)
+            {
+                Debug.Assert(_node != null);
+                while (MoveNext())
+                {
+                    var greenChild = GetGreenChildAt(_node, _childIndex, ref _slotData);
+                    if (greenChild != null && greenFilter(greenChild))
+                    {
+                        current = ItemInternal(_node, _childIndex, ref _slotData);
+                        return true;
+                    }
+                }
+
+                current = default;
+                return false;
             }
 
             internal SyntaxNode? TryMoveNextAndGetCurrentAsNode()

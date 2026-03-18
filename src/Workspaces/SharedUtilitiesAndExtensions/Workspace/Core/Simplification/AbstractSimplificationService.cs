@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -220,8 +220,9 @@ internal abstract class AbstractSimplificationService<
                                 : nodeOrToken.Parent.ReplaceToken(nodeOrToken.AsToken(), currentNodeOrToken.AsToken());
 
                             currentNodeOrToken = replacedParent
-                                .ChildNodesAndTokens()
-                                .Single(c => c.HasAnnotation(annotation));
+                                .GetAnnotatedNodesAndTokens(annotation)
+                                .First();
+                            Debug.Assert(replacedParent.GetAnnotatedNodesAndTokens(annotation).Count() == 1);
                         }
 
                         if (isNode)
@@ -235,7 +236,10 @@ internal abstract class AbstractSimplificationService<
                                 var newDocument = document.WithSyntaxRoot(newRoot);
                                 semanticModelForReduce = await newDocument.GetRequiredSemanticModelAsync(cancellationToken).ConfigureAwait(false);
                                 newRoot = await semanticModelForReduce.SyntaxTree.GetRootAsync(cancellationToken).ConfigureAwait(false);
-                                currentNodeOrToken = newRoot.DescendantNodes().Single(c => c.HasAnnotation(marker));
+                                currentNodeOrToken = newRoot
+                                    .GetAnnotatedNodesAndTokens(marker)
+                                    .First();
+                                Debug.Assert(newRoot.GetAnnotatedNodesAndTokens(marker).Count() == 1);
                             }
                             else
                             {

@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -122,10 +122,10 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <summary>
-        /// internal indexer that does not verify index.
-        /// Used when caller has already ensured that index is within bounds.
+        /// Walks green node slots to find the slot containing the child at the given index, updating slotData
+        /// for efficient subsequent lookups. Returns the green node for the slot and the index within that slot.
         /// </summary>
-        internal static SyntaxNodeOrToken ItemInternal(SyntaxNode node, int index, ref SlotData slotData)
+        private static GreenNode FindGreenSlotContainingIndex(SyntaxNode node, int index, ref SlotData slotData, out int idx, out int slotIndex, out int position)
         {
             GreenNode? greenChild;
             var green = node.Green;
@@ -133,9 +133,9 @@ namespace Microsoft.CodeAnalysis
             // slotData may contain information that allows us to start the loop below using data
             // calculated during a previous call. As index represents the offset into all children of
             // node, idx represents the offset requested relative to the given slot index.
-            var idx = index - slotData.PrecedingOccupantSlotCount;
-            var slotIndex = slotData.SlotIndex;
-            var position = slotData.PositionAtSlotIndex;
+            idx = index - slotData.PrecedingOccupantSlotCount;
+            slotIndex = slotData.SlotIndex;
+            position = slotData.PositionAtSlotIndex;
 
             Debug.Assert(idx >= 0);
 
@@ -171,6 +171,28 @@ namespace Microsoft.CodeAnalysis
                 // (index - idx) represents the number of occupants prior to this new slotIndex
                 slotData = new SlotData(slotIndex, index - idx, position);
             }
+
+            return greenChild!;
+        }
+
+        /// <summary>
+        /// Returns the green node for the child at the given index without creating any red nodes.
+        /// For list slots, returns the individual item's green node within the list.
+        /// Updates slotData for efficient subsequent lookups.
+        /// </summary>
+        internal static GreenNode? GetGreenChildAt(SyntaxNode node, int index, ref SlotData slotData)
+        {
+            var greenSlot = FindGreenSlotContainingIndex(node, index, ref slotData, out var idx, out _, out _);
+            return greenSlot.IsList ? greenSlot.GetSlot(idx) : greenSlot;
+        }
+
+        /// <summary>
+        /// internal indexer that does not verify index.
+        /// Used when caller has already ensured that index is within bounds.
+        /// </summary>
+        internal static SyntaxNodeOrToken ItemInternal(SyntaxNode node, int index, ref SlotData slotData)
+        {
+            var greenChild = FindGreenSlotContainingIndex(node, index, ref slotData, out var idx, out var slotIndex, out var position);
 
             // get node that represents this slot
             var red = node.GetNodeSlot(slotIndex);
@@ -302,45 +324,7 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         internal static SyntaxNode? ItemInternalAsNode(SyntaxNode node, int index, ref SlotData slotData)
         {
-            GreenNode? greenChild;
-            var green = node.Green;
-            var idx = index - slotData.PrecedingOccupantSlotCount;
-            var slotIndex = slotData.SlotIndex;
-            var position = slotData.PositionAtSlotIndex;
-
-            Debug.Assert(idx >= 0);
-
-            // find a slot that contains the node or its parent list (if node is in a list)
-            // we will be skipping whole slots here so we will not loop for long
-            // the max possible number of slots is 11 (TypeDeclarationSyntax)
-            // and typically much less than that
-            //
-            // at the end of this loop we will have
-            // 1) slot index - slotIdx
-            // 2) if the slot is a list, node index in the list - idx
-            while (true)
-            {
-                greenChild = green.GetSlot(slotIndex);
-                if (greenChild != null)
-                {
-                    int currentOccupancy = Occupancy(greenChild);
-                    if (idx < currentOccupancy)
-                    {
-                        break;
-                    }
-
-                    idx -= currentOccupancy;
-                    position += greenChild.FullWidth;
-                }
-
-                slotIndex++;
-            }
-
-            if (slotIndex != slotData.SlotIndex)
-            {
-                // (index - idx) represents the number of occupants prior to this new slotIndex
-                slotData = new SlotData(slotIndex, index - idx, position);
-            }
+            var greenChild = FindGreenSlotContainingIndex(node, index, ref slotData, out var idx, out var slotIndex, out _);
 
             // get node that represents this slot
             var red = node.GetNodeSlot(slotIndex);

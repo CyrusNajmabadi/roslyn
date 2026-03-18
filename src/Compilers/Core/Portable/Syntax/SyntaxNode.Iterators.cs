@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -64,12 +64,42 @@ namespace Microsoft.CodeAnalysis
                 }
             }
 
+            public ChildSyntaxListEnumeratorStack(SyntaxNode startingNode, Func<GreenNode, bool> greenFilter)
+            {
+                if (greenFilter(startingNode.Green))
+                {
+                    _stack = s_stackPool.Allocate();
+                    _stackPtr = 0;
+                    _stack[0].InitializeFrom(startingNode);
+                }
+                else
+                {
+                    _stack = null;
+                    _stackPtr = -1;
+                }
+            }
+
             public bool IsNotEmpty { get { return _stackPtr >= 0; } }
 
             public bool TryGetNextInSpan(in TextSpan span, out SyntaxNodeOrToken value)
             {
                 Debug.Assert(_stack is object);
                 while (_stack[_stackPtr].TryMoveNextAndGetCurrent(out value))
+                {
+                    if (IsInSpan(in span, value.FullSpan))
+                    {
+                        return true;
+                    }
+                }
+
+                _stackPtr--;
+                return false;
+            }
+
+            public bool TryGetNextInSpan(in TextSpan span, Func<GreenNode, bool> greenFilter, out SyntaxNodeOrToken value)
+            {
+                Debug.Assert(_stack is object);
+                while (_stack[_stackPtr].TryMoveNextAndGetCurrent(greenFilter, out value))
                 {
                     if (IsInSpan(in span, value.FullSpan))
                     {
@@ -112,6 +142,14 @@ namespace Microsoft.CodeAnalysis
             public void PushChildren(SyntaxNode node, Func<SyntaxNode, bool>? descendIntoChildren)
             {
                 if (descendIntoChildren == null || descendIntoChildren(node))
+                {
+                    PushChildren(node);
+                }
+            }
+
+            public void PushChildren(SyntaxNode node, Func<GreenNode, bool> greenFilter)
+            {
+                if (greenFilter(node.Green))
                 {
                     PushChildren(node);
                 }
@@ -433,6 +471,32 @@ namespace Microsoft.CodeAnalysis
                         if (nodeValue != null)
                         {
                             stack.PushChildren(nodeValue, descendIntoChildren);
+                        }
+
+                        yield return value;
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensOnly(TextSpan span, Func<GreenNode, bool> greenFilter, bool includeSelf)
+        {
+            if (includeSelf && greenFilter(this.Green) && IsInSpan(in span, this.FullSpan))
+            {
+                yield return this;
+            }
+
+            using (var stack = new ChildSyntaxListEnumeratorStack(this, greenFilter))
+            {
+                while (stack.IsNotEmpty)
+                {
+                    SyntaxNodeOrToken value;
+                    if (stack.TryGetNextInSpan(in span, greenFilter, out value))
+                    {
+                        var nodeValue = value.AsNode();
+                        if (nodeValue != null)
+                        {
+                            stack.PushChildren(nodeValue, greenFilter);
                         }
 
                         yield return value;

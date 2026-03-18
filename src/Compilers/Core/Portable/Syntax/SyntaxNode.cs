@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -1253,6 +1253,16 @@ recurse:
         }
 
         /// <summary>
+        /// Gets a list of descendant nodes and tokens (including this node) in prefix document order,
+        /// filtered at the green node level. Children whose green nodes do not pass <paramref name="greenFilter"/>
+        /// are skipped entirely (not yielded and not descended into), avoiding red node creation for those subtrees.
+        /// </summary>
+        internal IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensAndSelf(Func<GreenNode, bool> greenFilter)
+        {
+            return DescendantNodesAndTokensOnly(this.FullSpan, greenFilter, includeSelf: true);
+        }
+
+        /// <summary>
         /// Gets all nodes and tokens with an annotation of the specified annotation kind.
         /// </summary>
         public IEnumerable<SyntaxNodeOrToken> GetAnnotatedNodesAndTokens(string annotationKind)
@@ -1275,7 +1285,7 @@ recurse:
         /// </summary>
         public IEnumerable<SyntaxNodeOrToken> GetAnnotatedNodesAndTokens(SyntaxAnnotation annotation)
         {
-            return this.DescendantNodesAndTokensAndSelf(n => n.ContainsAnnotations, descendIntoTrivia: true)
+            return this.DescendantNodesAndTokensAndSelf(static g => g.ContainsAnnotations)
                 .Where(t => t.HasAnnotation(annotation));
         }
 
