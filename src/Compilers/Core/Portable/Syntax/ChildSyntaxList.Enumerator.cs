@@ -19,7 +19,7 @@ namespace Microsoft.CodeAnalysis
             private int _count;
             private int _childIndex;
             private SlotData _slotData;
-            private Func<GreenNode, bool>? _greenFilter;
+            private Func<GreenNode, bool>? _descendIntoChildrenGreen;
 
             internal Enumerator(SyntaxNode node, int count)
             {
@@ -27,18 +27,18 @@ namespace Microsoft.CodeAnalysis
                 _count = count;
                 _childIndex = -1;
                 _slotData = new SlotData(node);
-                _greenFilter = null;
+                _descendIntoChildrenGreen = null;
             }
 
             // PERF: Initialize an Enumerator directly from a SyntaxNode without going
             // via ChildNodesAndTokens. This saves constructing an intermediate ChildSyntaxList
-            internal void InitializeFrom(SyntaxNode node, Func<GreenNode, bool>? greenFilter)
+            internal void InitializeFrom(SyntaxNode node, Func<GreenNode, bool>? descendIntoChildrenGreen)
             {
                 _node = node;
                 _count = CountNodes(node.Green);
                 _childIndex = -1;
                 _slotData = new SlotData(node);
-                _greenFilter = greenFilter;
+                _descendIntoChildrenGreen = descendIntoChildrenGreen;
             }
 
             /// <summary>Advances the enumerator to the next element of the <see cref="ChildSyntaxList" />.</summary>
@@ -83,8 +83,8 @@ namespace Microsoft.CodeAnalysis
                     // green filter is active, check the child's green node first.  A null green child
                     // (possible for absent items in list slots) is skipped because it cannot satisfy
                     // any filter (e.g. ContainsAnnotations).
-                    if (_greenFilter is null
-                        || (GetGreenChildAt(_node, _childIndex, ref _slotData) is { } greenChild && _greenFilter(greenChild)))
+                    if (_descendIntoChildrenGreen is null
+                        || (GetGreenChildAt(_node, _childIndex, ref _slotData) is { } greenChild && _descendIntoChildrenGreen(greenChild)))
                     {
                         current = ItemInternal(_node, _childIndex, ref _slotData);
                         return true;
