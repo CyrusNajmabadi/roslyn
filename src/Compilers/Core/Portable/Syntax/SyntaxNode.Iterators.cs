@@ -147,14 +147,6 @@ namespace Microsoft.CodeAnalysis
                 return true;
             }
 
-            public void PushChildren(SyntaxNode node, Func<SyntaxNode, bool>? descendIntoChildren)
-            {
-                if (descendIntoChildren == null || descendIntoChildren(node))
-                {
-                    PushChildren(node);
-                }
-            }
-
             public void Dispose()
             {
                 // Return only reasonably-sized stacks to the pool.
