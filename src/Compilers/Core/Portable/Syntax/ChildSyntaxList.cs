@@ -172,7 +172,7 @@ namespace Microsoft.CodeAnalysis
                 slotData = new SlotData(slotIndex, index - idx, position);
             }
 
-            return greenChild!;
+            return greenChild;
         }
 
         /// <summary>
