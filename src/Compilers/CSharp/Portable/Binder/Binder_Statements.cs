@@ -2947,24 +2947,40 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private BoundStatement BindBreak(BreakStatementSyntax node, BindingDiagnosticBag diagnostics)
         {
-            var target = this.BreakLabel;
-            if ((object)target == null)
+            var labelName = node.Name?.Identifier.ValueText;
+            if (labelName != null)
+                MessageID.IDS_FeatureLabeledBreakContinue.CheckFeatureAvailability(diagnostics, node, node.Name!.GetLocation());
+
+            var target = this.GetBreakLabel(labelName);
+            if (target == null)
             {
-                Error(diagnostics, ErrorCode.ERR_NoBreakOrCont, node);
+                Error(diagnostics, labelName != null ? ErrorCode.ERR_NoBreakOrContId : ErrorCode.ERR_NoBreakOrCont, node.Name ?? (SyntaxNode)node, labelName ?? "");
                 return new BoundBadStatement(node, ImmutableArray<BoundNode>.Empty, hasErrors: true);
             }
-            return new BoundBreakStatement(node, target);
+            return new BoundBreakStatement(node, target, BindLabelExpression(node.Name, diagnostics));
         }
 
         private BoundStatement BindContinue(ContinueStatementSyntax node, BindingDiagnosticBag diagnostics)
         {
-            var target = this.ContinueLabel;
-            if ((object)target == null)
+            var labelName = node.Name?.Identifier.ValueText;
+            if (labelName != null)
+                MessageID.IDS_FeatureLabeledBreakContinue.CheckFeatureAvailability(diagnostics, node, node.Name!.GetLocation());
+
+            var target = this.GetContinueLabel(labelName);
+            if (target == null)
             {
-                Error(diagnostics, ErrorCode.ERR_NoBreakOrCont, node);
+                Error(diagnostics, labelName != null ? ErrorCode.ERR_NoBreakOrContId : ErrorCode.ERR_NoBreakOrCont, node.Name ?? (SyntaxNode)node, labelName ?? "");
                 return new BoundBadStatement(node, ImmutableArray<BoundNode>.Empty, hasErrors: true);
             }
-            return new BoundContinueStatement(node, target);
+            return new BoundContinueStatement(node, target, BindLabelExpression(node.Name, diagnostics));
+        }
+
+        private BoundLabel BindLabelExpression(IdentifierNameSyntax name, BindingDiagnosticBag diagnostics)
+        {
+            if (name == null)
+                return null;
+
+            return this.BindLabel(name, diagnostics) as BoundLabel;
         }
 
         private static SwitchBinder GetSwitchBinder(Binder binder)

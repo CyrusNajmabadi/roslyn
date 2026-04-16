@@ -3002,6 +3002,11 @@
         <target state="translated">'nameof' のインスタンス メンバー</target>
         <note />
       </trans-unit>
+      <trans-unit id="IDS_FeatureLabeledBreakContinue">
+        <source>labeled break and continue</source>
+        <target state="new">labeled break and continue</target>
+        <note />
+      </trans-unit>
       <trans-unit id="IDS_FeatureLambdaAttributes">
         <source>lambda attributes</source>
         <target state="translated">ラムダ属性</target>
@@ -6663,6 +6668,11 @@
       <trans-unit id="ERR_NoBreakOrCont">
         <source>No enclosing loop out of which to break or continue</source>
         <target state="translated">break または continue に対応するループがありません</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ERR_NoBreakOrContId">
+        <source>No enclosing loop or switch statement with the label '{0}' out of which to break or continue</source>
+        <target state="new">No enclosing loop or switch statement with the label '{0}' out of which to break or continue</target>
         <note />
       </trans-unit>
       <trans-unit id="ERR_DuplicateLabel">

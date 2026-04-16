@@ -2486,6 +2486,11 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         ERR_PPShebangNotOnFirstLine = 9378,
 
+        ERR_LabeledBreakContinueNotOnLoopOrSwitch = 9379,
+        ERR_LabeledContinueNotOnLoop = 9380,
+        ERR_LabeledBreakContinueNotContaining = 9381,
+        ERR_NoBreakOrContId = 9382,
+
         // Note: you will need to do the following after adding errors:
         //  1) Update ErrorFacts.IsBuildOnlyDiagnostic (src/Compilers/CSharp/Portable/Errors/ErrorFacts.cs)
         //  2) Add message to CSharpResources.resx
