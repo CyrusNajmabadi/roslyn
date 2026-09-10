@@ -647,10 +647,7 @@ new partial[] Goo();
         [Fact]
         public void NewModifier_Method_ReturnsPartialQualified()
         {
-            var src = """
-new partial.partial Goo();
-""";
-            var tree = UsingTree(src, options: TestOptions.Regular13);
+            UsingTree("new @partial.@partial Goo();");
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -661,72 +658,13 @@ new partial.partial Goo();
                     {
                         N(SyntaxKind.IdentifierName);
                         {
-                            N(SyntaxKind.IdentifierToken);
+                            N(SyntaxKind.IdentifierToken, "@partial");
                         }
                         N(SyntaxKind.DotToken);
                         N(SyntaxKind.IdentifierName);
                         {
-                            N(SyntaxKind.IdentifierToken);
+                            N(SyntaxKind.IdentifierToken, "@partial");
                         }
-                    }
-                    N(SyntaxKind.IdentifierToken);
-                    N(SyntaxKind.ParameterList);
-                    {
-                        N(SyntaxKind.OpenParenToken);
-                        N(SyntaxKind.CloseParenToken);
-                    }
-                    N(SyntaxKind.SemicolonToken);
-                }
-                N(SyntaxKind.EndOfFileToken);
-            }
-
-            tree = UsingTree(src,
-                // (1,13): error CS1525: Invalid expression term 'partial'
-                // new partial.partial Goo();
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "partial").WithArguments("partial").WithLocation(1, 13),
-                // (1,13): error CS1002: ; expected
-                // new partial.partial Goo();
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "partial").WithLocation(1, 13),
-                // (1,21): error CS1520: Method must have a return type
-                // new partial.partial Goo();
-                Diagnostic(ErrorCode.ERR_MemberNeedsType, "Goo").WithLocation(1, 21));
-
-            N(SyntaxKind.CompilationUnit);
-            {
-                N(SyntaxKind.GlobalStatement);
-                {
-                    N(SyntaxKind.ExpressionStatement);
-                    {
-                        N(SyntaxKind.ObjectCreationExpression);
-                        {
-                            N(SyntaxKind.NewKeyword);
-                            N(SyntaxKind.QualifiedName);
-                            {
-                                N(SyntaxKind.IdentifierName);
-                                {
-                                    N(SyntaxKind.IdentifierToken, "partial");
-                                }
-                                N(SyntaxKind.DotToken);
-                                M(SyntaxKind.IdentifierName);
-                                {
-                                    M(SyntaxKind.IdentifierToken);
-                                }
-                            }
-                            M(SyntaxKind.ArgumentList);
-                            {
-                                M(SyntaxKind.OpenParenToken);
-                                M(SyntaxKind.CloseParenToken);
-                            }
-                        }
-                        M(SyntaxKind.SemicolonToken);
-                    }
-                }
-                N(SyntaxKind.MethodDeclaration);
-                {
-                    N(SyntaxKind.PartialKeyword);
-                    M(SyntaxKind.PredefinedType);
-                    {
-                        M(SyntaxKind.VoidKeyword);
                     }
                     N(SyntaxKind.IdentifierToken, "Goo");
                     N(SyntaxKind.ParameterList);

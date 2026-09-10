@@ -2,9 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable disable
-
-using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Test.Utilities;
@@ -14,27 +11,46 @@ using Xunit.Abstractions;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests;
 
-/// <summary>
-/// Tests parser recovery when <c>partial</c> appears in a non-canonical modifier position.
-/// <para>
-/// The parser accepts <c>partial</c> in any position of the modifier list when the declaration is
-/// otherwise unambiguous. The binder continues to report
-/// <c>ERR_PartialMisplaced</c> at non-canonical positions, so this parser recovery does not change
-/// which programs are accepted. Modifiers that are not legal on a declaration at all (e.g.,
-/// <c>partial enum</c>) continue to produce the same binding error.
-/// </para>
-/// <para>
-/// The tests exercise parser shape directly and use compilation diagnostics where needed to verify
-/// that improved recovery does not make misplaced modifiers legal.
-/// </para>
-/// </summary>
-public sealed partial class ModifierParserRecoveryTests : ParsingTests
+public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output) : ParsingTests(output)
 {
-    public ModifierParserRecoveryTests(ITestOutputHelper output) : base(output) { }
+    private void UsingLambdaExpression(
+        string source,
+        DiagnosticDescription[]? expectedParsingDiagnostics = null,
+        DiagnosticDescription[]? expectedBindingDiagnostics = null,
+        string targetType = "System.Action",
+        string? declarations = null)
+    {
+        expectedParsingDiagnostics ??= [];
+        expectedBindingDiagnostics ??= expectedParsingDiagnostics;
+
+        UsingExpression(source, expectedParsingDiagnostics);
+
+        var compilationSource = declarations is null
+            ? $$"""
+                class C
+                {
+                    void M()
+                    {
+                        {{targetType}} x = {{source}};
+                    }
+                }
+                """
+            : $$"""
+                {{declarations}}
+
+                class C
+                {
+                    void M()
+                    {
+                        {{targetType}} x = {{source}};
+                    }
+                }
+                """;
+
+        CreateCompilation(compilationSource).VerifyDiagnostics(expectedBindingDiagnostics);
+    }
 
     #region partial modifier
-
-    // ---------- partial on type declarations ----------
 
     [Theory]
     [InlineData(LanguageVersion.CSharp14)]
@@ -312,7 +328,72 @@ public sealed partial class ModifierParserRecoveryTests : ParsingTests
             Diagnostic(ErrorCode.ERR_PartialMethodWithNonVoidReturnMustHaveAccessMods, "M").WithArguments("<invalid-global-code>.M()").WithLocation(1, 29));
     }
 
-    // ---------- partial on methods ----------
+    [Theory]
+    [InlineData(LanguageVersion.CSharp14)]
+    [InlineData(LanguageVersion.Preview)]
+    public void PartialPartial_TopLevel(LanguageVersion languageVersion)
+    {
+        const string source = "partial partial C();";
+        UsingTree(
+            source,
+            TestOptions.Regular.WithLanguageVersion(languageVersion),
+            // (1,17): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // partial partial C();
+            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "C").WithLocation(1, 17),
+            // (1,19): error CS1525: Invalid expression term ')'
+            // partial partial C();
+            Diagnostic(ErrorCode.ERR_InvalidExprTerm, ")").WithArguments(")").WithLocation(1, 19));
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.IncompleteMember);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "C");
+                }
+            }
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.ExpressionStatement);
+                {
+                    N(SyntaxKind.ParenthesizedExpression);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        M(SyntaxKind.IdentifierName);
+                        {
+                            M(SyntaxKind.IdentifierToken);
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void Partial_ConversionOperators()
+    {
+        const string source = """
+            partial class C
+            {
+                public static partial implicit operator int(C c) => 0;
+                public static partial explicit operator C(int i) => new();
+            }
+            """;
+
+        CreateCompilation(source).VerifyDiagnostics(
+            // (3,19): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+            //     public static partial implicit operator int(C c) => 0;
+            Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(3, 19),
+            // (4,19): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+            //     public static partial explicit operator C(int i) => new();
+            Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(4, 19));
+    }
 
     [Fact]
     public void Partial_RefReturn()
@@ -376,6 +457,8 @@ public sealed partial class ModifierParserRecoveryTests : ParsingTests
     }
 
     [Theory]
+    [InlineData("@partial", LanguageVersion.CSharp13)]
+    [InlineData("async", LanguageVersion.CSharp13)]
     [InlineData("required", LanguageVersion.CSharp10)]
     [InlineData("file", LanguageVersion.CSharp10)]
     [InlineData("closed", LanguageVersion.CSharp14)]
@@ -427,8 +510,6 @@ public sealed partial class ModifierParserRecoveryTests : ParsingTests
             Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(4, 5));
     }
 
-    // ---------- partial on properties ----------
-
     [Theory]
     [InlineData(LanguageVersion.CSharp14)]
     [InlineData(LanguageVersion.Preview)]
@@ -450,8 +531,6 @@ public sealed partial class ModifierParserRecoveryTests : ParsingTests
             //     partial public int P { get => 0; set { } }
             Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(4, 5));
     }
-
-    // ---------- parser recovery: 'partial' as identifier ----------
 
     [Fact]
     public void Partial_AsIdentifier_TopLevelAssignment_NotConsumedAsModifier()
@@ -490,20 +569,72 @@ public sealed partial class ModifierParserRecoveryTests : ParsingTests
             Diagnostic(ErrorCode.ERR_NameNotInContext, "partial").WithArguments("partial").WithLocation(1, 1));
     }
 
-    [Theory]
-    [InlineData("file")]
-    [InlineData("file async required")]
-    public void PartialThenContextualChain_NoDeclHead_FallsBackToIdentifier(string chain)
+    [Fact]
+    public void PartialThenFile_NoDeclHead_FallsBackToIdentifier()
     {
-        var src = $"partial {chain};";
-        var tree = SyntaxFactory.ParseSyntaxTree(src);
-        var root = tree.GetCompilationUnitRoot();
-        foreach (var member in root.Members)
+        UsingTree("partial file;");
+        N(SyntaxKind.CompilationUnit);
         {
-            Assert.False(
-                member is MemberDeclarationSyntax mem && mem.Modifiers.Any(SyntaxKind.PartialKeyword),
-                $"'partial' should not have been consumed as a modifier; got: {member.Kind()}");
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalDeclarationStatement);
+                {
+                    N(SyntaxKind.VariableDeclaration);
+                    {
+                        N(SyntaxKind.IdentifierName);
+                        {
+                            N(SyntaxKind.IdentifierToken, "partial");
+                        }
+                        N(SyntaxKind.VariableDeclarator);
+                        {
+                            N(SyntaxKind.IdentifierToken, "file");
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
         }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialThenContextualChain_NoDeclHead_FallsBackToIdentifier()
+    {
+        UsingTree(
+            "partial file async required;",
+            // (1,1): error CS1031: Type expected
+            // partial file async required;
+            Diagnostic(ErrorCode.ERR_TypeExpected, "partial").WithLocation(1, 1),
+            // (1,1): error CS1525: Invalid expression term 'partial'
+            // partial file async required;
+            Diagnostic(ErrorCode.ERR_InvalidExprTerm, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,1): error CS1003: Syntax error, ',' expected
+            // partial file async required;
+            Diagnostic(ErrorCode.ERR_SyntaxError, "partial").WithArguments(",").WithLocation(1, 1));
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalDeclarationStatement);
+                {
+                    M(SyntaxKind.VariableDeclaration);
+                    {
+                        M(SyntaxKind.IdentifierName);
+                        {
+                            M(SyntaxKind.IdentifierToken);
+                        }
+                        M(SyntaxKind.VariableDeclarator);
+                        {
+                            M(SyntaxKind.IdentifierToken);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
     }
 
     [Fact]
@@ -536,6 +667,727 @@ public sealed partial class ModifierParserRecoveryTests : ParsingTests
                 N(SyntaxKind.CloseBraceToken);
             }
             N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncReturnTypeAndPartialMethodName()
+    {
+        UsingTree("""
+            partial class C
+            {
+                partial async partial();
+            }
+            """);
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "async");
+                    }
+                    N(SyntaxKind.IdentifierToken, "partial");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncConstructorName()
+    {
+        var src = """
+            partial class async
+            {
+                partial async();
+            }
+            """;
+
+        UsingTree(src);
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "async");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.ConstructorDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "async");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+
+        CreateCompilation(src).VerifyDiagnostics(
+            // (1,15): warning CS8981: The type name 'async' only contains lower-cased ascii characters. Such names may become reserved for the language.
+            // partial class async
+            Diagnostic(ErrorCode.WRN_LowerCaseTypeName, "async").WithArguments("async").WithLocation(1, 15),
+            // (3,13): error CS9275: Partial member 'async.async()' must have an implementation part.
+            //     partial async();
+            Diagnostic(ErrorCode.ERR_PartialMemberMissingImplementation, "async").WithArguments("async.async()").WithLocation(3, 13));
+    }
+
+    [Fact]
+    public void PartialAsyncConstructorName_CSharp13()
+    {
+        UsingTree("""
+            partial class async
+            {
+                partial async();
+            }
+            """, TestOptions.Regular13);
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "async");
+                N(SyntaxKind.OpenBraceToken);
+            N(SyntaxKind.ConstructorDeclaration);
+                {
+                N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "async");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Theory]
+    [InlineData("required", SyntaxKind.RequiredKeyword, 43)]
+    [InlineData("file", SyntaxKind.FileKeyword, 35)]
+    [InlineData("closed", SyntaxKind.ClosedKeyword, 39)]
+    public void PartialContextualModifierConstructorName(
+        string name,
+        SyntaxKind keywordKind,
+        int closeParenColumn)
+    {
+        var source = $"partial class {name} {{ partial {name}(); }}";
+        UsingTree(
+            source,
+            Diagnostic(ErrorCode.ERR_TupleTooFewElements, ")").WithLocation(1, closeParenColumn),
+            Diagnostic(ErrorCode.ERR_InvalidMemberDecl, ";").WithArguments(";").WithLocation(1, closeParenColumn + 1));
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, name);
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.IncompleteMember);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(keywordKind);
+                    N(SyntaxKind.TupleType);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        M(SyntaxKind.TupleElement);
+                        {
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                        }
+                        M(SyntaxKind.CommaToken);
+                        M(SyntaxKind.TupleElement);
+                        {
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialSafeConstructorName()
+    {
+        UsingTree("partial class safe { partial safe(); }");
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "safe");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.ConstructorDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "safe");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncConstructorNameInNamespace()
+    {
+        UsingTree("namespace N { partial async(); }");
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.NamespaceDeclaration);
+            {
+                N(SyntaxKind.NamespaceKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "N");
+                }
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.ConstructorDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "async");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncConstructorNameAfterPublic()
+    {
+        UsingDeclaration("public partial async();");
+        N(SyntaxKind.ConstructorDeclaration);
+        {
+            N(SyntaxKind.PublicKeyword);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.IdentifierToken, "async");
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.SemicolonToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncConstructorNameAfterStatic()
+    {
+        UsingDeclaration("static partial async();");
+        N(SyntaxKind.ConstructorDeclaration);
+        {
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.IdentifierToken, "async");
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.SemicolonToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialStaticParenthesizedLambda()
+    {
+        const string source = "partial static () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,27): error CS0267: The 'partial' modifier can only appear on a class, record, struct, interface, event, instance constructor, method or property.
+                //         System.Action x = partial static () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 27),
+            ]);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialParenthesizedLambda()
+    {
+        const string source = "partial () => new partial()";
+        UsingLambdaExpression(
+            source,
+            targetType: "System.Func<partial>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                class partial
+                {
+                }
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.ObjectCreationExpression);
+            {
+                N(SyntaxKind.NewKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "partial");
+                }
+                N(SyntaxKind.ArgumentList);
+                {
+                    N(SyntaxKind.OpenParenToken);
+                    N(SyntaxKind.CloseParenToken);
+                }
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticPartialParenthesizedLambda()
+    {
+        const string source = "static partial () => new partial()";
+        UsingLambdaExpression(
+            source,
+            targetType: "System.Func<partial>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                class partial
+                {
+                }
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.ObjectCreationExpression);
+            {
+                N(SyntaxKind.NewKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "partial");
+                }
+                N(SyntaxKind.ArgumentList);
+                {
+                    N(SyntaxKind.OpenParenToken);
+                    N(SyntaxKind.CloseParenToken);
+                }
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialStaticAsyncParenthesizedLambda()
+    {
+        const string source = "partial static async () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,27): error CS0267: The 'partial' modifier can only appear on a class, record, struct, interface, event, instance constructor, method or property.
+                //         System.Action x = partial static async () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 27),
+            ]);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncStaticParenthesizedLambda()
+    {
+        const string source = "partial async static () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,27): error CS0267: The 'partial' modifier can only appear on a class, record, struct, interface, event, instance constructor, method or property.
+                //         System.Action x = partial async static () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 27),
+            ]);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncParenthesizedLambda()
+    {
+        const string source = "partial async () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedParsingDiagnostics:
+            [
+                // (1,1): error CS1525: Invalid expression term 'partial'
+                // partial async () => { }
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "partial").WithArguments("partial").WithLocation(1, 1),
+                // (1,1): error CS1073: Unexpected token 'partial'
+                // partial async () => { }
+                Diagnostic(ErrorCode.ERR_UnexpectedToken, "").WithArguments("partial").WithLocation(1, 1),
+            ],
+            expectedBindingDiagnostics:
+            [
+                // (5,27): error CS1525: Invalid expression term 'partial'
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "partial").WithArguments("partial").WithLocation(5, 27),
+                // (5,27): error CS1002: ; expected
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "partial").WithLocation(5, 27),
+                // (5,27): error CS1513: } expected
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "partial").WithLocation(5, 27),
+                // (5,35): error CS1520: Method must have a return type
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_MemberNeedsType, "async").WithLocation(5, 35),
+                // (5,35): error CS0751: A partial member must be declared within a partial type
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_PartialMemberOnlyInPartialClass, "async").WithLocation(5, 35),
+                // (5,35): error CS9276: Partial member 'C.C()' must have a definition part.
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_PartialMemberMissingDefinition, "async").WithArguments("C.C()").WithLocation(5, 35),
+                // (5,47): error CS1525: Invalid expression term '{'
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "{").WithArguments("{").WithLocation(5, 47),
+                // (5,47): error CS1002: ; expected
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "{").WithLocation(5, 47),
+                // (5,47): error CS1519: Invalid token '{' in a member declaration
+                //         System.Action x = partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidMemberDecl, "{").WithArguments("{").WithLocation(5, 47),
+                // (6,5): error CS1022: Type or namespace definition, or end-of-file expected
+                //     }
+                Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(6, 5),
+                // (7,1): error CS1022: Type or namespace definition, or end-of-file expected
+                // }
+                Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(7, 1),
+            ]);
+        M(SyntaxKind.IdentifierName);
+        {
+            M(SyntaxKind.IdentifierToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncPartialParenthesizedLambda()
+    {
+        const string source = "async partial () => { }";
+        UsingLambdaExpression(
+            source,
+            targetType: "System.Func<System.Threading.Tasks.Task>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                using partial = System.Threading.Tasks.Task;
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticPartialAsyncParenthesizedLambda()
+    {
+        const string source = "static partial async () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedParsingDiagnostics:
+            [
+                // (1,1): error CS1525: Invalid expression term 'static'
+                // static partial async () => { }
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "static").WithArguments("static").WithLocation(1, 1),
+                // (1,1): error CS1073: Unexpected token 'static'
+                // static partial async () => { }
+                Diagnostic(ErrorCode.ERR_UnexpectedToken, "").WithArguments("static").WithLocation(1, 1),
+            ],
+            expectedBindingDiagnostics:
+            [
+                // (5,27): error CS1525: Invalid expression term 'static'
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "static").WithArguments("static").WithLocation(5, 27),
+                // (5,27): error CS1002: ; expected
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "static").WithLocation(5, 27),
+                // (5,27): error CS0106: The modifier 'static' is not valid for this item
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_BadMemberFlag, "static").WithArguments("static").WithLocation(5, 27),
+                // (5,34): error CS1031: Type expected
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_TypeExpected, "partial").WithLocation(5, 34),
+                // (5,34): error CS1525: Invalid expression term 'partial'
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "partial").WithArguments("partial").WithLocation(5, 34),
+                // (5,34): error CS1002: ; expected
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "partial").WithLocation(5, 34),
+                // (5,34): error CS1513: } expected
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "partial").WithLocation(5, 34),
+                // (5,42): error CS1520: Method must have a return type
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_MemberNeedsType, "async").WithLocation(5, 42),
+                // (5,42): error CS0751: A partial member must be declared within a partial type
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_PartialMemberOnlyInPartialClass, "async").WithLocation(5, 42),
+                // (5,42): error CS9276: Partial member 'C.C()' must have a definition part.
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_PartialMemberMissingDefinition, "async").WithArguments("C.C()").WithLocation(5, 42),
+                // (5,54): error CS1525: Invalid expression term '{'
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "{").WithArguments("{").WithLocation(5, 54),
+                // (5,54): error CS1002: ; expected
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "{").WithLocation(5, 54),
+                // (5,54): error CS1519: Invalid token '{' in a member declaration
+                //         System.Action x = static partial async () => { };
+                Diagnostic(ErrorCode.ERR_InvalidMemberDecl, "{").WithArguments("{").WithLocation(5, 54),
+                // (6,5): error CS1022: Type or namespace definition, or end-of-file expected
+                //     }
+                Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(6, 5),
+                // (7,1): error CS1022: Type or namespace definition, or end-of-file expected
+                // }
+                Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(7, 1),
+            ]);
+        M(SyntaxKind.IdentifierName);
+        {
+            M(SyntaxKind.IdentifierToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticAsyncPartialParenthesizedLambda()
+    {
+        const string source = "static async partial () => { }";
+        UsingLambdaExpression(
+            source,
+            targetType: "System.Func<System.Threading.Tasks.Task>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                using partial = System.Threading.Tasks.Task;
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncPartialStaticParenthesizedLambda()
+    {
+        const string source = "async partial static () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedParsingDiagnostics:
+            [
+                // (1,1): error CS1073: Unexpected token 'partial'
+                // async partial static () => { }
+                Diagnostic(ErrorCode.ERR_UnexpectedToken, "async").WithArguments("partial").WithLocation(1, 1),
+            ],
+            expectedBindingDiagnostics:
+            [
+                // (5,27): error CS0103: The name 'async' does not exist in the current context
+                //         System.Action x = async partial static () => { };
+                Diagnostic(ErrorCode.ERR_NameNotInContext, "async").WithArguments("async").WithLocation(5, 27),
+                // (5,33): error CS1002: ; expected
+                //         System.Action x = async partial static () => { };
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "partial").WithLocation(5, 33),
+                // (5,33): error CS0267: The 'partial' modifier can only appear on a class, record, struct, interface, event, instance constructor, method or property.
+                //         System.Action x = async partial static () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 33),
+                // (5,33): error CS0201: Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement
+                //         System.Action x = async partial static () => { };
+                Diagnostic(ErrorCode.ERR_IllegalStatement, "partial static () => { }").WithLocation(5, 33),
+            ]);
+        N(SyntaxKind.IdentifierName);
+        {
+            N(SyntaxKind.IdentifierToken, "async");
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncStaticPartialParenthesizedLambda()
+    {
+        const string source = "async static partial () => { }";
+        UsingLambdaExpression(
+            source,
+            targetType: "System.Func<System.Threading.Tasks.Task>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                using partial = System.Threading.Tasks.Task;
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
         }
         EOF();
     }
