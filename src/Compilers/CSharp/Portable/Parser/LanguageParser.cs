@@ -1675,8 +1675,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
                 // 'partial Identifier(' starts a constructor. Use '@partial' for a return type
                 // named 'partial'.
-                if (isIdentifierFollowedByOpenParen(peekIndex: 0))
+                if (this.CurrentToken.Kind == SyntaxKind.IdentifierToken &&
+                    this.PeekToken(1).Kind == SyntaxKind.OpenParenToken)
+                {
                     return true;
+                }
 
                 while (GetModifierExcludingScoped(this.CurrentToken) != DeclarationModifiers.None)
                 {
@@ -1689,12 +1692,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     // can no longer be used as an unescaped return type. In either case, the initial
                     // 'partial' is a modifier.
                     if (this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword)
-                        return true;
-
-                    // Another contextual modifier followed by 'Identifier(' may be the return type,
-                    // as in 'partial async C()', or a modifier on a partial constructor. Either way,
-                    // the initial 'partial' is a modifier.
-                    if (isIdentifierFollowedByOpenParen(peekIndex: 1))
                         return true;
 
                     // A contextual modifier may otherwise be the member's return type, such as
@@ -1733,12 +1730,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 // Otherwise, require a return type followed by a member name, as in
                 // 'partial int M()'.
                 return this.IsTypeFollowedByMemberName();
-            }
-
-            bool isIdentifierFollowedByOpenParen(int peekIndex)
-            {
-                return this.PeekToken(peekIndex).Kind == SyntaxKind.IdentifierToken &&
-                    this.PeekToken(peekIndex + 1).Kind == SyntaxKind.OpenParenToken;
             }
         }
 
