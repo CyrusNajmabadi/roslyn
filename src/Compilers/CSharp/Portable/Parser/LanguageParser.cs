@@ -1685,17 +1685,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     if (this.CurrentToken.Kind != SyntaxKind.IdentifierToken)
                         return true;
 
-                    // A contextual modifier followed by 'Identifier(' either starts a method
-                    // return type, as in 'partial async C()', or is another modifier on a partial
-                    // constructor, as in 'partial partial C()'. Either way, the initial 'partial' is
-                    // a modifier. For the latter form in C# 14, scanning the second 'partial' as a type
-                    // reenters this helper and classifies it as a modifier, so IsTypeFollowedByMemberName()
-                    // returns false.
+                    // A second 'partial' is either another modifier or the member name because it
+                    // can no longer be used as an unescaped return type. In either case, the initial
+                    // 'partial' is a modifier.
+                    if (this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword)
+                        return true;
+
+                    // Another contextual modifier followed by 'Identifier(' may be the return type,
+                    // as in 'partial async C()', or a modifier on a partial constructor. Either way,
+                    // the initial 'partial' is a modifier.
                     if (isIdentifierFollowedByOpenParen(peekIndex: 1))
                         return true;
 
                     // A contextual modifier may otherwise be the member's return type, such as
-                    // the second 'partial' in 'partial partial P { get; }'.
+                    // 'async' in 'partial async P { get; }'.
                     if (this.IsTypeFollowedByMemberName())
                         return true;
 
@@ -1714,22 +1717,22 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 if (this.CurrentToken.Kind is SyntaxKind.ImplicitKeyword or SyntaxKind.ExplicitKeyword)
                     return true;
 
-                // IsTypeFollowedByMemberName() handles declarations with separate type and name
-                // components, such as 'partial int M()'. Also accept a single type-shaped component
-                // followed directly by a member suffix, as in 'partial C()', 'partial C { }',
-                // 'partial C => ...', or 'partial C;'. Those are the breaking-change cases: after
-                // consuming 'partial' as a modifier, the parser reparses 'C' as the declaration name
-                // instead of treating 'partial' as the type. IsTypeFollowedByMemberName() intentionally
-                // rejects these forms because the token after the scanned type is punctuation, not a name.
-                if (this.ScanType() == ScanTypeFlags.NotType)
-                    return false;
-
-                return IsPossibleMemberName() ||
-                    this.CurrentToken.Kind is
+                // A name followed directly by a member suffix has no return type, as in
+                // 'partial C()', 'partial C { }', 'partial C => ...', or 'partial C;'.
+                if (IsPossibleMemberName() &&
+                    this.PeekToken(1).Kind is
+                        SyntaxKind.LessThanToken or
                         SyntaxKind.OpenParenToken or
                         SyntaxKind.OpenBraceToken or
                         SyntaxKind.EqualsGreaterThanToken or
-                        SyntaxKind.SemicolonToken;
+                        SyntaxKind.SemicolonToken)
+                {
+                    return true;
+                }
+
+                // Otherwise, require a return type followed by a member name, as in
+                // 'partial int M()'.
+                return this.IsTypeFollowedByMemberName();
             }
 
             bool isIdentifierFollowedByOpenParen(int peekIndex)
