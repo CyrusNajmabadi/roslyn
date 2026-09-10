@@ -1714,12 +1714,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 if (this.CurrentToken.Kind is SyntaxKind.ImplicitKeyword or SyntaxKind.ExplicitKeyword)
                     return true;
 
-                // A name followed directly by a member suffix has no return type, as in
-                // 'partial C()', 'partial C { }', 'partial C => ...', or 'partial C;'.
+                // These are malformed members with a missing name after the return type, such as
+                // 'partial C { }', 'partial C => ...', 'partial C;', or 'partial C<T>()'. Still
+                // classify the leading 'partial' as a modifier so ParseModifiers consumes it.
+                // Otherwise, the caller may reinterpret 'partial' as the return type and 'C' as
+                // the member name.
                 if (IsPossibleMemberName() &&
                     this.PeekToken(1).Kind is
                         SyntaxKind.LessThanToken or
-                        SyntaxKind.OpenParenToken or
                         SyntaxKind.OpenBraceToken or
                         SyntaxKind.EqualsGreaterThanToken or
                         SyntaxKind.SemicolonToken)
