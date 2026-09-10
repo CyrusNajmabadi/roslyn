@@ -1038,11 +1038,52 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         UsingDeclaration("""
             partial ();
             """,
+            TestOptions.Regular.WithLanguageVersion(langVersion),
+            // (1,1): error CS1073: Unexpected token ';'
+            // partial ();
+            Diagnostic(ErrorCode.ERR_UnexpectedToken, "partial ()").WithArguments(";").WithLocation(1, 1),
+            // (1,10): error CS8124: Tuple must contain at least two elements.
+            // partial ();
+            Diagnostic(ErrorCode.ERR_TupleTooFewElements, ")").WithLocation(1, 10));
+
+        N(SyntaxKind.IncompleteMember);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.TupleType);
+            {
+                N(SyntaxKind.OpenParenToken);
+                M(SyntaxKind.TupleElement);
+                {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                }
+                M(SyntaxKind.CommaToken);
+                M(SyntaxKind.TupleElement);
+                {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                }
+                N(SyntaxKind.CloseParenToken);
+            }
+        }
+        EOF();
+    }
+
+    [Theory, CombinatorialData]
+    public void Constructor_EscapedPartialName([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    {
+        UsingDeclaration("""
+            @partial();
+            """,
             TestOptions.Regular.WithLanguageVersion(langVersion));
 
         N(SyntaxKind.ConstructorDeclaration);
         {
-            N(SyntaxKind.IdentifierToken, "partial");
+            N(SyntaxKind.IdentifierToken, "@partial");
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1059,18 +1100,38 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         UsingDeclaration("""
             partial partial();
             """,
-            TestOptions.Regular.WithLanguageVersion(langVersion));
+            TestOptions.Regular.WithLanguageVersion(langVersion),
+            // (1,1): error CS1073: Unexpected token ';'
+            // partial partial();
+            Diagnostic(ErrorCode.ERR_UnexpectedToken, "partial partial()").WithArguments(";").WithLocation(1, 1),
+            // (1,17): error CS8124: Tuple must contain at least two elements.
+            // partial partial();
+            Diagnostic(ErrorCode.ERR_TupleTooFewElements, ")").WithLocation(1, 17));
 
-        N(SyntaxKind.ConstructorDeclaration);
+        N(SyntaxKind.IncompleteMember);
         {
             N(SyntaxKind.PartialKeyword);
-            N(SyntaxKind.IdentifierToken, "partial");
-            N(SyntaxKind.ParameterList);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.TupleType);
             {
                 N(SyntaxKind.OpenParenToken);
+                M(SyntaxKind.TupleElement);
+                {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                }
+                M(SyntaxKind.CommaToken);
+                M(SyntaxKind.TupleElement);
+                {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                }
                 N(SyntaxKind.CloseParenToken);
             }
-            N(SyntaxKind.SemicolonToken);
         }
         EOF();
     }
@@ -1081,12 +1142,54 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         UsingDeclaration("""
             partial partial();
             """,
-            TestOptions.Regular13);
+            TestOptions.Regular13,
+            // (1,1): error CS1073: Unexpected token ';'
+            // partial partial();
+            Diagnostic(ErrorCode.ERR_UnexpectedToken, "partial partial()").WithArguments(";").WithLocation(1, 1),
+            // (1,17): error CS8124: Tuple must contain at least two elements.
+            // partial partial();
+            Diagnostic(ErrorCode.ERR_TupleTooFewElements, ")").WithLocation(1, 17));
+
+        N(SyntaxKind.IncompleteMember);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.TupleType);
+            {
+                N(SyntaxKind.OpenParenToken);
+                M(SyntaxKind.TupleElement);
+                {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                }
+                M(SyntaxKind.CommaToken);
+                M(SyntaxKind.TupleElement);
+                {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                }
+                N(SyntaxKind.CloseParenToken);
+            }
+        }
+        EOF();
+    }
+
+    [Theory, CombinatorialData]
+    public void Constructor_EscapedPartialAsName([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    {
+        UsingDeclaration("""
+            partial @partial();
+            """,
+            TestOptions.Regular.WithLanguageVersion(langVersion));
 
         N(SyntaxKind.ConstructorDeclaration);
         {
             N(SyntaxKind.PartialKeyword);
-            N(SyntaxKind.IdentifierToken, "partial");
+            N(SyntaxKind.IdentifierToken, "@partial");
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
