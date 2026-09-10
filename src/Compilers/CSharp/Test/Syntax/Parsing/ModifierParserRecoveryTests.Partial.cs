@@ -1,4 +1,4 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -186,8 +186,74 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
             Diagnostic(ErrorCode.ERR_DuplicateModifier, "partial").WithArguments("partial").WithLocation(1, 9));
     }
 
+    [Fact]
+    public void PartialPartial_MethodReturningPartial_CSharp13()
+    {
+        UsingTree(
+            "class C { partial partial M(); }",
+            TestOptions.Regular13);
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.ConstructorDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialPartial_MethodReturningEscapedPartial_CSharp13()
+    {
+        UsingTree(
+            """class C { partial @partial M(); }""",
+            TestOptions.Regular13);
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "@partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
     [Theory]
-    [InlineData(LanguageVersion.CSharp13)]
     [InlineData(LanguageVersion.CSharp14)]
     [InlineData(LanguageVersion.Preview)]
     public void PartialPartial_PartialConstructor(LanguageVersion languageVersion)
@@ -457,7 +523,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
     }
 
     [Theory]
-    [InlineData("@partial", LanguageVersion.CSharp13)]
+    [InlineData("partial", LanguageVersion.CSharp13)]
     [InlineData("async", LanguageVersion.CSharp13)]
     [InlineData("required", LanguageVersion.CSharp10)]
     [InlineData("file", LanguageVersion.CSharp10)]
@@ -479,9 +545,50 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
             }
             """;
 
-        CreateCompilation(
+        var compilation = CreateCompilation(
             src,
-            parseOptions: TestOptions.Regular.WithLanguageVersion(languageVersion)).VerifyDiagnostics();
+            parseOptions: TestOptions.Regular.WithLanguageVersion(languageVersion));
+
+        if (typeName != "partial")
+        {
+            compilation.VerifyDiagnostics();
+            return;
+        }
+
+        compilation.VerifyDiagnostics(
+            // (7,21): error CS1004: Duplicate 'partial' modifier
+            //     private partial partial M();
+            Diagnostic(ErrorCode.ERR_DuplicateModifier, "partial").WithArguments("partial").WithLocation(7, 21),
+            // (7,29): error CS1520: Method must have a return type
+            //     private partial partial M();
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "M").WithLocation(7, 29),
+            // (8,21): error CS1004: Duplicate 'partial' modifier
+            //     private partial partial M() => new();
+            Diagnostic(ErrorCode.ERR_DuplicateModifier, "partial").WithArguments("partial").WithLocation(8, 21),
+            // (8,29): error CS1520: Method must have a return type
+            //     private partial partial M() => new();
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "M").WithLocation(8, 29),
+            // (8,36): error CS0201: Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement
+            //     private partial partial M() => new();
+            Diagnostic(ErrorCode.ERR_IllegalStatement, "new()").WithLocation(8, 36));
+    }
+
+    [Fact]
+    public void Partial_ContextualModifierAsReturnType_EscapedPartial_CSharp13()
+    {
+        CreateCompilation(
+            """
+            #pragma warning disable 8981
+
+            class @partial { }
+
+            partial class C
+            {
+                private partial @partial M();
+                private partial @partial M() => new();
+            }
+            """,
+            parseOptions: TestOptions.Regular13).VerifyDiagnostics();
     }
 
     /// <summary>
@@ -772,9 +879,47 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
                 N(SyntaxKind.ClassKeyword);
                 N(SyntaxKind.IdentifierToken, "async");
                 N(SyntaxKind.OpenBraceToken);
-            N(SyntaxKind.ConstructorDeclaration);
+                N(SyntaxKind.ConstructorDeclaration);
                 {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "async");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialAsyncMethodReturningEscapedPartial_CSharp13()
+    {
+        UsingTree("""
+            partial class async
+            {
+                @partial async();
+            }
+            """, TestOptions.Regular13);
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
                 N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "async");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "@partial");
+                    }
                     N(SyntaxKind.IdentifierToken, "async");
                     N(SyntaxKind.ParameterList);
                     {

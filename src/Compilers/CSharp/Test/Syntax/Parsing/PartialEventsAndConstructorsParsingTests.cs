@@ -320,6 +320,39 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
     public void Event_Definition_PartialAfterType([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingDeclaration("""
+            event Action partial E;
+            """,
+            TestOptions.Regular.WithLanguageVersion(langVersion),
+            // (1,14): error CS1525: Invalid expression term 'partial'
+            // event Action partial E;
+            Diagnostic(ErrorCode.ERR_InvalidExprTerm, "partial").WithArguments("partial").WithLocation(1, 14),
+            // (1,14): error CS1003: Syntax error, ',' expected
+            // event Action partial E;
+            Diagnostic(ErrorCode.ERR_SyntaxError, "partial").WithArguments(",").WithLocation(1, 14));
+
+        N(SyntaxKind.EventFieldDeclaration);
+        {
+            N(SyntaxKind.EventKeyword);
+            N(SyntaxKind.VariableDeclaration);
+            {
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "Action");
+                }
+                M(SyntaxKind.VariableDeclarator);
+                {
+                    M(SyntaxKind.IdentifierToken);
+                }
+            }
+            N(SyntaxKind.SemicolonToken);
+        }
+        EOF();
+    }
+
+    [Theory, CombinatorialData]
+    public void Event_Definition_EscapedPartialAfterType([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    {
+        UsingDeclaration("""
             event Action @partial E;
             """,
             TestOptions.Regular.WithLanguageVersion(langVersion),
@@ -834,7 +867,7 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
     }
 
     [Theory, CombinatorialData]
-    public void Constructor_Declaration([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    public void Constructor_Declaration([CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingDeclaration("""
             partial C() { }
@@ -844,6 +877,61 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         N(SyntaxKind.ConstructorDeclaration);
         {
             N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.IdentifierToken, "C");
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void Constructor_Declaration_CSharp13()
+    {
+        UsingDeclaration("""
+            partial C() { }
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.ConstructorDeclaration);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.IdentifierToken, "C");
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void Constructor_Declaration_EscapedPartialReturnType_CSharp13()
+    {
+        UsingDeclaration("""
+            @partial C() { }
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.MethodDeclaration);
+        {
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "@partial");
+            }
             N(SyntaxKind.IdentifierToken, "C");
             N(SyntaxKind.ParameterList);
             {
@@ -919,6 +1007,32 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
     }
 
     [Theory, CombinatorialData]
+    public void Constructor_NoParens_EscapedPartial([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    {
+        UsingDeclaration("""
+            @partial C;
+            """,
+            TestOptions.Regular.WithLanguageVersion(langVersion));
+
+        N(SyntaxKind.FieldDeclaration);
+        {
+            N(SyntaxKind.VariableDeclaration);
+            {
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "@partial");
+                }
+                N(SyntaxKind.VariableDeclarator);
+                {
+                    N(SyntaxKind.IdentifierToken, "C");
+                }
+            }
+            N(SyntaxKind.SemicolonToken);
+        }
+        EOF();
+    }
+
+    [Theory, CombinatorialData]
     public void Constructor_NoName([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingDeclaration("""
@@ -940,7 +1054,7 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
     }
 
     [Theory, CombinatorialData]
-    public void Constructor_PartialAsName([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    public void Constructor_PartialAsName([CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingDeclaration("""
             partial partial();
@@ -951,6 +1065,53 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         {
             N(SyntaxKind.PartialKeyword);
             N(SyntaxKind.IdentifierToken, "partial");
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.SemicolonToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void Constructor_PartialAsName_CSharp13()
+    {
+        UsingDeclaration("""
+            partial partial();
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.ConstructorDeclaration);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.IdentifierToken, "partial");
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.SemicolonToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void Constructor_PartialAsName_EscapedPartialReturnType_CSharp13()
+    {
+        UsingDeclaration("""
+            @partial @partial();
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.MethodDeclaration);
+        {
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "@partial");
+            }
+            N(SyntaxKind.IdentifierToken, "@partial");
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1169,7 +1330,7 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
     }
 
     [Theory, CombinatorialData]
-    public void ReturningPartialType_LocalFunction_InMethod([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    public void ReturningPartialType_LocalFunction_InMethod([CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingTree("""
             class C
@@ -1239,8 +1400,147 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         EOF();
     }
 
+    [Fact]
+    public void ReturningPartialType_LocalFunction_InMethod_CSharp13()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial F() => null;
+                }
+            }
+            """,
+            TestOptions.Regular13,
+            // (4,6): error CS1513: } expected
+            //     {
+            Diagnostic(ErrorCode.ERR_RbraceExpected, "").WithLocation(4, 6),
+            // (7,1): error CS1022: Type or namespace definition, or end-of-file expected
+            // }
+            Diagnostic(ErrorCode.ERR_EOFExpected, "}").WithLocation(7, 1));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        M(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.ConstructorDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.ArrowExpressionClause);
+                    {
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void ReturningEscapedPartialType_LocalFunction_InMethod_CSharp13()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    @partial F() => null;
+                }
+            }
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "@partial");
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.ArrowExpressionClause);
+                            {
+                                N(SyntaxKind.EqualsGreaterThanToken);
+                                N(SyntaxKind.NullLiteralExpression);
+                                {
+                                    N(SyntaxKind.NullKeyword);
+                                }
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
     [Theory, CombinatorialData]
-    public void ReturningPartialType_LocalFunction_TopLevel([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    public void ReturningPartialType_LocalFunction_TopLevel([CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingTree("""
             partial F() => null;
@@ -1285,8 +1585,94 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         EOF();
     }
 
+    [Fact]
+    public void ReturningPartialType_LocalFunction_TopLevel_CSharp13()
+    {
+        UsingTree("""
+            partial F() => null;
+            """,
+            TestOptions.Regular13,
+            // (1,9): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // partial F() => null;
+            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "F").WithLocation(1, 9));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.IncompleteMember);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "F");
+                }
+            }
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.ExpressionStatement);
+                {
+                    N(SyntaxKind.ParenthesizedLambdaExpression);
+                    {
+                        N(SyntaxKind.ParameterList);
+                        {
+                            N(SyntaxKind.OpenParenToken);
+                            N(SyntaxKind.CloseParenToken);
+                        }
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void ReturningEscapedPartialType_LocalFunction_TopLevel_CSharp13()
+    {
+        UsingTree("""
+            @partial F() => null;
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "@partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.ArrowExpressionClause);
+                    {
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
     [Theory, CombinatorialData]
-    public void ReturningPartialType_Method([CSharp13_CSharp14_Preview] LanguageVersion langVersion)
+    public void ReturningPartialType_Method([CSharp14_Preview] LanguageVersion langVersion)
     {
         UsingTree("""
             class C
@@ -1352,4 +1738,70 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         EOF();
     }
 
+    [Fact]
+    public void ReturningPartialType_Method_CSharp13()
+    {
+        UsingTree("""
+            class C
+            {
+                partial M() => null;
+                @partial M() => null;
+            }
+            """,
+            TestOptions.Regular13);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.ConstructorDeclaration);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.ArrowExpressionClause);
+                    {
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "@partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.ArrowExpressionClause);
+                    {
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
 }
