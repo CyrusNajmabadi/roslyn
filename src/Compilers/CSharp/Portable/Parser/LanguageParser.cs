@@ -1714,7 +1714,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 if (this.CurrentToken.Kind is SyntaxKind.ImplicitKeyword or SyntaxKind.ExplicitKeyword)
                     return true;
 
-                // Otherwise, require a type followed by a member name or body.
+                // IsTypeFollowedByMemberName() handles declarations with separate type and name
+                // components, such as 'partial int M()'. Also accept a single type-shaped component
+                // followed directly by a member suffix, as in 'partial C()', 'partial C { }',
+                // 'partial C => ...', or 'partial C;'. Those are the breaking-change cases: after
+                // consuming 'partial' as a modifier, the parser reparses 'C' as the declaration name
+                // instead of treating 'partial' as the type. IsTypeFollowedByMemberName() intentionally
+                // rejects these forms because the token after the scanned type is punctuation, not a name.
                 if (this.ScanType() == ScanTypeFlags.NotType)
                     return false;
 
