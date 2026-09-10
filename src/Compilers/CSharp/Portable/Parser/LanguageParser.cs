@@ -876,7 +876,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     return true;
                 case SyntaxKind.IdentifierToken:
                     // `onlyForTypeDeclarations: true`: A type member such as 'partial int M()' cannot start a namespace body.
-                    return this.IsCurrentTokenDefinitelyPartialModifier(onlyForTypeDeclarations: true);
+                    return this.IsPartialModifierDeclarationStart(onlyForTypeDeclarations: true);
                 default:
                     return IsPossibleStartOfTypeDeclaration(this.CurrentToken.Kind);
             }
@@ -1371,7 +1371,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                     case DeclarationModifiers.Partial:
                         // `onlyForTypeDeclarations: false`: ParseModifiers is shared by types and members, such as
                         // 'partial class C' and 'partial void M()'.
-                        if (!this.IsCurrentTokenDefinitelyPartialModifier(onlyForTypeDeclarations: false))
+                        if (!this.IsPartialModifierDeclarationStart(onlyForTypeDeclarations: false))
                             return;
 
                         modTok = ConvertToKeyword(this.EatToken());
@@ -1523,7 +1523,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             // `onlyForTypeDeclarations: false`: The preceding modifier may belong to either a type or a member, such as
             // 'public partial class C' or 'public partial void M()'.
             if (!parsingStatementNotDeclaration &&
-                this.IsCurrentTokenDefinitelyPartialModifier(onlyForTypeDeclarations: false))
+                this.IsPartialModifierDeclarationStart(onlyForTypeDeclarations: false))
             {
                 return true;
             }
@@ -1631,16 +1631,83 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         }
 
         /// <summary>
-        /// Determines whether the current token is definitely a <c>partial</c> modifier,
-        /// including misplaced forms for binding to diagnose.
+        /// Determines whether a declaration starts with a <c>partial</c> modifier. Declaration
+        /// lookahead treats every following modifier-like token as a modifier.
         /// </summary>
-        private bool IsCurrentTokenDefinitelyPartialModifier(bool onlyForTypeDeclarations)
+        private bool IsPartialModifierDeclarationStart(bool onlyForTypeDeclarations)
         {
             if (this.CurrentToken.ContextualKind != SyntaxKind.PartialKeyword)
                 return false;
 
             // A leading 'partial' followed by anonymous-function modifiers and '(', such as
             // 'partial static () => ...' or 'partial async static () => ...', begins a lambda.
+            if (this.IsUnambiguousAnonymousFunctionModifierListFollowedByOpenParen())
+                return false;
+
+            using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
+
+            Debug.Assert(this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword);
+
+            // Treat every modifier-like token as a modifier, just as for type declarations.
+            while (GetModifierExcludingScoped(this.CurrentToken) != DeclarationModifiers.None)
+                this.EatToken();
+
+            if (this.IsTypeOrNamespaceDeclarationStart())
+                return true;
+
+            if (onlyForTypeDeclarations)
+                return false;
+
+            // An identifier followed by '(' starts a constructor.
+            if (this.CurrentToken.Kind == SyntaxKind.IdentifierToken &&
+                this.PeekToken(1).Kind == SyntaxKind.OpenParenToken)
+            {
+                return true;
+            }
+
+            // 'event' cannot begin another member form, so parse 'partial event' as an event in
+            // every language version. Binding reports the feature diagnostic when necessary.
+            if (this.CurrentToken.Kind == SyntaxKind.EventKeyword)
+                return true;
+
+            // 'implicit' and 'explicit' can only start conversion operators, so 'partial' is a
+            // modifier even when the operator declaration is incomplete.
+            if (this.CurrentToken.Kind is SyntaxKind.ImplicitKeyword or SyntaxKind.ExplicitKeyword)
+                return true;
+
+            // A modifier-like constructor name has already been consumed. Treat this as a malformed
+            // declaration with a missing name.
+            if (this.CurrentToken.Kind == SyntaxKind.OpenParenToken)
+                return true;
+
+            // These are malformed members with a missing name after the return type, such as
+            // 'partial C { }', 'partial C => ...', 'partial C;', or 'partial C<T>()'. Still
+            // classify the leading 'partial' as a modifier so ParseModifiers consumes it.
+            // Otherwise, the caller may reinterpret 'partial' as the return type and 'C' as
+            // the member name.
+            if (IsPossibleMemberName() &&
+                this.PeekToken(1).Kind is
+                    SyntaxKind.LessThanToken or
+                    SyntaxKind.OpenBraceToken or
+                    SyntaxKind.EqualsGreaterThanToken or
+                    SyntaxKind.SemicolonToken)
+            {
+                return true;
+            }
+
+            // Otherwise, require a return type followed by a member name.
+            return this.IsTypeFollowedByMemberName();
+        }
+
+        /// <summary>
+        /// Determines whether the current token is definitely a <c>partial</c> modifier from
+        /// contexts where it may instead be an identifier, such as expressions and lambdas.
+        /// </summary>
+        private bool IsCurrentTokenDefinitelyPartialModifier(bool onlyForTypeDeclarations)
+        {
+            if (this.CurrentToken.ContextualKind != SyntaxKind.PartialKeyword)
+                return false;
+
             if (this.IsUnambiguousAnonymousFunctionModifierListFollowedByOpenParen())
                 return false;
 

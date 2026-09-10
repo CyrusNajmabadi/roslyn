@@ -781,10 +781,67 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
     [Fact]
     public void PartialAsyncReturnTypeAndPartialMethodName()
     {
+        UsingTree(
+            """
+                partial class C
+                {
+                    partial async partial();
+                }
+                """,
+            // (3,27): error CS8124: Tuple must contain at least two elements.
+            //     partial async partial();
+            Diagnostic(ErrorCode.ERR_TupleTooFewElements, ")").WithLocation(3, 27),
+            // (3,28): error CS1519: Invalid token ';' in a member declaration
+            //     partial async partial();
+            Diagnostic(ErrorCode.ERR_InvalidMemberDecl, ";").WithArguments(";").WithLocation(3, 28));
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.IncompleteMember);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.AsyncKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.TupleType);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        M(SyntaxKind.TupleElement);
+                        {
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                        }
+                        M(SyntaxKind.CommaToken);
+                        M(SyntaxKind.TupleElement);
+                        {
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialEscapedAsyncReturnTypeAndEscapedPartialMethodName()
+    {
         UsingTree("""
             partial class C
             {
-                partial async partial();
+                partial @async @partial();
             }
             """);
         N(SyntaxKind.CompilationUnit);
@@ -800,9 +857,9 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
                     N(SyntaxKind.PartialKeyword);
                     N(SyntaxKind.IdentifierName);
                     {
-                        N(SyntaxKind.IdentifierToken, "async");
+                        N(SyntaxKind.IdentifierToken, "@async");
                     }
-                    N(SyntaxKind.IdentifierToken, "partial");
+                    N(SyntaxKind.IdentifierToken, "@partial");
                     N(SyntaxKind.ParameterList);
                     {
                         N(SyntaxKind.OpenParenToken);
