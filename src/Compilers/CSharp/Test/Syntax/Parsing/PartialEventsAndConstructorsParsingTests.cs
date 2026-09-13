@@ -1272,7 +1272,13 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
                 }
             }
             """,
-            TestOptions.Regular.WithLanguageVersion(langVersion));
+            TestOptions.Regular.WithLanguageVersion(langVersion),
+            // (5,9): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial F() => null;
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 9),
+            // (5,17): error CS1520: Method must have a return type
+            //         partial F() => null;
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 17));
 
         N(SyntaxKind.CompilationUnit);
         {
@@ -1298,9 +1304,10 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
                         N(SyntaxKind.OpenBraceToken);
                         N(SyntaxKind.LocalFunctionStatement);
                         {
-                            N(SyntaxKind.IdentifierName);
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
                             {
-                                N(SyntaxKind.IdentifierToken, "partial");
+                                M(SyntaxKind.IdentifierToken);
                             }
                             N(SyntaxKind.IdentifierToken, "F");
                             N(SyntaxKind.ParameterList);
@@ -1340,7 +1347,287 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
                 }
             }
             """,
-            TestOptions.Regular13);
+            TestOptions.Regular13,
+            // (5,9): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial F() => null;
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 9),
+            // (5,17): error CS1520: Method must have a return type
+            //         partial F() => null;
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 17));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.ArrowExpressionClause);
+                            {
+                                N(SyntaxKind.EqualsGreaterThanToken);
+                                N(SyntaxKind.NullLiteralExpression);
+                                {
+                                    N(SyntaxKind.NullKeyword);
+                                }
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Theory, CombinatorialData]
+    public void ReturningPartialType_LocalFunction_TopLevel([CSharp14_Preview] LanguageVersion langVersion)
+    {
+        UsingTree("""
+            partial F() => null;
+            """,
+            TestOptions.Regular.WithLanguageVersion(langVersion),
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial F() => null;
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS1520: Method must have a return type
+            // partial F() => null;
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 9));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.ArrowExpressionClause);
+                    {
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void ReturningPartialType_LocalFunction_TopLevel_CSharp13()
+    {
+        UsingTree("""
+            partial F() => null;
+            """,
+            TestOptions.Regular13,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial F() => null;
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS1520: Method must have a return type
+            // partial F() => null;
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 9));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.ArrowExpressionClause);
+                    {
+                        N(SyntaxKind.EqualsGreaterThanToken);
+                        N(SyntaxKind.NullLiteralExpression);
+                        {
+                            N(SyntaxKind.NullKeyword);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialLocalFunction_BlockBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial F() { }
+                }
+            }
+            """,
+            // (5,9): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 9),
+            // (5,17): error CS1520: Method must have a return type
+            //         partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 17));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialLocalFunction_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            partial F() { }
+            """,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS1520: Method must have a return type
+            // partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 9));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialLocalFunction_Semicolon_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial F();
+                }
+            }
+            """);
 
         N(SyntaxKind.CompilationUnit);
         {
@@ -1376,6 +1663,99 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
                                 N(SyntaxKind.OpenParenToken);
                                 N(SyntaxKind.CloseParenToken);
                             }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialLocalFunction_Semicolon_TopLevel()
+    {
+        UsingTree("""
+            partial F();
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialLocalFunctionName_ExpressionBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial() => null;
+                }
+            }
+            """,
+            // (4,6): error CS1520: Method must have a return type
+            //     {
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "").WithLocation(4, 6));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "partial");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
                             N(SyntaxKind.ArrowExpressionClause);
                             {
                                 N(SyntaxKind.EqualsGreaterThanToken);
@@ -1396,13 +1776,15 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
         EOF();
     }
 
-    [Theory, CombinatorialData]
-    public void ReturningPartialType_LocalFunction_TopLevel([CSharp14_Preview] LanguageVersion langVersion)
+    [Fact]
+    public void PartialLocalFunctionName_ExpressionBody_TopLevel()
     {
         UsingTree("""
-            partial F() => null;
+            partial() => null;
             """,
-            TestOptions.Regular.WithLanguageVersion(langVersion));
+            // (1,1): error CS1520: Method must have a return type
+            // partial() => null;
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "partial").WithLocation(1, 1));
 
         N(SyntaxKind.CompilationUnit);
         {
@@ -1410,11 +1792,11 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
             {
                 N(SyntaxKind.LocalFunctionStatement);
                 {
-                    N(SyntaxKind.IdentifierName);
+                    M(SyntaxKind.IdentifierName);
                     {
-                        N(SyntaxKind.IdentifierToken, "partial");
+                        M(SyntaxKind.IdentifierToken);
                     }
-                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.IdentifierToken, "partial");
                     N(SyntaxKind.ParameterList);
                     {
                         N(SyntaxKind.OpenParenToken);
@@ -1437,12 +1819,89 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
     }
 
     [Fact]
-    public void ReturningPartialType_LocalFunction_TopLevel_CSharp13()
+    public void PartialGenericLocalFunctionName_BlockBody_InMethod()
     {
         UsingTree("""
-            partial F() => null;
+            class C
+            {
+                void M()
+                {
+                    partial<T>() { }
+                }
+            }
             """,
-            TestOptions.Regular13);
+            // (4,6): error CS1520: Method must have a return type
+            //     {
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "").WithLocation(4, 6));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "partial");
+                            N(SyntaxKind.TypeParameterList);
+                            {
+                                N(SyntaxKind.LessThanToken);
+                                N(SyntaxKind.TypeParameter);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "T");
+                                }
+                                N(SyntaxKind.GreaterThanToken);
+                            }
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialGenericLocalFunctionName_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            partial<T>() { }
+            """,
+            // (1,1): error CS1520: Method must have a return type
+            // partial<T>() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "partial").WithLocation(1, 1));
 
         N(SyntaxKind.CompilationUnit);
         {
@@ -1450,6 +1909,573 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
             {
                 N(SyntaxKind.LocalFunctionStatement);
                 {
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "partial");
+                    N(SyntaxKind.TypeParameterList);
+                    {
+                        N(SyntaxKind.LessThanToken);
+                        N(SyntaxKind.TypeParameter);
+                        {
+                            N(SyntaxKind.IdentifierToken, "T");
+                        }
+                        N(SyntaxKind.GreaterThanToken);
+                    }
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticPartialLocalFunction_BlockBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    static partial F() { }
+                }
+            }
+            """,
+            // (5,16): error CS0106: The modifier 'partial' is not valid for this item
+            //         static partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 16),
+            // (5,24): error CS1520: Method must have a return type
+            //         static partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 24));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.StaticKeyword);
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticPartialLocalFunction_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            static partial F() { }
+            """,
+            // (1,8): error CS0106: The modifier 'partial' is not valid for this item
+            // static partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 8),
+            // (1,16): error CS1520: Method must have a return type
+            // static partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 16));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.StaticKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialStaticLocalFunction_BlockBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial static F() { }
+                }
+            }
+            """,
+            // (5,9): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial static F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 9),
+            // (5,24): error CS1520: Method must have a return type
+            //         partial static F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 24));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.PartialKeyword);
+                            N(SyntaxKind.StaticKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialStaticLocalFunction_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            partial static F() { }
+            """,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial static F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,16): error CS1520: Method must have a return type
+            // partial static F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 16));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.StaticKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncPartialLocalFunction_BlockBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    async partial F() { }
+                }
+            }
+            """,
+            // (5,15): error CS0106: The modifier 'partial' is not valid for this item
+            //         async partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 15),
+            // (5,23): error CS1520: Method must have a return type
+            //         async partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 23));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.AsyncKeyword);
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncPartialLocalFunction_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            async partial F() { }
+            """,
+            // (1,7): error CS0106: The modifier 'partial' is not valid for this item
+            // async partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 7),
+            // (1,15): error CS1520: Method must have a return type
+            // async partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 15));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.AsyncKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void RepeatedPartialLocalFunction_BlockBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial partial F() { }
+                }
+            }
+            """,
+            // (5,9): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 9),
+            // (5,17): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 17),
+            // (5,25): error CS1520: Method must have a return type
+            //         partial partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 25));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.PartialKeyword);
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void RepeatedPartialLocalFunction_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            partial partial F() { }
+            """,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
+            // (1,17): error CS1520: Method must have a return type
+            // partial partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 17));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticLocalFunctionReturningPartial_Semicolon_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    static partial F();
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.StaticKeyword);
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "partial");
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticLocalFunctionReturningPartial_Semicolon_TopLevel()
+    {
+        UsingTree("""
+            static partial F();
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.StaticKeyword);
                     N(SyntaxKind.IdentifierName);
                     {
                         N(SyntaxKind.IdentifierToken, "partial");
@@ -1460,12 +2486,1150 @@ public sealed class PartialEventsAndConstructorsParsingTests(ITestOutputHelper o
                         N(SyntaxKind.OpenParenToken);
                         N(SyntaxKind.CloseParenToken);
                     }
-                    N(SyntaxKind.ArrowExpressionClause);
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialExpressionThenStaticLocalFunction_Semicolon_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial static F();
+                }
+            }
+            """,
+            // (5,17): error CS1002: ; expected
+            //         partial static F();
+            Diagnostic(ErrorCode.ERR_SemicolonExpected, "static").WithLocation(5, 17),
+            // (5,25): error CS1001: Identifier expected
+            //         partial static F();
+            Diagnostic(ErrorCode.ERR_IdentifierExpected, "(").WithLocation(5, 25));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
                     {
-                        N(SyntaxKind.EqualsGreaterThanToken);
-                        N(SyntaxKind.NullLiteralExpression);
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.ExpressionStatement);
                         {
-                            N(SyntaxKind.NullKeyword);
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "partial");
+                            }
+                            M(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.StaticKeyword);
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "F");
+                            }
+                            M(SyntaxKind.IdentifierToken);
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialStaticIncompleteMemberThenExpression_Semicolon_TopLevel()
+    {
+        UsingTree("""
+            partial static F();
+            """,
+            // (1,16): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // partial static F();
+            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "F").WithLocation(1, 16),
+            // (1,18): error CS1525: Invalid expression term ')'
+            // partial static F();
+            Diagnostic(ErrorCode.ERR_InvalidExprTerm, ")").WithArguments(")").WithLocation(1, 18));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.IncompleteMember);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.StaticKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "F");
+                }
+            }
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.ExpressionStatement);
+                {
+                    N(SyntaxKind.ParenthesizedExpression);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        M(SyntaxKind.IdentifierName);
+                        {
+                            M(SyntaxKind.IdentifierToken);
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncLocalFunctionReturningPartial_Semicolon_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    async partial F();
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.AsyncKeyword);
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "partial");
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncLocalFunctionReturningPartial_Semicolon_TopLevel()
+    {
+        UsingTree("""
+            async partial F();
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.AsyncKeyword);
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void ExternLocalFunctionReturningPartial_Semicolon_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    extern partial F();
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.ExternKeyword);
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "partial");
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void ExternLocalFunctionReturningPartial_Semicolon_TopLevel()
+    {
+        UsingTree("""
+            extern partial F();
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.ExternKeyword);
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticLocalFunctionReturningPartial_MissingName_Semicolon_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    static partial();
+                }
+            }
+            """,
+            // (5,23): error CS1001: Identifier expected
+            //         static partial();
+            Diagnostic(ErrorCode.ERR_IdentifierExpected, "(").WithLocation(5, 23));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.StaticKeyword);
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "partial");
+                            }
+                            M(SyntaxKind.IdentifierToken);
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void StaticLocalFunctionReturningPartial_MissingName_Semicolon_TopLevel()
+    {
+        UsingTree("""
+            static partial();
+            """,
+            // (1,15): error CS1001: Identifier expected
+            // static partial();
+            Diagnostic(ErrorCode.ERR_IdentifierExpected, "(").WithLocation(1, 15));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.StaticKeyword);
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "partial");
+                    }
+                    M(SyntaxKind.IdentifierToken);
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void TriplePartialLocalFunction_BlockBody_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial partial partial F() { }
+                }
+            }
+            """,
+            // (5,9): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 9),
+            // (5,17): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 17),
+            // (5,25): error CS0106: The modifier 'partial' is not valid for this item
+            //         partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(5, 25),
+            // (5,33): error CS1520: Method must have a return type
+            //         partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(5, 33));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.PartialKeyword);
+                            N(SyntaxKind.PartialKeyword);
+                            N(SyntaxKind.PartialKeyword);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void TriplePartialLocalFunction_BlockBody_TopLevel()
+    {
+        UsingTree("""
+            partial partial partial F() { }
+            """,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
+            // (1,17): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 17),
+            // (1,25): error CS1520: Method must have a return type
+            // partial partial partial F() { }
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "F").WithLocation(1, 25));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialInvocation_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial();
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.ExpressionStatement);
+                        {
+                            N(SyntaxKind.InvocationExpression);
+                            {
+                                N(SyntaxKind.IdentifierName);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "partial");
+                                }
+                                N(SyntaxKind.ArgumentList);
+                                {
+                                    N(SyntaxKind.OpenParenToken);
+                                    N(SyntaxKind.CloseParenToken);
+                                }
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialInvocation_TopLevel()
+    {
+        UsingTree("""
+            partial();
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.ExpressionStatement);
+                {
+                    N(SyntaxKind.InvocationExpression);
+                    {
+                        N(SyntaxKind.IdentifierName);
+                        {
+                            N(SyntaxKind.IdentifierToken, "partial");
+                        }
+                        N(SyntaxKind.ArgumentList);
+                        {
+                            N(SyntaxKind.OpenParenToken);
+                            N(SyntaxKind.CloseParenToken);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialGenericInvocation_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial<T>();
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.ExpressionStatement);
+                        {
+                            N(SyntaxKind.InvocationExpression);
+                            {
+                                N(SyntaxKind.GenericName);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "partial");
+                                    N(SyntaxKind.TypeArgumentList);
+                                    {
+                                        N(SyntaxKind.LessThanToken);
+                                        N(SyntaxKind.IdentifierName);
+                                        {
+                                            N(SyntaxKind.IdentifierToken, "T");
+                                        }
+                                        N(SyntaxKind.GreaterThanToken);
+                                    }
+                                }
+                                N(SyntaxKind.ArgumentList);
+                                {
+                                    N(SyntaxKind.OpenParenToken);
+                                    N(SyntaxKind.CloseParenToken);
+                                }
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialGenericInvocation_TopLevel()
+    {
+        UsingTree("""
+            partial<T>();
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.ExpressionStatement);
+                {
+                    N(SyntaxKind.InvocationExpression);
+                    {
+                        N(SyntaxKind.GenericName);
+                        {
+                            N(SyntaxKind.IdentifierToken, "partial");
+                            N(SyntaxKind.TypeArgumentList);
+                            {
+                                N(SyntaxKind.LessThanToken);
+                                N(SyntaxKind.IdentifierName);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "T");
+                                }
+                                N(SyntaxKind.GreaterThanToken);
+                            }
+                        }
+                        N(SyntaxKind.ArgumentList);
+                        {
+                            N(SyntaxKind.OpenParenToken);
+                            N(SyntaxKind.CloseParenToken);
+                        }
+                    }
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void RefPartialReturnType_LocalFunction_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    ref partial F() { }
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.RefType);
+                            {
+                                N(SyntaxKind.RefKeyword);
+                                N(SyntaxKind.IdentifierName);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "partial");
+                                }
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void RefPartialReturnType_LocalFunction_TopLevel()
+    {
+        UsingTree("""
+            ref partial F() { }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.RefType);
+                    {
+                        N(SyntaxKind.RefKeyword);
+                        N(SyntaxKind.IdentifierName);
+                        {
+                            N(SyntaxKind.IdentifierToken, "partial");
+                        }
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void EscapedPartialReturnType_LocalFunction_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    @partial F() { }
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalFunctionStatement);
+                        {
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "@partial");
+                            }
+                            N(SyntaxKind.IdentifierToken, "F");
+                            N(SyntaxKind.ParameterList);
+                            {
+                                N(SyntaxKind.OpenParenToken);
+                                N(SyntaxKind.CloseParenToken);
+                            }
+                            N(SyntaxKind.Block);
+                            {
+                                N(SyntaxKind.OpenBraceToken);
+                                N(SyntaxKind.CloseBraceToken);
+                            }
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void EscapedPartialReturnType_LocalFunction_TopLevel()
+    {
+        UsingTree("""
+            @partial F() { }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.LocalFunctionStatement);
+                {
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "@partial");
+                    }
+                    N(SyntaxKind.IdentifierToken, "F");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialType_LocalVariable_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial p;
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalDeclarationStatement);
+                        {
+                            N(SyntaxKind.VariableDeclaration);
+                            {
+                                N(SyntaxKind.IdentifierName);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "partial");
+                                }
+                                N(SyntaxKind.VariableDeclarator);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "p");
+                                }
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialType_LocalVariable_TopLevel()
+    {
+        UsingTree("""
+            partial p;
+            """,
+            // (1,9): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // partial p;
+            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "p").WithLocation(1, 9));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.IncompleteMember);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "p");
+                }
+            }
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.EmptyStatement);
+                {
+                    N(SyntaxKind.SemicolonToken);
+                }
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialType_InitializedLocalVariable_InMethod()
+    {
+        UsingTree("""
+            class C
+            {
+                void M()
+                {
+                    partial p = default;
+                }
+            }
+            """);
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.ClassDeclaration);
+            {
+                N(SyntaxKind.ClassKeyword);
+                N(SyntaxKind.IdentifierToken, "C");
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.MethodDeclaration);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.VoidKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.Block);
+                    {
+                        N(SyntaxKind.OpenBraceToken);
+                        N(SyntaxKind.LocalDeclarationStatement);
+                        {
+                            N(SyntaxKind.VariableDeclaration);
+                            {
+                                N(SyntaxKind.IdentifierName);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "partial");
+                                }
+                                N(SyntaxKind.VariableDeclarator);
+                                {
+                                    N(SyntaxKind.IdentifierToken, "p");
+                                    N(SyntaxKind.EqualsValueClause);
+                                    {
+                                        N(SyntaxKind.EqualsToken);
+                                        N(SyntaxKind.DefaultLiteralExpression);
+                                        {
+                                            N(SyntaxKind.DefaultKeyword);
+                                        }
+                                    }
+                                }
+                            }
+                            N(SyntaxKind.SemicolonToken);
+                        }
+                        N(SyntaxKind.CloseBraceToken);
+                    }
+                }
+                N(SyntaxKind.CloseBraceToken);
+            }
+            N(SyntaxKind.EndOfFileToken);
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialType_InitializedLocalVariable_TopLevel()
+    {
+        UsingTree("""
+            partial p = default;
+            """,
+            // (1,9): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // partial p = default;
+            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "p").WithLocation(1, 9),
+            // (1,11): error CS1525: Invalid expression term '='
+            // partial p = default;
+            Diagnostic(ErrorCode.ERR_InvalidExprTerm, "=").WithArguments("=").WithLocation(1, 11));
+
+        N(SyntaxKind.CompilationUnit);
+        {
+            N(SyntaxKind.IncompleteMember);
+            {
+                N(SyntaxKind.PartialKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "p");
+                }
+            }
+            N(SyntaxKind.GlobalStatement);
+            {
+                N(SyntaxKind.ExpressionStatement);
+                {
+                    N(SyntaxKind.SimpleAssignmentExpression);
+                    {
+                        M(SyntaxKind.IdentifierName);
+                        {
+                            M(SyntaxKind.IdentifierToken);
+                        }
+                        N(SyntaxKind.EqualsToken);
+                        N(SyntaxKind.DefaultLiteralExpression);
+                        {
+                            N(SyntaxKind.DefaultKeyword);
                         }
                     }
                     N(SyntaxKind.SemicolonToken);

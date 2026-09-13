@@ -2944,7 +2944,6 @@ parse_member_name:;
                 switch (statement?.Kind)
                 {
                     case null:
-                    case SyntaxKind.LocalFunctionStatement:
                     case SyntaxKind.ExpressionStatement when
                             !isScript &&
                             // Do not parse a single identifier as an expression statement in a Simple Program, this could be a beginning of a keyword and
@@ -2952,6 +2951,14 @@ parse_member_name:;
                             statement is ExpressionStatementSyntax { Expression.Kind: SyntaxKind.IdentifierName, SemicolonToken.IsMissing: true }:
 
                         return false;
+
+                    case SyntaxKind.LocalFunctionStatement:
+                        return !isScript &&
+                            statement is LocalFunctionStatementSyntax
+                            {
+                                ReturnType.IsMissing: true,
+                                Identifier.ContextualKind: SyntaxKind.PartialKeyword,
+                            };
 
                     case SyntaxKind.LocalDeclarationStatement:
                         return !isScript && statement is LocalDeclarationStatementSyntax { UsingKeyword: not null };
@@ -8504,6 +8511,13 @@ done:
 
             tk = this.CurrentToken.ContextualKind;
 
+            if (tk == SyntaxKind.PartialKeyword &&
+                (this.IsCurrentTokenPartialLocalFunctionName() ||
+                 this.IsCurrentTokenPartialLocalFunctionModifier()))
+            {
+                return true;
+            }
+
             var isPossibleModifier =
                 IsAdditionalLocalFunctionModifier(tk)
                 && (tk is not (SyntaxKind.AsyncKeyword or SyntaxKind.SafeKeyword or SyntaxKind.ScopedKeyword) || ShouldContextualKeywordBeTreatedAsModifier(parsingStatementNotDeclaration: true));
@@ -10719,7 +10733,14 @@ done:
             out TypeSyntax type,
             out LocalFunctionStatementSyntax localFunction)
         {
-            type = allowLocalFunctions ? ParseReturnType() : this.ParseType();
+            var missingLocalFunctionReturnType =
+                allowLocalFunctions &&
+                (this.IsCurrentTokenPartialLocalFunctionName() ||
+                 mods.Any((int)SyntaxKind.PartialKeyword) && this.IsCurrentTokenLocalFunctionName());
+
+            type = missingLocalFunctionReturnType
+                ? this.AddError(this.CreateMissingIdentifierName(), ErrorCode.ERR_MemberNeedsType)
+                : allowLocalFunctions ? ParseReturnType() : this.ParseType();
 
             if (scopedKeyword != null)
                 type = _syntaxFactory.ScopedType(scopedKeyword, type);
@@ -10764,13 +10785,76 @@ done:
             }
         }
 
+        private bool IsCurrentTokenPartialLocalFunctionName()
+            => this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword &&
+               this.IsCurrentTokenLocalFunctionName();
+
+        private bool IsCurrentTokenPartialLocalFunctionModifier()
+        {
+            if (this.CurrentToken.ContextualKind != SyntaxKind.PartialKeyword ||
+                this.IsCurrentTokenPartialLocalFunctionName())
+            {
+                return false;
+            }
+
+            // Reinterpret a declaration that would otherwise use 'partial' as its return type.
+            using (this.GetDisposableResetPoint(resetOnDispose: true))
+            {
+                if (this.ScanType() != ScanTypeFlags.NotType &&
+                    this.IsCurrentTokenLocalFunctionName())
+                {
+                    return true;
+                }
+            }
+
+            // Also recognize a local function after intervening modifiers.
+            using (this.GetDisposableResetPoint(resetOnDispose: true))
+            {
+                this.EatToken();
+
+                while (this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword ||
+                       IsDeclarationModifier(this.CurrentToken.ContextualKind) ||
+                       IsAdditionalLocalFunctionModifier(this.CurrentToken.ContextualKind))
+                {
+                    if (this.IsCurrentTokenLocalFunctionName())
+                        return true;
+
+                    this.EatToken();
+                }
+
+                if (this.IsCurrentTokenLocalFunctionName())
+                    return true;
+
+                return this.ScanType() != ScanTypeFlags.NotType &&
+                    this.IsCurrentTokenLocalFunctionName();
+            }
+        }
+
+        private bool IsCurrentTokenLocalFunctionName()
+        {
+            if (this.CurrentToken.Kind != SyntaxKind.IdentifierToken)
+                return false;
+
+            using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
+            this.EatToken();
+
+            return this.CurrentToken.Kind is SyntaxKind.OpenParenToken or SyntaxKind.LessThanToken &&
+                this.IsLocalFunctionAfterIdentifier();
+        }
+
         private void ParseLocalDeclarationStatementModifiers(SyntaxListBuilder list, bool isUsingDeclaration)
         {
             SyntaxKind k;
-            while (IsDeclarationModifier(k = this.CurrentToken.ContextualKind) || IsAdditionalLocalFunctionModifier(k))
+            while (IsDeclarationModifier(k = this.CurrentToken.ContextualKind) ||
+                   IsAdditionalLocalFunctionModifier(k) ||
+                   this.IsCurrentTokenPartialLocalFunctionModifier())
             {
                 SyntaxToken mod;
-                if (k is SyntaxKind.AsyncKeyword or SyntaxKind.SafeKeyword)
+                if (k == SyntaxKind.PartialKeyword)
+                {
+                    mod = this.EatContextualToken(SyntaxKind.PartialKeyword);
+                }
+                else if (k is SyntaxKind.AsyncKeyword or SyntaxKind.SafeKeyword)
                 {
                     // check for things like "async async()" where async is the type and/or the function name
                     if (!shouldTreatAsModifier())
@@ -13053,6 +13137,32 @@ done:
                     return false;
             }
 
+            using (this.GetDisposableResetPoint(resetOnDispose: true))
+            {
+                var modifiers = this.ParseAnonymousFunctionModifiers();
+                if (modifiers.Any((int)SyntaxKind.PartialKeyword))
+                {
+                    if (this.CurrentToken.Kind == SyntaxKind.IdentifierToken &&
+                        this.PeekToken(1).Kind == SyntaxKind.EqualsGreaterThanToken)
+                    {
+                        return true;
+                    }
+
+                    if (this.CurrentToken.Kind == SyntaxKind.OpenParenToken)
+                    {
+                        using var parameterListResetPoint = this.GetDisposableResetPoint(resetOnDispose: true);
+                        if (ScanParenthesizedLambda(precedence))
+                            return true;
+                    }
+
+                    if (this.ScanType() != ScanTypeFlags.NotType &&
+                        this.CurrentToken.Kind == SyntaxKind.OpenParenToken)
+                    {
+                        return ScanParenthesizedLambda(precedence);
+                    }
+                }
+            }
+
             if (this.IsUnambiguousAnonymousFunctionModifierListFollowedByOpenParen())
                 return true;
 
@@ -13754,17 +13864,12 @@ done:
         {
             var modifiers = _pool.Allocate();
 
-            // A leading 'partial' is treated as a recovery modifier only when a later 'static'
-            // makes the lambda shape unambiguous, as in 'partial async static () => ...'.
-            // In 'partial () => ...' and 'partial async()', it remains a type or member name.
-            var allowPartial = this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword &&
-                isStaticModifierAhead();
-
             while (true)
             {
                 // 'partial' is not a valid anonymous-function modifier. Consume it for better
-                // error recovery and let binding report the invalid modifier.
-                if (allowPartial && this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword)
+                // error recovery unless it is the parameter of a simple lambda.
+                if (this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword &&
+                    this.PeekToken(1).Kind != SyntaxKind.EqualsGreaterThanToken)
                 {
                     modifiers.Add(this.EatContextualToken(SyntaxKind.PartialKeyword));
                     continue;
@@ -13787,19 +13892,6 @@ done:
             }
 
             return _pool.ToTokenListAndFree(modifiers);
-
-            bool isStaticModifierAhead()
-            {
-                for (var i = 1; ; i++)
-                {
-                    var token = this.PeekToken(i);
-                    if (token.Kind == SyntaxKind.StaticKeyword)
-                        return true;
-
-                    if (token.ContextualKind is not (SyntaxKind.PartialKeyword or SyntaxKind.AsyncKeyword))
-                        return false;
-                }
-            }
         }
 
         private bool IsUnambiguousAnonymousFunctionModifierListFollowedByOpenParen()
@@ -13810,9 +13902,8 @@ done:
             if (this.CurrentToken.Kind != SyntaxKind.OpenParenToken)
                 return false;
 
-            // Without 'static', 'partial' and 'async' are contextual identifiers and may instead be
-            // a return type or member name. For example, 'partial async()' can be a constructor, and
-            // 'async partial () => ...' is an async lambda with the explicit return type 'partial'.
+            // Without 'static', contextual-only modifier sequences may instead be a return type or
+            // member name. Full lambda lookahead is required to find the following '=>'.
             // 'async (' alone is intentionally left to the regular lambda lookahead, which must also
             // distinguish an async lambda from an invocation of a method named 'async'.
             return modifiers.Any((int)SyntaxKind.StaticKeyword);
