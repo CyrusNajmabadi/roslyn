@@ -1517,8 +1517,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
             // If 'partial' starts a declaration, the preceding token is also a modifier,
             // as in 'closed partial ref struct'.
-            if (!parsingStatementNotDeclaration &&
-                this.IsCurrentTokenDefinitelyPartialModifier())
+            if (this.IsCurrentTokenDefinitelyPartialModifier())
             {
                 return true;
             }
@@ -8511,17 +8510,15 @@ done:
 
             tk = this.CurrentToken.ContextualKind;
 
-            if (tk == SyntaxKind.PartialKeyword &&
-                (this.IsCurrentTokenPartialLocalFunctionName() ||
-                 this.IsCurrentTokenPartialLocalFunctionModifier()))
-            {
-                return true;
-            }
-
-            var isPossibleModifier =
-                IsAdditionalLocalFunctionModifier(tk)
-                && (tk is not (SyntaxKind.AsyncKeyword or SyntaxKind.SafeKeyword or SyntaxKind.ScopedKeyword) || ShouldContextualKeywordBeTreatedAsModifier(parsingStatementNotDeclaration: true));
-            if (isPossibleModifier)
+            var isPossiblePartialName =
+                tk == SyntaxKind.PartialKeyword &&
+                this.IsCurrentTokenPartialLocalFunctionName();
+            var isPossibleModifier = tk == SyntaxKind.PartialKeyword
+                ? this.IsCurrentTokenPartialLocalFunctionModifier()
+                : IsAdditionalLocalFunctionModifier(tk)
+                    && (tk is not (SyntaxKind.AsyncKeyword or SyntaxKind.SafeKeyword or SyntaxKind.ScopedKeyword) ||
+                        ShouldContextualKeywordBeTreatedAsModifier(parsingStatementNotDeclaration: true));
+            if (isPossiblePartialName || isPossibleModifier)
             {
                 return true;
             }
@@ -10791,21 +10788,12 @@ done:
 
         private bool IsCurrentTokenPartialLocalFunctionModifier()
         {
-            if (this.CurrentToken.ContextualKind != SyntaxKind.PartialKeyword ||
-                this.IsCurrentTokenPartialLocalFunctionName())
-            {
+            if (!this.IsCurrentTokenDefinitelyPartialModifier())
                 return false;
-            }
 
             // Reinterpret a declaration that would otherwise use 'partial' as its return type.
-            using (this.GetDisposableResetPoint(resetOnDispose: true))
-            {
-                if (this.ScanType() != ScanTypeFlags.NotType &&
-                    this.IsCurrentTokenLocalFunctionName())
-                {
-                    return true;
-                }
-            }
+            if (this.IsTypeFollowedByLocalFunctionName())
+                return true;
 
             // Also recognize a local function after intervening modifiers.
             using (this.GetDisposableResetPoint(resetOnDispose: true))
@@ -10825,8 +10813,7 @@ done:
                 if (this.IsCurrentTokenLocalFunctionName())
                     return true;
 
-                return this.ScanType() != ScanTypeFlags.NotType &&
-                    this.IsCurrentTokenLocalFunctionName();
+                return this.IsTypeFollowedByLocalFunctionName();
             }
         }
 
@@ -10840,6 +10827,13 @@ done:
 
             return this.CurrentToken.Kind is SyntaxKind.OpenParenToken or SyntaxKind.LessThanToken &&
                 this.IsLocalFunctionAfterIdentifier();
+        }
+
+        private bool IsTypeFollowedByLocalFunctionName()
+        {
+            using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
+            return this.ScanType() != ScanTypeFlags.NotType &&
+                this.IsCurrentTokenLocalFunctionName();
         }
 
         private void ParseLocalDeclarationStatementModifiers(SyntaxListBuilder list, bool isUsingDeclaration)
