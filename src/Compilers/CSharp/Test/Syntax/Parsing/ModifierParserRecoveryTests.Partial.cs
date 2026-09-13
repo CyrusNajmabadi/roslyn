@@ -18,7 +18,8 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         DiagnosticDescription[]? expectedParsingDiagnostics = null,
         DiagnosticDescription[]? expectedBindingDiagnostics = null,
         string targetType = "System.Action",
-        string? declarations = null)
+        string? declarations = null,
+        string variableName = "x")
     {
         expectedParsingDiagnostics ??= [];
         expectedBindingDiagnostics ??= expectedParsingDiagnostics;
@@ -31,7 +32,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
                 {
                     void M()
                     {
-                        {{targetType}} x = {{source}};
+                        {{targetType}} {{variableName}} = {{source}};
                     }
                 }
                 """
@@ -42,7 +43,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
                 {
                     void M()
                     {
-                        {{targetType}} x = {{source}};
+                        {{targetType}} {{variableName}} = {{source}};
                     }
                 }
                 """;
@@ -315,48 +316,68 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
     [Theory]
     [InlineData(LanguageVersion.CSharp14)]
     [InlineData(LanguageVersion.Preview)]
-    public void PartialPartialPartial_TopLevelMethod(LanguageVersion languageVersion)
+    public void PartialPartialPartial_TopLevelLocalFunction(LanguageVersion languageVersion)
     {
         const string source = "partial partial partial int M();";
         var parseOptions = TestOptions.Regular.WithLanguageVersion(languageVersion);
 
-        UsingTree(source, parseOptions);
+        UsingTree(
+            source,
+            parseOptions,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
+            // (1,17): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 17));
         N(SyntaxKind.CompilationUnit);
         {
-            N(SyntaxKind.MethodDeclaration);
+            N(SyntaxKind.GlobalStatement);
             {
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PredefinedType);
+                N(SyntaxKind.LocalFunctionStatement);
                 {
-                    N(SyntaxKind.IntKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.IntKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
                 }
-                N(SyntaxKind.IdentifierToken, "M");
-                N(SyntaxKind.ParameterList);
-                {
-                    N(SyntaxKind.OpenParenToken);
-                    N(SyntaxKind.CloseParenToken);
-                }
-                N(SyntaxKind.SemicolonToken);
             }
             N(SyntaxKind.EndOfFileToken);
         }
         EOF();
 
         CreateCompilation(source, parseOptions: parseOptions).VerifyDiagnostics(
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
             // (1,9): error CS1004: Duplicate 'partial' modifier
             // partial partial partial int M();
             Diagnostic(ErrorCode.ERR_DuplicateModifier, "partial").WithArguments("partial").WithLocation(1, 9),
-            // (1,29): error CS9348: A compilation unit cannot directly contain members such as fields, methods or properties
+            // (1,17): error CS0106: The modifier 'partial' is not valid for this item
             // partial partial partial int M();
-            Diagnostic(ErrorCode.ERR_CompilationUnitUnexpected, "M").WithLocation(1, 29),
-            // (1,29): error CS0751: A partial member must be declared within a partial type
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 17),
+            // (1,29): error CS8112: Local function 'M()' must declare a body because it is not marked 'static extern'.
             // partial partial partial int M();
-            Diagnostic(ErrorCode.ERR_PartialMemberOnlyInPartialClass, "M").WithLocation(1, 29),
-            // (1,29): error CS8796: Partial method '<invalid-global-code>.M()' must have accessibility modifiers because it has a non-void return type.
+            Diagnostic(ErrorCode.ERR_LocalFunctionMissingBody, "M").WithArguments("M()").WithLocation(1, 29),
+            // (1,29): warning CS8321: The local function 'M' is declared but never used
             // partial partial partial int M();
-            Diagnostic(ErrorCode.ERR_PartialMethodWithNonVoidReturnMustHaveAccessMods, "M").WithArguments("<invalid-global-code>.M()").WithLocation(1, 29));
+            Diagnostic(ErrorCode.WRN_UnreferencedLocalFunction, "M").WithArguments("M").WithLocation(1, 29));
     }
 
     [Theory]
@@ -368,34 +389,31 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         UsingTree(
             source,
             TestOptions.Regular.WithLanguageVersion(languageVersion),
-            // (1,17): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
             // partial partial C();
-            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "C").WithLocation(1, 17),
-            // (1,19): error CS1525: Invalid expression term ')'
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
             // partial partial C();
-            Diagnostic(ErrorCode.ERR_InvalidExprTerm, ")").WithArguments(")").WithLocation(1, 19));
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
+            // (1,17): error CS1520: Method must have a return type
+            // partial partial C();
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "C").WithLocation(1, 17));
         N(SyntaxKind.CompilationUnit);
         {
-            N(SyntaxKind.IncompleteMember);
-            {
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.IdentifierName);
-                {
-                    N(SyntaxKind.IdentifierToken, "C");
-                }
-            }
             N(SyntaxKind.GlobalStatement);
             {
-                N(SyntaxKind.ExpressionStatement);
+                N(SyntaxKind.LocalFunctionStatement);
                 {
-                    N(SyntaxKind.ParenthesizedExpression);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "C");
+                    N(SyntaxKind.ParameterList);
                     {
                         N(SyntaxKind.OpenParenToken);
-                        M(SyntaxKind.IdentifierName);
-                        {
-                            M(SyntaxKind.IdentifierToken);
-                        }
                         N(SyntaxKind.CloseParenToken);
                     }
                     N(SyntaxKind.SemicolonToken);
@@ -1031,6 +1049,12 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "partial () => new partial()";
         UsingLambdaExpression(
             source,
+            expectedBindingDiagnostics:
+            [
+                // (11,34): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<partial> x = partial () => new partial();
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(11, 34),
+            ],
             targetType: "System.Func<partial>",
             declarations: """
                 #pragma warning disable CS8981
@@ -1041,10 +1065,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
                 """);
         N(SyntaxKind.ParenthesizedLambdaExpression);
         {
-            N(SyntaxKind.IdentifierName);
-            {
-                N(SyntaxKind.IdentifierToken, "partial");
-            }
+            N(SyntaxKind.PartialKeyword);
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1074,6 +1095,12 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "static partial () => new partial()";
         UsingLambdaExpression(
             source,
+            expectedBindingDiagnostics:
+            [
+                // (11,41): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<partial> x = static partial () => new partial();
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(11, 41),
+            ],
             targetType: "System.Func<partial>",
             declarations: """
                 #pragma warning disable CS8981
@@ -1085,10 +1112,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         N(SyntaxKind.ParenthesizedLambdaExpression);
         {
             N(SyntaxKind.StaticKeyword);
-            N(SyntaxKind.IdentifierName);
-            {
-                N(SyntaxKind.IdentifierToken, "partial");
-            }
+            N(SyntaxKind.PartialKeyword);
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1182,27 +1206,27 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "partial async () => { }";
         UsingLambdaExpression(
             source,
-            expectedParsingDiagnostics:
-            [
-                // (1,1): error CS1073: Unexpected token 'async'
-                // partial async () => { }
-                Diagnostic(ErrorCode.ERR_UnexpectedToken, "partial").WithArguments("async").WithLocation(1, 1),
-            ],
             expectedBindingDiagnostics:
             [
-                // (5,27): error CS0103: The name 'partial' does not exist in the current context
+                // (5,27): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
                 //         System.Action x = partial async () => { };
-                Diagnostic(ErrorCode.ERR_NameNotInContext, "partial").WithArguments("partial").WithLocation(5, 27),
-                // (5,35): error CS1002: ; expected
-                //         System.Action x = partial async () => { };
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "async").WithLocation(5, 35),
-                // (5,35): error CS0201: Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement
-                //         System.Action x = partial async () => { };
-                Diagnostic(ErrorCode.ERR_IllegalStatement, "async () => { }").WithLocation(5, 35),
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 27),
             ]);
-        N(SyntaxKind.IdentifierName);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
         {
-            N(SyntaxKind.IdentifierToken, "partial");
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
         }
         EOF();
     }
@@ -1213,6 +1237,15 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "async partial () => { }";
         UsingLambdaExpression(
             source,
+            expectedBindingDiagnostics:
+            [
+                // (3,1): hidden CS8019: Unnecessary using directive.
+                // using partial = System.Threading.Tasks.Task;
+                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using partial = System.Threading.Tasks.Task;").WithLocation(3, 1),
+                // (9,60): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<System.Threading.Tasks.Task> x = async partial () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(9, 60),
+            ],
             targetType: "System.Func<System.Threading.Tasks.Task>",
             declarations: """
                 #pragma warning disable CS8981
@@ -1222,10 +1255,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         N(SyntaxKind.ParenthesizedLambdaExpression);
         {
             N(SyntaxKind.AsyncKeyword);
-            N(SyntaxKind.IdentifierName);
-            {
-                N(SyntaxKind.IdentifierToken, "partial");
-            }
+            N(SyntaxKind.PartialKeyword);
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1247,39 +1277,28 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "static partial async () => { }";
         UsingLambdaExpression(
             source,
-            expectedParsingDiagnostics:
-            [
-                // (1,1): error CS1525: Invalid expression term 'static'
-                // static partial async () => { }
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "static").WithArguments("static").WithLocation(1, 1),
-                // (1,1): error CS1073: Unexpected token 'static'
-                // static partial async () => { }
-                Diagnostic(ErrorCode.ERR_UnexpectedToken, "").WithArguments("static").WithLocation(1, 1),
-            ],
             expectedBindingDiagnostics:
             [
-                // (5,27): error CS1525: Invalid expression term 'static'
+                // (5,34): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
                 //         System.Action x = static partial async () => { };
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "static").WithArguments("static").WithLocation(5, 27),
-                // (5,27): error CS1002: ; expected
-                //         System.Action x = static partial async () => { };
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "static").WithLocation(5, 27),
-                // (5,34): error CS0246: The type or namespace name 'partial' could not be found (are you missing a using directive or an assembly reference?)
-                //         System.Action x = static partial async () => { };
-                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "partial").WithArguments("partial").WithLocation(5, 34),
-                // (5,42): warning CS8321: The local function 'async' is declared but never used
-                //         System.Action x = static partial async () => { };
-                Diagnostic(ErrorCode.WRN_UnreferencedLocalFunction, "async").WithArguments("async").WithLocation(5, 42),
-                // (5,54): error CS1525: Invalid expression term '{'
-                //         System.Action x = static partial async () => { };
-                Diagnostic(ErrorCode.ERR_InvalidExprTerm, "{").WithArguments("{").WithLocation(5, 54),
-                // (5,54): error CS1002: ; expected
-                //         System.Action x = static partial async () => { };
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "{").WithLocation(5, 54),
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 34),
             ]);
-        M(SyntaxKind.IdentifierName);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
         {
-            M(SyntaxKind.IdentifierToken);
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
         }
         EOF();
     }
@@ -1290,6 +1309,15 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "static async partial () => { }";
         UsingLambdaExpression(
             source,
+            expectedBindingDiagnostics:
+            [
+                // (3,1): hidden CS8019: Unnecessary using directive.
+                // using partial = System.Threading.Tasks.Task;
+                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using partial = System.Threading.Tasks.Task;").WithLocation(3, 1),
+                // (9,67): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<System.Threading.Tasks.Task> x = static async partial () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(9, 67),
+            ],
             targetType: "System.Func<System.Threading.Tasks.Task>",
             declarations: """
                 #pragma warning disable CS8981
@@ -1300,10 +1328,7 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         {
             N(SyntaxKind.StaticKeyword);
             N(SyntaxKind.AsyncKeyword);
-            N(SyntaxKind.IdentifierName);
-            {
-                N(SyntaxKind.IdentifierToken, "partial");
-            }
+            N(SyntaxKind.PartialKeyword);
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1325,54 +1350,17 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         const string source = "async partial static () => { }";
         UsingLambdaExpression(
             source,
-            expectedParsingDiagnostics:
-            [
-                // (1,1): error CS1073: Unexpected token 'partial'
-                // async partial static () => { }
-                Diagnostic(ErrorCode.ERR_UnexpectedToken, "async").WithArguments("partial").WithLocation(1, 1),
-            ],
             expectedBindingDiagnostics:
             [
-                // (5,27): error CS0103: The name 'async' does not exist in the current context
-                //         System.Action x = async partial static () => { };
-                Diagnostic(ErrorCode.ERR_NameNotInContext, "async").WithArguments("async").WithLocation(5, 27),
-                // (5,33): error CS1002: ; expected
-                //         System.Action x = async partial static () => { };
-                Diagnostic(ErrorCode.ERR_SemicolonExpected, "partial").WithLocation(5, 33),
-                // (5,33): error CS0267: The 'partial' modifier can only appear on a class, record, struct, interface, event, instance constructor, method or property.
+                // (5,33): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
                 //         System.Action x = async partial static () => { };
                 Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 33),
-                // (5,33): error CS0201: Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement
-                //         System.Action x = async partial static () => { };
-                Diagnostic(ErrorCode.ERR_IllegalStatement, "partial static () => { }").WithLocation(5, 33),
             ]);
-        N(SyntaxKind.IdentifierName);
-        {
-            N(SyntaxKind.IdentifierToken, "async");
-        }
-        EOF();
-    }
-
-    [Fact]
-    public void AsyncStaticPartialParenthesizedLambda()
-    {
-        const string source = "async static partial () => { }";
-        UsingLambdaExpression(
-            source,
-            targetType: "System.Func<System.Threading.Tasks.Task>",
-            declarations: """
-                #pragma warning disable CS8981
-
-                using partial = System.Threading.Tasks.Task;
-                """);
         N(SyntaxKind.ParenthesizedLambdaExpression);
         {
             N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.PartialKeyword);
             N(SyntaxKind.StaticKeyword);
-            N(SyntaxKind.IdentifierName);
-            {
-                N(SyntaxKind.IdentifierToken, "partial");
-            }
             N(SyntaxKind.ParameterList);
             {
                 N(SyntaxKind.OpenParenToken);
@@ -1383,6 +1371,508 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
             {
                 N(SyntaxKind.OpenBraceToken);
                 N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncStaticPartialParenthesizedLambda()
+    {
+        const string source = "async static partial () => { }";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (3,1): hidden CS8019: Unnecessary using directive.
+                // using partial = System.Threading.Tasks.Task;
+                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using partial = System.Threading.Tasks.Task;").WithLocation(3, 1),
+                // (9,67): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<System.Threading.Tasks.Task> x = async static partial () => { };
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(9, 67),
+            ],
+            targetType: "System.Func<System.Threading.Tasks.Task>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                using partial = System.Threading.Tasks.Task;
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.StaticKeyword);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.Block);
+            {
+                N(SyntaxKind.OpenBraceToken);
+                N(SyntaxKind.CloseBraceToken);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialExplicitReturnTypeParenthesizedLambda()
+    {
+        const string source = "partial int () => 0";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,30): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<int> x = partial int () => 0;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 30),
+            ],
+            targetType: "System.Func<int>");
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.PredefinedType);
+            {
+                N(SyntaxKind.IntKeyword);
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.NumericLiteralExpression);
+            {
+                N(SyntaxKind.NumericLiteralToken, "0");
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void AsyncPartialExplicitReturnTypeParenthesizedLambda()
+    {
+        const string source = "async partial int () => 0";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,65): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<System.Threading.Tasks.Task<int>> x = async partial int () => 0;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 65),
+                // (5,80): error CS8934: Cannot convert lambda expression to type 'Func<Task<int>>' because the return type does not match the delegate return type
+                //         System.Func<System.Threading.Tasks.Task<int>> x = async partial int () => 0;
+                Diagnostic(ErrorCode.ERR_CantConvAnonMethReturnType, "=>").WithArguments("lambda expression", "System.Func<System.Threading.Tasks.Task<int>>").WithLocation(5, 80),
+            ],
+            targetType: "System.Func<System.Threading.Tasks.Task<int>>");
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.AsyncKeyword);
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.PredefinedType);
+            {
+                N(SyntaxKind.IntKeyword);
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.NumericLiteralExpression);
+            {
+                N(SyntaxKind.NumericLiteralToken, "0");
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialExplicitRefReturnTypeParenthesizedLambda()
+    {
+        const string source = "partial ref int () => ref x";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (7,15): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         D x = partial ref int () => ref x;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(7, 15),
+                // (7,41): error CS8151: The return expression must be of type 'int' because this method returns by reference
+                //         D x = partial ref int () => ref x;
+                Diagnostic(ErrorCode.ERR_RefReturnMustHaveIdentityConversion, "x").WithArguments("int").WithLocation(7, 41),
+                // (7,41): error CS0165: Use of unassigned local variable 'x'
+                //         D x = partial ref int () => ref x;
+                Diagnostic(ErrorCode.ERR_UseDefViolation, "x").WithArguments("x").WithLocation(7, 41),
+            ],
+            targetType: "D",
+            declarations: "delegate ref int D();");
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.RefType);
+            {
+                N(SyntaxKind.RefKeyword);
+                N(SyntaxKind.PredefinedType);
+                {
+                    N(SyntaxKind.IntKeyword);
+                }
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.RefExpression);
+            {
+                N(SyntaxKind.RefKeyword);
+                N(SyntaxKind.IdentifierName);
+                {
+                    N(SyntaxKind.IdentifierToken, "x");
+                }
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialSimpleLambdaParameter()
+    {
+        const string source = "partial => partial";
+        UsingLambdaExpression(source, targetType: "System.Func<int, int>");
+        N(SyntaxKind.SimpleLambdaExpression);
+        {
+            N(SyntaxKind.Parameter);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialParenthesizedLambdaParameter()
+    {
+        const string source = "(partial) => partial";
+        UsingLambdaExpression(source, targetType: "System.Func<int, int>");
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.Parameter);
+                {
+                    N(SyntaxKind.IdentifierToken, "partial");
+                }
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void EscapedPartialExplicitReturnTypeParenthesizedLambda()
+    {
+        const string source = "@partial () => default";
+        UsingLambdaExpression(
+            source,
+            targetType: "System.Func<partial>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                class partial
+                {
+                }
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "@partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.DefaultLiteralExpression);
+            {
+                N(SyntaxKind.DefaultKeyword);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialModifierAndEscapedPartialExplicitReturnTypeParenthesizedLambda()
+    {
+        const string source = "partial @partial () => default";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (11,34): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<partial> x = partial @partial () => default;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(11, 34),
+            ],
+            targetType: "System.Func<partial>",
+            declarations: """
+                #pragma warning disable CS8981
+
+                class partial
+                {
+                }
+                """);
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "@partial");
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.DefaultLiteralExpression);
+            {
+                N(SyntaxKind.DefaultKeyword);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialModifierAndSimpleLambdaParameter()
+    {
+        const string source = "partial x => x";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,35): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<int, int> d = partial x => x;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 35),
+            ],
+            targetType: "System.Func<int, int>",
+            variableName: "d");
+        N(SyntaxKind.SimpleLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.Parameter);
+            {
+                N(SyntaxKind.IdentifierToken, "x");
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "x");
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialModifierAndPartialSimpleLambdaParameter()
+    {
+        const string source = "partial partial => partial";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,35): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<int, int> d = partial partial => partial;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 35),
+            ],
+            targetType: "System.Func<int, int>",
+            variableName: "d");
+        N(SyntaxKind.SimpleLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.Parameter);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialModifierAndTupleExplicitReturnTypeParenthesizedLambda()
+    {
+        const string source = "partial (int, int) () => default";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,37): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<(int, int)> x = partial (int, int) () => default;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 37),
+            ],
+            targetType: "System.Func<(int, int)>");
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.TupleType);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.TupleElement);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.IntKeyword);
+                    }
+                }
+                N(SyntaxKind.CommaToken);
+                N(SyntaxKind.TupleElement);
+                {
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.IntKeyword);
+                    }
+                }
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.DefaultLiteralExpression);
+            {
+                N(SyntaxKind.DefaultKeyword);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialModifierAndNestedTupleExplicitReturnTypeParenthesizedLambda()
+    {
+        const string source = "partial ((int, int), (string, bool)) () => default";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,55): error CS0267: The 'partial' modifier can only appear immediately before 'class', 'record', 'struct', 'interface', 'event', an instance constructor name, or a method or property return type.
+                //         System.Func<((int, int), (string, bool))> x = partial ((int, int), (string, bool)) () => default;
+                Diagnostic(ErrorCode.ERR_PartialMisplaced, "partial").WithLocation(5, 55),
+            ],
+            targetType: "System.Func<((int, int), (string, bool))>");
+        N(SyntaxKind.ParenthesizedLambdaExpression);
+        {
+            N(SyntaxKind.PartialKeyword);
+            N(SyntaxKind.TupleType);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.TupleElement);
+                {
+                    N(SyntaxKind.TupleType);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.TupleElement);
+                        {
+                            N(SyntaxKind.PredefinedType);
+                            {
+                                N(SyntaxKind.IntKeyword);
+                            }
+                        }
+                        N(SyntaxKind.CommaToken);
+                        N(SyntaxKind.TupleElement);
+                        {
+                            N(SyntaxKind.PredefinedType);
+                            {
+                                N(SyntaxKind.IntKeyword);
+                            }
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                }
+                N(SyntaxKind.CommaToken);
+                N(SyntaxKind.TupleElement);
+                {
+                    N(SyntaxKind.TupleType);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.TupleElement);
+                        {
+                            N(SyntaxKind.PredefinedType);
+                            {
+                                N(SyntaxKind.StringKeyword);
+                            }
+                        }
+                        N(SyntaxKind.CommaToken);
+                        N(SyntaxKind.TupleElement);
+                        {
+                            N(SyntaxKind.PredefinedType);
+                            {
+                                N(SyntaxKind.BoolKeyword);
+                            }
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                }
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.ParameterList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
+            }
+            N(SyntaxKind.EqualsGreaterThanToken);
+            N(SyntaxKind.DefaultLiteralExpression);
+            {
+                N(SyntaxKind.DefaultKeyword);
+            }
+        }
+        EOF();
+    }
+
+    [Fact]
+    public void PartialInvocationExpression()
+    {
+        const string source = "partial()";
+        UsingLambdaExpression(
+            source,
+            expectedBindingDiagnostics:
+            [
+                // (5,20): error CS0103: The name 'partial' does not exist in the current context
+                //         object x = partial();
+                Diagnostic(ErrorCode.ERR_NameNotInContext, "partial").WithArguments("partial").WithLocation(5, 20),
+            ],
+            targetType: "object");
+        N(SyntaxKind.InvocationExpression);
+        {
+            N(SyntaxKind.IdentifierName);
+            {
+                N(SyntaxKind.IdentifierToken, "partial");
+            }
+            N(SyntaxKind.ArgumentList);
+            {
+                N(SyntaxKind.OpenParenToken);
+                N(SyntaxKind.CloseParenToken);
             }
         }
         EOF();
