@@ -1633,11 +1633,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             if (this.CurrentToken.ContextualKind != SyntaxKind.PartialKeyword)
                 return false;
 
-            // A leading 'partial' followed by anonymous-function modifiers and '(', such as
-            // 'partial static () => ...' or 'partial async static () => ...', begins a lambda.
-            if (this.IsUnambiguousAnonymousFunctionModifierListFollowedByOpenParen())
-                return false;
-
             // A leading 'partial' followed by a definite member-name continuation, such as
             // 'partial;', 'partial =>', or 'partial<T>', names the member.
             if (this.IsCurrentTokenDefinitelyPartialMemberName())
@@ -1686,13 +1681,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
         }
 
         /// <summary>
-        /// Checks for a type followed by a possible member name without advancing the parser.
+        /// Checks for a type followed by a possible member name without advancing the parser,
+        /// optionally requiring that the name continue as a local function.
         /// Examples include <c>int M()</c> and <c>int this[int i]</c>.
         /// </summary>
-        private bool IsTypeFollowedByMemberName()
+        private bool IsTypeFollowedByMemberName(bool requireLocalFunction = false)
         {
             using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
-            return this.ScanType() != ScanTypeFlags.NotType && IsPossibleMemberName();
+            if (this.ScanType() == ScanTypeFlags.NotType || !IsPossibleMemberName())
+                return false;
+
+            return !requireLocalFunction || this.IsCurrentTokenFunctionName();
         }
 
         private bool IsPossibleMemberName()
@@ -2620,6 +2619,16 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 
                         case SyntaxKind.NewKeyword:
                             if (IsPossibleNewExpression())
+                            {
+                                return _syntaxFactory.GlobalStatement(ParseExpressionStatement(attributes));
+                            }
+                            break;
+
+                        case SyntaxKind.IdentifierToken when
+                            this.CurrentToken.ContextualKind == SyntaxKind.PartialKeyword:
+                            if (!this.IsCurrentTokenPartialLocalFunctionName() &&
+                                !this.IsCurrentTokenPartialLocalFunctionModifier() &&
+                                this.IsPossibleLambdaExpression(Precedence.Expression))
                             {
                                 return _syntaxFactory.GlobalStatement(ParseExpressionStatement(attributes));
                             }
@@ -10733,7 +10742,7 @@ done:
             var missingLocalFunctionReturnType =
                 allowLocalFunctions &&
                 (this.IsCurrentTokenPartialLocalFunctionName() ||
-                 mods.Any((int)SyntaxKind.PartialKeyword) && this.IsCurrentTokenLocalFunctionName());
+                 mods.Any((int)SyntaxKind.PartialKeyword) && this.IsCurrentTokenFunctionName());
 
             type = missingLocalFunctionReturnType
                 ? this.AddError(this.CreateMissingIdentifierName(), ErrorCode.ERR_MemberNeedsType)
@@ -10792,7 +10801,7 @@ done:
                 return false;
 
             // Reinterpret a declaration that would otherwise use 'partial' as its return type.
-            if (this.IsTypeFollowedByLocalFunctionName())
+            if (this.IsTypeFollowedByMemberName(requireLocalFunction: true))
                 return true;
 
             // Also recognize a local function after intervening modifiers.
@@ -10804,16 +10813,16 @@ done:
                        IsDeclarationModifier(this.CurrentToken.ContextualKind) ||
                        IsAdditionalLocalFunctionModifier(this.CurrentToken.ContextualKind))
                 {
-                    if (this.IsCurrentTokenLocalFunctionName())
+                    if (this.IsCurrentTokenFunctionName())
                         return true;
 
                     this.EatToken();
                 }
 
-                if (this.IsCurrentTokenLocalFunctionName())
+                if (this.IsCurrentTokenFunctionName())
                     return true;
 
-                return this.IsTypeFollowedByLocalFunctionName();
+                return this.IsTypeFollowedByMemberName(requireLocalFunction: true);
             }
         }
 
@@ -10825,24 +10834,50 @@ done:
             using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
             this.EatToken();
 
-            return this.CurrentToken.Kind is SyntaxKind.OpenParenToken or SyntaxKind.LessThanToken &&
+            if (this.CurrentToken.Kind == SyntaxKind.LessThanToken)
+                this.ParseTypeParameterList();
+
+            return this.CurrentToken.Kind == SyntaxKind.OpenParenToken &&
                 this.IsLocalFunctionAfterIdentifier();
         }
 
-        private bool IsTypeFollowedByLocalFunctionName()
+        private bool IsCurrentTokenFunctionName()
         {
+            if (this.CurrentToken.Kind != SyntaxKind.IdentifierToken)
+                return false;
+
             using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
-            return this.ScanType() != ScanTypeFlags.NotType &&
-                this.IsCurrentTokenLocalFunctionName();
+            this.EatToken();
+
+            if (this.CurrentToken.Kind == SyntaxKind.LessThanToken)
+                this.ParseTypeParameterList();
+
+            return this.CurrentToken.Kind == SyntaxKind.OpenParenToken;
         }
 
         private void ParseLocalDeclarationStatementModifiers(SyntaxListBuilder list, bool isUsingDeclaration)
         {
-            SyntaxKind k;
-            while (IsDeclarationModifier(k = this.CurrentToken.ContextualKind) ||
-                   IsAdditionalLocalFunctionModifier(k) ||
-                   this.IsCurrentTokenPartialLocalFunctionModifier())
+            var parsingPartialLocalFunction = false;
+            while (true)
             {
+                var k = this.CurrentToken.ContextualKind;
+                if (k == SyntaxKind.PartialKeyword)
+                {
+                    if (this.IsCurrentTokenPartialLocalFunctionName())
+                        break;
+
+                    if (!parsingPartialLocalFunction)
+                    {
+                        parsingPartialLocalFunction = this.IsCurrentTokenPartialLocalFunctionModifier();
+                        if (!parsingPartialLocalFunction)
+                            break;
+                    }
+                }
+                else if (!IsDeclarationModifier(k) && !IsAdditionalLocalFunctionModifier(k))
+                {
+                    break;
+                }
+
                 SyntaxToken mod;
                 if (k == SyntaxKind.PartialKeyword)
                 {
@@ -10851,7 +10886,7 @@ done:
                 else if (k is SyntaxKind.AsyncKeyword or SyntaxKind.SafeKeyword)
                 {
                     // check for things like "async async()" where async is the type and/or the function name
-                    if (!shouldTreatAsModifier())
+                    if (!ShouldContextualKeywordBeTreatedAsModifier(parsingStatementNotDeclaration: true))
                     {
                         break;
                     }
@@ -10876,37 +10911,6 @@ done:
                 // They will be reported during binding (see Binder_Statements.BindDeclarationStatementParts).
 
                 list.Add(mod);
-            }
-
-            bool shouldTreatAsModifier()
-            {
-                using var _ = this.GetDisposableResetPoint(resetOnDispose: true);
-
-                Debug.Assert(this.CurrentToken.Kind == SyntaxKind.IdentifierToken);
-
-                do
-                {
-                    this.EatToken();
-
-                    if (IsDeclarationModifier(this.CurrentToken.Kind) ||
-                        IsAdditionalLocalFunctionModifier(this.CurrentToken.Kind))
-                    {
-                        return true;
-                    }
-
-                    using var _2 = this.GetDisposableResetPoint(resetOnDispose: true);
-
-                    if (ScanType() != ScanTypeFlags.NotType && this.CurrentToken.Kind == SyntaxKind.IdentifierToken)
-                    {
-                        return true;
-                    }
-                }
-                // If current token might be a contextual modifier we need to check ahead the next token after it
-                // If the next token appears to be a modifier, we treat current token as a modifier as well
-                // This allows to correctly parse things like local functions with several `async` modifiers
-                while (IsAdditionalLocalFunctionModifier(this.CurrentToken.ContextualKind));
-
-                return false;
             }
         }
 
@@ -13154,6 +13158,8 @@ done:
                     {
                         return ScanParenthesizedLambda(precedence);
                     }
+
+                    return false;
                 }
             }
 

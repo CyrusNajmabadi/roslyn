@@ -316,50 +316,68 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
     [Theory]
     [InlineData(LanguageVersion.CSharp14)]
     [InlineData(LanguageVersion.Preview)]
-    public void PartialPartialPartial_TopLevelMethod(LanguageVersion languageVersion)
+    public void PartialPartialPartial_TopLevelLocalFunction(LanguageVersion languageVersion)
     {
         const string source = "partial partial partial int M();";
         var parseOptions = TestOptions.Regular.WithLanguageVersion(languageVersion);
 
         UsingTree(
             source,
-            parseOptions);
+            parseOptions,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
+            // (1,17): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 17));
         N(SyntaxKind.CompilationUnit);
         {
-            N(SyntaxKind.MethodDeclaration);
+            N(SyntaxKind.GlobalStatement);
             {
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PredefinedType);
+                N(SyntaxKind.LocalFunctionStatement);
                 {
-                    N(SyntaxKind.IntKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PredefinedType);
+                    {
+                        N(SyntaxKind.IntKeyword);
+                    }
+                    N(SyntaxKind.IdentifierToken, "M");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
                 }
-                N(SyntaxKind.IdentifierToken, "M");
-                N(SyntaxKind.ParameterList);
-                {
-                    N(SyntaxKind.OpenParenToken);
-                    N(SyntaxKind.CloseParenToken);
-                }
-                N(SyntaxKind.SemicolonToken);
             }
             N(SyntaxKind.EndOfFileToken);
         }
         EOF();
 
         CreateCompilation(source, parseOptions: parseOptions).VerifyDiagnostics(
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
+            // partial partial partial int M();
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
             // (1,9): error CS1004: Duplicate 'partial' modifier
             // partial partial partial int M();
             Diagnostic(ErrorCode.ERR_DuplicateModifier, "partial").WithArguments("partial").WithLocation(1, 9),
-            // (1,29): error CS9348: A compilation unit cannot directly contain members such as fields, methods or properties
+            // (1,17): error CS0106: The modifier 'partial' is not valid for this item
             // partial partial partial int M();
-            Diagnostic(ErrorCode.ERR_CompilationUnitUnexpected, "M").WithLocation(1, 29),
-            // (1,29): error CS0751: A partial member must be declared within a partial type
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 17),
+            // (1,29): error CS8112: Local function 'M()' must declare a body because it is not marked 'static extern'.
             // partial partial partial int M();
-            Diagnostic(ErrorCode.ERR_PartialMemberOnlyInPartialClass, "M").WithLocation(1, 29),
-            // (1,29): error CS8796: Partial method '<invalid-global-code>.M()' must have accessibility modifiers because it has a non-void return type.
+            Diagnostic(ErrorCode.ERR_LocalFunctionMissingBody, "M").WithArguments("M()").WithLocation(1, 29),
+            // (1,29): warning CS8321: The local function 'M' is declared but never used
             // partial partial partial int M();
-            Diagnostic(ErrorCode.ERR_PartialMethodWithNonVoidReturnMustHaveAccessMods, "M").WithArguments("<invalid-global-code>.M()").WithLocation(1, 29));
+            Diagnostic(ErrorCode.WRN_UnreferencedLocalFunction, "M").WithArguments("M").WithLocation(1, 29));
     }
 
     [Theory]
@@ -371,34 +389,31 @@ public sealed partial class ModifierParserRecoveryTests(ITestOutputHelper output
         UsingTree(
             source,
             TestOptions.Regular.WithLanguageVersion(languageVersion),
-            // (1,17): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
             // partial partial C();
-            Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "C").WithLocation(1, 17),
-            // (1,19): error CS1525: Invalid expression term ')'
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
+            // (1,9): error CS0106: The modifier 'partial' is not valid for this item
             // partial partial C();
-            Diagnostic(ErrorCode.ERR_InvalidExprTerm, ")").WithArguments(")").WithLocation(1, 19));
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 9),
+            // (1,17): error CS1520: Method must have a return type
+            // partial partial C();
+            Diagnostic(ErrorCode.ERR_MemberNeedsType, "C").WithLocation(1, 17));
         N(SyntaxKind.CompilationUnit);
         {
-            N(SyntaxKind.IncompleteMember);
-            {
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.IdentifierName);
-                {
-                    N(SyntaxKind.IdentifierToken, "C");
-                }
-            }
             N(SyntaxKind.GlobalStatement);
             {
-                N(SyntaxKind.ExpressionStatement);
+                N(SyntaxKind.LocalFunctionStatement);
                 {
-                    N(SyntaxKind.ParenthesizedExpression);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.PartialKeyword);
+                    M(SyntaxKind.IdentifierName);
+                    {
+                        M(SyntaxKind.IdentifierToken);
+                    }
+                    N(SyntaxKind.IdentifierToken, "C");
+                    N(SyntaxKind.ParameterList);
                     {
                         N(SyntaxKind.OpenParenToken);
-                        M(SyntaxKind.IdentifierName);
-                        {
-                            M(SyntaxKind.IdentifierToken);
-                        }
                         N(SyntaxKind.CloseParenToken);
                     }
                     N(SyntaxKind.SemicolonToken);

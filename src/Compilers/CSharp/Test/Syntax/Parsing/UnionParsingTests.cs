@@ -233,6 +233,9 @@ union M()
 partial union U1(E1);
 """;
         UsingTree(src, TestOptions.Regular14,
+            // (1,1): error CS0106: The modifier 'partial' is not valid for this item
+            // partial union U1(E1);
+            Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 1),
             // (1,20): error CS1001: Identifier expected
             // partial union U1(E1);
             Diagnostic(ErrorCode.ERR_IdentifierExpected, ")").WithLocation(1, 20)
@@ -240,28 +243,31 @@ partial union U1(E1);
 
         N(SyntaxKind.CompilationUnit);
         {
-            N(SyntaxKind.MethodDeclaration);
+            N(SyntaxKind.GlobalStatement);
             {
-                N(SyntaxKind.PartialKeyword);
-                N(SyntaxKind.IdentifierName);
+                N(SyntaxKind.LocalFunctionStatement);
                 {
-                    N(SyntaxKind.IdentifierToken, "union");
-                }
-                N(SyntaxKind.IdentifierToken, "U1");
-                N(SyntaxKind.ParameterList);
-                {
-                    N(SyntaxKind.OpenParenToken);
-                    N(SyntaxKind.Parameter);
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierName);
                     {
-                        N(SyntaxKind.IdentifierName);
-                        {
-                            N(SyntaxKind.IdentifierToken, "E1");
-                        }
-                        M(SyntaxKind.IdentifierToken);
+                        N(SyntaxKind.IdentifierToken, "union");
                     }
-                    N(SyntaxKind.CloseParenToken);
+                    N(SyntaxKind.IdentifierToken, "U1");
+                    N(SyntaxKind.ParameterList);
+                    {
+                        N(SyntaxKind.OpenParenToken);
+                        N(SyntaxKind.Parameter);
+                        {
+                            N(SyntaxKind.IdentifierName);
+                            {
+                                N(SyntaxKind.IdentifierToken, "E1");
+                            }
+                            M(SyntaxKind.IdentifierToken);
+                        }
+                        N(SyntaxKind.CloseParenToken);
+                    }
+                    N(SyntaxKind.SemicolonToken);
                 }
-                N(SyntaxKind.SemicolonToken);
             }
             N(SyntaxKind.EndOfFileToken);
         }

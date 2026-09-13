@@ -698,7 +698,13 @@ new partial.partial Goo();
                 Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "partial").WithLocation(1, 5),
                 // (1,12): error CS1022: Type or namespace definition, or end-of-file expected
                 // new partial.partial Goo();
-                Diagnostic(ErrorCode.ERR_EOFExpected, ".").WithLocation(1, 12));
+                Diagnostic(ErrorCode.ERR_EOFExpected, ".").WithLocation(1, 12),
+                // (1,13): error CS0106: The modifier 'partial' is not valid for this item
+                // new partial.partial Goo();
+                Diagnostic(ErrorCode.ERR_BadMemberFlag, "partial").WithArguments("partial").WithLocation(1, 13),
+                // (1,21): error CS1520: Method must have a return type
+                // new partial.partial Goo();
+                Diagnostic(ErrorCode.ERR_MemberNeedsType, "Goo").WithLocation(1, 21));
 
             N(SyntaxKind.CompilationUnit);
             {
@@ -706,9 +712,10 @@ new partial.partial Goo();
                 {
                     N(SyntaxKind.LocalFunctionStatement);
                     {
-                        N(SyntaxKind.IdentifierName);
+                        N(SyntaxKind.PartialKeyword);
+                        M(SyntaxKind.IdentifierName);
                         {
-                            N(SyntaxKind.IdentifierToken, "partial");
+                            M(SyntaxKind.IdentifierToken);
                         }
                         N(SyntaxKind.IdentifierToken, "Goo");
                         N(SyntaxKind.ParameterList);
@@ -875,22 +882,35 @@ new partial partial.partial partial();
                 Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "partial").WithLocation(1, 13),
                 // (1,20): error CS1022: Type or namespace definition, or end-of-file expected
                 // new partial partial.partial partial();
-                Diagnostic(ErrorCode.ERR_EOFExpected, ".").WithLocation(1, 20));
+                Diagnostic(ErrorCode.ERR_EOFExpected, ".").WithLocation(1, 20),
+                // (1,37): error CS1525: Invalid expression term ')'
+                // new partial partial.partial partial();
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm, ")").WithArguments(")").WithLocation(1, 37),
+                // (1,39): error CS0116: A namespace cannot directly contain members such as fields, methods or statements
+                // new partial partial.partial partial();
+                Diagnostic(ErrorCode.ERR_NamespaceUnexpected, "").WithLocation(1, 39));
 
             N(SyntaxKind.CompilationUnit);
             {
+                N(SyntaxKind.IncompleteMember);
+                {
+                    N(SyntaxKind.PartialKeyword);
+                    N(SyntaxKind.IdentifierName);
+                    {
+                        N(SyntaxKind.IdentifierToken, "partial");
+                    }
+                }
                 N(SyntaxKind.GlobalStatement);
                 {
-                    N(SyntaxKind.LocalFunctionStatement);
+                    N(SyntaxKind.ExpressionStatement);
                     {
-                        N(SyntaxKind.IdentifierName);
-                        {
-                            N(SyntaxKind.IdentifierToken, "partial");
-                        }
-                        N(SyntaxKind.IdentifierToken, "partial");
-                        N(SyntaxKind.ParameterList);
+                        N(SyntaxKind.ParenthesizedExpression);
                         {
                             N(SyntaxKind.OpenParenToken);
+                            M(SyntaxKind.IdentifierName);
+                            {
+                                M(SyntaxKind.IdentifierToken);
+                            }
                             N(SyntaxKind.CloseParenToken);
                         }
                         N(SyntaxKind.SemicolonToken);
