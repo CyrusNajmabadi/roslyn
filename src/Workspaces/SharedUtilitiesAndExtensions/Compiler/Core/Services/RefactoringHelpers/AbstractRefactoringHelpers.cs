@@ -373,6 +373,37 @@ internal abstract class AbstractRefactoringHelpers<TExpressionSyntax, TArgumentS
         var prevNode = selectionNode;
         do
         {
+            // A selection spanning members can have the containing type as its smallest enclosing node.
+            // Only consider that type if the selection also includes part of its header.
+            //
+            // FindNode returns C for each of these selections:
+            //   [|class C|] { int i; string s; }         -> Accept C: its header is selected.
+            //   class [|C { int i;|] string s; }         -> Accept C: starts in the header and extends into the body.
+            //   class C { [|int i; string s;|] }         -> Reject C: only members are selected.
+            //   class C { [|class A { } class B { }|] }  -> Reject C: starts on A's header, not C's.
+            //
+            // GetSpanWithoutAttributes starts at the first declaration token after any attribute lists,
+            // matching the start of the header used by IsOnTypeHeader. For example:
+            //
+            //   [A] [|[B] class C|] { int i; string s; }
+            //
+            // This selection starts before the header but includes it, so it must bypass the header-position
+            // check. Comparing against selectionNode.SpanStart instead would enter that check and reject it
+            // because the selection starts inside the attributes, which IsOnTypeHeader excludes.
+            // Selections containing only attributes are still rejected by the intersection check below.
+            if (syntaxFacts.IsTypeDeclaration(selectionNode) &&
+                selectionTrimmed.Start > syntaxFacts.GetSpanWithoutAttributes(root, selectionNode).Start)
+            {
+                // IsOnTypeHeader includes the header's end boundary for carets. Check the first selected
+                // token's end so a body token starting exactly at that boundary is not treated as header text.
+                var firstSelectedToken = root.FindToken(selectionTrimmed.Start);
+                if (!HeaderFacts.IsOnTypeHeader(root, firstSelectedToken.Span.End, fullHeader: true, out var typeDeclaration) ||
+                    typeDeclaration != selectionNode)
+                {
+                    return;
+                }
+            }
+
             var nonHiddenExtractedSelectedNodes = ExtractNodesSimple(selectionNode, syntaxFacts).OfType<TSyntaxNode>().Where(n => !n.OverlapsHiddenPosition(cancellationToken));
             foreach (var nonHiddenExtractedNode in nonHiddenExtractedSelectedNodes)
             {
@@ -381,8 +412,9 @@ internal abstract class AbstractRefactoringHelpers<TExpressionSyntax, TArgumentS
                 // if user selected only its attributes.
 
                 // Selection contains only AttributeLists -> don't consider current Node
+                // Require actual overlap: an attribute-only selection can end exactly where the header begins.
                 var spanWithoutAttributes = syntaxFacts.GetSpanWithoutAttributes(root, nonHiddenExtractedNode);
-                if (!selectionTrimmed.IntersectsWith(spanWithoutAttributes))
+                if (!selectionTrimmed.OverlapsWith(spanWithoutAttributes))
                 {
                     break;
                 }
